@@ -8,6 +8,9 @@ con todo integrado primero en staging y promocionado a producción mediante PR.
 ## Decision
 
 - `main` es producción; `staging` es integración y preproducción.
+- La rama por defecto en GitHub es `main`, de modo que el repositorio muestra lo que está en producción.
+  Al abrir un PR de cambio hay que elegir `staging` como destino;
+  la plantilla de PR lo recuerda y `release-source` bloquea los errores.
 - Cada cambio nace de `staging` en una rama `feat/…`, `fix/…`, `chore/…` o `docs/…`
   y vuelve a `staging` por PR.
 - La release es un PR `staging → main`.
