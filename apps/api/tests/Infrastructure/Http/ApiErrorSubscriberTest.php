@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Infrastructure\Http;
 
 use App\Infrastructure\Http\Error\ApiErrorSubscriber;
+use App\Infrastructure\Http\Error\ApiProblem;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -50,6 +51,22 @@ final class ApiErrorSubscriberTest extends TestCase
         })->onException($event);
 
         self::assertNull($event->getResponse());
+    }
+
+    public function test_should_include_details_when_the_error_provides_them(): void
+    {
+        $event = $this->exceptionEvent('/api/x', new ApiProblem(409, 'group_full', 'El grupo está completo.', details: ['occupied' => 12, 'capacity' => 12]));
+
+        new ApiErrorSubscriber(new class extends AbstractLogger {
+            public function log($level, Stringable|string $message, array $context = []): void
+            {
+            }
+        })->onException($event);
+
+        self::assertJsonStringEqualsJsonString(
+            '{"error":{"code":"group_full","message":"El grupo está completo.","details":{"occupied":12,"capacity":12}}}',
+            (string) $event->getResponse()?->getContent(),
+        );
     }
 
     private function exceptionEvent(string $path, Throwable $exception): ExceptionEvent

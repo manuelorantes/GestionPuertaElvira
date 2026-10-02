@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Support\Identity;
 
-use App\Domain\Identity\EmailAddress;
-use App\Domain\Identity\FullName;
+use App\Domain\Common\EmailAddress;
+use App\Domain\Common\FullName;
 use App\Domain\Identity\PlainPassword;
 use App\Domain\Identity\Role;
 use App\Domain\Identity\User;
@@ -68,6 +68,16 @@ abstract class ApiAuthTestCase extends WebTestCase
         self::assertIsString($error['message'] ?? null);
 
         return $error['message'];
+    }
+
+    /** @return array<mixed> */
+    protected function errorDetails(): array
+    {
+        $error = $this->responseBody()['error'] ?? null;
+        self::assertIsArray($error);
+        self::assertIsArray($error['details'] ?? null);
+
+        return $error['details'];
     }
 
     /** @return array<mixed> */

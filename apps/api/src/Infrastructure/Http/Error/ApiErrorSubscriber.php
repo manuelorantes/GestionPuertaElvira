@@ -4,10 +4,19 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Error;
 
+use App\Application\Classes\Error\ClassGroupNotFound;
+use App\Application\Classes\Error\ClassroomConflict;
+use App\Application\Classes\Error\TeacherNotAvailable;
 use App\Application\Identity\Error\CurrentPasswordMismatch;
 use App\Application\Identity\Error\EmailAlreadyRegistered;
 use App\Application\Identity\Error\InvalidCredentials;
 use App\Application\Identity\Error\TooManyLoginAttempts;
+use App\Application\Teachers\Error\TeacherHasGroups;
+use App\Application\Teachers\Error\TeacherNotFound;
+use App\Domain\Classes\Error\AlreadyEnrolled;
+use App\Domain\Classes\Error\GroupFull;
+use App\Domain\Classes\Error\StudentScheduleOverlap;
+use App\Domain\Common\HasErrorDetails;
 use App\Domain\Common\InvalidValue;
 use App\Domain\Identity\Error\WeakPassword;
 use Psr\Log\LoggerInterface;
@@ -45,6 +54,14 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
         WeakPassword::class => [Response::HTTP_UNPROCESSABLE_ENTITY, 'weak_password'],
         EmailAlreadyRegistered::class => [Response::HTTP_CONFLICT, 'email_already_registered'],
         InvalidValue::class => [Response::HTTP_UNPROCESSABLE_ENTITY, 'unprocessable'],
+        TeacherNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        TeacherHasGroups::class => [Response::HTTP_CONFLICT, 'teacher_has_groups'],
+        ClassGroupNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        ClassroomConflict::class => [Response::HTTP_CONFLICT, 'classroom_conflict'],
+        TeacherNotAvailable::class => [Response::HTTP_UNPROCESSABLE_ENTITY, 'teacher_not_available'],
+        GroupFull::class => [Response::HTTP_CONFLICT, 'group_full'],
+        StudentScheduleOverlap::class => [Response::HTTP_CONFLICT, 'schedule_overlap'],
+        AlreadyEnrolled::class => [Response::HTTP_CONFLICT, 'already_enrolled'],
     ];
 
     public function __construct(private LoggerInterface $logger)
@@ -62,7 +79,16 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
             return;
         }
 
-        $event->setResponse($this->toResponse($event->getThrowable()));
+        $exception = $event->getThrowable();
+        $response = $this->toResponse($exception);
+        if ($exception instanceof HasErrorDetails && [] !== $exception->details()) {
+            $body = json_decode((string) $response->getContent(), true, flags: \JSON_THROW_ON_ERROR);
+            \assert(\is_array($body) && \is_array($body['error']));
+            $body['error']['details'] = $exception->details();
+            $response->setData($body);
+        }
+
+        $event->setResponse($response);
     }
 
     private function toResponse(Throwable $exception): JsonResponse
