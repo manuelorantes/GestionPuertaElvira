@@ -113,8 +113,9 @@ db-reset: ## Recrea la base de datos de desarrollo
 	$(MAKE) db-init
 
 .PHONY: seed
-seed: ## Crea los usuarios de prueba de desarrollo (contraseñas conocidas, solo local)
+seed: ## Datos de desarrollo: usuarios de prueba (contraseñas conocidas) y demostración del diseño
 	$(PHP) bin/console app:dev:seed-users
+	$(PHP) bin/console app:dev:seed-demo
 
 ##@ Cuentas de usuario
 
@@ -164,7 +165,8 @@ coverage-web: ## Tests de la web con cobertura (mínimo 75 %)
 	$(NODE) npm run test:coverage
 
 .PHONY: e2e
-e2e: seed ## Tests de extremo a extremo con Playwright contra el entorno levantado (resiembra los usuarios)
+e2e: seed ## Tests de extremo a extremo con Playwright (¡reinicia los grupos y profesores locales!)
+	$(PHP) bin/console app:dev:seed-demo --reset
 	$(COMPOSE) run --rm $(TTY) -e E2E_BASE_URL=$(E2E_BASE_URL) e2e
 
 .PHONY: lint
