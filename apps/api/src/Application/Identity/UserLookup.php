@@ -6,7 +6,7 @@ namespace App\Application\Identity;
 
 use App\Application\Identity\Error\UserNotFound;
 use App\Application\Identity\Port\UserRepository;
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 use App\Domain\Identity\User;
 
 final readonly class UserLookup

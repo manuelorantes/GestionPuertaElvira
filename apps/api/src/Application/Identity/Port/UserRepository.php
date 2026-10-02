@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Identity\Port;
 
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 use App\Domain\Identity\User;
 use App\Domain\Identity\UserId;
 

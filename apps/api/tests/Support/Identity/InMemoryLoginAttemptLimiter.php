@@ -6,7 +6,7 @@ namespace App\Tests\Support\Identity;
 
 use App\Application\Identity\Error\TooManyLoginAttempts;
 use App\Application\Identity\Port\LoginAttemptLimiter;
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 
 final class InMemoryLoginAttemptLimiter implements LoginAttemptLimiter
 {

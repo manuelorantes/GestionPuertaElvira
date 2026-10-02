@@ -7,6 +7,7 @@ namespace App\Infrastructure\Identity\Http;
 use App\Application\Identity\ChangeOwnPassword;
 use App\Application\Identity\LogIn;
 use App\Application\Identity\LogOut;
+use App\Infrastructure\Http\JsonBody;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Domain\Identity;
+namespace App\Tests\Domain\Common;
 
+use App\Domain\Common\EmailAddress;
 use App\Domain\Common\InvalidValue;
-use App\Domain\Identity\EmailAddress;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

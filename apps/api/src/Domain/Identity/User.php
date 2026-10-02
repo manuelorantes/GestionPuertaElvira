@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\Identity;
 
+use App\Domain\Common\EmailAddress;
+use App\Domain\Common\FullName;
 use App\Domain\Common\RecordsEvents;
 use App\Domain\Identity\Event\UserDisabled;
 use App\Domain\Identity\Event\UserPasswordChanged;

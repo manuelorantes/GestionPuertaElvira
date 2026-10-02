@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Domain\Identity;
 
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 use App\Domain\Identity\Error\WeakPassword;
 use App\Domain\Identity\PasswordPolicy;
 use App\Domain\Identity\PlainPassword;

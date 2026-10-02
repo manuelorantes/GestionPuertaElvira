@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Identity;
 
+use App\Domain\Common\EmailAddress;
 use App\Domain\Identity\Error\WeakPassword;
 
 final readonly class PasswordPolicy
