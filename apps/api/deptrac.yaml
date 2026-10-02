@@ -1,0 +1,46 @@
+# Reglas de dependencia de la arquitectura hexagonal
+# (ver specs/decisions/arquitectura-hexagonal-ddd-en-symfony.md).
+#   Infrastructure → Application → Domain
+# Domain y Application no dependen de ningún vendor salvo las excepciones listadas.
+deptrac:
+  paths:
+    - ./src
+  exclude_files:
+    - '#.*Kernel\.php$#'
+  layers:
+    - name: Domain
+      collectors:
+        - type: classLike
+          value: '^App\\Domain\\.*'
+    - name: Application
+      collectors:
+        - type: classLike
+          value: '^App\\Application\\.*'
+    - name: Infrastructure
+      collectors:
+        - type: classLike
+          value: '^App\\Infrastructure\\.*'
+    - name: Assertions
+      collectors:
+        - type: classLike
+          value: '^Webmozart\\Assert\\.*'
+    - name: Vendor
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^(?!App\\).*\\.*'
+          must_not:
+            - type: classLike
+              value: '^Webmozart\\Assert\\.*'
+  ruleset:
+    Domain:
+      - Assertions
+    Application:
+      - Domain
+      - Assertions
+    Infrastructure:
+      - Application
+      - Domain
+      - Assertions
+      - Vendor

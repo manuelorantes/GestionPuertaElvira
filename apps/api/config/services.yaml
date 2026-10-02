@@ -1,0 +1,26 @@
+# Registro de servicios.
+#
+# - Domain no se registra: son objetos de negocio puros que se construyen, no se inyectan.
+# - Application registra los casos de uso; los puertos (interfaces en */Port/) se excluyen
+#   y se enlazan explícitamente a su adaptador de Infrastructure más abajo.
+# - Infrastructure registra adaptadores, controladores y el resto del pegamento de Symfony.
+parameters:
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\Application\:
+        resource: '../src/Application/'
+        exclude:
+            - '../src/Application/**/Port/'
+
+    App\Infrastructure\:
+        resource: '../src/Infrastructure/'
+        exclude:
+            - '../src/Infrastructure/Kernel.php'
+            - '../src/Infrastructure/Persistence/Doctrine/Model/'
+
+    # Puertos → adaptadores
+    App\Application\Health\Port\DatabaseHealth: '@App\Infrastructure\Persistence\Doctrine\DoctrineDatabaseHealth'
