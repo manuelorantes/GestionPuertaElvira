@@ -13,7 +13,7 @@ COMPOSE := docker compose
 TTY := $(shell if [ -t 0 ] && [ -t 1 ]; then echo ""; else echo "-T"; fi)
 PHP := $(COMPOSE) exec $(TTY) php-fpm
 NODE := $(COMPOSE) run --rm --no-deps $(TTY) vite
-PHP_TEST := $(PHP) env APP_ENV=test APP_DEBUG=0
+PHP_TEST := $(PHP) env APP_ENV=test APP_DEBUG=1
 E2E_BASE_URL ?= http://nginx
 
 ##@ Entorno
@@ -25,7 +25,7 @@ help: ## Muestra esta ayuda
 		/^[a-zA-Z0-9_-]+:.*## / { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .PHONY: init
-init: build deps up db-init hooks ## Prepara el proyecto desde cero (primera vez)
+init: build deps up db-init seed hooks ## Prepara el proyecto desde cero (primera vez)
 	@echo "\nListo: http://localhost:$${APP_PORT:-8080}"
 
 .PHONY: build
@@ -112,6 +112,32 @@ db-reset: ## Recrea la base de datos de desarrollo
 	$(PHP) bin/console doctrine:database:drop --force --if-exists -n
 	$(MAKE) db-init
 
+.PHONY: seed
+seed: ## Crea los usuarios de prueba de desarrollo (contraseñas conocidas, solo local)
+	$(PHP) bin/console app:dev:seed-users
+
+##@ Cuentas de usuario
+
+.PHONY: user-create
+user-create: ## Alta de cuenta: ARGS="email@club.es 'Nombre Apellidos' administrator|teacher"
+	$(PHP) bin/console app:user:create $(ARGS)
+
+.PHONY: user-disable
+user-disable: ## Desactiva una cuenta y cierra sus sesiones: ARGS="email@club.es"
+	$(PHP) bin/console app:user:disable $(ARGS)
+
+.PHONY: user-enable
+user-enable: ## Reactiva una cuenta: ARGS="email@club.es"
+	$(PHP) bin/console app:user:enable $(ARGS)
+
+.PHONY: user-role
+user-role: ## Cambia el rol: ARGS="email@club.es administrator|teacher"
+	$(PHP) bin/console app:user:role $(ARGS)
+
+.PHONY: user-reset-password
+user-reset-password: ## Contraseña temporal nueva: ARGS="email@club.es"
+	$(PHP) bin/console app:user:reset-password $(ARGS)
+
 ##@ Calidad
 
 .PHONY: test
@@ -138,7 +164,7 @@ coverage-web: ## Tests de la web con cobertura (mínimo 75 %)
 	$(NODE) npm run test:coverage
 
 .PHONY: e2e
-e2e: ## Tests de extremo a extremo con Playwright contra el entorno levantado
+e2e: seed ## Tests de extremo a extremo con Playwright contra el entorno levantado (resiembra los usuarios)
 	$(COMPOSE) run --rm $(TTY) -e E2E_BASE_URL=$(E2E_BASE_URL) e2e
 
 .PHONY: lint
