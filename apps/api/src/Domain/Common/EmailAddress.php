@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Identity;
-
-use App\Domain\Common\InvalidValue;
+namespace App\Domain\Common;
 
 final readonly class EmailAddress
 {

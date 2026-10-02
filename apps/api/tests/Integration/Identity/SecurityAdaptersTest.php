@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Identity;
 
 use App\Application\Identity\Error\TooManyLoginAttempts;
 use App\Application\Identity\SessionToken;
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 use App\Domain\Identity\PasswordHash;
 use App\Domain\Identity\PasswordPolicy;
 use App\Domain\Identity\PlainPassword;

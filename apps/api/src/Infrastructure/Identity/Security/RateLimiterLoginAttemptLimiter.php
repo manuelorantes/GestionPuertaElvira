@@ -6,7 +6,7 @@ namespace App\Infrastructure\Identity\Security;
 
 use App\Application\Identity\Error\TooManyLoginAttempts;
 use App\Application\Identity\Port\LoginAttemptLimiter;
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
