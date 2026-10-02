@@ -1,0 +1,133 @@
+# Frontend Capability
+
+> This file is maintained by Aircury AI Framework. Do not edit it directly. Add project-specific rules in FRAMEWORK.local.md.
+
+Frontend standards with a self-contained UI workflow skill
+
+## Framework Rules
+
+## 1. Module Purpose
+
+Activate this module when the project has an existing frontend or when a task creates, rebuilds, restyles, or substantially changes UI. Analyse the code before modifying the UI. Replicate and extend the UI with strict fidelity to the project's real design system.
+
+Use `frontend-ui-workflow` as the single frontend skill. It is self-contained and includes bundled references for layout extraction, experience extraction, style extraction, clean implementation planning, and final UI generation.
+
+Frontend work is frontend-only by default. Do not modify backend files, API endpoints, server actions, schemas, migrations, services, repositories, jobs, queues, auth policies, or infrastructure unless the user explicitly authorizes backend work. If backend support appears necessary, ask for permission before touching those files and name the exact backend layer or files required.
+
+## 2. Workflow Selection
+
+Use the lightest workflow that controls risk.
+
+| Task | Flow |
+|---|---|
+| Small safe UI edit | Inspect nearby code and `specs/ui/style-guide.md`; do not run the full pipeline unless ambiguity or risk appears |
+| Existing UI rebuild or restyle | Use `frontend-ui-workflow` to extract layout and experience, update the style guide, plan clean implementation, and generate UI |
+| New UI or substantial behaviour change | Use `frontend-ui-workflow` to derive layout and experience from specs/requirements, update the style guide, plan clean implementation, and generate UI |
+| React/Next performance, hooks, rendering, data fetching, bundle, or server/client boundary work | Load `vercel-react-best-practices` alongside `frontend-ui-workflow` when UI contracts are involved |
+
+## 3. Required Frontend Artefacts
+
+For new UI, rebuilds, non-trivial forms, role-gated UI, restyles, or substantial behaviour changes, maintain these files:
+
+- `specs/features/<feature-name>/layout.md`: structural source of truth for fields, labels, sections, actions, and static content.
+- `specs/features/<feature-name>/experience.md`: behavioral source of truth for flows, micro-interactions, validation, loading/error/empty states, and visibility rules.
+- `specs/features/<feature-name>/implementation-plan.md`: clean implementation source of truth for component responsibilities, file organization, state ownership, JSX structure, local primitive reuse, and conditional rendering strategy.
+- `specs/ui/style-guide.md`: canonical source of truth for design tokens, reusable primitives, variants, states, responsive conventions, accessibility-related visual conventions, gaps, and strict reuse rules.
+
+Small safe UI edits may skip the full artefact pipeline when nearby code and `specs/ui/style-guide.md` are sufficient.
+
+## 4. Full Frontend Pipeline
+
+Use `frontend-ui-workflow` for this pipeline. The skill decides which bundled references to read.
+
+1. Produce or update `layout.md` to capture what must render with full field parity.
+2. Produce or update `experience.md` to capture how the UI behaves and when fields, sections, and actions render, hide, disable, or become read-only.
+3. Produce or update `specs/ui/style-guide.md` from the real frontend codebase before writing substantial UI code.
+4. Produce or update `implementation-plan.md` before implementing substantial UI.
+5. Implement the UI from `layout.md`, `experience.md`, `implementation-plan.md`, and `specs/ui/style-guide.md`.
+6. Update the canonical feature spec in `specs/features/` when observable behaviour changes.
+
+For existing UI rebuilds, extract `layout.md` and `experience.md` from the source UI. For new UI, derive them from the feature spec, requirements, designs, and verified product conventions.
+
+## 5. Style Guide Structure
+
+`specs/ui/style-guide.md` must follow the detailed structure used by `frontend-ui-workflow`:
+
+- Overview.
+- Sources analysed.
+- Design tokens.
+- Semantic usage rules.
+- Core UI primitives.
+- Interaction states.
+- Composition patterns.
+- Responsive conventions.
+- Accessibility-related visual conventions.
+- Known gaps and inconsistencies.
+- Strict reuse rules.
+
+Mark a section as `[pending analysis]` if there is not enough data. Do not omit it, leave it empty, or invent values.
+
+## 6. Implementation Rules
+
+- Use tokens, primitives, variants, and composition patterns from `specs/ui/style-guide.md` before introducing new visual structures.
+- Extend existing component libraries such as MUI, shadcn, Radix, or local primitives by following their project patterns. Do not rewrite them from scratch.
+- Detect the correct reusable component path before creating shared UI files.
+- Inspect existing shared components, hooks, utilities, form patterns, and local primitives before creating substantial UI.
+- Create feature hooks for non-trivial orchestration, form coordination, filters, derived state, permission gates, query adaptation, data shaping, multi-step flow state, or complex event handlers that would otherwise clutter render code. Feature hooks do not require cross-feature reuse.
+- Create or update common hooks and shared components when repeated behaviour or UI structure has stable reuse across screens or features. Shared hooks require stable reuse or a clearly reusable project convention.
+- Keep simple visual state in the component when extraction would only hide obvious markup behaviour.
+- Keep one-off UI and narrowly specific helpers local to the feature until real reuse exists.
+- Generate or update `implementation-plan.md` before creating substantial new UI components.
+- Keep orchestration, presentational rendering, form state, and conditional branches separated when combining them would produce a giant component.
+- Render date entry through a shared date primitive so control order matches the target locale. For UK-locale UI, order controls Day-before-Month in date pickers, recurrence editors, and numeric day/month selectors. Do not hand-roll date control ordering per screen.
+- Create new animations using the library already present in the project.
+- Add an ADR before introducing a new UI dependency such as an animation, component, or icon library.
+
+## 7. Quality Review Before Finish
+
+Before finishing substantial frontend work, verify:
+
+- Field parity with `layout.md`.
+- Experience parity with `experience.md`.
+- Hidden, disabled, read-only, role-gated, owner-gated, tenant-gated, plan-gated, and feature-flagged behaviour.
+- Design-token and primitive fidelity with `specs/ui/style-guide.md`.
+- Component responsibility boundaries, state ownership, JSX structure, conditional rendering, and naming from `implementation-plan.md`.
+- Hooks and common components are reused or created where repeated behaviour or UI structure would otherwise drift.
+- Feature hooks are created where non-trivial local orchestration would otherwise make components hard to read.
+- Date entry controls (date pickers, recurrence editors, numeric day/month selectors) follow the target locale's day/month order — Day-before-Month for UK locales — through the shared date primitive.
+- Accessibility and responsive behaviour.
+- Relevant tests, lint, typecheck, or build checks when feasible.
+
+## 8. Absolute Restrictions
+
+- Do not invent design tokens that do not exist in the project.
+- Do not touch backend files, API contracts, persistence, server-side business logic, migrations, or infrastructure unless the user explicitly grants permission for that backend change.
+- Do not use hardcoded values where an equivalent token, primitive, variant, or observed convention exists.
+- Do not skip style extraction for substantial frontend work, even when `specs/ui/style-guide.md` does not exist yet.
+- Do not skip clean implementation planning for new UI, rebuilds, non-trivial forms, changed flows, role-gated UI, or substantial frontend changes.
+- Do not ship first-pass frontend code that needs a cleanup refactor for component boundaries, duplicated JSX, tangled state, unclear naming, or hardcoded styling.
+- Do not duplicate meaningful JSX, state orchestration, permission checks, validation plumbing, or data-shaping logic when a small shared component or hook would make the implementation clearer.
+- Do not create generic shared hooks or components without demonstrated reuse.
+- Do not generate or modify substantial UI without updating the relevant frontend artefacts.
+- Do not introduce UI dependencies without explicit approval and an ADR.
+- Do not assume a composition pattern is correct without verifying it in the existing code.
+
+## Agent Operating Rules
+
+- Use the `frontend-ui-workflow` skill for frontend UI work that needs layout, experience, design-system extraction, clean implementation planning, or UI generation.
+- The `frontend-ui-workflow` skill is self-contained and includes bundled references for structural extraction, behavioral extraction, style extraction, clean implementation planning, and final UI generation.
+- Use it to generate or update `specs/features/<name>/layout.md`, `specs/features/<name>/experience.md`, `specs/features/<name>/implementation-plan.md`, and `specs/ui/style-guide.md` when the task is substantial.
+- Load `vercel-react-best-practices` only when React/Next performance, hooks, rendering, data-fetching, bundle, or server/client boundary patterns matter.
+- For substantial frontend work, read `specs/ui/frontend-workflow.md` before implementing.
+
+- Maintain `specs/ui/style-guide.md` as the canonical source for all visual tokens and reusable patterns.
+- Frontend work is frontend-only by default: do not modify backend files, API endpoints, server actions, schemas, migrations, services, jobs, queues, auth policies, or infrastructure unless the user explicitly authorizes backend work.
+- If backend support appears necessary, ask permission before touching backend files and name the exact backend layer or files required.
+- Before creating substantial UI, inspect existing shared components, hooks, utilities, form patterns, and local primitives.
+- Create feature hooks for non-trivial local orchestration, form coordination, filters, derived state, permission gates, query adaptation, data shaping, multi-step flow state, or complex event handlers. Feature hooks do not require cross-feature reuse.
+- Create or update common hooks and shared components when repeated behaviour or UI structure has stable reuse across screens or features; keep one-off UI and simple visual state local to the feature.
+- Render date entry through a shared date primitive matching the target locale's day/month order; for UK-locale UI, order controls Day-before-Month in date pickers, recurrence editors, and numeric day/month selectors.
+- Do not skip extraction, invent unsupported tokens, or hardcode values when the project already defines an equivalent token or primitive.
+- New UI must be shippable without a cleanup refactor unless requirements change.
+- Do not use `vercel-react-best-practices` as a substitute for component responsibility, naming, file organization, or readable JSX structure.
+- For legacy replication: prioritise structural fidelity in `layout.md` and visual consistency in the final implementation.

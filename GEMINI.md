@@ -1,0 +1,13 @@
+# AGENTS.md
+
+## Framework
+
+> Framework-managed section. Add project-specific instructions outside this section.
+
+This project follows the Aircury engineering framework defined in [FRAMEWORK.md](./FRAMEWORK.md).
+
+All agents contributing to this repository MUST read and apply FRAMEWORK.md before doing any work. It is not optional and it is not advisory.
+
+All framework workflow rules, delivery constraints, and enabled standards now live in `FRAMEWORK.md` as the single source of truth.
+
+If this repository also has project-specific agent instructions, keep them outside the framework-managed section or in `FRAMEWORK.local.md`, and treat `FRAMEWORK.md` as the governing framework layer.

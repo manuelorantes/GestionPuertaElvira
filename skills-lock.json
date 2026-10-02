@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "skills": {
+    "ask-question": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/ask-question/SKILL.md",
+      "computedHash": "97ecea091c892fb1ba367c79c74c091bf7f249f1298a8e7cc7f9e7c91cd0af35"
+    },
+    "clean-ddd-hexagonal": {
+      "source": "ccheney/robust-skills",
+      "sourceType": "github",
+      "skillPath": "skills/clean-ddd-hexagonal/SKILL.md",
+      "computedHash": "7f14c93b5aedb7fa2b63998aa572c1dea97e495dc3c77dae251ff33e408ceb7f"
+    },
+    "commit-changes": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/commit-changes/SKILL.md",
+      "computedHash": "98fb775983e89600e25c1bd47ab9ee8a05ff770f004b4fc9b096781593112082"
+    },
+    "dbml-database-docs": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/dbml-database-docs/SKILL.md",
+      "computedHash": "0fe865a4a42122c73610431e3067cecbc19f9dff2ceecc156b5c6df36a228b6d"
+    },
+    "e2e-testing-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-essentials/skills/e2e-testing-patterns/SKILL.md",
+      "computedHash": "6daed3254a84348588532aca327ec82a57cafefd7c97c50e75879788f7c1a18d"
+    },
+    "error-handling-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "skillPath": "plugins/developer-essentials/skills/error-handling-patterns/SKILL.md",
+      "computedHash": "73f0570edd3ddc740ba5411932a67954df375530bbffbe7fa0cecd8e59b0711e"
+    },
+    "frontend-ui-workflow": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/frontend-ui-workflow/SKILL.md",
+      "computedHash": "75139b39da16129b997655851c0b5f2963a7c3e46ce3d0a58afda879140b4b3c"
+    },
+    "logging-best-practices": {
+      "source": "aj-geddes/useful-ai-prompts",
+      "sourceType": "github",
+      "skillPath": "skills/logging-best-practices/SKILL.md",
+      "computedHash": "3014f6c866622db4de48a1f4872b594b33b242017d5e75fbd595e1307eef6991"
+    },
+    "playwright-best-practices": {
+      "source": "currents-dev/playwright-best-practices-skill",
+      "sourceType": "github",
+      "skillPath": "playwright-best-practices/SKILL.md",
+      "computedHash": "7eb144f734450fee649dc1d209114775ddda07cbf45be84fe969d3d4f3971dce"
+    },
+    "semantic-line-breaks": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/semantic-line-breaks/SKILL.md",
+      "computedHash": "15b6feaf78f24d53aa6fb48328718076689cd1c5b9738f4740c34f1ab41233c8"
+    },
+    "spec-kit-analyse": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/spec-kit-analyse/SKILL.md",
+      "computedHash": "948b51da2dd3fc859034809feba0a2203c5764313fbf4c4490d1a2a34d16611e"
+    },
+    "spec-kit-checklist": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/spec-kit-checklist/SKILL.md",
+      "computedHash": "cd28b3211e2cf09fea5e03934ac56dbd4ff21926ca046197cbed266c79e6a314"
+    },
+    "spec-kit-clarify": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/spec-kit-clarify/SKILL.md",
+      "computedHash": "f4113f27be3a87d6307493eba264bf60c16afc60dc6593e519f290a84d7001c5"
+    },
+    "spec-kit-implement": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/spec-kit-implement/SKILL.md",
+      "computedHash": "7d33960508d4dee8053a0188fd10a7a293d4a44e71b42838e76beac1530e126a"
+    },
+    "spec-kit-plan": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/spec-kit-plan/SKILL.md",
+      "computedHash": "5bdae52d26283c23c00309c20119b4ad38568865080b7740020aafbaa18bfcdd"
+    },
+    "spec-kit-specify": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/spec-kit-specify/SKILL.md",
+      "computedHash": "d85af0ec7666ff9a02662d00c618d6d3f319db242e0073b6f1550f7cca102d17"
+    },
+    "spec-kit-tasks": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/spec-kit-tasks/SKILL.md",
+      "computedHash": "0dc5516a90f1bf37ceebd6f3df3df9c1f4155c84abacb8a86e2ff39196c4586f"
+    },
+    "specs-extractor": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/specs-extractor/SKILL.md",
+      "computedHash": "aceeb937ad1c839a705ea68383be583ca293b40acd7c3c721b2294212c105ce6"
+    },
+    "specs-interpreter": {
+      "source": "aircury/ai-framework",
+      "sourceType": "github",
+      "skillPath": "skills/specs-interpreter/SKILL.md",
+      "computedHash": "a4fdc30c3cfe297184dde538eb1de3bc34f78888432b3d91e6dc323f53adb072"
+    },
+    "uk-business-english": {
+      "source": "jezweb/claude-skills",
+      "sourceType": "github",
+      "skillPath": "plugins/writing/skills/uk-business-english/SKILL.md",
+      "computedHash": "38d757f02faf387e39b2d3df48c3dfd0a1b61839530db4f7656864b3e637813c"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "3219a1944e404ffc14d1d9d6aef6dd2e3855b81387ee0a044ccbfe14d34c2357"
+    }
+  }
+}
