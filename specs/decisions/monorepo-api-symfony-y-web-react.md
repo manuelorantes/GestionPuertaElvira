@@ -11,7 +11,7 @@ Hay un único desarrollador y se quiere seguir los estándares de Aircury.
 
 Un único repositorio con dos aplicaciones:
 
-- `apps/api`: API JSON en Symfony 7.4 LTS sobre PHP 8.4.
+- `apps/api`: API JSON en Symfony 7.4 LTS sobre PHP 8.5.
 - `apps/web`: SPA en React 19 + Vite + TypeScript.
 
 La infraestructura local (`docker/`, `compose.yaml`), el `Makefile`,
