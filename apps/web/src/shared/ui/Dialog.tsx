@@ -29,6 +29,7 @@ export function Dialog({ open, onClose, labelledBy, children, size = 'narrow' }:
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'Escape') {
+      event.preventDefault();
       event.stopPropagation();
       onClose();
       return;

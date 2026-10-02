@@ -89,6 +89,10 @@ Implementados en `apps/web/src/shared/ui/`. Úsalos antes de crear marcado propi
 | `Badge` | `tone`: `success`, `warning`, `danger`, `neutral` | `rounded-full`, 12px, peso 600 |
 | `OccupancyBar` | `occupied`, `capacity` | Barra de 6px sobre `surface-muted` (`brand`, o `brand-strong` si está lleno), «N/M» y badge «Sobre el cupo» |
 | `SectionHeader` | `eyebrow`, `title`, `action` | Antetítulo 14px `ink-muted`, título `font-display` 28px y botón primario |
+| `DateField` | `label`, `value` (ISO), `onChange`, `fromYear`, `toYear`, `error` | Tres selects **día / mes / año** (orden exigido por el framework) en un `fieldset`; emite el valor solo con la fecha completa |
+| `ConfirmDialog` | `title`, `message`, `confirmLabel`, `onConfirm`, `onCancel` | `Dialog` estrecho; el foco empieza en «Cancelar» |
+| `SidePanel` | `labelledBy`, `onClose` | Ficha lateral de hasta 560px sobre fondo `ink-strong/40` en escritorio, pantalla completa en móvil; se cierra con Esc aunque el foco esté fuera |
+| `Avatar` | `name`, `size` | Círculo `brand-soft` con iniciales `brand-strong` |
 | `Toast` (`ToastProvider`, `useToast`) | mensaje | Fondo `ink-strong`, texto `paper`, abajo y centrado; desaparece a los 2,8 s |
 
 Iconos: Lucide (`lucide-react`), a 18px (22px en la barra inferior móvil).

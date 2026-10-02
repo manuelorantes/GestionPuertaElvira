@@ -14,10 +14,10 @@ describe('armazón del panel', () => {
       'aria-current',
       'page',
     );
-    for (const section of ['Alumnos', 'Profesores', 'Cobros y cuotas', 'Contabilidad']) {
+    for (const section of ['Profesores', 'Cobros y cuotas', 'Contabilidad']) {
       expect(within(nav).getByText(section).closest('[aria-disabled="true"]')).not.toBeNull();
     }
-    expect(within(nav).getAllByText('Próximamente')).toHaveLength(4);
+    expect(within(nav).getAllByText('Próximamente')).toHaveLength(3);
     expect(screen.getAllByText('Lucía Moreno Gil').length).toBeGreaterThan(0);
     expect(screen.getByText('Profesorado')).toBeVisible();
     expect(screen.getByText('Hola, Lucía')).toBeVisible();
@@ -42,6 +42,20 @@ describe('armazón del panel', () => {
       '/api/auth/logout',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+});
+
+describe('cabecera móvil', () => {
+  it('should show the title of the current section', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/groups': [200, { items: [] }],
+      'GET /api/admin/teachers': [200, { items: [] }],
+    });
+
+    renderApp('/panel/clases');
+
+    expect(await screen.findByText('Clases', { selector: 'header p' })).toBeInTheDocument();
   });
 });
 

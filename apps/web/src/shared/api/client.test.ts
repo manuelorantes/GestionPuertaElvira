@@ -61,3 +61,15 @@ describe('apiSend', () => {
     });
   });
 });
+
+describe('error details', () => {
+  it('should expose structured details sent by the API', async () => {
+    mockFetchResponse(409, {
+      error: { code: 'group_full', message: 'Completo', details: { occupied: 12, capacity: 12 } },
+    });
+
+    await expect(apiGet('/api/x')).rejects.toMatchObject({
+      details: { occupied: 12, capacity: 12 },
+    });
+  });
+});

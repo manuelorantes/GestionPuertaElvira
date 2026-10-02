@@ -120,8 +120,9 @@ describe('Clases', () => {
     renderApp('/panel/clases');
 
     await user.click(await screen.findByRole('button', { name: 'Nuevo grupo' }));
+    expect(screen.getByText('Cargando profesores…')).toBeVisible();
     releaseTeachers(new Response(JSON.stringify({ items: [TEACHER] }), { status: 200 }));
-    const dialog = screen.getByRole('dialog');
+    const dialog = await screen.findByRole('dialog', { name: 'Nuevo grupo' });
     await within(dialog).findByLabelText('Profesor');
     await user.type(within(dialog).getByLabelText('Nombre del grupo'), 'Tarde');
     await user.click(within(dialog).getByRole('button', { name: 'Mar' }));
