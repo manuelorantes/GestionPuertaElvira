@@ -1,0 +1,22 @@
+# Hooks de git. Se instalan con `make hooks` (incluido en `make init`).
+# Todo se ejecuta en Docker; los comandos fallan rápido si el entorno no está levantado.
+commit-msg:
+  commands:
+    conventional-commits:
+      # commitlint lee el mensaje por stdin: el contenedor de Node no tiene git.
+      run: docker compose run --rm --no-deps -T -w /app vite npx commitlint < {1}
+
+pre-commit:
+  parallel: true
+  commands:
+    php-cs-fixer:
+      glob: 'apps/api/**/*.php'
+      run: docker compose exec -T php-fpm vendor/bin/php-cs-fixer fix --dry-run --diff
+    web-lint:
+      glob: 'apps/web/**/*.{ts,tsx,js,json,css,md}'
+      run: docker compose run --rm --no-deps -T vite sh -c "npx eslint . && npx prettier --check ."
+
+pre-push:
+  commands:
+    unit-tests:
+      run: make test

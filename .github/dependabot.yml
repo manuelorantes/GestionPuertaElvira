@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /apps/api
+    schedule: { interval: weekly }
+    target-branch: staging
+    groups:
+      symfony: { patterns: ['symfony/*'] }
+      quality: { patterns: ['phpstan/*', 'friendsofphp/*', 'deptrac/*', 'phpunit/*'] }
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule: { interval: weekly }
+    target-branch: staging
+    groups:
+      dev-tooling: { dependency-type: development }
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: monthly }
+    target-branch: staging
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    target-branch: staging
+  - package-ecosystem: docker
+    directory: /docker/php
+    schedule: { interval: monthly }
+    target-branch: staging

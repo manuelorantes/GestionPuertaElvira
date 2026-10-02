@@ -1,0 +1,14 @@
+{
+  "name": "gestion-puerta-elvira",
+  "private": true,
+  "description": "Herramientas del repositorio (hooks de git y convenci\u00f3n de commits). La web vive en apps/web.",
+  "scripts": {
+    "commitlint": "commitlint"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "lefthook": "^2.1.16"
+  },
+  "type": "module"
+}
