@@ -89,6 +89,16 @@ hooks: ## Instala los hooks de git (Lefthook)
 	@# (binario estático instalado por npm en node_modules) también se registra desde aquí.
 	./node_modules/.bin/lefthook install
 
+.PHONY: sync-staging
+sync-staging: ## Tras una release: rebasa staging sobre main y lo sube (force-push)
+	@# Excepción a «nada en el host»: es una operación de git sobre el repositorio.
+	@test -z "$$(git status --porcelain)" || (echo "Hay cambios sin commitear: guárdalos antes" >&2; exit 1)
+	git fetch origin main staging
+	git switch -C staging origin/staging
+	git rebase origin/main
+	git push --force-with-lease=staging:origin/staging origin staging
+	git switch -
+
 ##@ Base de datos
 
 .PHONY: db-init
