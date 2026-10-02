@@ -2,12 +2,19 @@
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly retryAfterSeconds: number | null;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(
+    status: number,
+    code: string,
+    message: string,
+    retryAfterSeconds: number | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -15,22 +22,46 @@ interface ErrorEnvelope {
   error?: { code?: string; message?: string };
 }
 
-/** Petición JSON a la API (mismo origen, cookies incluidas). */
-export async function apiGet<T>(path: string): Promise<T> {
+type Method = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+/** Petición GET a la API (mismo origen, cookies incluidas). */
+export function apiGet<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'GET' });
+}
+
+/** Petición que cambia estado: siempre JSON (la API rechaza otros formatos). */
+export function apiSend<T = void>(method: Method, path: string, body: unknown = {}): Promise<T> {
+  return request<T>(path, {
+    method,
+    body: JSON.stringify(body),
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+async function request<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(path, {
-    headers: { Accept: 'application/json' },
+    ...init,
+    headers: { Accept: 'application/json', ...init.headers },
     credentials: 'same-origin',
   });
-  const body: unknown = await response.json().catch(() => null);
+  const body: unknown =
+    response.status === 204 ? undefined : await response.json().catch(() => null);
 
   if (!response.ok) {
-    const envelope = (body ?? {}) as ErrorEnvelope;
-    throw new ApiError(
-      response.status,
-      envelope.error?.code ?? 'http_error',
-      envelope.error?.message ?? `HTTP ${response.status}`,
-    );
+    throw toApiError(response, body);
   }
 
   return body as T;
+}
+
+function toApiError(response: Response, body: unknown): ApiError {
+  const envelope = (body ?? {}) as ErrorEnvelope;
+  const retryAfter = Number(response.headers.get('Retry-After'));
+
+  return new ApiError(
+    response.status,
+    envelope.error?.code ?? 'http_error',
+    envelope.error?.message ?? `HTTP ${response.status}`,
+    Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
+  );
 }
