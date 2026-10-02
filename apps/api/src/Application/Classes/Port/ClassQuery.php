@@ -13,4 +13,7 @@ interface ClassQuery
     public function groups(LocalDate $on): array;
 
     public function group(string $id, LocalDate $on): ?GroupSummary;
+
+    /** @return list<array{id: string, fullName: string, age: int}> */
+    public function enrolledStudents(string $groupId, LocalDate $on): array;
 }

@@ -48,6 +48,24 @@ final readonly class SqlClassQuery implements ClassQuery
         return false === $row ? null : self::toSummary($row);
     }
 
+    /** @return list<array{id: string, fullName: string, age: int}> alumnos con inscripción activa, por nombre */
+    public function enrolledStudents(string $groupId, LocalDate $on): array
+    {
+        $rows = $this->connection->fetchAllAssociative(<<<'SQL'
+            SELECT s.id, s.full_name, s.birth_date
+              FROM classes_enrolment e
+              JOIN students_student s ON s.id = e.student_id
+             WHERE e.class_group_id = :group AND e.enrolled_on <= :on AND (e.ends_on IS NULL OR e.ends_on > :on)
+             ORDER BY s.search_name
+            SQL, ['group' => $groupId, 'on' => $on->toString()]);
+
+        return array_map(static function (array $values) use ($on): array {
+            $row = new Row($values);
+
+            return ['id' => $row->string('id'), 'fullName' => $row->string('full_name'), 'age' => LocalDate::fromString($row->string('birth_date'))->ageOn($on)];
+        }, $rows);
+    }
+
     /** @param array<string, mixed> $values */
     private static function toSummary(array $values): GroupSummary
     {

@@ -17,6 +17,12 @@ final readonly class JsonBody
     {
     }
 
+    /** @param array<mixed> $data */
+    public static function fromArray(array $data): self
+    {
+        return new self($data);
+    }
+
     public static function from(Request $request): self
     {
         $data = json_decode($request->getContent(), true);

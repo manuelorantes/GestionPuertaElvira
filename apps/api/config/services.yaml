@@ -38,6 +38,10 @@ services:
     App\Application\Classes\Port\EnrolmentRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Classes\DoctrineEnrolmentRepository'
     App\Application\Classes\Port\TeacherDirectory: '@App\Infrastructure\Classes\TeachersTeacherDirectory'
     App\Application\Classes\Port\ClassQuery: '@App\Infrastructure\Classes\SqlClassQuery'
+    App\Application\Classes\Port\StudentStatus: '@App\Infrastructure\Classes\StudentsStudentStatus'
+    App\Application\Students\Port\StudentRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Students\DoctrineStudentRepository'
+    App\Application\Students\Port\StudentQuery: '@App\Infrastructure\Students\SqlStudentQuery'
+    App\Application\Students\Port\Enrolments: '@App\Infrastructure\Students\ClassesEnrolments'
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
     App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Identity\Logging\MonologSecurityEventLog'
 
@@ -59,6 +63,26 @@ when@test:
             resource: '../src/Infrastructure/Classes/'
             autowire: true
             autoconfigure: true
+            public: true
+        App\Infrastructure\Students\:
+            resource: '../src/Infrastructure/Students/'
+            autowire: true
+            autoconfigure: true
+            public: true
+        App\Application\Students\RegisterStudent:
+            autowire: true
+            public: true
+        App\Application\Students\WithdrawStudent:
+            autowire: true
+            public: true
+        App\Application\Students\LinkSiblings:
+            autowire: true
+            public: true
+        App\Application\Classes\CreateClassGroup:
+            autowire: true
+            public: true
+        App\Application\Teachers\RegisterTeacher:
+            autowire: true
             public: true
         App\Infrastructure\Teachers\:
             resource: '../src/Infrastructure/Teachers/'
