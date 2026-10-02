@@ -1,6 +1,44 @@
 // Esquema de la base de datos (fuente documental; ver specs/decisions/postgresql-con-doctrine-y-modelos-de-persistencia-separados.md).
-// Se actualiza con cada migración. Aún no hay tablas: llegarán con la primera especificación.
+// Se actualiza con cada migración.
 Project puerta_elvira {
   database_type: 'PostgreSQL'
   Note: 'Gestión del Club Ajedrez Puerta Elvira'
+}
+
+// --- Identity -----------------------------------------------------------
+
+Table identity_user {
+  id uuid [pk, note: 'UUIDv7']
+  email varchar(254) [not null, unique, note: 'normalizado a minúsculas']
+  full_name varchar(120) [not null]
+  role varchar(20) [not null, note: 'administrator | teacher']
+  password_hash varchar(255) [not null]
+  status varchar(20) [not null, note: 'active | disabled']
+  must_change_password boolean [not null, note: 'true tras alta o restablecimiento']
+  created_at timestamptz [not null]
+  password_changed_at timestamptz [not null]
+}
+
+Table identity_session {
+  id uuid [pk, note: 'UUIDv7']
+  token_hash varchar(64) [not null, unique, note: 'SHA-256 del token de la cookie; el token nunca se guarda']
+  user_id uuid [not null, note: 'referencia por identidad a identity_user.id (sin FK: agregados independientes)']
+  started_at timestamptz [not null]
+  last_activity_at timestamptz [not null]
+
+  indexes {
+    user_id [name: 'identity_session_user_idx']
+  }
+}
+
+Ref: identity_session.user_id > identity_user.id
+
+// --- Infraestructura ----------------------------------------------------
+
+Table cache_items {
+  item_id varchar(255) [pk]
+  item_data bytea [not null]
+  item_lifetime int
+  item_time int [not null]
+  Note: 'Almacén compartido del limitador de intentos de inicio de sesión'
 }

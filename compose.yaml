@@ -7,6 +7,9 @@ x-api-env: &api-env
   APP_SECRET: ${APP_SECRET:-dev-secret-not-for-production}
   DEFAULT_URI: http://localhost:${APP_PORT:-8080}
   DATABASE_URL: postgresql://club:club@postgres:5432/club?serverVersion=17&charset=utf8
+  # En producción: __Host-pe_session y Secure=1 (exige HTTPS).
+  SESSION_COOKIE_NAME: pe_session
+  SESSION_COOKIE_SECURE: "0"
 
 services:
   php-fpm:
