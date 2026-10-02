@@ -35,6 +35,8 @@ Después abre <http://localhost:8080>.
 | `nuevo@puertaelvira.test` | `desarrollo-nuevo` | Administración, con contraseña temporal |
 
 `make seed` las restablece y reinicia los bloqueos por intentos fallidos.
+También crea, si no hay ninguno, los 5 profesores y 18 grupos **ficticios** del diseño.
+`make e2e` los reinicia antes de las pruebas, así que borra los grupos y profesores que hayas creado en local.
 
 ### Cuentas reales y primer administrador
 
