@@ -1,0 +1,8 @@
+# Aircury AI Framework
+specs/changes/
+
+# Repositorio
+node_modules/
+.idea/
+.vscode/
+.DS_Store

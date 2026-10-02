@@ -1,0 +1,6 @@
+// Esquema de la base de datos (fuente documental; ver specs/decisions/postgresql-con-doctrine-y-modelos-de-persistencia-separados.md).
+// Se actualiza con cada migración. Aún no hay tablas: llegarán con la primera especificación.
+Project puerta_elvira {
+  database_type: 'PostgreSQL'
+  Note: 'Gestión del Club Ajedrez Puerta Elvira'
+}
