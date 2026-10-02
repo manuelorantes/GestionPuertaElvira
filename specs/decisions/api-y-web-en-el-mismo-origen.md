@@ -19,5 +19,11 @@ La web y la API se sirven desde el mismo origen:
 ## Consequences
 
 - No se configura CORS.
-- La autenticación podrá usar cookies `HttpOnly; Secure; SameSite=Strict`.
+- La sesión viaja en una cookie `HttpOnly; SameSite=Strict; Path=/`.
+  En producción usa el prefijo `__Host-` y `Secure`, de modo que no se puede fijar desde subdominios
+  (ver [Sesiones opacas en base de datos](specs/decisions/sesiones-opacas-en-base-de-datos.md)).
+- Defensa CSRF en profundidad: mismo origen, `SameSite=Strict`
+  y, además, la API rechaza con 415 las peticiones que cambian estado y no llegan como `application/json`.
+  Un formulario de otro origen no puede enviarlas sin una petición previa de CORS, que no se autoriza.
+- Todas las respuestas de `/api` llevan `Cache-Control: no-store`.
 - Las cabeceras de seguridad se ponen en un único punto (nginx o CDN).
