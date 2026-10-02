@@ -1,0 +1,82 @@
+import { Plus } from 'lucide-react';
+import { useState } from 'react';
+import { useSearchParams } from 'react-router';
+
+import type { ClassGroup } from '@/features/classes/api';
+import { useGroups, useTeachers } from '@/features/classes/hooks';
+import { SectionHeader } from '@/shared/ui/SectionHeader';
+import { Tabs } from '@/shared/ui/Tabs';
+import { useToast } from '@/shared/ui/Toast';
+
+import { ClassGroupDialog } from './ClassGroupDialog';
+import { GroupsTable } from './GroupsTable';
+import { TeachersPanel } from './TeachersPanel';
+import { WeeklySchedule } from './WeeklySchedule';
+
+const TABS = [
+  { id: 'horario', label: 'Horario semanal' },
+  { id: 'grupos', label: 'Grupos' },
+  { id: 'profesores', label: 'Profesores' },
+];
+
+type DialogState = { group: ClassGroup | null } | null;
+
+export function ClassesPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = TABS.some((t) => t.id === searchParams.get('pestana'))
+    ? (searchParams.get('pestana') as string)
+    : 'horario';
+  const [dialog, setDialog] = useState<DialogState>(null);
+  const groups = useGroups();
+  const teachers = useTeachers();
+  const toast = useToast();
+  const groupList = groups.data ?? [];
+
+  function renderTab() {
+    if (tab === 'profesores') return <TeachersPanel teachers={teachers.data ?? []} />;
+    if (groups.isPending) return <p className="text-ink-muted">Cargando grupos…</p>;
+    if (groupList.length === 0)
+      return (
+        <p className="text-ink-muted">Todavía no hay grupos. Crea el primero con «Nuevo grupo».</p>
+      );
+    const edit = (group: ClassGroup) => setDialog({ group });
+    return tab === 'grupos' ? (
+      <GroupsTable groups={groupList} onEdit={edit} />
+    ) : (
+      <WeeklySchedule groups={groupList} onSelect={edit} />
+    );
+  }
+
+  return (
+    <main className="mx-auto max-w-[1280px] px-4 py-6 md:px-8 md:py-8">
+      <SectionHeader
+        eyebrow={`Lunes a viernes · 2 aulas · ${groupList.length} grupos`}
+        title="Clases"
+        action={{
+          label: 'Nuevo grupo',
+          icon: <Plus aria-hidden size={18} />,
+          onClick: () => setDialog({ group: null }),
+        }}
+      />
+      <Tabs
+        label="Vistas de clases"
+        tabs={TABS}
+        value={tab}
+        onChange={(id) => setSearchParams({ pestana: id })}
+      >
+        {renderTab()}
+      </Tabs>
+      {dialog && (
+        <ClassGroupDialog
+          group={dialog.group}
+          teachers={teachers.data ?? []}
+          onClose={() => setDialog(null)}
+          onSaved={(name) => {
+            setDialog(null);
+            toast(dialog.group ? 'Grupo actualizado' : `Grupo «${name}» creado`);
+          }}
+        />
+      )}
+    </main>
+  );
+}

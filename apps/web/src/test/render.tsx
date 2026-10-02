@@ -4,14 +4,17 @@ import { MemoryRouter } from 'react-router';
 
 import { AppRoutes } from '@/app/AppRoutes';
 import { createQueryClient } from '@/app/queryClient';
+import { ToastProvider } from '@/shared/ui/Toast';
 
 /** Monta la aplicación completa en una ruta concreta. */
 export function renderApp(path: string) {
   return render(
     <QueryClientProvider client={createQueryClient()}>
-      <MemoryRouter initialEntries={[path]}>
-        <AppRoutes />
-      </MemoryRouter>
+      <ToastProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <AppRoutes />
+        </MemoryRouter>
+      </ToastProvider>
     </QueryClientProvider>,
   );
 }
