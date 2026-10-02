@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+
+/*
+ * Tokens de diseño extraídos de GestionClub.dc.html (proyecto de diseño del club).
+ * Fuente de verdad documentada: specs/ui/style-guide.md. No uses colores sueltos:
+ * añade aquí el token y documéntalo antes de usarlo.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@500;600&family=Work+Sans:wght@400;500;600&display=swap');
+
+@theme {
+  --font-sans: 'Work Sans', sans-serif;
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-serif: 'Cinzel', serif;
+
+  /* Superficies */
+  --color-paper: #f3ecd8; /* fondo general */
+  --color-surface: #fffdf7; /* tarjetas, inputs */
+  --color-surface-muted: #efe7d2; /* filas alternas, chips */
+  --color-surface-raised: #fbf8f0; /* texto sobre verde */
+  --color-sand: #eadfc0;
+
+  /* Bordes */
+  --color-line: #e6dcc2;
+  --color-line-strong: #d9cfb4;
+  --color-line-soft: #e2d8bf;
+  --color-line-muted: #b7ac8e;
+
+  /* Texto */
+  --color-ink: #1a1a17; /* texto principal */
+  --color-ink-strong: #151513; /* títulos, fondos oscuros */
+  --color-ink-soft: #3d3a2f;
+  --color-ink-muted: #5c5748; /* secundario */
+
+  /* Marca */
+  --color-brand: #1d5c36;
+  --color-brand-strong: #134026;
+  --color-brand-soft: #e3ebdd;
+  --color-brand-tint: #b9cdb3;
+
+  /* Estados */
+  --color-success-bg: #e3ebdd;
+  --color-success-fg: #134026;
+  --color-warning-bg: #f5eacb;
+  --color-warning-fg: #6e4d0b;
+  --color-danger-bg: #f6e3dc;
+  --color-danger-fg: #8c2f22;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+
+  --shadow-card: 0 1px 3px rgb(41 37 36 / 0.08);
+  --shadow-overlay: 0 8px 24px rgb(41 37 36 / 0.14);
+}
+
+@layer base {
+  body {
+    @apply bg-paper font-sans text-[15px] leading-normal text-ink;
+  }
+
+  a {
+    @apply text-brand hover:text-brand-strong;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+    }
+  }
+}
