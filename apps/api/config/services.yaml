@@ -23,6 +23,7 @@ services:
             - '../src/Infrastructure/Persistence/Doctrine/Model/'
 
     # Puertos → adaptadores
+    App\Application\Common\Port\TransactionRunner: '@App\Infrastructure\Persistence\Doctrine\DoctrineTransactionRunner'
     App\Application\Health\Port\DatabaseHealth: '@App\Infrastructure\Persistence\Doctrine\DoctrineDatabaseHealth'
     App\Application\Identity\Port\UserRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Identity\DoctrineUserRepository'
     App\Application\Identity\Port\SessionRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Identity\DoctrineSessionRepository'
@@ -30,6 +31,13 @@ services:
     App\Application\Identity\Port\SessionTokenGenerator: '@App\Infrastructure\Identity\Security\RandomSessionTokenGenerator'
     App\Application\Identity\Port\TemporaryPasswordGenerator: '@App\Infrastructure\Identity\Security\RandomTemporaryPasswordGenerator'
     App\Application\Identity\Port\LoginAttemptLimiter: '@App\Infrastructure\Identity\Security\RateLimiterLoginAttemptLimiter'
+    App\Application\Teachers\Port\TeacherRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Teachers\DoctrineTeacherRepository'
+    App\Application\Teachers\Port\TeacherQuery: '@App\Infrastructure\Teachers\SqlTeacherQuery'
+    App\Application\Teachers\Port\TeacherAssignments: '@App\Infrastructure\Teachers\ClassesTeacherAssignments'
+    App\Application\Classes\Port\ClassGroupRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Classes\DoctrineClassGroupRepository'
+    App\Application\Classes\Port\EnrolmentRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Classes\DoctrineEnrolmentRepository'
+    App\Application\Classes\Port\TeacherDirectory: '@App\Infrastructure\Classes\TeachersTeacherDirectory'
+    App\Application\Classes\Port\ClassQuery: '@App\Infrastructure\Classes\SqlClassQuery'
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
     App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Identity\Logging\MonologSecurityEventLog'
 
@@ -41,8 +49,24 @@ when@test:
         App\Infrastructure\Persistence\Doctrine\Repository\:
             resource: '../src/Infrastructure/Persistence/Doctrine/Repository/'
             autowire: true
+            autoconfigure: true
+            public: true
+        App\Infrastructure\Persistence\Doctrine\DoctrineTransactionRunner:
+            autowire: true
+            autoconfigure: true
+            public: true
+        App\Infrastructure\Classes\:
+            resource: '../src/Infrastructure/Classes/'
+            autowire: true
+            autoconfigure: true
+            public: true
+        App\Infrastructure\Teachers\:
+            resource: '../src/Infrastructure/Teachers/'
+            autowire: true
+            autoconfigure: true
             public: true
         App\Infrastructure\Identity\Security\:
             resource: '../src/Infrastructure/Identity/Security/'
             autowire: true
+            autoconfigure: true
             public: true

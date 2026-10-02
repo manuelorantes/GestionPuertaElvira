@@ -85,7 +85,7 @@ final class SessionEndpointsTest extends ApiAuthTestCase
         $this->createUser('nueva@club.es', mustChangePassword: true);
         $this->logIn('nueva@club.es');
 
-        $this->client->request('GET', '/api/admin/ping');
+        $this->client->request('GET', '/api/admin/groups');
         $this->assertError(403, 'password_change_required');
 
         $this->client->request('GET', '/api/auth/me');
@@ -98,11 +98,11 @@ final class SessionEndpointsTest extends ApiAuthTestCase
         $this->createUser('junta@club.es');
 
         $this->logIn('profe@club.es');
-        $this->client->request('GET', '/api/admin/ping');
+        $this->client->request('GET', '/api/admin/groups');
         $this->assertError(403, 'forbidden');
 
         $this->logIn('junta@club.es');
-        $this->client->request('GET', '/api/admin/ping');
+        $this->client->request('GET', '/api/admin/groups');
         self::assertResponseIsSuccessful();
     }
 
