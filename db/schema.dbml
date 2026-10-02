@@ -33,6 +33,30 @@ Table identity_session {
 
 Ref: identity_session.user_id > identity_user.id
 
+// --- Alumnado -------------------------------------------------------------
+
+Table students_student {
+  id uuid [pk, note: 'UUIDv7']
+  full_name varchar(120) [not null]
+  search_name varchar(120) [not null, note: 'nombre en minúsculas y sin tildes para la búsqueda']
+  birth_date date [not null]
+  national_id varchar(9) [note: 'DNI o NIE con letra de control']
+  contact_email varchar(254)
+  guardians json [not null, note: 'lista de 0 a 2 {name, phone}']
+  own_phone varchar(12)
+  federation_licence varchar(20) [note: 'su presencia indica federado']
+  image_consent boolean [not null]
+  joined_on date [not null]
+  withdrawn_on date [note: 'baja (no activo desde ese día)']
+  sibling_ids json [not null, note: 'ids de hermanos; relación mutua']
+
+  indexes {
+    search_name [name: 'students_student_search_idx']
+  }
+}
+
+Ref: classes_enrolment.student_id > students_student.id
+
 // --- Profesorado ---------------------------------------------------------
 
 Table teachers_teacher {

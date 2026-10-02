@@ -165,7 +165,7 @@ coverage-web: ## Tests de la web con cobertura (mínimo 75 %)
 	$(NODE) npm run test:coverage
 
 .PHONY: e2e
-e2e: seed ## Tests de extremo a extremo con Playwright (¡reinicia los grupos y profesores locales!)
+e2e: seed ## Tests de extremo a extremo con Playwright (¡reinicia alumnos, grupos y profesores locales!)
 	$(PHP) bin/console app:dev:seed-demo --reset
 	$(COMPOSE) run --rm $(TTY) -e E2E_BASE_URL=$(E2E_BASE_URL) e2e
 
