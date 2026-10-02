@@ -4,8 +4,8 @@
  * Tokens de diseño extraídos de GestionClub.dc.html (proyecto de diseño del club).
  * Fuente de verdad documentada: specs/ui/style-guide.md. No uses colores sueltos:
  * añade aquí el token y documéntalo antes de usarlo.
+ * Las fuentes se cargan con <link> en index.html (un @import aquí quedaría detrás de las reglas de Tailwind).
  */
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Cinzel:wght@500;600&family=Work+Sans:wght@400;500;600&display=swap');
 
 @theme {
   --font-sans: 'Work Sans', sans-serif;
