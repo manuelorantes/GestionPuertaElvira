@@ -24,6 +24,7 @@ Sobria, con densidad de información media-alta en el panel de administración.
 | `surface-muted` | `#EFE7D2` | Fondos secundarios, chips, filas alternas |
 | `surface-raised` | `#FBF8F0` | Texto o iconos sobre verde |
 | `sand` | `#EADFC0` | Nivel «peques», mapa de calor bajo |
+| `sage` | `#CFDCC8` | Nivel «adultos» |
 | `line` | `#E6DCC2` | Borde de tarjetas |
 | `line-strong` | `#D9CFB4` | Borde de inputs y botones secundarios |
 | `line-soft` | `#E2D8BF` | Separadores, cabecera |
@@ -80,12 +81,35 @@ Implementados en `apps/web/src/shared/ui/`. Úsalos antes de crear marcado propi
 | `Alert` | `tone`: `danger` (`role="alert"`) e `info` (`role="status"`) | `rounded-sm`, 14px, peso 500 |
 | `ClubLogo` | `size` en px | Logo circular recortado al 112 %, como en el diseño |
 
-Pendientes de crear cuando se necesiten:
+| `Tabs` | `label`, `tabs`, `value`, `onChange` | Alto 44, subrayado 2px `brand` y texto `brand-strong` 600 en la activa; flechas izquierda y derecha |
+| `Card` | props de `<div>` | `surface`, borde `line`, `rounded-md`, `shadow-card` |
+| `Select` | `label`, `options`, `value`, `onChange`, `error` | Alto 44, mismo estilo que `TextField` |
+| `ToggleButton` | `pressed`, `tone`: `brand` (días) e `ink` (aulas) | Alto 40, `rounded-sm`; inactivo con borde `line-strong` |
+| `Switch` | `label`, `checked`, `onChange` | 44×24, `brand` activo y `line-strong` inactivo |
+| `Badge` | `tone`: `success`, `warning`, `danger`, `neutral` | `rounded-full`, 12px, peso 600 |
+| `OccupancyBar` | `occupied`, `capacity` | Barra de 6px sobre `surface-muted` (`brand`, o `brand-strong` si está lleno), «N/M» y badge «Sobre el cupo» |
+| `SectionHeader` | `eyebrow`, `title`, `action` | Antetítulo 14px `ink-muted`, título `font-display` 28px y botón primario |
+| `Toast` (`ToastProvider`, `useToast`) | mensaje | Fondo `ink-strong`, texto `paper`, abajo y centrado; desaparece a los 2,8 s |
 
-- **Pestañas:** alto 44 y subrayado de 2px `brand` en la activa.
-- **Badge de estado:** `rounded-full` con la pareja de colores de estado.
-- **Tarjeta:** `surface`, borde `line`, `rounded-md` y `shadow-card`.
-- **Iconos:** Lucide (`lucide-react`), a 18px (22px en la barra inferior móvil).
+Iconos: Lucide (`lucide-react`), a 18px (22px en la barra inferior móvil).
+
+### Colores por nivel (Clases)
+
+Definidos en `apps/web/src/features/classes/levels.ts`, solo con tokens:
+
+| Nivel | Fondo / texto / borde |
+|---|---|
+| Iniciación | `brand-soft` / `brand-strong` / `brand-tint` |
+| Intermedio | `brand` / `surface-raised` / `brand` |
+| Avanzado y competición | `ink-strong` / `paper` / `ink-strong` |
+| Peques y jóvenes | `sand` / `ink-soft` / `line-strong` |
+| Adultos | `sage` / `brand-strong` / `brand-tint` |
+| Particular | `surface` / `ink-soft` / `line-muted`, con borde discontinuo |
+
+### Horario semanal
+
+Rejilla por día con 2 columnas (aula 1 y aula 2) y 10 filas de media hora de 44px (de 16:00 a 21:00).
+Cada bloque es un botón coloreado por nivel; el ancho mínimo es de 980px, con scroll horizontal en pantallas estrechas.
 
 ### Navegación del panel
 

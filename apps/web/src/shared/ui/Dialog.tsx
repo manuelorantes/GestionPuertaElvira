@@ -4,6 +4,7 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
 interface DialogProps {
+  size?: 'narrow' | 'wide';
   open: boolean;
   onClose: () => void;
   labelledBy: string;
@@ -13,7 +14,7 @@ interface DialogProps {
 /**
  * Diálogo modal accesible: foco atrapado, Esc y clic fuera cierran, y el foco vuelve a quien lo abrió.
  */
-export function Dialog({ open, onClose, labelledBy, children }: DialogProps) {
+export function Dialog({ open, onClose, labelledBy, children, size = 'narrow' }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export function Dialog({ open, onClose, labelledBy, children }: DialogProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className="w-full max-w-[400px] overflow-hidden rounded-md bg-surface shadow-overlay"
+        className={`max-h-full w-full overflow-auto rounded-md bg-surface shadow-overlay ${size === 'wide' ? 'max-w-[560px]' : 'max-w-[400px]'}`}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
