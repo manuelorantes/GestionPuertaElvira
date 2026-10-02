@@ -38,7 +38,7 @@ final readonly class ClassGroupsController
     {
         $group = $this->query->group($id, $this->today()) ?? throw new ClassGroupNotFound();
 
-        return new JsonResponse(self::present($group));
+        return new JsonResponse([...self::present($group), 'students' => $this->query->enrolledStudents($id, $this->today())]);
     }
 
     #[Route('', name: 'create', methods: ['POST'])]
