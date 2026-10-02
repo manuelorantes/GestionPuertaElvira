@@ -4,7 +4,7 @@ Aplicación de gestión del **Club Ajedrez Puerta Elvira** (Granada):
 alumnos, clases y horario, profesores y sus horas, cuotas y cobros, y contabilidad.
 Incluye también la web pública con los precios de la temporada.
 
-- `apps/api`: API JSON en Symfony 7.4 LTS (PHP 8.4) con arquitectura hexagonal.
+- `apps/api`: API JSON en Symfony 7.4 LTS (PHP 8.5) con arquitectura hexagonal.
 - `apps/web`: SPA en React 19 + Vite + TypeScript + Tailwind.
 - PostgreSQL 17. Todo se ejecuta en Docker a través de `make`.
 
