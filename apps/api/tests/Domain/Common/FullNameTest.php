@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Domain\Identity;
+namespace App\Tests\Domain\Common;
 
+use App\Domain\Common\FullName;
 use App\Domain\Common\InvalidValue;
-use App\Domain\Identity\FullName;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

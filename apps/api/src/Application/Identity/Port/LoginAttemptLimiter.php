@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Application\Identity\Port;
 
 use App\Application\Identity\Error\TooManyLoginAttempts;
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 
 interface LoginAttemptLimiter
 {

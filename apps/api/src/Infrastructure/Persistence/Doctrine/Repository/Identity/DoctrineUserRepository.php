@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Infrastructure\Persistence\Doctrine\Repository\Identity;
 
 use App\Application\Identity\Port\UserRepository;
-use App\Domain\Identity\EmailAddress;
+use App\Domain\Common\EmailAddress;
 use App\Domain\Identity\User;
 use App\Domain\Identity\UserId;
 use App\Infrastructure\Persistence\Doctrine\Mapper\Identity\UserMapper;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Cli\Identity;
 
+use App\Domain\Common\EmailAddress;
 use App\Domain\Identity\AccountStatus;
-use App\Domain\Identity\EmailAddress;
 use App\Domain\Identity\Role;
 use App\Domain\Identity\User;
 use App\Infrastructure\Persistence\Doctrine\Repository\Identity\DoctrineUserRepository;

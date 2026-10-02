@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Domain\Identity;
 
+use App\Domain\Common\EmailAddress;
+use App\Domain\Common\FullName;
 use App\Domain\Identity\AccountStatus;
-use App\Domain\Identity\EmailAddress;
 use App\Domain\Identity\Event\UserDisabled;
 use App\Domain\Identity\Event\UserPasswordChanged;
 use App\Domain\Identity\Event\UserPasswordReset;
 use App\Domain\Identity\Event\UserRegistered;
-use App\Domain\Identity\FullName;
 use App\Domain\Identity\PasswordHash;
 use App\Domain\Identity\Role;
 use App\Domain\Identity\User;
