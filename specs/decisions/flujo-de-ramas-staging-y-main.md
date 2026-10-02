@@ -13,7 +13,12 @@ con todo integrado primero en staging y promocionado a producción mediante PR.
   la plantilla de PR lo recuerda y `release-source` bloquea los errores.
 - Cada cambio nace de `staging` en una rama `feat/…`, `fix/…`, `chore/…` o `docs/…`
   y vuelve a `staging` por PR.
+- **Todos los PR se fusionan con «Rebase and merge»**, también la release.
+  Es el único método habilitado en GitHub (merge commit y squash están desactivados),
+  así que el historial es lineal y no hay commits de merge.
 - La release es un PR `staging → main`.
+  Como el rebase crea commits nuevos en `main`, tras cada release hay que realinear `staging` con `main`
+  (rebase de `staging` sobre `main`) antes de seguir integrando; si no, la siguiente release volvería a incluir commits ya publicados.
   El job `release-source` del CI rechaza cualquier PR a `main` que no venga de `staging`.
 - Ambas ramas están protegidas: PR obligatorio, check `CI` en verde,
   sin force-push y sin borrado.
