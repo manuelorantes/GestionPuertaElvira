@@ -13,6 +13,13 @@ updates:
     target-branch: staging
     groups:
       dev-tooling: { dependency-type: development }
+    ignore:
+      # typescript-eslint aún no admite TypeScript 7 (peer «<6.1.0»); revisar cuando lo haga.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+      # Los tipos de Node siguen la versión mayor del runtime (node:24 en Docker y CI).
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: npm
     directory: /
     schedule: { interval: monthly }

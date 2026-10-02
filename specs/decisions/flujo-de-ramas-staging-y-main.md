@@ -21,6 +21,9 @@ con todo integrado primero en staging y promocionado a producción mediante PR.
   rebasa `staging` sobre `main` (las copias ya publicadas desaparecen y lo integrado después se conserva) y lo sube con force-push.
   Si no, la siguiente release volvería a incluir commits ya publicados.
   El job `release-source` del CI rechaza cualquier PR a `main` que no venga de `staging`.
+- El borrado automático de ramas tras fusionar está **desactivado** en GitHub
+  (llegó a borrar `staging` al fusionar la release): las ramas de cambio se borran al fusionarlas
+  (`gh pr merge --rebase --delete-branch`) y `staging` nunca se borra.
 - `main` está protegida: PR obligatorio, check `CI` en verde, sin force-push y sin borrado.
 - `staging` tiene un ruleset con PR obligatorio (solo rebase), check `CI` en verde y sin borrado,
   pero **permite force-push** para poder limpiarla tras cada release;
