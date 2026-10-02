@@ -6,11 +6,14 @@ namespace App\Infrastructure\Http\Error;
 
 use App\Application\Classes\Error\ClassGroupNotFound;
 use App\Application\Classes\Error\ClassroomConflict;
+use App\Application\Classes\Error\LastEnrolment;
+use App\Application\Classes\Error\NotEnrolled;
 use App\Application\Classes\Error\TeacherNotAvailable;
 use App\Application\Identity\Error\CurrentPasswordMismatch;
 use App\Application\Identity\Error\EmailAlreadyRegistered;
 use App\Application\Identity\Error\InvalidCredentials;
 use App\Application\Identity\Error\TooManyLoginAttempts;
+use App\Application\Students\Error\StudentNotFound;
 use App\Application\Teachers\Error\TeacherHasGroups;
 use App\Application\Teachers\Error\TeacherNotFound;
 use App\Domain\Classes\Error\AlreadyEnrolled;
@@ -19,6 +22,7 @@ use App\Domain\Classes\Error\StudentScheduleOverlap;
 use App\Domain\Common\HasErrorDetails;
 use App\Domain\Common\InvalidValue;
 use App\Domain\Identity\Error\WeakPassword;
+use App\Domain\Students\Error\MissingContact;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -62,6 +66,10 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
         GroupFull::class => [Response::HTTP_CONFLICT, 'group_full'],
         StudentScheduleOverlap::class => [Response::HTTP_CONFLICT, 'schedule_overlap'],
         AlreadyEnrolled::class => [Response::HTTP_CONFLICT, 'already_enrolled'],
+        NotEnrolled::class => [Response::HTTP_NOT_FOUND, 'not_enrolled'],
+        LastEnrolment::class => [Response::HTTP_CONFLICT, 'last_enrolment'],
+        StudentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        MissingContact::class => [Response::HTTP_UNPROCESSABLE_ENTITY, 'missing_contact'],
     ];
 
     public function __construct(private LoggerInterface $logger)
