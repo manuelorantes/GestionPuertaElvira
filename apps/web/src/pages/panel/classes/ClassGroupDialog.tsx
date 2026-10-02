@@ -17,12 +17,31 @@ const END_OPTIONS = halfHours('16:30', '21:00').map((time) => ({ value: time, la
 
 interface ClassGroupDialogProps {
   group: ClassGroup | null;
-  teachers: Teacher[];
+  teachers: Teacher[] | undefined;
   onClose: () => void;
   onSaved: (name: string) => void;
 }
 
-export function ClassGroupDialog({ group, teachers, onClose, onSaved }: ClassGroupDialogProps) {
+/** Espera a tener los profesores para que el formulario arranque con un profesor por defecto. */
+export function ClassGroupDialog({ teachers, ...props }: ClassGroupDialogProps) {
+  if (!teachers) {
+    return (
+      <Dialog open onClose={props.onClose} labelledBy="group-dialog-loading">
+        <p id="group-dialog-loading" className="p-6 text-ink-muted">
+          Cargando profesores…
+        </p>
+      </Dialog>
+    );
+  }
+  return <GroupForm teachers={teachers} {...props} />;
+}
+
+function GroupForm({
+  group,
+  teachers,
+  onClose,
+  onSaved,
+}: Omit<ClassGroupDialogProps, 'teachers'> & { teachers: Teacher[] }) {
   const activeTeachers = teachers.filter(
     (teacher) => teacher.active || teacher.id === group?.teacher.id,
   );

@@ -9,6 +9,7 @@ import { Tabs } from '@/shared/ui/Tabs';
 import { useToast } from '@/shared/ui/Toast';
 
 import { ClassGroupDialog } from './ClassGroupDialog';
+import { ClassGroupPanel } from './ClassGroupPanel';
 import { GroupsTable } from './GroupsTable';
 import { TeachersPanel } from './TeachersPanel';
 import { WeeklySchedule } from './WeeklySchedule';
@@ -27,6 +28,7 @@ export function ClassesPage() {
     ? (searchParams.get('pestana') as string)
     : 'horario';
   const [dialog, setDialog] = useState<DialogState>(null);
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const groups = useGroups();
   const teachers = useTeachers();
   const toast = useToast();
@@ -40,10 +42,11 @@ export function ClassesPage() {
         <p className="text-ink-muted">Todavía no hay grupos. Crea el primero con «Nuevo grupo».</p>
       );
     const edit = (group: ClassGroup) => setDialog({ group });
+    const open = (group: ClassGroup) => setOpenGroupId(group.id);
     return tab === 'grupos' ? (
-      <GroupsTable groups={groupList} onEdit={edit} />
+      <GroupsTable groups={groupList} onEdit={edit} onOpen={open} />
     ) : (
-      <WeeklySchedule groups={groupList} onSelect={edit} />
+      <WeeklySchedule groups={groupList} onSelect={open} />
     );
   }
 
@@ -66,10 +69,20 @@ export function ClassesPage() {
       >
         {renderTab()}
       </Tabs>
+      {openGroupId && (
+        <ClassGroupPanel
+          groupId={openGroupId}
+          onClose={() => setOpenGroupId(null)}
+          onEdit={(group) => {
+            setOpenGroupId(null);
+            setDialog({ group });
+          }}
+        />
+      )}
       {dialog && (
         <ClassGroupDialog
           group={dialog.group}
-          teachers={teachers.data ?? []}
+          teachers={teachers.data}
           onClose={() => setDialog(null)}
           onSaved={(name) => {
             setDialog(null);

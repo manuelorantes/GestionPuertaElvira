@@ -8,9 +8,11 @@ import { OccupancyBar } from '@/shared/ui/OccupancyBar';
 export function GroupsTable({
   groups,
   onEdit,
+  onOpen,
 }: {
   groups: ClassGroup[];
   onEdit: (group: ClassGroup) => void;
+  onOpen: (group: ClassGroup) => void;
 }) {
   return (
     <Card className="overflow-x-auto">
@@ -50,7 +52,15 @@ export function GroupsTable({
               <td className="px-4 py-3">
                 <OccupancyBar occupied={group.occupied} capacity={group.capacity} />
               </td>
-              <td className="px-4 py-3 text-right">
+              <td className="flex justify-end gap-2 px-4 py-3">
+                <button
+                  type="button"
+                  onClick={() => onOpen(group)}
+                  aria-label={`Alumnos de ${group.name}`}
+                  className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
+                >
+                  Alumnos
+                </button>
                 <button
                   type="button"
                   onClick={() => onEdit(group)}

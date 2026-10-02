@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react';
+import type { ButtonHTMLAttributes, Ref } from 'react';
 
 type Variant = 'primary' | 'secondary' | 'outline' | 'ghost';
 type Size = 'md' | 'lg';
@@ -21,6 +21,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
   busy?: boolean;
   busyLabel?: string;
+  ref?: Ref<HTMLButtonElement>;
 }
 
 export function Button({

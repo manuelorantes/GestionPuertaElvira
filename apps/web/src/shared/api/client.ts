@@ -3,23 +3,31 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly retryAfterSeconds: number | null;
+  readonly details: Record<string, unknown>;
 
   constructor(
     status: number,
     code: string,
     message: string,
     retryAfterSeconds: number | null = null,
+    details: Record<string, unknown> = {},
   ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.details = details;
+  }
+
+  /** Campo del formulario al que se refiere el error, si la API lo indica. */
+  get field(): string | null {
+    return typeof this.details.field === 'string' ? this.details.field : null;
   }
 }
 
 interface ErrorEnvelope {
-  error?: { code?: string; message?: string };
+  error?: { code?: string; message?: string; details?: Record<string, unknown> };
 }
 
 type Method = 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -63,5 +71,6 @@ function toApiError(response: Response, body: unknown): ApiError {
     envelope.error?.code ?? 'http_error',
     envelope.error?.message ?? `HTTP ${response.status}`,
     Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
+    envelope.error?.details ?? {},
   );
 }

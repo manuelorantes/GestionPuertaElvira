@@ -1,0 +1,315 @@
+import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+
+import { ADMIN, mockApi, renderApp } from '@/test/render';
+
+const GROUPS = [
+  {
+    id: 'g1',
+    name: 'Iniciación A',
+    level: 'beginner',
+    teacher: { id: 't1', fullName: 'Lucía Moreno Gil' },
+    days: ['mon', 'wed'],
+    start: '17:00',
+    end: '18:00',
+    slotLabel: 'Lun y Mié · 17:00–18:00',
+    classroom: 1,
+    capacity: 12,
+    occupied: 11,
+    weeklyPlan: 'two_hours',
+  },
+  {
+    id: 'g2',
+    name: 'Peques B',
+    level: 'juniors',
+    teacher: { id: 't1', fullName: 'Lucía Moreno Gil' },
+    days: ['tue'],
+    start: '16:00',
+    end: '17:00',
+    slotLabel: 'Mar · 16:00–17:00',
+    classroom: 2,
+    capacity: 1,
+    occupied: 1,
+    weeklyPlan: 'one_hour',
+  },
+];
+const MARTINA = {
+  id: 's1',
+  fullName: 'Martina López Herrera',
+  age: 12,
+  status: 'active',
+  groups: [{ id: 'g1', name: 'Iniciación A', slotLabel: 'Lun y Mié · 17:00–18:00' }],
+  hasSiblings: true,
+};
+const HUGO = {
+  id: 's2',
+  fullName: 'Hugo Martín Castillo',
+  age: 14,
+  status: 'withdrawn',
+  groups: [],
+  hasSiblings: false,
+};
+const DETAIL = {
+  id: 's1',
+  fullName: 'Martina López Herrera',
+  birthDate: '2014-03-12',
+  age: 12,
+  nationalId: '12345678Z',
+  contactEmail: 'familia@ejemplo.com',
+  guardians: [{ name: 'Rocío Herrera', phone: '612 48 19 30' }],
+  ownPhone: null,
+  federationLicence: 'AND-20417',
+  imageConsent: true,
+  joinedOn: '2026-09-15',
+  withdrawnOn: null,
+  status: 'active',
+  groups: [
+    {
+      id: 'g1',
+      name: 'Iniciación A',
+      slotLabel: 'Lun y Mié · 17:00–18:00',
+      teacherName: 'Lucía Moreno Gil',
+      classroom: 1,
+    },
+  ],
+  siblings: [{ id: 's3', fullName: 'Pablo López Herrera' }],
+};
+
+function api(extra: Parameters<typeof mockApi>[0] = {}) {
+  return mockApi({
+    'GET /api/auth/me': [200, { user: ADMIN }],
+    'GET /api/admin/groups': [200, { items: GROUPS }],
+    'GET /api/admin/teachers': [200, { items: [] }],
+    'GET /api/admin/students?filter=all': [200, { items: [MARTINA, HUGO], total: 2 }],
+    'GET /api/admin/students?filter=withdrawn': [200, { items: [HUGO], total: 2 }],
+    'GET /api/admin/students?filter=all&q=lopez': [200, { items: [MARTINA], total: 2 }],
+    'GET /api/admin/students/s1': [200, DETAIL],
+    ...extra,
+  });
+}
+
+function postBody(spy: ReturnType<typeof api>, url: string) {
+  const call = spy.mock.calls.find(([u, init]) => u === url && init?.method === 'POST');
+  return JSON.parse(String(call?.[1]?.body));
+}
+
+describe('Alumnos', () => {
+  it('should list students with their groups and status, and filter them', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/alumnos');
+
+    expect(await screen.findByRole('button', { name: /martina lópez herrera/i })).toHaveTextContent(
+      'Iniciación A',
+    );
+    expect(screen.getByText('2 de 2 mostrados')).toBeVisible();
+    expect(screen.getByRole('button', { name: /hugo martín castillo/i })).toHaveTextContent(
+      'De baja',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'De baja' }));
+    expect(await screen.findByText('1 de 2 mostrados')).toBeVisible();
+    expect(screen.queryByRole('button', { name: /martina/i })).not.toBeInTheDocument();
+  });
+
+  it('should search by name after a short pause', async () => {
+    const user = userEvent.setup();
+    const spy = api();
+    renderApp('/panel/alumnos');
+
+    await user.type(await screen.findByRole('searchbox', { name: 'Buscar alumnos' }), 'lopez');
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith('/api/admin/students?filter=all&q=lopez', expect.anything()),
+    );
+    expect(await screen.findByText('1 de 2 mostrados')).toBeVisible();
+  });
+
+  it('should open the student card with personal data, contact and groups', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: /martina lópez herrera/i }));
+
+    const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    expect(within(card).getByText('12/03/2014')).toBeVisible();
+    expect(within(card).getByText('Sí · AND-20417')).toBeVisible();
+    expect(within(card).getByRole('link', { name: '612 48 19 30' })).toHaveAttribute(
+      'href',
+      'tel:612481930',
+    );
+    expect(within(card).getByText('Pablo López Herrera')).toBeVisible();
+    expect(within(card).getByText('Aula 1 · Lucía Moreno Gil')).toBeVisible();
+  });
+
+  it('should require a guardian for minors before sending a new student', async () => {
+    const user = userEvent.setup();
+    const spy = api();
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
+    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Lucía Fernández Ortiz');
+    await user.selectOptions(within(dialog).getByLabelText('Día'), '7');
+    await user.selectOptions(within(dialog).getByLabelText('Mes'), 'marzo');
+    await user.selectOptions(within(dialog).getByLabelText('Año'), '2015');
+    await user.click(within(dialog).getByRole('button', { name: 'Dar de alta' }));
+
+    expect(
+      within(dialog).getByText('Un alumno menor necesita al menos un tutor con teléfono.'),
+    ).toBeVisible();
+    expect(spy).not.toHaveBeenCalledWith(
+      '/api/admin/students',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('should register a student and confirm when the group is full', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'POST /api/admin/students': [
+        [
+          409,
+          {
+            error: {
+              code: 'group_full',
+              message: 'El grupo está completo (1/1).',
+              details: { occupied: 1, capacity: 1 },
+            },
+          },
+        ],
+        [201, { id: 's9' }],
+      ],
+      'GET /api/admin/students/s9': [
+        200,
+        { ...DETAIL, id: 's9', fullName: 'Lucía Fernández Ortiz' },
+      ],
+    });
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
+    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Lucía Fernández Ortiz');
+    await user.selectOptions(within(dialog).getByLabelText('Día'), '7');
+    await user.selectOptions(within(dialog).getByLabelText('Mes'), 'marzo');
+    await user.selectOptions(within(dialog).getByLabelText('Año'), '2015');
+    await user.type(within(dialog).getByLabelText('Tutor 1'), 'Carmen Ortiz');
+    await user.type(within(dialog).getByLabelText('Teléfono tutor 1'), '612000111');
+    await user.selectOptions(within(dialog).getByLabelText('Grupo'), 'g2');
+    await user.click(within(dialog).getByRole('button', { name: 'Dar de alta' }));
+
+    const confirm = await screen.findByRole('dialog', { name: 'Grupo completo' });
+    expect(confirm).toHaveTextContent('El grupo está completo (1/1). ¿Inscribir igualmente?');
+    await user.click(within(confirm).getByRole('button', { name: 'Inscribir igualmente' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Lucía Fernández Ortiz' })).toBeVisible();
+    const lastPost = spy.mock.calls
+      .filter(([u, init]) => u === '/api/admin/students' && init?.method === 'POST')
+      .at(-1);
+    expect(JSON.parse(String(lastPost?.[1]?.body))).toMatchObject({
+      fullName: 'Lucía Fernández Ortiz',
+      birthDate: '2015-03-07',
+      guardians: [{ name: 'Carmen Ortiz', phone: '612000111' }],
+      groupIds: ['g2'],
+      confirmOverCapacity: true,
+    });
+  });
+
+  it('should withdraw a student with a date', async () => {
+    const user = userEvent.setup();
+    const spy = api({ 'POST /api/admin/students/s1/withdrawal': [204] });
+    renderApp('/panel/alumnos/s1');
+
+    await user.click(await screen.findByRole('button', { name: 'Dar de baja' }));
+    const dialog = screen.getByRole('dialog', { name: /dar de baja a martina/i });
+    await user.click(within(dialog).getByRole('button', { name: 'Dar de baja' }));
+
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(
+        '/api/admin/students/s1/withdrawal',
+        expect.objectContaining({ method: 'POST' }),
+      ),
+    );
+    expect(postBody(spy, '/api/admin/students/s1/withdrawal').date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('should explain why the only group cannot be removed', async () => {
+    const user = userEvent.setup();
+    api({
+      'DELETE /api/admin/students/s1/enrolments/g1': [
+        409,
+        {
+          error: {
+            code: 'last_enrolment',
+            message:
+              'Es su único grupo: para dejarlo, da de baja al alumno o muévelo a otro grupo.',
+          },
+        },
+      ],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    await user.click(await screen.findByRole('button', { name: 'Quitar de Iniciación A' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Es su único grupo');
+  });
+
+  it('should move a student to another group', async () => {
+    const user = userEvent.setup();
+    const spy = api({ 'POST /api/admin/students/s1/enrolments/g1/move': [204] });
+    renderApp('/panel/alumnos/s1');
+
+    await user.click(await screen.findByRole('button', { name: 'Mover de Iniciación A' }));
+    const dialog = screen.getByRole('dialog', { name: 'Mover de Iniciación A' });
+    await user.selectOptions(within(dialog).getByLabelText('Grupo'), 'g2');
+    await user.click(within(dialog).getByRole('button', { name: 'Mover' }));
+
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/students/s1/enrolments/g1/move')).toEqual({
+        toGroupId: 'g2',
+        confirmOverCapacity: false,
+      }),
+    );
+  });
+});
+
+describe('ficha de grupo', () => {
+  it('should list enrolled students and enrol another from the group', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'GET /api/admin/groups/g1': [
+        200,
+        { ...GROUPS[0], students: [{ id: 's1', fullName: 'Martina López Herrera', age: 12 }] },
+      ],
+      'GET /api/admin/students?filter=active': [
+        200,
+        {
+          items: [
+            MARTINA,
+            { ...HUGO, status: 'active', id: 's4', fullName: 'Nerea Villar Campos' },
+          ],
+          total: 2,
+        },
+      ],
+      'POST /api/admin/students/s4/enrolments': [204],
+    });
+    renderApp('/panel/clases');
+
+    const [block] = await screen.findAllByRole('button', { name: /iniciación a, lun y mié/i });
+    if (!block) throw new Error('Falta el bloque del grupo');
+    await user.click(block);
+    const panel = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(within(panel).getByText('Martina López Herrera')).toBeVisible();
+
+    await user.selectOptions(within(panel).getByLabelText('Inscribir alumno'), 's4');
+    await user.click(within(panel).getByRole('button', { name: 'Inscribir' }));
+
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/students/s4/enrolments')).toEqual({
+        groupId: 'g1',
+        confirmOverCapacity: false,
+      }),
+    );
+  });
+});
