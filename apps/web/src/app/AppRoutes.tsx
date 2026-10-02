@@ -6,6 +6,8 @@ import { ChangePasswordPage } from '@/pages/panel/ChangePasswordPage';
 import { ClassesPage } from '@/pages/panel/classes/ClassesPage';
 import { PanelHomePage } from '@/pages/panel/PanelHomePage';
 import { PanelLayout } from '@/pages/panel/PanelLayout';
+import { StudentPanel } from '@/pages/panel/students/StudentPanel';
+import { StudentsPage } from '@/pages/panel/students/StudentsPage';
 
 export function AppRoutes() {
   return (
@@ -16,6 +18,9 @@ export function AppRoutes() {
         <Route element={<PanelLayout />}>
           <Route index element={<PanelHomePage />} />
           <Route path="clases" element={<ClassesPage />} />
+          <Route path="alumnos" element={<StudentsPage />}>
+            <Route path=":id" element={<StudentPanel />} />
+          </Route>
         </Route>
       </Route>
     </Routes>

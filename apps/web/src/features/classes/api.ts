@@ -60,3 +60,11 @@ export function createTeacher(fullName: string): Promise<unknown> {
 export function updateTeacher(id: string, fullName: string, active: boolean): Promise<unknown> {
   return apiSend('PUT', `/api/admin/teachers/${id}`, { fullName, active });
 }
+
+export interface ClassGroupDetail extends ClassGroup {
+  students: { id: string; fullName: string; age: number }[];
+}
+
+export function fetchGroup(id: string): Promise<ClassGroupDetail> {
+  return apiGet(`/api/admin/groups/${id}`);
+}

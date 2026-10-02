@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   createTeacher,
+  fetchGroup,
   fetchGroups,
   fetchTeachers,
   saveGroup,
@@ -14,6 +15,10 @@ const TEACHERS_KEY = ['teachers'] as const;
 
 export function useGroups() {
   return useQuery({ queryKey: GROUPS_KEY, queryFn: fetchGroups });
+}
+
+export function useGroup(id: string) {
+  return useQuery({ queryKey: [...GROUPS_KEY, id], queryFn: () => fetchGroup(id) });
 }
 
 export function useTeachers() {
