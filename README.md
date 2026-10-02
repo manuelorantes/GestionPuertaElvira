@@ -1,0 +1,95 @@
+# Gestión Puerta Elvira
+
+Aplicación de gestión del **Club Ajedrez Puerta Elvira** (Granada):
+alumnos, clases y horario, profesores y sus horas, cuotas y cobros, y contabilidad.
+Incluye también la web pública con los precios de la temporada.
+
+- `apps/api`: API JSON en Symfony 7.4 LTS (PHP 8.4) con arquitectura hexagonal.
+- `apps/web`: SPA en React 19 + Vite + TypeScript + Tailwind.
+- PostgreSQL 17. Todo se ejecuta en Docker a través de `make`.
+
+## Requisitos
+
+- Docker con Compose v2.
+- `make`.
+- Nada más: PHP, Composer, Node y PostgreSQL viven en contenedores.
+
+## Primera vez
+
+```sh
+make init
+```
+
+Construye las imágenes, instala dependencias, crea las bases de datos (desarrollo y test),
+aplica migraciones e instala los hooks de git.
+Después abre <http://localhost:8080>.
+
+## Día a día
+
+| Comando | Qué hace |
+|---|---|
+| `make up` / `make down` | Arranca o para el entorno |
+| `make logs ARGS=php-fpm` | Logs de un servicio |
+| `make test` | Tests de API y web |
+| `make lint` | Todas las comprobaciones estáticas |
+| `make fix` | Aplica los formateadores |
+| `make e2e` | Tests de extremo a extremo (Playwright) |
+| `make ci` | Lo mismo que GitHub Actions |
+| `make console ARGS="debug:router"` | Consola de Symfony |
+| `make help` | Todos los objetivos |
+
+URLs locales:
+
+- Web: <http://localhost:8080>
+- API: <http://localhost:8080/api/health>
+- OpenAPI: <http://localhost:8080/api/doc.json>
+- PostgreSQL: `localhost:5432` (usuario `club`, contraseña `club`; solo desarrollo)
+
+Los puertos se cambian con `APP_PORT` y `DB_PORT`.
+
+## Cómo se trabaja
+
+El proyecto sigue el [Aircury AI Framework](FRAMEWORK.md),
+con las adaptaciones de [`FRAMEWORK.local.md`](FRAMEWORK.local.md).
+
+- **Especificación primero:** cada funcionalidad pasa por Spec Kit
+  (specify → clarify → plan → tasks → analyse → implement).
+  El comportamiento vigente queda en [`specs/features/`](specs/features/).
+- **TDD:** test que falla, implementación mínima, refactor.
+- **Decisiones** en [`specs/decisions/`](specs/decisions/) (ADRs).
+- **Ramas:** se parte de `staging`, PR a `staging`, y la release es un PR `staging → main`.
+  Commits en [Conventional Commits](https://www.conventionalcommits.org/).
+  Ver [flujo de ramas](specs/decisions/flujo-de-ramas-staging-y-main.md).
+
+## Arquitectura
+
+```
+apps/api/src/
+  Domain/          reglas de negocio puras (sin framework)
+  Application/     casos de uso y puertos
+  Infrastructure/  HTTP, Doctrine, Symfony, logging
+apps/web/src/
+  app/             arranque, proveedores y rutas
+  pages/           pantallas
+  shared/          cliente de API, UI común
+```
+
+Las dependencias van `Infrastructure → Application → Domain`, y Deptrac lo comprueba en CI.
+Más detalle en las [ADRs](specs/decisions/).
+
+## Despliegue
+
+Por ahora solo en local.
+Está previsto en AWS, con un entorno de staging y otro de producción
+([ADR](specs/decisions/despliegue-en-aws-pendiente.md)).
+
+## Estándares de desarrollo
+
+| Dimensión | Nivel actual |
+|---|---|
+| Revisión | PR obligatorio + CI en verde (0 aprobaciones mientras haya un solo desarrollador) |
+| Cobertura | ≥ 75 % de líneas en API y web |
+| E2E | Smoke de Playwright en cada PR |
+| Lint | PHPStan nivel máximo, Deptrac, ESLint strict, Prettier, knip: cero errores |
+| Seguridad | `composer audit` y `npm audit` (alta/crítica) en CI; sin secretos en el repo |
+| Despliegue | Pendiente |
