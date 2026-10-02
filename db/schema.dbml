@@ -33,6 +33,48 @@ Table identity_session {
 
 Ref: identity_session.user_id > identity_user.id
 
+// --- Profesorado ---------------------------------------------------------
+
+Table teachers_teacher {
+  id uuid [pk, note: 'UUIDv7']
+  full_name varchar(120) [not null]
+  active boolean [not null]
+}
+
+// --- Clases ---------------------------------------------------------------
+
+Table classes_group {
+  id uuid [pk, note: 'UUIDv7']
+  name varchar(60) [not null]
+  level varchar(20) [not null, note: 'beginner | intermediate | advanced | juniors | adults | private_lesson']
+  teacher_id uuid [not null, note: 'referencia por identidad a teachers_teacher.id']
+  days json [not null, note: 'días ISO 1–5 (lunes–viernes), ordenados']
+  start_minutes smallint [not null, note: 'minutos desde medianoche, 960–1260, múltiplo de 30']
+  end_minutes smallint [not null, note: 'mayor que start_minutes']
+  classroom smallint [not null, note: '1 | 2']
+  capacity smallint [not null, note: '1–30']
+
+  indexes {
+    teacher_id [name: 'classes_group_teacher_idx']
+  }
+}
+
+Table classes_enrolment {
+  id uuid [pk, note: 'UUIDv7']
+  student_id uuid [not null, note: 'referencia por identidad al alumno (contexto Alumnado)']
+  class_group_id uuid [not null, note: 'referencia por identidad a classes_group.id']
+  enrolled_on date [not null]
+  ends_on date [note: 'fin no incluido; nulo = vigente']
+
+  indexes {
+    student_id [name: 'classes_enrolment_student_idx']
+    class_group_id [name: 'classes_enrolment_group_idx']
+  }
+}
+
+Ref: classes_group.teacher_id > teachers_teacher.id
+Ref: classes_enrolment.class_group_id > classes_group.id
+
 // --- Infraestructura ----------------------------------------------------
 
 Table cache_items {
