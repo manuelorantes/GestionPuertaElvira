@@ -75,6 +75,7 @@ jobs:
       - run: docker compose run --rm --no-deps -T vite npm ci --no-audit --no-fund
       - run: make up
       - run: make db-init
+      - run: make seed
       - run: make wait
       - run: make e2e
         env:

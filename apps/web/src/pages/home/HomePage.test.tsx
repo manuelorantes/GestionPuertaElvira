@@ -1,32 +1,30 @@
 import { screen } from '@testing-library/react';
 
-import { mockFetchResponse, renderWithProviders } from '@/test/render';
-
-import { HomePage } from './HomePage';
+import { NO_SESSION, mockApi, renderApp } from '@/test/render';
 
 describe('HomePage', () => {
-  it('should show the club name and logo', () => {
-    mockFetchResponse(200, { status: 'healthy', database: 'reachable' });
+  it('should show the club name and logo without a session', async () => {
+    mockApi({
+      'GET /api/health': [200, { status: 'healthy', database: 'reachable' }],
+      'GET /api/auth/me': NO_SESSION,
+    });
 
-    renderWithProviders(<HomePage />);
+    renderApp('/');
 
     expect(screen.getByRole('heading', { name: /club ajedrez puerta elvira/i })).toBeVisible();
-    expect(screen.getByRole('img', { name: /club ajedrez puerta elvira/i })).toBeVisible();
-  });
-
-  it('should show that the API is connected when the health check succeeds', async () => {
-    mockFetchResponse(200, { status: 'healthy', database: 'reachable' });
-
-    renderWithProviders(<HomePage />);
-
+    expect(
+      screen.getAllByRole('img', { name: /club ajedrez puerta elvira/i }).length,
+    ).toBeGreaterThan(0);
     expect(await screen.findByText('API conectada')).toBeVisible();
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/health', expect.anything());
   });
 
   it('should show that the API is unavailable when the health check fails', async () => {
-    mockFetchResponse(503, { status: 'unhealthy', database: 'unreachable' });
+    mockApi({
+      'GET /api/health': [503, { status: 'unhealthy', database: 'unreachable' }],
+      'GET /api/auth/me': NO_SESSION,
+    });
 
-    renderWithProviders(<HomePage />);
+    renderApp('/');
 
     expect(await screen.findByText('API sin conexión')).toBeVisible();
   });
@@ -34,7 +32,7 @@ describe('HomePage', () => {
   it('should show that the API is being checked while waiting for the answer', () => {
     vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => {}));
 
-    renderWithProviders(<HomePage />);
+    renderApp('/');
 
     expect(screen.getByText('Comprobando la API…')).toBeVisible();
   });

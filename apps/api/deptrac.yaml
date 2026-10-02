@@ -8,10 +8,14 @@ deptrac:
   exclude_files:
     - '#.*Kernel\.php$#'
   layers:
-    - name: Domain
+    - name: DomainCommon
       collectors:
         - type: classLike
-          value: '^App\\Domain\\.*'
+          value: '^App\\Domain\\Common\\.*'
+    - name: DomainIdentity
+      collectors:
+        - type: classLike
+          value: '^App\\Domain\\Identity\\.*'
     - name: Application
       collectors:
         - type: classLike
@@ -33,14 +37,20 @@ deptrac:
           must_not:
             - type: classLike
               value: '^Webmozart\\Assert\\.*'
+  # Cada contexto de dominio solo puede usar DomainCommon; los contextos no se importan entre sí.
   ruleset:
-    Domain:
+    DomainCommon:
+      - Assertions
+    DomainIdentity:
+      - DomainCommon
       - Assertions
     Application:
-      - Domain
+      - DomainCommon
+      - DomainIdentity
       - Assertions
     Infrastructure:
       - Application
-      - Domain
+      - DomainCommon
+      - DomainIdentity
       - Assertions
       - Vendor

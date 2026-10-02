@@ -70,17 +70,31 @@ Tamaños observados: 11, 12, 13, 14 (el más usado), 15, 16, 18, 20, 22, 24, 26 
 
 ## Core UI primitives
 
-[pending analysis] Se crearán en `apps/web/src/shared/ui/` con la primera funcionalidad que los use.
-Medidas observadas en el diseño:
+Implementados en `apps/web/src/shared/ui/`. Úsalos antes de crear marcado propio.
 
-- **Botón primario:** alto 44 (36 en compacto), padding 0 20px, `rounded-sm`, `brand` / `surface-raised`, peso 600, 14px.
-- **Botón secundario:** alto 44, borde 1px `line-strong`, fondo transparente, `ink`.
-- **Botón de icono:** 40×40, transparente, `rounded-sm`.
-- **Input / select:** alto 44, padding 0 12px, borde 1px `line-strong`, fondo `surface`, `rounded-sm`.
-- **Pestañas:** alto 44, subrayado de 2px `brand` en la activa, texto `brand-strong` 600; inactiva `ink-muted` 500.
-- **Badge de estado:** `rounded-full`, pareja de colores de estado, 12–13px, peso 600.
-- **Tarjeta:** `surface`, borde 1px `line`, `rounded-md`, `shadow-card`.
-- **Iconos:** Lucide, 18px (22px en la navegación móvil), trazo 2.
+| Primitivo | Variantes y props | Medidas del diseño |
+|---|---|---|
+| `Button` | `variant`: `primary` (verde), `secondary` (contorno `line-strong`), `outline` (contorno `ink-strong`, hover `sand`), `ghost`; `size`: `md` (44px), `lg` (48px); `fullWidth`; `busy` + `busyLabel` | `rounded-sm`, peso 600 |
+| `TextField` | `label`, `help`, `error`, `describedBy`; resto de props de `<input>` | Alto 48, borde `line-strong`, fondo `surface`, foco `brand`, error `danger-fg` |
+| `Dialog` | `open`, `onClose`, `labelledBy` | Fondo `ink-strong/50`, panel `surface` hasta 400px, `rounded-md`, `shadow-overlay`; foco atrapado, Esc y clic fuera |
+| `Alert` | `tone`: `danger` (`role="alert"`) e `info` (`role="status"`) | `rounded-sm`, 14px, peso 500 |
+| `ClubLogo` | `size` en px | Logo circular recortado al 112 %, como en el diseño |
+
+Pendientes de crear cuando se necesiten:
+
+- **Pestañas:** alto 44 y subrayado de 2px `brand` en la activa.
+- **Badge de estado:** `rounded-full` con la pareja de colores de estado.
+- **Tarjeta:** `surface`, borde `line`, `rounded-md` y `shadow-card`.
+- **Iconos:** Lucide (`lucide-react`), a 18px (22px en la barra inferior móvil).
+
+### Navegación del panel
+
+- **Barra lateral (escritorio, ≥ 768px):** 248px de ancho, fondo `surface-raised`, borde derecho `line-soft`.
+  Cada elemento mide 44 de alto.
+  El activo lleva fondo `brand-soft` y texto `brand-strong` 600.
+  Las secciones no disponibles se atenúan, llevan «Próximamente» (10px, mayúsculas) bajo el nombre y `aria-disabled`.
+- **Móvil:** cabecera con logo de 36, título en `font-display` 22px y botón de icono «Cerrar sesión».
+  Barra inferior de 4 pestañas de 64 de alto, con la activa marcada con un borde superior de 3px `brand`.
 
 ## Interaction states
 

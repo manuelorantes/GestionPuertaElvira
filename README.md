@@ -24,6 +24,32 @@ Construye las imágenes, instala dependencias, crea las bases de datos (desarrol
 aplica migraciones e instala los hooks de git.
 Después abre <http://localhost:8080>.
 
+### Usuarios de desarrollo
+
+`make init` (y `make seed`) crea estas cuentas **solo en local**:
+
+| Email | Contraseña | Rol |
+|---|---|---|
+| `admin@puertaelvira.test` | `desarrollo-admin` | Administración |
+| `profe@puertaelvira.test` | `desarrollo-profe` | Profesorado |
+| `nuevo@puertaelvira.test` | `desarrollo-nuevo` | Administración, con contraseña temporal |
+
+`make seed` las restablece y reinicia los bloqueos por intentos fallidos.
+
+### Cuentas reales y primer administrador
+
+Las cuentas se gestionan por consola; todavía no hay pantalla de usuarios.
+
+```sh
+make user-create ARGS="junta@ejemplo.es 'Nombre Apellidos' administrator"   # muestra la contraseña temporal
+make user-reset-password ARGS="junta@ejemplo.es"                            # nueva contraseña temporal
+make user-disable ARGS="junta@ejemplo.es"     # make user-enable ARGS="..."
+make user-role ARGS="junta@ejemplo.es teacher"
+```
+
+La contraseña temporal se muestra una sola vez: hay que entregarla en persona,
+y la persona tendrá que cambiarla al entrar.
+
 ## Día a día
 
 | Comando | Qué hace |

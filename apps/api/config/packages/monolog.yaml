@@ -3,6 +3,7 @@
 monolog:
     channels:
         - deprecation
+        - identity
 
 when@dev:
     monolog:

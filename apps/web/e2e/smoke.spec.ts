@@ -15,3 +15,14 @@ test('should answer API errors with the JSON error envelope', async ({ request }
     error: { code: 'not_found', message: 'Recurso no encontrado.' },
   });
 });
+
+test('should keep the home page public and the session endpoint closed without a session', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: /acceso administración/i })).toBeVisible();
+
+  const me = await request.get('/api/auth/me');
+  expect(me.status()).toBe(401);
+});
