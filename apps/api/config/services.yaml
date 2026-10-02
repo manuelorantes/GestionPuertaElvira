@@ -24,3 +24,25 @@ services:
 
     # Puertos → adaptadores
     App\Application\Health\Port\DatabaseHealth: '@App\Infrastructure\Persistence\Doctrine\DoctrineDatabaseHealth'
+    App\Application\Identity\Port\UserRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Identity\DoctrineUserRepository'
+    App\Application\Identity\Port\SessionRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Identity\DoctrineSessionRepository'
+    App\Application\Identity\Port\PasswordHasher: '@App\Infrastructure\Identity\Security\SymfonyPasswordHasher'
+    App\Application\Identity\Port\SessionTokenGenerator: '@App\Infrastructure\Identity\Security\RandomSessionTokenGenerator'
+    App\Application\Identity\Port\TemporaryPasswordGenerator: '@App\Infrastructure\Identity\Security\RandomTemporaryPasswordGenerator'
+    App\Application\Identity\Port\LoginAttemptLimiter: '@App\Infrastructure\Identity\Security\RateLimiterLoginAttemptLimiter'
+    App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
+    App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Identity\Logging\MonologSecurityEventLog'
+
+
+when@test:
+    services:
+        # Los tests de integración piden los adaptadores concretos al contenedor,
+        # aunque todavía no los use ningún punto de entrada.
+        App\Infrastructure\Persistence\Doctrine\Repository\:
+            resource: '../src/Infrastructure/Persistence/Doctrine/Repository/'
+            autowire: true
+            public: true
+        App\Infrastructure\Identity\Security\:
+            resource: '../src/Infrastructure/Identity/Security/'
+            autowire: true
+            public: true

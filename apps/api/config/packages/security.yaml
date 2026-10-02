@@ -1,0 +1,40 @@
+# Symfony Security es solo un adaptador de entrada: la validación de la sesión vive en el caso de uso
+# AuthenticateSession (ver specs/decisions/sesiones-opacas-en-base-de-datos.md).
+security:
+    password_hashers:
+        # Algoritmo recomendado por Symfony (argon2id o bcrypt). Lo usa SymfonyPasswordHasher.
+        identity:
+            algorithm: auto
+
+    providers:
+        # El usuario lo construye el autenticador a partir de la sesión; no se carga por identificador.
+        none: { memory: null }
+
+    firewalls:
+        api:
+            pattern: ^/api
+            stateless: true
+            lazy: true
+            provider: none
+            custom_authenticators:
+                - App\Infrastructure\Identity\Http\SessionCookieAuthenticator
+
+    role_hierarchy:
+        ROLE_ADMIN: [ROLE_USER]
+        ROLE_TEACHER: [ROLE_USER]
+
+    access_control:
+        - { path: ^/api/health$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/doc\.json$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/auth/(login|logout)$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/admin, roles: ROLE_ADMIN }
+        - { path: ^/api, roles: ROLE_USER }
+
+when@test:
+    security:
+        password_hashers:
+            identity:
+                algorithm: auto
+                cost: 4
+                time_cost: 3
+                memory_cost: 10
