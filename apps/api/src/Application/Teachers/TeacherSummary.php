@@ -11,6 +11,7 @@ final readonly class TeacherSummary
         public string $fullName,
         public bool $active,
         public int $groupCount,
+        public string $hourlyRate,
     ) {
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Application\Teachers;
 
 use App\Application\Teachers\ActivateTeacher;
+use App\Application\Teachers\ChangeTeacherRate;
 use App\Application\Teachers\DeactivateTeacher;
 use App\Application\Teachers\Error\TeacherHasGroups;
 use App\Application\Teachers\Error\TeacherNotFound;
@@ -40,6 +41,15 @@ final class TeacherManagementTest extends TestCase
         new RenameTeacher($this->teachers)($id, 'Carlos Ruiz Márquez');
 
         self::assertSame('Carlos Ruiz Márquez', $this->teachers->find(TeacherId::fromString($id))?->fullName()->value);
+    }
+
+    public function test_should_change_the_hourly_rate(): void
+    {
+        $id = new RegisterTeacher($this->teachers)('Carlos Ruiz');
+
+        new ChangeTeacherRate($this->teachers)($id, '18,50');
+
+        self::assertSame(1850, $this->teachers->find(TeacherId::fromString($id))?->hourlyRate()->cents);
     }
 
     public function test_should_deactivate_a_teacher_without_groups_and_activate_again(): void
