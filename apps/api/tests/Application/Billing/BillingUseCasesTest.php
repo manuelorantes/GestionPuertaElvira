@@ -19,7 +19,7 @@ use App\Domain\Billing\Error\InvalidPaymentRequest;
 use App\Domain\Billing\Error\InvoiceAlreadyIssued;
 use App\Domain\Billing\PaymentId;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
+use App\Domain\Common\YearMonth;
 use App\Tests\Support\Billing\BillingFixture;
 use PHPUnit\Framework\TestCase;
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Http\Billing;
 
-use App\Domain\Billing\Season;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\Season;
+use App\Domain\Common\YearMonth;
 use App\Domain\Identity\Role;
 use App\Tests\Support\Identity\ApiAuthTestCase;
 use DateTimeImmutable;

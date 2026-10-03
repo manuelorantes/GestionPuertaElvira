@@ -13,10 +13,10 @@ use App\Domain\Billing\DocumentNumber;
 use App\Domain\Billing\Error\InvoiceAlreadyIssued;
 use App\Domain\Billing\InvoiceCustomer;
 use App\Domain\Billing\PaymentId;
-use App\Domain\Billing\Season;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\Clock;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\Season;
+use App\Domain\Common\YearMonth;
 
 /** Emite, bajo petición, la factura de un cobro (una sola vez). */
 final readonly class IssueInvoice

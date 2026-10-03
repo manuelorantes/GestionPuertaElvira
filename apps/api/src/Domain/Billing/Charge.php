@@ -7,6 +7,7 @@ namespace App\Domain\Billing;
 use App\Domain\Billing\Error\ChargeAlreadyPaid;
 use App\Domain\Common\LocalDate;
 use App\Domain\Common\Money;
+use App\Domain\Common\YearMonth;
 
 /**
  * Cuota de un alumno: mensual (una por mes de temporada) o de socio (una por temporada).

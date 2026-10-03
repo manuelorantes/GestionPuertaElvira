@@ -8,7 +8,7 @@ use App\Domain\Billing\Charge;
 use App\Domain\Billing\ChargeId;
 use App\Domain\Billing\ChargeKind;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
+use App\Domain\Common\YearMonth;
 
 interface ChargeRepository
 {

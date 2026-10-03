@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Domain\Billing;
+namespace App\Tests\Domain\Common;
 
-use App\Domain\Billing\Season;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\InvalidValue;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\Season;
+use App\Domain\Common\YearMonth;
 use PHPUnit\Framework\TestCase;
 
 final class CalendarTest extends TestCase

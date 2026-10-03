@@ -33,8 +33,8 @@ final class SeedDemoDataCommandTest extends KernelTestCase
         self::assertCount(4, $students->list(\App\Application\Students\StudentFilter::Siblings, null, LocalDate::fromInstant(new DateTimeImmutable())));
         self::assertSame(16, array_sum(array_map(static fn ($g): int => $g->occupied, $groups)));
 
-        $month = \App\Domain\Billing\YearMonth::of(LocalDate::fromInstant(new DateTimeImmutable()));
-        if (null !== \App\Domain\Billing\Season::teachingSeason($month)) {
+        $month = \App\Domain\Common\YearMonth::of(LocalDate::fromInstant(new DateTimeImmutable()));
+        if (null !== \App\Domain\Common\Season::teachingSeason($month)) {
             $connection = $container->get(\Doctrine\DBAL\Connection::class);
             self::assertEquals(16, $connection->fetchOne('SELECT COUNT(*) FROM billing_charge WHERE period = :m AND kind = :k', ['m' => $month->toString(), 'k' => 'monthly']));
             self::assertEquals(1, $connection->fetchOne('SELECT COUNT(*) FROM billing_payment WHERE invoice_number IS NOT NULL'));

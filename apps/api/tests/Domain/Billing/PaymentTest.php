@@ -13,10 +13,10 @@ use App\Domain\Billing\PaymentId;
 use App\Domain\Billing\PaymentMethod;
 use App\Domain\Billing\QuoteLine;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\InvalidValue;
 use App\Domain\Common\LocalDate;
 use App\Domain\Common\Money;
+use App\Domain\Common\YearMonth;
 use PHPUnit\Framework\TestCase;
 
 final class PaymentTest extends TestCase
