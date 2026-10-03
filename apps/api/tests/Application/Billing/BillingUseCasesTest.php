@@ -126,6 +126,16 @@ final class BillingUseCasesTest extends TestCase
         $this->register($id, 10);
     }
 
+    public function test_should_refuse_payments_dated_in_a_closed_season(): void
+    {
+        $id = $this->fx->student();
+        $this->fx->closedDates = ['2026-10-02'];
+
+        $this->expectException(\App\Application\Common\Error\PeriodClosed::class);
+
+        $this->register($id, 1);
+    }
+
     public function test_should_register_the_membership_fee_without_discounts(): void
     {
         $id = $this->fx->student(siblings: true);
@@ -178,7 +188,7 @@ final class BillingUseCasesTest extends TestCase
 
     private function register(string $id, int $months, string $kind = 'monthly'): string
     {
-        $register = new RegisterPayment(new QuotePayment($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock), $this->fx, $this->fx, $this->fx, $this->fx->transactions);
+        $register = new RegisterPayment(new QuotePayment($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock), $this->fx, $this->fx, $this->fx, $this->fx->transactions, $this->fx);
 
         return $register(new PaymentRequest($id, $kind, $months, 'transfer', '2026-10-02', false, null, null));
     }
