@@ -16,7 +16,7 @@ export function GroupsTable({
 }) {
   return (
     <Card className="overflow-x-auto">
-      <table className="w-full min-w-[960px] text-left text-sm">
+      <table className="w-full min-w-[900px] text-left text-sm">
         <caption className="sr-only">Grupos</caption>
         <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
           <tr>
@@ -52,24 +52,26 @@ export function GroupsTable({
               <td className="px-4 py-3">
                 <OccupancyBar occupied={group.occupied} capacity={group.capacity} />
               </td>
-              <td className="flex justify-end gap-2 px-4 py-3">
-                <button
-                  type="button"
-                  onClick={() => onOpen(group)}
-                  aria-label={`Alumnos de ${group.name}`}
-                  className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
-                >
-                  Alumnos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onEdit(group)}
-                  aria-label={`Editar ${group.name}`}
-                  className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-brand-soft"
-                >
-                  <Pencil aria-hidden size={16} />
-                  Editar
-                </button>
+              <td className="px-4 py-3">
+                <div className="flex flex-wrap justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onOpen(group)}
+                    aria-label={`Alumnos de ${group.name}`}
+                    className="inline-flex h-9 cursor-pointer items-center rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
+                  >
+                    Alumnos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onEdit(group)}
+                    aria-label={`Editar ${group.name}`}
+                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-brand-soft"
+                  >
+                    <Pencil aria-hidden size={16} />
+                    Editar
+                  </button>
+                </div>
               </td>
             </tr>
           ))}

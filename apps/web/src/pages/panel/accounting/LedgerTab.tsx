@@ -40,7 +40,7 @@ export function LedgerTab({
     return (
       <>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[680px] text-left text-sm">
+          <table className="w-full min-w-[640px] text-left text-sm">
             <caption className="sr-only">Movimientos de {label}</caption>
             <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
               <tr>
@@ -48,11 +48,11 @@ export function LedgerTab({
                   <span className="sr-only">Tipo</span>
                 </th>
                 {['Fecha', 'Concepto', 'Categoría', 'Forma de pago'].map((h) => (
-                  <th key={h} scope="col" className="px-4 py-3 font-semibold">
+                  <th key={h} scope="col" className="px-3 py-3 font-semibold">
                     {h}
                   </th>
                 ))}
-                <th scope="col" className="px-4 py-3 text-right font-semibold">
+                <th scope="col" className="px-3 py-3 text-right font-semibold">
                   Importe
                 </th>
                 <th scope="col">
@@ -75,16 +75,16 @@ export function LedgerTab({
                       <ArrowUpRight aria-label="Gasto" size={18} />
                     )}
                   </td>
-                  <td className="px-4 py-3 text-ink-muted">{formatDate(item.date)}</td>
-                  <td className="px-4 py-3 font-medium">{item.concept}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 text-ink-muted">{formatDate(item.date)}</td>
+                  <td className="px-3 py-3 font-medium">{item.concept}</td>
+                  <td className="px-3 py-3">
                     <span className="rounded-full bg-line-soft px-2 py-0.5 text-xs whitespace-nowrap">
                       {item.categoryLabel}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-ink-soft">{item.methodLabel}</td>
+                  <td className="px-3 py-3 text-ink-soft">{item.methodLabel}</td>
                   <td
-                    className={`px-4 py-3 text-right font-semibold whitespace-nowrap ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}
+                    className={`px-3 py-3 text-right font-semibold whitespace-nowrap ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}
                   >
                     {signed(item)}
                   </td>

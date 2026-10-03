@@ -34,7 +34,7 @@ export function Tabs({ label, tabs, value, onChange, children }: TabsProps) {
         role="tablist"
         aria-label={label}
         onKeyDown={handleKeyDown}
-        className="mb-6 flex gap-6 overflow-x-auto border-b border-line-soft"
+        className="mb-6 flex [scrollbar-width:none] gap-4 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-line-soft)] lg:gap-6 [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab) => {
           const selected = tab.id === value;
@@ -48,7 +48,7 @@ export function Tabs({ label, tabs, value, onChange, children }: TabsProps) {
               aria-controls={`${baseId}-panel`}
               tabIndex={selected ? 0 : -1}
               onClick={() => onChange(tab.id)}
-              className={`-mb-px h-11 shrink-0 cursor-pointer border-b-2 px-1 text-[15px] ${
+              className={`h-11 shrink-0 cursor-pointer border-b-2 px-1 text-[15px] whitespace-nowrap focus-visible:-outline-offset-2 ${
                 selected
                   ? 'border-brand font-semibold text-brand-strong'
                   : 'border-transparent font-medium text-ink-muted'

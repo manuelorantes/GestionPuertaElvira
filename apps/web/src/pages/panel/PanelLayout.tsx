@@ -24,7 +24,7 @@ export function PanelLayout() {
     <div className="flex h-screen flex-col md:flex-row">
       <PanelSidebar user={user} onLogout={handleLogout} />
       <PanelMobileHeader title={title} onLogout={handleLogout} />
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto">
         <Outlet />
       </div>
       <PanelMobileNav />

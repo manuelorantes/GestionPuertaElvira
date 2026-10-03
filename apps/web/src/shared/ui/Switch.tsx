@@ -17,7 +17,7 @@ export function Switch({ label, checked, onChange }: SwitchProps) {
       >
         <span
           aria-hidden
-          className={`absolute top-0.5 size-5 rounded-full bg-surface shadow-card transition-transform ${checked ? 'translate-x-5.5' : 'translate-x-0.5'}`}
+          className={`absolute top-0.5 left-0 size-5 rounded-full bg-surface shadow-card transition-transform ${checked ? 'translate-x-5.5' : 'translate-x-0.5'}`}
         />
       </button>
       <span aria-hidden>{label}</span>
