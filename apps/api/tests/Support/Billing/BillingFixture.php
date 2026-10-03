@@ -61,6 +61,13 @@ final class BillingFixture implements ClosedPeriods, BillingSettingsRepository, 
         return $id;
     }
 
+    /** Cambia los grupos del alumno (p. ej. sube de nivel o se da de baja). */
+    public function changeHours(string $id, float $regularHours): void
+    {
+        $s = $this->students[$id];
+        $this->students[$id] = new BillingStudent($s->id, $s->name, $s->guardianName, $s->guardianPhone, $s->hasSiblings, $regularHours, $s->privateLessons);
+    }
+
     // BillingSettingsRepository
     public function get(): BillingSettings
     {

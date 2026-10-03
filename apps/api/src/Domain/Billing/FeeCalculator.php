@@ -63,6 +63,33 @@ final readonly class FeeCalculator
     }
 
     /**
+     * Cobro de importes ya fijados (cuotas pendientes con su importe guardado y meses nuevos con el de hoy):
+     * el descuento familiar ya va dentro de cada importe; se suman el de pago adelantado y el especial.
+     *
+     * @param non-empty-list<QuoteLine> $items
+     */
+    public function quoteItems(array $items, BillingSettings $settings, ?SpecialDiscount $special = null): Quote
+    {
+        $months = \count($items);
+        if ($months > self::MAX_MONTHS) {
+            throw InvalidPaymentRequest::months();
+        }
+        $gross = array_reduce($items, static fn (Money $sum, QuoteLine $l): Money => $sum->plus($l->amount), Money::zero());
+        $discounts = [];
+        $prepayment = $settings->tariff->prepaymentPercent($months);
+        if ($prepayment > 0) {
+            $discounts[] = [\sprintf('Pago adelantado %d meses', $months), $prepayment];
+        }
+        if (null !== $special) {
+            $discounts[] = [$special->concept, $special->percent];
+        }
+        $percent = min(100, array_sum(array_column($discounts, 1)));
+        $total = $gross->percent(100 - $percent);
+
+        return new Quote([...$items, ...self::discountLines($discounts, $gross, $gross->minus($total))], $gross, $percent, $total, $items[0]->amount);
+    }
+
+    /**
      * Una línea por descuento; la última absorbe el redondeo para que todo sume el total exacto.
      *
      * @param list<array{0: string, 1: int}> $discounts

@@ -55,15 +55,33 @@ final readonly class QuotePayment
 
         $periods = $this->periods($ref, $date, $request->months);
         $special = null === $request->specialPercent ? null : new SpecialDiscount($request->specialPercent, (string) $request->specialConcept);
-        $proration = $request->prorate ? new Proration((int) substr($date->toString(), 8, 2), $periods[0]->days()) : null;
         $profile = FeeProfiles::of($student, $this->accounts->account($ref), $settings);
         $calculator = new FeeCalculator();
-        $quote = $calculator->quote($profile, $settings, $request->months, $special, $proration);
-        if (0 === $quote->total->cents && 0 === $quote->gross->cents) {
+        $monthly = $calculator->quote($profile, $settings, 1)->total;
+
+        // Las cuotas ya generadas se cobran por su importe guardado; los meses nuevos, con el de hoy.
+        $pending = [];
+        foreach ($this->charges->unpaidFor($ref, ChargeKind::Monthly) as $charge) {
+            $pending[$charge->period()->toString()] = $charge->amount();
+        }
+        $items = array_map(static fn (YearMonth $p): QuoteLine => new QuoteLine('Cuota de '.$p->label(), $pending[$p->toString()] ?? $monthly), $periods);
+        $sameAsToday = [] === array_filter($items, static fn (QuoteLine $l): bool => !$l->amount->equals($monthly));
+
+        if ($request->prorate) {
+            if (1 !== \count($periods) || !$periods[0]->equals(YearMonth::of($date)) || !$sameAsToday) {
+                throw $request->months > 1 ? InvalidPaymentRequest::prorationRequiresOneMonth() : InvalidPaymentRequest::prorationOnlyCurrentMonth();
+            }
+        }
+        $proration = $request->prorate ? new Proration((int) substr($date->toString(), 8, 2), $periods[0]->days()) : null;
+        $quote = $sameAsToday
+            ? $calculator->quote($profile, $settings, $request->months, $special, $proration)
+            : $calculator->quoteItems($items, $settings, $special);
+        // Sin grupos, los meses nuevos valen 0 €: solo se puede cobrar lo pendiente.
+        if (0 === $quote->gross->cents || [] !== array_filter($items, static fn (QuoteLine $l): bool => 0 === $l->amount->cents)) {
             throw InvalidPaymentRequest::nothingToPay();
         }
 
-        return new PaymentQuote($student, $kind, $date, $quote, $periods, self::concept($periods), $calculator->quote($profile, $settings, 1)->total);
+        return new PaymentQuote($student, $kind, $date, $quote, $periods, self::concept($periods), $monthly);
     }
 
     /** Meses que propone el formulario según la forma de pago preferida y lo que queda de temporada. */
@@ -87,17 +105,13 @@ final readonly class QuotePayment
         if ($months < 1 || $months > FeeCalculator::MAX_MONTHS) {
             throw InvalidPaymentRequest::months();
         }
-        $available = $this->available($ref, $date);
-        if ($months > $available) {
-            throw InvalidPaymentRequest::beyondSeason($available);
+        $candidates = $this->candidates($ref, $date);
+        if ($months > \count($candidates)) {
+            throw InvalidPaymentRequest::beyondSeason(\count($candidates));
         }
 
-        $periods = array_map(static fn (Charge $c): YearMonth => $c->period(), $this->charges->unpaidFor($ref, ChargeKind::Monthly));
-        for ($next = $this->firstUncharged($ref, $date); \count($periods) < $months; $next = $next->next()) {
-            $periods[] = $next;
-        }
-
-        $selected = array_values(\array_slice($periods, 0, $months));
+        $selected = \array_slice($candidates, 0, $months);
+        usort($selected, static fn (YearMonth $a, YearMonth $b): int => $a->toString() <=> $b->toString());
         \assert([] !== $selected);
 
         return $selected;
@@ -105,22 +119,30 @@ final readonly class QuotePayment
 
     private function available(StudentRef $ref, LocalDate $date): int
     {
-        $first = $this->firstUncharged($ref, $date);
-        $season = Season::containing($first);
-
-        return \count($this->charges->unpaidFor($ref, ChargeKind::Monthly)) + ($season->includes($first) ? $season->monthsFrom($first) : 0);
+        return \count($this->candidates($ref, $date));
     }
 
-    /** Primer mes que aún no tiene cuota: el siguiente a la última, y nunca antes del mes del cobro ni fuera de temporada. */
-    private function firstUncharged(StudentRef $ref, LocalDate $date): YearMonth
+    /**
+     * Meses que se pueden cobrar, en orden: primero las cuotas pendientes (de la más antigua a la más reciente) y después
+     * los meses de la temporada, desde el del cobro, que aún no tienen cuota (rellenando huecos).
+     *
+     * @return list<YearMonth>
+     */
+    private function candidates(StudentRef $ref, LocalDate $date): array
     {
-        $current = YearMonth::of($date);
-        if (null === Season::teachingSeason($current)) {
-            $current = Season::containing($current)->firstMonth();
+        $periods = array_map(static fn (Charge $c): YearMonth => $c->period(), $this->charges->unpaidFor($ref, ChargeKind::Monthly));
+        $start = YearMonth::of($date);
+        if (null === Season::teachingSeason($start)) {
+            $start = Season::containing($start)->firstMonth();
         }
-        $latest = $this->charges->latestMonthlyPeriod($ref);
+        $season = Season::containing($start);
+        for ($month = $start; $season->includes($month); $month = $month->next()) {
+            if (null === $this->charges->chargeFor($ref, ChargeKind::Monthly, $month)) {
+                $periods[] = $month;
+            }
+        }
 
-        return null !== $latest && !$latest->isBefore($current) ? $latest->next() : $current;
+        return $periods;
     }
 
     private function membership(BillingStudent $student, StudentRef $ref, LocalDate $date): PaymentQuote
