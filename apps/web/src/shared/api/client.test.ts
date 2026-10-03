@@ -1,6 +1,6 @@
 import { mockFetchResponse } from '@/test/render';
 
-import { ApiError, apiGet, apiSend } from './client';
+import { ApiError, apiGet, apiSend, apiUpload } from './client';
 
 describe('apiGet', () => {
   it('should return the parsed body when the response is successful', async () => {
@@ -71,5 +71,23 @@ describe('error details', () => {
     await expect(apiGet('/api/x')).rejects.toMatchObject({
       details: { occupied: 12, capacity: 12 },
     });
+  });
+
+  it('should upload documents as multipart with the fetch marker header', async () => {
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ id: 'f1' }), { status: 201 }));
+    const form = new FormData();
+    form.append('supplier', 'Escaque');
+
+    await expect(apiUpload('/api/admin/accounting/invoices', form)).resolves.toEqual({ id: 'f1' });
+    expect(spy).toHaveBeenCalledWith(
+      '/api/admin/accounting/invoices',
+      expect.objectContaining({
+        method: 'POST',
+        body: form,
+        headers: expect.objectContaining({ 'X-Requested-With': 'fetch' }),
+      }),
+    );
   });
 });
