@@ -16,6 +16,7 @@ use App\Application\Identity\Error\CurrentPasswordMismatch;
 use App\Application\Identity\Error\EmailAlreadyRegistered;
 use App\Application\Identity\Error\InvalidCredentials;
 use App\Application\Identity\Error\TooManyLoginAttempts;
+use App\Application\Payroll\Error\SessionNotFound;
 use App\Application\Students\Error\StudentNotFound;
 use App\Application\Teachers\Error\TeacherHasGroups;
 use App\Application\Teachers\Error\TeacherNotFound;
@@ -28,6 +29,7 @@ use App\Domain\Classes\Error\StudentScheduleOverlap;
 use App\Domain\Common\HasErrorDetails;
 use App\Domain\Common\InvalidValue;
 use App\Domain\Identity\Error\WeakPassword;
+use App\Domain\Payroll\Error\SettlementAlreadyPaid;
 use App\Domain\Students\Error\MissingContact;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -80,6 +82,8 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
         ChargeNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         BillingStudentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         InvoiceAlreadyIssued::class => [Response::HTTP_CONFLICT, 'invoice_already_issued'],
+        SessionNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        SettlementAlreadyPaid::class => [Response::HTTP_CONFLICT, 'settlement_paid'],
         ChargeAlreadyPaid::class => [Response::HTTP_CONFLICT, 'charge_already_paid'],
     ];
 

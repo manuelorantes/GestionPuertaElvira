@@ -39,6 +39,8 @@ final class SeedDemoDataCommandTest extends KernelTestCase
             self::assertEquals(16, $connection->fetchOne('SELECT COUNT(*) FROM billing_charge WHERE period = :m AND kind = :k', ['m' => $month->toString(), 'k' => 'monthly']));
             self::assertEquals(1, $connection->fetchOne('SELECT COUNT(*) FROM billing_payment WHERE invoice_number IS NOT NULL'));
             self::assertGreaterThan(8, $connection->fetchOne('SELECT COUNT(*) FROM billing_payment'));
+            self::assertGreaterThan(50, $connection->fetchOne('SELECT COUNT(*) FROM payroll_session'));
+            self::assertEquals(2000, $connection->fetchOne("SELECT hourly_rate_cents FROM teachers_teacher WHERE full_name = 'Javier Ortega Sánchez'"));
         }
     }
 
