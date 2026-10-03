@@ -6,6 +6,7 @@ namespace App\Infrastructure\Persistence\Doctrine\Repository\Teachers;
 
 use App\Application\Teachers\Port\TeacherRepository;
 use App\Domain\Common\FullName;
+use App\Domain\Common\Money;
 use App\Domain\Teachers\Teacher;
 use App\Domain\Teachers\TeacherId;
 use App\Infrastructure\Persistence\Doctrine\Model\Teachers\TeacherRecord;
@@ -21,7 +22,7 @@ final readonly class DoctrineTeacherRepository implements TeacherRepository
     {
         $record = $this->em->find(TeacherRecord::class, $id->value);
 
-        return null === $record ? null : Teacher::restore(TeacherId::fromString($record->id), FullName::fromString($record->fullName), $record->active);
+        return null === $record ? null : Teacher::restore(TeacherId::fromString($record->id), FullName::fromString($record->fullName), $record->active, Money::cents($record->hourlyRateCents));
     }
 
     public function save(Teacher $teacher): void
@@ -30,6 +31,7 @@ final readonly class DoctrineTeacherRepository implements TeacherRepository
             ?? new TeacherRecord($teacher->id()->value, $teacher->fullName()->value, $teacher->isActive());
         $record->fullName = $teacher->fullName()->value;
         $record->active = $teacher->isActive();
+        $record->hourlyRateCents = $teacher->hourlyRate()->cents;
         $this->em->persist($record);
         $this->em->flush();
     }
