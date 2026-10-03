@@ -7,6 +7,7 @@ namespace App\Domain\Billing;
 use App\Domain\Billing\Error\InvoiceAlreadyIssued;
 use App\Domain\Common\LocalDate;
 use App\Domain\Common\Money;
+use App\Domain\Common\YearMonth;
 
 /** Cobro registrado, con su recibo y, si se pide, su factura. */
 final class Payment

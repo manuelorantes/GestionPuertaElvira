@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Billing;
+namespace App\Domain\Common;
 
 /**
  * Temporada del club: de septiembre a junio. Julio y agosto no tienen clases.

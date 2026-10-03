@@ -6,9 +6,9 @@ namespace App\Application\Billing;
 
 use App\Domain\Billing\ChargeKind;
 use App\Domain\Billing\Quote;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\LocalDate;
 use App\Domain\Common\Money;
+use App\Domain\Common\YearMonth;
 
 /** Cotización de un cobro: desglose, meses que cubre y concepto del recibo. */
 final readonly class PaymentQuote
