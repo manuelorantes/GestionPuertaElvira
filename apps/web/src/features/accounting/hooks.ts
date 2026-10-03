@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
 import * as api from './api';
 
@@ -21,14 +23,6 @@ export function useFiscalYear(startYear: number) {
 export function useAccountingMutation<Variables, Result = void>(
   mutationFn: (variables: Variables) => Promise<Result>,
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn,
-    onSuccess: () =>
-      Promise.all(
-        ['ledger', 'invoices', 'fiscal-year', 'dashboard'].map((key) =>
-          queryClient.invalidateQueries({ queryKey: [key] }),
-        ),
-      ),
-  });
+  const refresh = useRefreshClubData();
+  return useMutation({ mutationFn, onSuccess: refresh });
 }

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { todayIso } from '@/features/students/format';
@@ -37,8 +37,8 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
   const [special, setSpecial] = useState({ enabled: false, percent: '', concept: '' });
   const account = useAccount(studentId);
   const concept = chosenConcept ?? conceptFor(account.data);
-  const remaining = account.data?.remainingMonths ?? 10;
-  const months = { month: 1, three: 3, six: 6, rest: remaining, membership: 1 }[concept];
+  const remaining = account.data?.remainingMonths ?? null;
+  const months = { month: 1, three: 3, six: 6, rest: remaining ?? 0, membership: 1 }[concept];
   const percent = Number(special.percent);
 
   const request: api.PaymentRequest = {
@@ -53,15 +53,26 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
         ? { percent, concept: special.concept.trim() }
         : null,
   };
-  const debounced = useDebouncedValue(request, 250);
+  // Se espera a una pausa en la escritura comparando el texto de la petición (un objeto nuevo en cada render no se asentaría nunca).
+  const requestKey = JSON.stringify(request);
+  const debouncedKey = useDebouncedValue(requestKey, 250);
+  const debounced = useMemo(() => JSON.parse(debouncedKey) as api.PaymentRequest, [debouncedKey]);
+  const ready =
+    Boolean(debounced.studentId) &&
+    Boolean(debounced.date) &&
+    debounced.months > 0 &&
+    (concept !== 'rest' || remaining !== null);
   const quote = useQuery({
-    queryKey: ['quote', debounced],
+    queryKey: ['quote', debouncedKey],
     queryFn: () => api.quotePayment(debounced),
-    enabled: Boolean(debounced.studentId) && Boolean(debounced.date),
+    enabled: ready,
     retry: false,
+    // Una cotización vale para ese momento: tras un cobro, la misma petición cubre otros meses.
+    staleTime: 0,
+    gcTime: 0,
   });
   const save = useBillingMutation(api.registerPayment);
-  const stale = JSON.stringify(request) !== JSON.stringify(debounced);
+  const stale = requestKey !== debouncedKey;
 
   return {
     studentId,
@@ -71,6 +82,11 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     },
     concept,
     setConcept,
+    /** Conceptos que no caben en lo que queda por cobrar (se muestran desactivados). */
+    unavailable: (id: Concept) =>
+      remaining !== null &&
+      id !== 'membership' &&
+      ({ month: 1, three: 3, six: 6, rest: 1 } as const)[id] > remaining,
     method,
     setMethod,
     date,
