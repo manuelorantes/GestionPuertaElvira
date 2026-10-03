@@ -99,6 +99,67 @@ Table classes_enrolment {
 Ref: classes_group.teacher_id > teachers_teacher.id
 Ref: classes_enrolment.class_group_id > classes_group.id
 
+// --- Cobros (Billing) -----------------------------------------------------
+
+Table billing_settings {
+  id varchar(20) [pk, note: "una sola fila: 'club'"]
+  data json [not null, note: 'tarifas, descuentos, precios por hora de particulares y datos fiscales (importes en céntimos)']
+}
+
+Table billing_account {
+  student_id uuid [pk, note: 'referencia por identidad al alumno']
+  preferred_plan varchar(20) [not null, note: 'monthly | three_months | six_months | rest_of_season (solo propone meses)']
+  member boolean [not null, note: 'socio: cuota de socio por temporada']
+  private_rate_cents int [note: 'precio por hora pactado de sus particulares']
+  points int [not null, note: 'contador manual, ≥ 0']
+}
+
+Table billing_charge {
+  id uuid [pk, note: 'UUIDv7']
+  student_id uuid [not null]
+  kind varchar(12) [not null, note: 'monthly | membership']
+  period varchar(7) [not null, note: 'AAAA-MM; en las de socio, septiembre de la temporada']
+  amount_cents int [not null, note: 'fijado al generarla']
+  paid_by uuid [note: 'billing_payment.id; nulo = sin pagar']
+  reminded_on date [note: 'último aviso por WhatsApp']
+
+  indexes {
+    (student_id, kind, period) [unique, name: 'billing_charge_unique']
+    period [name: 'billing_charge_period_idx']
+  }
+}
+
+Table billing_payment {
+  id uuid [pk, note: 'UUIDv7']
+  student_id uuid [not null]
+  paid_on date [not null]
+  method varchar(10) [not null, note: 'cash | transfer']
+  receipt_number varchar(16) [unique, not null, note: 'R-AAAA-NNNN por temporada']
+  kind varchar(12) [not null]
+  concept varchar(120) [not null]
+  lines json [not null, note: 'desglose [{label, amountCents}]; suma = total']
+  total_cents int [not null]
+  periods json [not null, note: 'meses cubiertos AAAA-MM']
+  invoice_number varchar(16) [unique, note: 'F-AAAA-NNNN si se emitió factura']
+  invoice json [note: 'cliente, base, IVA 21 % incluido y total']
+
+  indexes {
+    student_id [name: 'billing_payment_student_idx']
+  }
+}
+
+Table billing_document_sequence {
+  prefix varchar(1) [not null, note: 'R (recibo) | F (factura)']
+  season_year smallint [not null]
+  last_value int [not null]
+
+  indexes {
+    (prefix, season_year) [pk]
+  }
+}
+
+Ref: billing_charge.paid_by > billing_payment.id
+
 // --- Infraestructura ----------------------------------------------------
 
 Table cache_items {
