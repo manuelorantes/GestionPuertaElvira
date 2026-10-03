@@ -7,6 +7,8 @@ namespace App\Application\Billing;
 use App\Application\Billing\Port\ChargeRepository;
 use App\Application\Billing\Port\DocumentSequence;
 use App\Application\Billing\Port\PaymentRepository;
+use App\Application\Common\Error\PeriodClosed;
+use App\Application\Common\Port\ClosedPeriods;
 use App\Application\Common\Port\TransactionRunner;
 use App\Domain\Billing\Charge;
 use App\Domain\Billing\ChargeId;
@@ -27,12 +29,14 @@ final readonly class RegisterPayment
         private PaymentRepository $payments,
         private DocumentSequence $sequence,
         private TransactionRunner $transactions,
+        private ClosedPeriods $closed,
     ) {
     }
 
     public function __invoke(PaymentRequest $request): string
     {
         $quote = ($this->quotes)($request);
+        PeriodClosed::guard($this->closed, $quote->date);
         $ref = StudentRef::fromString($quote->student->id);
 
         return $this->transactions->run(function () use ($quote, $request, $ref): string {

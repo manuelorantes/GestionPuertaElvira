@@ -12,6 +12,7 @@ use App\Application\Billing\Port\PaymentRepository;
 use App\Application\Billing\Port\StudentAccountRepository;
 use App\Application\Billing\Port\StudentDirectory;
 use App\Application\Billing\PrivateEnrolment;
+use App\Application\Common\Port\ClosedPeriods;
 use App\Domain\Billing\BillingSettings;
 use App\Domain\Billing\Charge;
 use App\Domain\Billing\ChargeId;
@@ -26,7 +27,7 @@ use App\Tests\Support\FrozenClock;
 use App\Tests\Support\ImmediateTransactionRunner;
 
 /** Dobles en memoria de todos los puertos de Billing. */
-final class BillingFixture implements BillingSettingsRepository, StudentAccountRepository, ChargeRepository, PaymentRepository, DocumentSequence, StudentDirectory
+final class BillingFixture implements ClosedPeriods, BillingSettingsRepository, StudentAccountRepository, ChargeRepository, PaymentRepository, DocumentSequence, StudentDirectory
 {
     public BillingSettings $settings;
     /** @var array<string, StudentAccount> */
@@ -39,6 +40,8 @@ final class BillingFixture implements BillingSettingsRepository, StudentAccountR
     public array $sequences = [];
     /** @var array<string, BillingStudent> */
     public array $students = [];
+    /** @var list<string> fechas de temporadas cerradas */
+    public array $closedDates = [];
     public FrozenClock $clock;
     public ImmediateTransactionRunner $transactions;
 
@@ -147,5 +150,10 @@ final class BillingFixture implements BillingSettingsRepository, StudentAccountR
     public function find(StudentRef $student, LocalDate $day): ?BillingStudent
     {
         return $this->students[$student->value] ?? null;
+    }
+
+    public function isClosed(LocalDate $date): bool
+    {
+        return \in_array($date->toString(), $this->closedDates, true);
     }
 }

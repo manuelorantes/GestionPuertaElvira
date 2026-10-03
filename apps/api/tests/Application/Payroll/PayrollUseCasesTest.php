@@ -96,7 +96,7 @@ final class PayrollUseCasesTest extends TestCase
     public function test_should_pay_a_settlement_freezing_it_and_locking_its_sessions(): void
     {
         $this->propose('2026-10');
-        new PaySettlement($this->fx, $this->fx, $this->fx)($this->lucia, '2026-10', '2026-11-02');
+        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx)($this->lucia, '2026-10', '2026-11-02');
         $this->fx->teachers[$this->lucia] = new \App\Application\Payroll\TeacherRate($this->lucia, 'Lucía Moreno Gil', \App\Domain\Common\Money::cents(9900), true);
 
         $lucia = new ListSettlements($this->fx, $this->fx, $this->fx)('2026-10')[1];
@@ -109,16 +109,26 @@ final class PayrollUseCasesTest extends TestCase
         new DeleteSession($this->fx, $this->fx)($session->id()->value);
     }
 
+    public function test_should_refuse_paying_in_a_closed_season(): void
+    {
+        $this->propose('2026-10');
+        $this->fx->closed = true;
+
+        $this->expectException(\App\Application\Common\Error\PeriodClosed::class);
+
+        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx)($this->lucia, '2026-10', '2026-11-02');
+    }
+
     public function test_should_pay_every_pending_settlement_of_the_month(): void
     {
         $this->propose('2026-10');
 
-        $paid = new PayAllSettlements(new PaySettlement($this->fx, $this->fx, $this->fx), new ListSettlements($this->fx, $this->fx, $this->fx))('2026-10', '2026-11-02');
+        $paid = new PayAllSettlements(new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx), new ListSettlements($this->fx, $this->fx, $this->fx))('2026-10', '2026-11-02');
 
         self::assertSame(2, $paid);
         self::assertCount(2, $this->fx->settlements);
         $this->expectException(SettlementAlreadyPaid::class);
-        new PaySettlement($this->fx, $this->fx, $this->fx)($this->carlos, '2026-10', '2026-11-03');
+        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx)($this->carlos, '2026-10', '2026-11-03');
     }
 
     private function propose(string $month): void
