@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Application\Payroll;
 
+use App\Application\Common\Error\PeriodClosed;
+use App\Application\Common\Port\ClosedPeriods;
 use App\Application\Payroll\Port\SettlementRepository;
 use App\Application\Payroll\Port\TeacherRates;
 use App\Application\Payroll\Port\TimesheetRepository;
@@ -22,6 +24,7 @@ final readonly class PaySettlement
         private TimesheetRepository $timesheets,
         private SettlementRepository $settlements,
         private TeacherRates $teachers,
+        private ClosedPeriods $closed,
     ) {
     }
 
@@ -30,6 +33,7 @@ final readonly class PaySettlement
         $teacher = TeacherRef::fromString($teacherId);
         $period = YearMonth::fromString($month);
         SettlementGuard::ensureOpen($this->settlements, $teacher, $period);
+        PeriodClosed::guard($this->closed, LocalDate::fromString($paidOn));
         $rate = array_values(array_filter($this->teachers->all(), static fn (TeacherRate $t): bool => $t->id === $teacher->value))[0]
             ?? throw new InvalidValue('teacherId', 'Ese profesor no existe.');
         $entries = array_values(array_filter($this->timesheets->forMonth($period), static fn (TimesheetEntry $e): bool => $e->teacher()->equals($teacher)));

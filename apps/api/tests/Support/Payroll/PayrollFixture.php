@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Support\Payroll;
 
+use App\Application\Common\Port\ClosedPeriods;
 use App\Application\Payroll\Port\ProposalLog;
 use App\Application\Payroll\Port\ScheduleDirectory;
 use App\Application\Payroll\Port\SettlementRepository;
@@ -23,7 +24,7 @@ use App\Tests\Support\FrozenClock;
 use App\Tests\Support\ImmediateTransactionRunner;
 
 /** Dobles en memoria de los puertos de Payroll. */
-final class PayrollFixture implements ScheduleDirectory, TeacherRates, TimesheetRepository, SettlementRepository, ProposalLog
+final class PayrollFixture implements ClosedPeriods, ScheduleDirectory, TeacherRates, TimesheetRepository, SettlementRepository, ProposalLog
 {
     /** @var list<ScheduledGroup> */
     public array $groups = [];
@@ -35,6 +36,7 @@ final class PayrollFixture implements ScheduleDirectory, TeacherRates, Timesheet
     public array $settlements = [];
     /** @var array<string, true> */
     public array $proposed = [];
+    public bool $closed = false;
     public FrozenClock $clock;
     public ImmediateTransactionRunner $transactions;
 
@@ -112,5 +114,10 @@ final class PayrollFixture implements ScheduleDirectory, TeacherRates, Timesheet
     public function markProposed(YearMonth $month): void
     {
         $this->proposed[$month->toString()] = true;
+    }
+
+    public function isClosed(LocalDate $date): bool
+    {
+        return $this->closed;
     }
 }
