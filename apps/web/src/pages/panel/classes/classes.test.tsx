@@ -3,7 +3,13 @@ import userEvent from '@testing-library/user-event';
 
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
-const TEACHER = { id: 't1', fullName: 'Lucía Moreno Gil', active: true, groupCount: 1 };
+const TEACHER = {
+  id: 't1',
+  fullName: 'Lucía Moreno Gil',
+  active: true,
+  groupCount: 1,
+  hourlyRate: '16.00',
+};
 const GROUP = {
   id: 'g1',
   name: 'Iniciación A',
@@ -184,6 +190,29 @@ describe('Clases', () => {
     await user.click(screen.getByRole('button', { name: 'Guardar' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No se puede desactivar');
+  });
+
+  it('should show and change the hourly rate of a teacher', async () => {
+    const user = userEvent.setup();
+    const fetchSpy = api({ 'PUT /api/admin/teachers/t1': [204] });
+    renderApp('/panel/clases?pestana=profesores');
+
+    expect(await screen.findByText('16 €/h')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Editar Lucía Moreno Gil' }));
+    const rate = screen.getByLabelText('Tarifa por hora (€)');
+    await user.clear(rate);
+    await user.type(rate, '17,5');
+    await user.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        '/api/admin/teachers/t1',
+        expect.objectContaining({
+          method: 'PUT',
+          body: '{"fullName":"Lucía Moreno Gil","active":true,"hourlyRate":"17,5"}',
+        }),
+      ),
+    );
   });
 
   it('should be reachable from the panel navigation', async () => {

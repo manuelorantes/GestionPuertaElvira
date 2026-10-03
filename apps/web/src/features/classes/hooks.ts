@@ -50,8 +50,17 @@ export function useCreateTeacher() {
 export function useUpdateTeacher() {
   const invalidate = useInvalidateClasses();
   return useMutation({
-    mutationFn: ({ id, fullName, active }: { id: string; fullName: string; active: boolean }) =>
-      updateTeacher(id, fullName, active),
+    mutationFn: ({
+      id,
+      fullName,
+      active,
+      hourlyRate,
+    }: {
+      id: string;
+      fullName: string;
+      active: boolean;
+      hourlyRate: string;
+    }) => updateTeacher(id, fullName, active, hourlyRate),
     onSuccess: invalidate,
   });
 }

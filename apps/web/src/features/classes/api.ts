@@ -26,6 +26,7 @@ export interface Teacher {
   fullName: string;
   active: boolean;
   groupCount: number;
+  hourlyRate: string;
 }
 
 export interface GroupPayload {
@@ -57,8 +58,13 @@ export function createTeacher(fullName: string): Promise<unknown> {
   return apiSend('POST', '/api/admin/teachers', { fullName });
 }
 
-export function updateTeacher(id: string, fullName: string, active: boolean): Promise<unknown> {
-  return apiSend('PUT', `/api/admin/teachers/${id}`, { fullName, active });
+export function updateTeacher(
+  id: string,
+  fullName: string,
+  active: boolean,
+  hourlyRate: string,
+): Promise<unknown> {
+  return apiSend('PUT', `/api/admin/teachers/${id}`, { fullName, active, hourlyRate });
 }
 
 export interface ClassGroupDetail extends ClassGroup {

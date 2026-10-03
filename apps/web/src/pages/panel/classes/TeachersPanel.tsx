@@ -11,6 +11,11 @@ import { Card } from '@/shared/ui/Card';
 import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 
+/** «16.00» → «16»; «17.50» → «17,5». */
+function rateLabel(rate: string): string {
+  return String(Number(rate)).replace('.', ',');
+}
+
 function NewTeacherForm() {
   const [name, setName] = useState('');
   const create = useCreateTeacher();
@@ -43,12 +48,13 @@ function TeacherRow({ teacher }: { teacher: Teacher }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(teacher.fullName);
   const [active, setActive] = useState(teacher.active);
+  const [rate, setRate] = useState(rateLabel(teacher.hourlyRate));
   const update = useUpdateTeacher();
 
   function save(event: FormEvent) {
     event.preventDefault();
     update.mutate(
-      { id: teacher.id, fullName: name, active },
+      { id: teacher.id, fullName: name, active, hourlyRate: rate },
       { onSuccess: () => setEditing(false) },
     );
   }
@@ -62,6 +68,13 @@ function TeacherRow({ teacher }: { teacher: Teacher }) {
             label="Nombre y apellidos"
             value={name}
             onChange={(event) => setName(event.target.value)}
+          />
+          <TextField
+            label="Tarifa por hora (€)"
+            help="Lo que el club le paga por hora impartida"
+            inputMode="decimal"
+            value={rate}
+            onChange={(event) => setRate(event.target.value)}
           />
           <Switch label="Activo" checked={active} onChange={setActive} />
           <div className="flex gap-2">
@@ -80,6 +93,7 @@ function TeacherRow({ teacher }: { teacher: Teacher }) {
   return (
     <li className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
       <span className="flex-1 font-medium">{teacher.fullName}</span>
+      <span className="text-sm text-ink-soft">{rateLabel(teacher.hourlyRate)} €/h</span>
       <span className="text-sm text-ink-muted">
         {teacher.groupCount} {teacher.groupCount === 1 ? 'grupo' : 'grupos'}
       </span>
