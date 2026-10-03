@@ -235,18 +235,23 @@ final readonly class SeedDemoDataCommand
             }
         }
 
-        $previousMonths = 0;
+        $previous = [];
         for ($month = $season->firstMonth(); !$current->isBefore($month); $month = $month->next()) {
             ($this->generateCharges)($month->toString());
-            $previousMonths += $month->isBefore($current) ? 1 : 0;
+            if ($month->isBefore($current)) {
+                $previous[] = $month;
+            }
         }
 
-        $pay = fn (string $key, int $months, string $kind = 'monthly', string $method = 'transfer'): string => ($this->registerPayment)(new PaymentRequest($studentIds[$key], $kind, $months, $method, $today->toString(), false, null, null));
+        $pay = fn (string $key, int $months, string $kind = 'monthly', string $method = 'transfer', ?string $date = null): string => ($this->registerPayment)(new PaymentRequest($studentIds[$key], $kind, $months, $method, $date ?? $today->toString(), false, null, null));
         $count = 0;
-        foreach (array_keys($studentIds) as $key) {
-            if ($previousMonths > 0 && !\in_array($key, self::OVERDUE, true)) {
-                $pay($key, $previousMonths, method: 0 === $count % 3 ? 'cash' : 'transfer');
-                ++$count;
+        // Los meses anteriores se cobraron en plazo, cada uno en su mes.
+        foreach ($previous as $month) {
+            foreach (array_keys($studentIds) as $key) {
+                if (!\in_array($key, self::OVERDUE, true)) {
+                    $pay($key, 1, method: 0 === $count % 3 ? 'cash' : 'transfer', date: \sprintf('%s-%02d', $month->toString(), 2 + $count % 3));
+                    ++$count;
+                }
             }
         }
         foreach (self::PAID_THIS_MONTH as $key => $months) {
