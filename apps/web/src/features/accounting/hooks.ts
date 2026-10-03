@@ -26,7 +26,7 @@ export function useAccountingMutation<Variables, Result = void>(
     mutationFn,
     onSuccess: () =>
       Promise.all(
-        ['ledger', 'invoices', 'fiscal-year'].map((key) =>
+        ['ledger', 'invoices', 'fiscal-year', 'dashboard'].map((key) =>
           queryClient.invalidateQueries({ queryKey: [key] }),
         ),
       ),
