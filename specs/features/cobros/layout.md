@@ -79,7 +79,7 @@ StudentPanel (ficha de alumno) → nueva tarjeta «Cuotas y cobros»
 ## 3. Responsive
 
 - **Escritorio:** las tablas se muestran como rejillas.
-- **Móvil (< md):** las filas pasan a ser tarjetas con el nombre, el concepto, el importe, el estado y las acciones a ancho completo.
+- **Móvil (< md):** las cuotas pasan a ser tarjetas con el nombre, el importe, el concepto, el estado y las acciones; la tabla de cobros registrados se desplaza en horizontal dentro de su tarjeta.
   - Las pestañas se pueden desplazar en horizontal.
   - El recibo ocupa toda la anchura.
 - **Impresión:** solo se imprime la hoja del recibo (`print:` oculta el resto).

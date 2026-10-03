@@ -162,3 +162,11 @@ Cada bloque es un botón coloreado por nivel; el ancho mínimo es de 980px, con 
 - Prohibido usar colores hexadecimales en componentes: solo tokens de `index.css`.
 - Antes de crear un primitivo, busca en `apps/web/src/shared/ui/`.
 - Un token nuevo se añade a la vez en `index.css` y en esta guía.
+
+## Hoja imprimible (recibos y facturas)
+
+- La hoja va dentro del diálogo con la clase `receipt-sheet` y fondo `bg-white`, sobre el borde `border-line`.
+  La cabecera lleva el `ClubLogo` y una línea inferior `border-b-4 border-brand`.
+- Al imprimir (`window.print()`), las reglas `@media print` de `index.css` ocultan todo salvo `.receipt-sheet`.
+  Los controles del diálogo llevan `print:hidden`.
+- Los importes se formatean siempre con `formatCents`, que omite los decimales cuando son cero («45 €», «40,50 €»).
