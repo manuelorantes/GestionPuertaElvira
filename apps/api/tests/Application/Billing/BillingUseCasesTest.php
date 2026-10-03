@@ -49,8 +49,8 @@ final class BillingUseCasesTest extends TestCase
         $id = $this->fx->student();
         new UpdateStudentAccount($this->fx)($id, 'monthly', true, null);
 
+        $this->generate('2026-09');
         $this->generate('2026-10');
-        $this->generate('2026-11');
 
         self::assertSame(5000, $this->fx->chargeFor(StudentRef::fromString($id), ChargeKind::Membership, YearMonth::fromString('2026-09'))?->amount()->cents);
         self::assertCount(3, $this->fx->charges);
@@ -105,6 +105,59 @@ final class BillingUseCasesTest extends TestCase
             self::assertTrue($this->fx->chargeFor(StudentRef::fromString($id), ChargeKind::Monthly, YearMonth::fromString($month))?->isPaid());
         }
         self::assertSame(1, $this->fx->transactions->runs);
+    }
+
+    public function test_should_fill_gaps_instead_of_jumping_after_the_latest_charge(): void
+    {
+        $id = $this->fx->student(regularHours: 2.0);
+        $this->generate('2026-10');
+        $december = \App\Domain\Billing\Charge::create(\App\Domain\Billing\ChargeId::generate(), StudentRef::fromString($id), ChargeKind::Monthly, YearMonth::fromString('2026-12'), \App\Domain\Common\Money::euros(45));
+        $december->payWith(PaymentId::generate());
+        $this->fx->saveCharge($december);
+
+        $paymentId = $this->register($id, 3);
+
+        self::assertSame(['2026-10', '2026-11', '2027-01'], array_map(static fn ($p): string => $p->toString(), $this->fx->payment(PaymentId::fromString($paymentId))?->periods() ?? []));
+    }
+
+    public function test_should_not_generate_charges_for_future_months(): void
+    {
+        $this->fx->student();
+
+        $this->generate('2026-11');
+
+        self::assertSame([], $this->fx->charges);
+    }
+
+    public function test_should_charge_pending_months_at_their_stored_amount(): void
+    {
+        $id = $this->fx->student(regularHours: 2.0);
+        $this->generate('2026-10');
+        $this->fx->changeHours($id, 3.0);
+
+        self::assertSame(4500, $this->quote($id, 1)->quote->total->cents, 'octubre se generó a 45 €');
+        self::assertSame(4500 + 5500, $this->quote($id, 2)->quote->gross->cents, 'noviembre ya va con el tramo nuevo');
+    }
+
+    public function test_should_collect_the_debt_of_a_withdrawn_student(): void
+    {
+        $id = $this->fx->student(regularHours: 2.0);
+        $this->generate('2026-10');
+        $this->fx->changeHours($id, 0.0);
+
+        self::assertSame(4500, $this->quote($id, 1)->quote->total->cents);
+        $this->expectExceptionObject(InvalidPaymentRequest::nothingToPay());
+        $this->quote($id, 2);
+    }
+
+    public function test_should_only_prorate_the_month_of_the_payment(): void
+    {
+        $id = $this->fx->student(regularHours: 2.0);
+        $this->generate('2026-09');
+
+        $this->expectExceptionObject(InvalidPaymentRequest::prorationOnlyCurrentMonth());
+
+        new QuotePayment($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock)(new PaymentRequest($id, 'monthly', 1, 'cash', '2026-10-15', true, null, null));
     }
 
     public function test_should_number_receipts_correlatively(): void
@@ -178,7 +231,7 @@ final class BillingUseCasesTest extends TestCase
 
     private function generate(string $month): void
     {
-        new GenerateMonthlyCharges($this->fx, $this->fx, $this->fx, $this->fx)($month);
+        new GenerateMonthlyCharges($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock)($month);
     }
 
     private function quote(string $id, int $months): PaymentQuote

@@ -24,6 +24,11 @@ final class InvalidPaymentRequest extends DomainException implements HasErrorDet
         return new self('El prorrateo solo se aplica al cobrar un único mes.', 'proration_requires_one_month');
     }
 
+    public static function prorationOnlyCurrentMonth(): self
+    {
+        return new self('El prorrateo solo se aplica al mes de la fecha del cobro, sin cuotas anteriores pendientes.', 'proration_only_current_month');
+    }
+
     public static function beyondSeason(int $available): self
     {
         return new self(\sprintf('Solo quedan %d meses de temporada por cobrar.', $available), 'beyond_season');
