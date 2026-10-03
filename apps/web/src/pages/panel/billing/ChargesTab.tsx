@@ -1,4 +1,4 @@
-import { Check, ChevronLeft, ChevronRight, MessageCircle, Printer } from 'lucide-react';
+import { Check, MessageCircle, Printer } from 'lucide-react';
 
 import type { Charge, ChargeStatus } from '@/features/billing/api';
 import { useMonthlyCharges } from '@/features/billing/hooks';
@@ -7,6 +7,7 @@ import { Alert } from '@/shared/ui/Alert';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
+import { MonthNav } from '@/shared/ui/MonthNav';
 
 import type { BillingDialog } from './BillingPage';
 
@@ -176,30 +177,11 @@ export function ChargesTab({ month, onMonthChange, onAction }: ChargesTabProps) 
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <button
-          type="button"
-          aria-label="Mes anterior"
-          onClick={() => onMonthChange(shiftMonth(month, -1))}
-          className="flex size-10 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted"
-        >
-          <ChevronLeft aria-hidden size={18} />
-        </button>
-        <p
-          aria-live="polite"
-          className="min-w-40 text-center font-display text-xl font-semibold tracking-[0.04em] uppercase"
-        >
-          {monthLabel(month)}
-        </p>
-        <button
-          type="button"
-          aria-label="Mes siguiente"
-          onClick={() => onMonthChange(shiftMonth(month, 1))}
-          className="flex size-10 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted"
-        >
-          <ChevronRight aria-hidden size={18} />
-        </button>
-      </div>
+      <MonthNav
+        label={monthLabel(month)}
+        onPrevious={() => onMonthChange(shiftMonth(month, -1))}
+        onNext={() => onMonthChange(shiftMonth(month, 1))}
+      />
       {data && items.length > 0 && (
         <Card className="flex flex-col gap-2 px-6 py-5">
           <div className="flex flex-wrap justify-between gap-2 text-sm">
