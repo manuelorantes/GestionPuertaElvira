@@ -32,6 +32,10 @@ deptrac:
       collectors:
         - type: classLike
           value: '^App\\Domain\\Billing\\.*'
+    - name: DomainPayroll
+      collectors:
+        - type: classLike
+          value: '^App\\Domain\\Payroll\\.*'
     - name: Application
       collectors:
         - type: classLike
@@ -72,7 +76,11 @@ deptrac:
     DomainBilling:
       - DomainCommon
       - Assertions
+    DomainPayroll:
+      - DomainCommon
+      - Assertions
     Application:
+      - DomainPayroll
       - DomainBilling
       - DomainCommon
       - DomainIdentity
@@ -81,6 +89,7 @@ deptrac:
       - DomainTeachers
       - Assertions
     Infrastructure:
+      - DomainPayroll
       - DomainBilling
       - Application
       - DomainCommon
