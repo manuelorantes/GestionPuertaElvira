@@ -100,6 +100,15 @@ final class AccountingUseCasesTest extends TestCase
         $close(2026);
     }
 
+    public function test_should_not_close_a_season_while_an_older_one_with_movements_is_open(): void
+    {
+        $this->fx->external = [new LedgerLine('payment', 'p0', '2024-10-02', 'income', 'Octubre 2024', 'fees', 'cash', 4500)];
+
+        $this->expectException(\App\Application\Accounting\Error\PreviousSeasonOpen::class);
+
+        new CloseSeason(new FiscalYearSummary($this->fx, $this->fx, $this->fx->clock), $this->fx, $this->fx->clock)(2026);
+    }
+
     public function test_should_not_close_a_season_before_its_last_month(): void
     {
         $this->expectException(SeasonNotFinished::class);

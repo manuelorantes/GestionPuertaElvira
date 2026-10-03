@@ -6,6 +6,7 @@ namespace App\Application\Payroll;
 
 use App\Application\Payroll\Port\ScheduleDirectory;
 use App\Application\Payroll\Port\SettlementRepository;
+use App\Application\Payroll\Port\TeacherRates;
 use App\Application\Payroll\Port\TimesheetRepository;
 use App\Domain\Common\InvalidValue;
 use App\Domain\Common\LocalDate;
@@ -23,12 +24,14 @@ final readonly class RecordSession
         private TimesheetRepository $timesheets,
         private SettlementRepository $settlements,
         private ScheduleDirectory $schedule,
+        private TeacherRates $teachers,
     ) {
     }
 
     public function __invoke(SessionInput $input): string
     {
         $teacher = TeacherRef::fromString($input->teacherId);
+        TeacherCheck::ensureExists($this->teachers, $teacher);
         $date = LocalDate::fromString($input->date);
         $group = null;
         $label = (string) $input->activity;

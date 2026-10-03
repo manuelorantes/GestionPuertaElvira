@@ -44,12 +44,14 @@ final class BillingFixture implements ClosedPeriods, BillingSettingsRepository, 
     public array $closedDates = [];
     public FrozenClock $clock;
     public ImmediateTransactionRunner $transactions;
+    public \App\Tests\Support\RecordingLocks $locks;
 
     public function __construct(string $now = '2026-10-02 10:00:00')
     {
         $this->settings = BillingSettings::defaults();
         $this->clock = new FrozenClock($now);
         $this->transactions = new ImmediateTransactionRunner();
+        $this->locks = new \App\Tests\Support\RecordingLocks();
     }
 
     /** @param list<PrivateEnrolment> $private */

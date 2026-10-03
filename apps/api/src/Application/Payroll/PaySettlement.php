@@ -6,6 +6,8 @@ namespace App\Application\Payroll;
 
 use App\Application\Common\Error\PeriodClosed;
 use App\Application\Common\Port\ClosedPeriods;
+use App\Application\Common\Port\Locks;
+use App\Application\Common\Port\TransactionRunner;
 use App\Application\Payroll\Port\SettlementRepository;
 use App\Application\Payroll\Port\TeacherRates;
 use App\Application\Payroll\Port\TimesheetRepository;
@@ -25,6 +27,8 @@ final readonly class PaySettlement
         private SettlementRepository $settlements,
         private TeacherRates $teachers,
         private ClosedPeriods $closed,
+        private TransactionRunner $transactions,
+        private Locks $locks,
     ) {
     }
 
@@ -32,6 +36,14 @@ final readonly class PaySettlement
     {
         $teacher = TeacherRef::fromString($teacherId);
         $period = YearMonth::fromString($month);
+        $this->transactions->run(function () use ($teacher, $period, $paidOn): void {
+            $this->locks->acquire(\sprintf('payroll:settlement:%s:%s', $teacher->value, $period));
+            $this->pay($teacher, $period, $paidOn);
+        });
+    }
+
+    private function pay(TeacherRef $teacher, YearMonth $period, string $paidOn): void
+    {
         SettlementGuard::ensureOpen($this->settlements, $teacher, $period);
         PeriodClosed::guard($this->closed, LocalDate::fromString($paidOn));
         $rate = array_values(array_filter($this->teachers->all(), static fn (TeacherRate $t): bool => $t->id === $teacher->value))[0]
