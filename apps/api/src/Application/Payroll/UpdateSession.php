@@ -6,6 +6,7 @@ namespace App\Application\Payroll;
 
 use App\Application\Payroll\Error\SessionNotFound;
 use App\Application\Payroll\Port\SettlementRepository;
+use App\Application\Payroll\Port\TeacherRates;
 use App\Application\Payroll\Port\TimesheetRepository;
 use App\Domain\Payroll\SessionMinutes;
 use App\Domain\Payroll\TeacherRef;
@@ -14,7 +15,7 @@ use App\Domain\Payroll\TimesheetEntryId;
 /** Cambia el profesor (sustitución) o las horas de una sesión. */
 final readonly class UpdateSession
 {
-    public function __construct(private TimesheetRepository $timesheets, private SettlementRepository $settlements)
+    public function __construct(private TimesheetRepository $timesheets, private SettlementRepository $settlements, private TeacherRates $teachers)
     {
     }
 
@@ -22,6 +23,7 @@ final readonly class UpdateSession
     {
         $entry = $this->timesheets->entry(TimesheetEntryId::fromString($id)) ?? throw new SessionNotFound();
         $teacher = TeacherRef::fromString($teacherId);
+        TeacherCheck::ensureExists($this->teachers, $teacher);
         SettlementGuard::ensureOpen($this->settlements, $entry->teacher(), $entry->month());
         SettlementGuard::ensureOpen($this->settlements, $teacher, $entry->month());
 

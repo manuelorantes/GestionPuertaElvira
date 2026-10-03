@@ -24,6 +24,7 @@ services:
 
     # Puertos → adaptadores
     App\Application\Common\Port\TransactionRunner: '@App\Infrastructure\Persistence\Doctrine\DoctrineTransactionRunner'
+    App\Application\Common\Port\Locks: '@App\Infrastructure\Persistence\Doctrine\PostgresAdvisoryLocks'
     App\Application\Health\Port\DatabaseHealth: '@App\Infrastructure\Persistence\Doctrine\DoctrineDatabaseHealth'
     App\Application\Identity\Port\UserRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Identity\DoctrineUserRepository'
     App\Application\Identity\Port\SessionRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Identity\DoctrineSessionRepository'

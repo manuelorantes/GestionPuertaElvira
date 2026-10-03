@@ -8,6 +8,8 @@ use App\Application\Billing\Port\BillingSettingsRepository;
 use App\Application\Billing\Port\ChargeRepository;
 use App\Application\Billing\Port\StudentAccountRepository;
 use App\Application\Billing\Port\StudentDirectory;
+use App\Application\Common\Port\Locks;
+use App\Application\Common\Port\TransactionRunner;
 use App\Domain\Billing\Charge;
 use App\Domain\Billing\ChargeId;
 use App\Domain\Billing\ChargeKind;
@@ -30,6 +32,8 @@ final readonly class GenerateMonthlyCharges
         private StudentAccountRepository $accounts,
         private ChargeRepository $charges,
         private Clock $clock,
+        private TransactionRunner $transactions,
+        private Locks $locks,
     ) {
     }
 
@@ -42,6 +46,15 @@ final readonly class GenerateMonthlyCharges
             return;
         }
 
+        $this->transactions->run(function () use ($period, $season): void {
+            // Dos pantallas que abren el mismo mes a la vez no deben crear la misma cuota dos veces.
+            $this->locks->acquire('billing:charges:'.$period->toString());
+            $this->generate($period, $season);
+        });
+    }
+
+    private function generate(YearMonth $period, Season $season): void
+    {
         $settings = $this->settings->get();
         $calculator = new FeeCalculator();
         foreach ($this->directory->activeIn($period) as $student) {

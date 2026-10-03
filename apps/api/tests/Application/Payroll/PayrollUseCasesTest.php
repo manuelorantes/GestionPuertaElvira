@@ -44,6 +44,21 @@ final class PayrollUseCasesTest extends TestCase
         self::assertCount(11, $this->fx->entries);
     }
 
+    public function test_should_not_propose_months_older_than_the_previous_one(): void
+    {
+        $this->propose('2026-08');
+        $this->propose('2025-10');
+
+        self::assertSame([], $this->fx->entries);
+    }
+
+    public function test_should_refuse_sessions_for_unknown_teachers(): void
+    {
+        $this->expectException(InvalidValue::class);
+
+        new RecordSession($this->fx, $this->fx, $this->fx, $this->fx)(new SessionInput(\App\Domain\Payroll\TeacherRef::generate()->value, '2026-10-15', null, 'Torneo', 1.0));
+    }
+
     public function test_should_not_propose_future_months(): void
     {
         $this->propose('2026-11');
@@ -56,7 +71,7 @@ final class PayrollUseCasesTest extends TestCase
     {
         $group = $this->fx->groups[0]->id->value;
 
-        $record = new RecordSession($this->fx, $this->fx, $this->fx);
+        $record = new RecordSession($this->fx, $this->fx, $this->fx, $this->fx);
         $groupSession = $record(new SessionInput($this->carlos, '2026-10-15', $group, null, 1.0));
         $activity = $record(new SessionInput($this->lucia, '2026-10-17', null, 'Torneo escolar', 3.0));
 
@@ -71,7 +86,7 @@ final class PayrollUseCasesTest extends TestCase
         $this->propose('2026-10');
         $mondaySession = array_values(array_filter($this->fx->entries, static fn ($e): bool => '2026-10-12' === $e->date()->toString()))[0];
 
-        new UpdateSession($this->fx, $this->fx)($mondaySession->id()->value, $this->carlos, 1.5);
+        new UpdateSession($this->fx, $this->fx, $this->fx)($mondaySession->id()->value, $this->carlos, 1.5);
         self::assertSame($this->carlos, $mondaySession->teacher()->value);
         self::assertSame(90, $mondaySession->minutes()->minutes);
 
@@ -96,7 +111,7 @@ final class PayrollUseCasesTest extends TestCase
     public function test_should_pay_a_settlement_freezing_it_and_locking_its_sessions(): void
     {
         $this->propose('2026-10');
-        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx)($this->lucia, '2026-10', '2026-11-02');
+        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->transactions, $this->fx->locks)($this->lucia, '2026-10', '2026-11-02');
         $this->fx->teachers[$this->lucia] = new \App\Application\Payroll\TeacherRate($this->lucia, 'Lucía Moreno Gil', \App\Domain\Common\Money::cents(9900), true);
 
         $lucia = new ListSettlements($this->fx, $this->fx, $this->fx)('2026-10')[1];
@@ -116,23 +131,23 @@ final class PayrollUseCasesTest extends TestCase
 
         $this->expectException(\App\Application\Common\Error\PeriodClosed::class);
 
-        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx)($this->lucia, '2026-10', '2026-11-02');
+        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->transactions, $this->fx->locks)($this->lucia, '2026-10', '2026-11-02');
     }
 
     public function test_should_pay_every_pending_settlement_of_the_month(): void
     {
         $this->propose('2026-10');
 
-        $paid = new PayAllSettlements(new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx), new ListSettlements($this->fx, $this->fx, $this->fx))('2026-10', '2026-11-02');
+        $paid = new PayAllSettlements(new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->transactions, $this->fx->locks), new ListSettlements($this->fx, $this->fx, $this->fx), $this->fx->transactions)('2026-10', '2026-11-02');
 
         self::assertSame(2, $paid);
         self::assertCount(2, $this->fx->settlements);
         $this->expectException(SettlementAlreadyPaid::class);
-        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx)($this->carlos, '2026-10', '2026-11-03');
+        new PaySettlement($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->transactions, $this->fx->locks)($this->carlos, '2026-10', '2026-11-03');
     }
 
     private function propose(string $month): void
     {
-        new ProposeMonthSessions($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock, $this->fx->transactions)($month);
+        new ProposeMonthSessions($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock, $this->fx->transactions, $this->fx->locks)($month);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\Payroll;
 
+use App\Application\Common\Port\Locks;
 use App\Application\Common\Port\TransactionRunner;
 use App\Application\Payroll\Port\ProposalLog;
 use App\Application\Payroll\Port\ScheduleDirectory;
@@ -17,7 +18,7 @@ use App\Domain\Payroll\TimesheetEntry;
 use App\Domain\Payroll\TimesheetEntryId;
 
 /**
- * Propone, una sola vez por mes y nunca para meses futuros, las sesiones del horario.
+ * Propone, una sola vez por mes y solo para el mes en curso o el anterior, las sesiones del horario.
  * Lo que administración borre después no vuelve a aparecer.
  */
 final readonly class ProposeMonthSessions
@@ -29,17 +30,24 @@ final readonly class ProposeMonthSessions
         private ProposalLog $log,
         private Clock $clock,
         private TransactionRunner $transactions,
+        private Locks $locks,
     ) {
     }
 
     public function __invoke(string $month): void
     {
         $period = YearMonth::fromString($month);
-        if (YearMonth::of(LocalDate::fromInstant($this->clock->now()))->isBefore($period) || $this->log->wasProposed($period)) {
+        $current = YearMonth::of(LocalDate::fromInstant($this->clock->now()));
+        // Solo el mes en curso y el anterior (el que se liquida): un mes antiguo no se rellena con el horario de hoy.
+        if (!$period->equals($current) && !$period->next()->equals($current)) {
             return;
         }
 
         $this->transactions->run(function () use ($period): void {
+            $this->locks->acquire('payroll:proposal:'.$period->toString());
+            if ($this->log->wasProposed($period)) {
+                return;
+            }
             foreach (new SessionPlanner()->plan($period, $this->schedule->groups()) as $session) {
                 if (null !== $this->settlements->settlement($session->group->teacher, $period)) {
                     continue;

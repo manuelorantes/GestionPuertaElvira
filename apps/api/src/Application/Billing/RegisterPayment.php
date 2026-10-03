@@ -9,6 +9,7 @@ use App\Application\Billing\Port\DocumentSequence;
 use App\Application\Billing\Port\PaymentRepository;
 use App\Application\Common\Error\PeriodClosed;
 use App\Application\Common\Port\ClosedPeriods;
+use App\Application\Common\Port\Locks;
 use App\Application\Common\Port\TransactionRunner;
 use App\Domain\Billing\Charge;
 use App\Domain\Billing\ChargeId;
@@ -30,16 +31,19 @@ final readonly class RegisterPayment
         private DocumentSequence $sequence,
         private TransactionRunner $transactions,
         private ClosedPeriods $closed,
+        private Locks $locks,
     ) {
     }
 
     public function __invoke(PaymentRequest $request): string
     {
-        $quote = ($this->quotes)($request);
-        PeriodClosed::guard($this->closed, $quote->date);
-        $ref = StudentRef::fromString($quote->student->id);
+        return $this->transactions->run(function () use ($request): string {
+            // Un doble clic no puede cobrar dos veces lo mismo: el segundo espera y recalcula sobre lo ya pagado.
+            $this->locks->acquire('billing:student:'.StudentRef::fromString($request->studentId)->value);
+            $quote = ($this->quotes)($request);
+            PeriodClosed::guard($this->closed, $quote->date);
+            $ref = StudentRef::fromString($quote->student->id);
 
-        return $this->transactions->run(function () use ($quote, $request, $ref): string {
             $season = Season::containing(YearMonth::of($quote->date));
             $payment = Payment::register(
                 PaymentId::generate(),

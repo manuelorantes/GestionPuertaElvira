@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Teachers\Http;
 
+use App\Application\Common\Port\TransactionRunner;
 use App\Application\Teachers\ActivateTeacher;
 use App\Application\Teachers\ChangeTeacherRate;
 use App\Application\Teachers\DeactivateTeacher;
@@ -41,14 +42,18 @@ final readonly class TeachersController
         ActivateTeacher $activate,
         DeactivateTeacher $deactivate,
         ChangeTeacherRate $changeRate,
+        TransactionRunner $transactions,
     ): Response {
         $body = JsonBody::from($request);
-        $rename($id, $body->requiredString('fullName'));
-        $rate = $body->optionalString('hourlyRate');
-        if (null !== $rate) {
-            $changeRate($id, $rate);
-        }
-        $body->bool('active', true) ? $activate($id) : $deactivate($id);
+        // Todo o nada: si la tarifa no es válida o no se puede desactivar, tampoco se cambia el nombre.
+        $transactions->run(static function () use ($body, $id, $rename, $changeRate, $activate, $deactivate): void {
+            $rename($id, $body->requiredString('fullName'));
+            $rate = $body->optionalString('hourlyRate');
+            if (null !== $rate) {
+                $changeRate($id, $rate);
+            }
+            $body->bool('active', true) ? $activate($id) : $deactivate($id);
+        });
 
         return new Response(status: Response::HTTP_NO_CONTENT);
     }
