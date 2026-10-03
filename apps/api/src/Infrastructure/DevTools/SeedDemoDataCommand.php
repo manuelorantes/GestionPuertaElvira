@@ -13,15 +13,19 @@ use App\Application\Billing\UpdateStudentAccount;
 use App\Application\Classes\CreateClassGroup;
 use App\Application\Classes\GroupInput;
 use App\Application\Classes\Port\ClassGroupRepository;
+use App\Application\Payroll\PaySettlement;
+use App\Application\Payroll\ProposeMonthSessions;
 use App\Application\Students\LinkSiblings;
 use App\Application\Students\RegisterStudent;
 use App\Application\Students\StudentInput;
+use App\Application\Teachers\ChangeTeacherRate;
 use App\Application\Teachers\RegisterTeacher;
 use App\Domain\Common\Clock;
 use App\Domain\Common\LocalDate;
 use App\Domain\Common\Season;
 use App\Domain\Common\YearMonth;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
@@ -45,6 +49,12 @@ final readonly class SeedDemoDataCommand
         'p4' => 'Ana Belén Torres',
         'p5' => 'Miguel Á. Fernández',
     ];
+
+    /** Tarifa por hora del diseño. */
+    private const array RATES = ['p1' => '16', 'p2' => '18', 'p3' => '20', 'p4' => '15', 'p5' => '17'];
+
+    /** Profesor con la liquidación del mes anterior aún pendiente. */
+    private const string UNPAID_TEACHER = 'p5';
 
     /** [nombre, nivel, profesor, días, inicio, fin, aula, plazas] */
     private const array GROUPS = [
@@ -124,6 +134,10 @@ final readonly class SeedDemoDataCommand
         private RegisterPayment $registerPayment,
         private IssueInvoice $issueInvoice,
         private Clock $clock,
+        private ChangeTeacherRate $changeRate,
+        private ProposeMonthSessions $proposeSessions,
+        private PaySettlement $paySettlement,
+        private EntityManagerInterface $em,
     ) {
     }
 
@@ -133,13 +147,14 @@ final readonly class SeedDemoDataCommand
         bool $reset = false,
     ): int {
         if ($reset) {
-            foreach (['billing_charge', 'billing_payment', 'billing_account', 'billing_settings', 'billing_document_sequence'] as $table) {
+            foreach (['payroll_session', 'payroll_settlement', 'payroll_proposed_month', 'billing_charge', 'billing_payment', 'billing_account', 'billing_settings', 'billing_document_sequence'] as $table) {
                 $this->connection->executeStatement("DELETE FROM {$table}");
             }
             $this->connection->executeStatement('DELETE FROM classes_enrolment');
             $this->connection->executeStatement('DELETE FROM students_student');
             $this->connection->executeStatement('DELETE FROM classes_group');
             $this->connection->executeStatement('DELETE FROM teachers_teacher');
+            $this->em->clear();
         }
 
         if ([] !== $this->groups->all()) {
@@ -149,6 +164,9 @@ final readonly class SeedDemoDataCommand
         }
 
         $teacherIds = array_map(fn (string $name): string => ($this->registerTeacher)($name), self::TEACHERS);
+        foreach (self::RATES as $key => $rate) {
+            ($this->changeRate)($teacherIds[$key], $rate);
+        }
         $groupIds = [];
         foreach (self::GROUPS as [$name, $level, $teacher, $days, $start, $end, $classroom, $capacity]) {
             $groupIds[$name] = ($this->createGroup)(new GroupInput($name, $level, $teacherIds[$teacher], $days, $start, $end, $classroom, $capacity));
@@ -165,6 +183,7 @@ final readonly class SeedDemoDataCommand
         }
 
         $payments = $this->seedBilling($studentIds);
+        $this->seedPayroll($teacherIds);
 
         $io->success(\sprintf('Creados %d profesores, %d grupos, %d alumnos y %d cobros de demostración.', \count(self::TEACHERS), \count(self::GROUPS), \count(self::STUDENTS), $payments));
 
@@ -223,5 +242,32 @@ final readonly class SeedDemoDataCommand
         }
 
         return $count;
+    }
+
+    /**
+     * Sesiones propuestas desde septiembre y liquidaciones de los meses anteriores pagadas (salvo una).
+     *
+     * @param array<string, string> $teacherIds
+     */
+    private function seedPayroll(array $teacherIds): void
+    {
+        $today = LocalDate::fromInstant($this->clock->now());
+        $current = YearMonth::of($today);
+        $season = Season::teachingSeason($current);
+        if (null === $season) {
+            return;
+        }
+
+        for ($month = $season->firstMonth(); !$current->isBefore($month); $month = $month->next()) {
+            ($this->proposeSessions)($month->toString());
+            if (!$month->isBefore($current)) {
+                continue;
+            }
+            foreach ($teacherIds as $key => $teacherId) {
+                if (self::UNPAID_TEACHER !== $key || $month->next()->isBefore($current)) {
+                    ($this->paySettlement)($teacherId, $month->toString(), $month->next()->toString().'-02');
+                }
+            }
+        }
     }
 }

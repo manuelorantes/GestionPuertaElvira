@@ -107,6 +107,16 @@ final readonly class JsonBody
         return $value;
     }
 
+    public function optionalNumber(string $field): ?float
+    {
+        $value = $this->data[$field] ?? null;
+        if (null !== $value && !\is_int($value) && !\is_float($value)) {
+            throw new InvalidValue($field, \sprintf('El campo «%s» debe ser un número.', $field));
+        }
+
+        return null === $value ? null : (float) $value;
+    }
+
     public function optionalObject(string $field): ?self
     {
         $value = $this->data[$field] ?? null;
