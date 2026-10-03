@@ -69,18 +69,46 @@
   }
 }
 
-/* Al imprimir un recibo o una factura solo sale la hoja. */
+/*
+ * Al imprimir un recibo, una factura o una liquidación solo sale la hoja, en flujo normal
+ * (aunque esté dentro de un diálogo fijo y de un panel con altura de pantalla): así ocupa las páginas que necesite.
+ */
 @media print {
-  body * {
-    visibility: hidden;
+  *:has(.receipt-sheet) {
+    position: static !important;
+    display: block !important;
+    height: auto !important;
+    max-height: none !important;
+    max-width: none !important;
+    width: auto !important;
+    overflow: visible !important;
+    inset: auto !important;
+    padding: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
   }
-  .receipt-sheet,
-  .receipt-sheet * {
-    visibility: visible;
+  *:has(.receipt-sheet) > :not(:has(.receipt-sheet)):not(.receipt-sheet) {
+    display: none !important;
   }
   .receipt-sheet {
-    position: absolute;
-    inset: 0 0 auto;
     border: none;
   }
+}
+
+/*
+ * Los contenedores con desplazamiento son la referencia de sus hijos absolutos (p. ej. los captions sr-only de las tablas):
+ * si no, se escapan del recorte y ensanchan toda la página.
+ */
+:where(.overflow-auto, .overflow-x-auto) {
+  position: relative;
+}
+
+/* Foco visible coherente con la marca, y sin el rectángulo de toque de los navegadores móviles. */
+:where(html) {
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(a, button, [role='tab'], summary):focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
