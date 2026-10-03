@@ -7,16 +7,15 @@ namespace App\Infrastructure\Payroll;
 use App\Application\Payroll\Port\PayrollQuery;
 use App\Application\Payroll\SessionView;
 use App\Application\Payroll\TeacherActivity;
+use App\Domain\Common\Clock;
 use App\Domain\Common\LocalDate;
 use App\Domain\Common\YearMonth;
 use App\Infrastructure\Persistence\Doctrine\Row;
-use DateTimeImmutable;
-use DateTimeZone;
 use Doctrine\DBAL\Connection;
 
 final readonly class SqlPayrollQuery implements PayrollQuery
 {
-    public function __construct(private Connection $connection)
+    public function __construct(private Connection $connection, private Clock $clock)
     {
     }
 
@@ -53,7 +52,7 @@ final readonly class SqlPayrollQuery implements PayrollQuery
     public function activity(YearMonth $month): array
     {
         $range = self::range($month);
-        $today = LocalDate::fromInstant(new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid')))->toString();
+        $today = LocalDate::fromInstant($this->clock->now())->toString();
 
         // Grupos y ocupación actual por profesor.
         $groups = $this->connection->fetchAllAssociative(
@@ -88,7 +87,10 @@ final readonly class SqlPayrollQuery implements PayrollQuery
         }
 
         $charges = $this->connection->fetchAllAssociative(
-            "SELECT student_id, amount_cents FROM billing_charge WHERE kind = 'monthly' AND period = :month AND paid_by IS NOT NULL",
+            // Lo realmente cobrado por ese mes: el total del cobro repartido entre los meses que cubre (con sus descuentos).
+            "SELECT c.student_id, ROUND(p.total_cents::numeric / GREATEST(jsonb_array_length(p.periods::jsonb), 1)) AS amount_cents
+               FROM billing_charge c JOIN billing_payment p ON p.id = c.paid_by
+              WHERE c.kind = 'monthly' AND c.period = :month",
             ['month' => $month->toString()],
         );
         foreach ($charges as $values) {

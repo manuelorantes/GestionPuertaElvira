@@ -17,6 +17,9 @@ use App\Domain\Common\Money;
 /** Cierra un ejercicio terminado (o en su último mes), en orden, congelando su resultado. */
 final readonly class CloseSeason
 {
+    /** Temporadas anteriores que se revisan (el club no tiene datos de antes). */
+    private const int YEARS_BACK = 10;
+
     public function __construct(private FiscalYearSummary $summary, private SeasonClosingRepository $closings, private Clock $clock)
     {
     }
@@ -31,9 +34,11 @@ final readonly class CloseSeason
         if (!$view->canClose) {
             throw new SeasonNotFinished();
         }
-        $previous = $year->previous();
-        if (null === $this->closings->closing($previous) && $this->hasMovements($previous)) {
-            throw new PreviousSeasonOpen();
+        // En orden: ninguna temporada anterior con movimientos puede quedar abierta.
+        for ($previous = $year->previous(), $i = 0; $i < self::YEARS_BACK; $previous = $previous->previous(), ++$i) {
+            if (null === $this->closings->closing($previous) && $this->hasMovements($previous)) {
+                throw new PreviousSeasonOpen();
+            }
         }
 
         $this->closings->saveClosing(SeasonClosing::close($year, Money::cents($view->incomeCents), Money::cents($view->expenseCents), LocalDate::fromInstant($this->clock->now())));
