@@ -49,6 +49,12 @@ services:
     App\Application\Billing\Port\ChargeRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\DoctrineChargeRepository'
     App\Application\Billing\Port\PaymentRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\DoctrinePaymentRepository'
     App\Application\Billing\Port\DocumentSequence: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\SqlDocumentSequence'
+    App\Application\Payroll\Port\ScheduleDirectory: '@App\Infrastructure\Payroll\SqlScheduleDirectory'
+    App\Application\Payroll\Port\TeacherRates: '@App\Infrastructure\Payroll\SqlTeacherRates'
+    App\Application\Payroll\Port\PayrollQuery: '@App\Infrastructure\Payroll\SqlPayrollQuery'
+    App\Application\Payroll\Port\TimesheetRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Payroll\DoctrineTimesheetRepository'
+    App\Application\Payroll\Port\SettlementRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Payroll\DoctrineSettlementRepository'
+    App\Application\Payroll\Port\ProposalLog: '@App\Infrastructure\Persistence\Doctrine\Repository\Payroll\DoctrineSettlementRepository'
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
     App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Identity\Logging\MonologSecurityEventLog'
 
@@ -107,6 +113,26 @@ when@test:
             public: true
         App\Application\Billing\UpdateStudentAccount:
             autowire: true
+            public: true
+        App\Application\Payroll\ProposeMonthSessions:
+            autowire: true
+            public: true
+        App\Application\Payroll\PaySettlement:
+            autowire: true
+            public: true
+        App\Application\Payroll\ListSettlements:
+            autowire: true
+            public: true
+        App\Application\Payroll\Profitability:
+            autowire: true
+            public: true
+        App\Application\Teachers\ChangeTeacherRate:
+            autowire: true
+            public: true
+        App\Infrastructure\Payroll\:
+            resource: '../src/Infrastructure/Payroll/'
+            autowire: true
+            autoconfigure: true
             public: true
         App\Infrastructure\Teachers\:
             resource: '../src/Infrastructure/Teachers/'
