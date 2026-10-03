@@ -1,12 +1,4 @@
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  FileText,
-  Plus,
-  Printer,
-  Receipt,
-  Trash2,
-} from 'lucide-react';
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
@@ -22,53 +14,49 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { MonthNav } from '@/shared/ui/MonthNav';
 import { useToast } from '@/shared/ui/Toast';
 
-import { ReceiptDialog } from '@/pages/panel/billing/ReceiptDialog';
-import { SettlementSheetDialog } from '@/pages/panel/payroll/SettlementSheetDialog';
-
 import { EntryDialog } from './EntryDialog';
 
 const ROW_ACTION =
   'flex size-9 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted';
 
-/** De dónde sale cada movimiento automático y dónde se gestiona (aquí no se puede quitar). */
-const ORIGINS: Record<Exclude<LedgerItem['source'], 'manual'>, { label: string; hint: string }> = {
-  payment: { label: 'Ver recibo', hint: 'Viene de Cobros y cuotas: se gestiona allí' },
-  settlement: {
-    label: 'Ver liquidación',
-    hint: 'Viene de Profesores → Liquidación: se gestiona allí',
-  },
-  invoice: { label: 'Ver facturas', hint: 'Viene de una factura pagada: se gestiona en Facturas' },
-};
+/** De dónde sale cada movimiento automático: se gestiona allí (aquí no se quita ni se imprime). */
+function origin(item: LedgerItem): { to: string; label: string; hint: string } | null {
+  switch (item.source) {
+    case 'payment':
+      return {
+        to: '/panel/cobros?pestana=registro',
+        label: 'Ir a Cobros',
+        hint: 'Viene de Cobros y cuotas: se gestiona allí',
+      };
+    case 'settlement':
+      return {
+        to: `/panel/profesores?pestana=liquidacion&mes=${item.sourceId.split('/')[1] ?? ''}`,
+        label: 'Ir a la liquidación',
+        hint: 'Viene de Profesores → Liquidación: se gestiona allí',
+      };
+    case 'invoice':
+      return {
+        to: '/panel/contabilidad?pestana=facturas',
+        label: 'Ir a Facturas',
+        hint: 'Viene de una factura pagada: se gestiona en Facturas',
+      };
+    default:
+      return null;
+  }
+}
 
-function OriginAction({ item, onOpen }: { item: LedgerItem; onOpen: (item: LedgerItem) => void }) {
-  if (item.source === 'manual') return null;
-  const { label, hint } = ORIGINS[item.source];
-  const name = `${label}: ${item.concept}`;
-  if (item.source === 'invoice')
-    return (
-      <Link
-        to="/panel/contabilidad?pestana=facturas"
-        aria-label={name}
-        title={hint}
-        className={ROW_ACTION}
-      >
-        <FileText aria-hidden size={16} />
-      </Link>
-    );
+function OriginLink({ item }: { item: LedgerItem }) {
+  const target = origin(item);
+  if (!target) return null;
   return (
-    <button
-      type="button"
-      aria-label={name}
-      title={hint}
-      onClick={() => onOpen(item)}
+    <Link
+      to={target.to}
+      aria-label={`${target.label}: ${item.concept}`}
+      title={target.hint}
       className={ROW_ACTION}
     >
-      {item.source === 'payment' ? (
-        <Printer aria-hidden size={16} />
-      ) : (
-        <Receipt aria-hidden size={16} />
-      )}
-    </button>
+      <ArrowRight aria-hidden size={16} />
+    </Link>
   );
 }
 
@@ -86,7 +74,6 @@ export function LedgerTab({
   const ledger = useLedger(month);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<LedgerItem | null>(null);
-  const [origin, setOrigin] = useState<LedgerItem | null>(null);
   const remove = useAccountingMutation(deleteEntry);
   const toast = useToast();
   const data = ledger.data;
@@ -166,7 +153,7 @@ export function LedgerTab({
                         <Trash2 aria-hidden size={16} />
                       </button>
                     ) : (
-                      <OriginAction item={item} onOpen={setOrigin} />
+                      <OriginLink item={item} />
                     )}
                   </td>
                 </tr>
@@ -231,16 +218,6 @@ export function LedgerTab({
         </Card>
       </div>
       {adding && <EntryDialog onClose={() => setAdding(false)} />}
-      {origin?.source === 'payment' && (
-        <ReceiptDialog paymentId={origin.sourceId} onClose={() => setOrigin(null)} />
-      )}
-      {origin?.source === 'settlement' && (
-        <SettlementSheetDialog
-          teacherId={origin.sourceId.split('/')[0] ?? ''}
-          month={origin.sourceId.split('/')[1] ?? ''}
-          onClose={() => setOrigin(null)}
-        />
-      )}
       {removing && (
         <ConfirmDialog
           title="Quitar movimiento"
