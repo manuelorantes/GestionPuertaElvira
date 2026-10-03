@@ -143,6 +143,80 @@ describe('Alumnos', () => {
     expect(within(card).getByText('Aula 1 · Lucía Moreno Gil')).toBeVisible();
   });
 
+  it('should manage billing preferences, points and history from the student card', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'GET /api/admin/billing/accounts/s1': [
+        [
+          200,
+          {
+            preferredPlan: 'monthly',
+            member: false,
+            privateRate: null,
+            points: 2,
+            suggestedMonths: 1,
+            remainingMonths: 9,
+          },
+        ],
+        [
+          200,
+          {
+            preferredPlan: 'monthly',
+            member: false,
+            privateRate: null,
+            points: 3,
+            suggestedMonths: 1,
+            remainingMonths: 9,
+          },
+        ],
+      ],
+      'GET /api/admin/billing/payments?studentId=s1': [
+        200,
+        {
+          items: [
+            {
+              id: 'p1',
+              receiptNumber: 'R-2026-0001',
+              paidOn: '2026-09-03',
+              studentId: 's1',
+              studentName: 'Martina López Herrera',
+              kind: 'monthly',
+              concept: 'Septiembre 2026',
+              method: 'cash',
+              totalCents: 4050,
+              invoiceNumber: null,
+            },
+          ],
+        },
+      ],
+      'POST /api/admin/billing/accounts/s1/points': [200, { points: 3 }],
+      'PUT /api/admin/billing/accounts/s1': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    const history = await screen.findByRole('list', { name: 'Historial de cobros' });
+    expect(within(history).getByText('Septiembre 2026')).toBeInTheDocument();
+    expect(within(history).getByText('40,50 €')).toBeInTheDocument();
+    expect(screen.getByText('Puntos:')).toHaveTextContent('Puntos: 2');
+
+    await user.click(screen.getByRole('button', { name: 'Sumar un punto' }));
+    expect(postBody(spy, '/api/admin/billing/accounts/s1/points')).toEqual({ delta: 1 });
+
+    expect(await screen.findByText('Puntos:')).toHaveTextContent('Puntos: 3');
+    await user.selectOptions(screen.getByLabelText('Forma de pago preferida'), 'three_months');
+    await user.click(screen.getByRole('switch', { name: 'Socio del club' }));
+    await user.click(screen.getByRole('button', { name: 'Guardar' }));
+    expect(await screen.findByText('Datos de cobro guardados')).toBeInTheDocument();
+    const put = spy.mock.calls.find(
+      ([u, init]) => u === '/api/admin/billing/accounts/s1' && init?.method === 'PUT',
+    );
+    expect(JSON.parse(String(put?.[1]?.body))).toEqual({
+      preferredPlan: 'three_months',
+      member: true,
+      privateRate: null,
+    });
+  });
+
   it('should require a guardian for minors before sending a new student', async () => {
     const user = userEvent.setup();
     const spy = api();
