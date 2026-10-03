@@ -241,7 +241,10 @@ export function StudentPanel() {
                 onClick={() =>
                   void mutate
                     .mutateAsync(() => api.unlinkSibling(s.id, sibling.id))
-                    .then(() => done('Hermanos desvinculados'))
+                    .then(
+                      () => done('Hermanos desvinculados'),
+                      (failure: unknown) => setError(apiErrorMessage(failure)),
+                    )
                 }
                 className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
               >

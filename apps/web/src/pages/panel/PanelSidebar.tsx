@@ -1,6 +1,9 @@
 import { LogOut } from 'lucide-react';
 import { NavLink } from 'react-router';
 
+import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
+import { currentMonth } from '@/features/billing/money';
+
 import { ROLE_LABEL, type SessionUser } from '@/features/auth/api';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 
@@ -28,7 +31,7 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
             <NavLink
               key={id}
               to={path}
-              end
+              end={path === '/panel'}
               className="flex h-11 items-center gap-3 rounded-sm px-3 text-[15px] font-medium text-ink-soft no-underline hover:bg-surface-muted aria-[current=page]:bg-brand-soft aria-[current=page]:font-semibold aria-[current=page]:text-brand-strong"
             >
               <Icon aria-hidden size={18} className="shrink-0" />
@@ -58,7 +61,10 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
           <p className="text-xs text-ink-muted">{ROLE_LABEL[user.role]}</p>
         </div>
         <p className="text-xs text-ink-muted">
-          Temporada <strong className="text-ink-strong">2026/27</strong>
+          Temporada{' '}
+          <strong className="text-ink-strong">
+            {fiscalYearLabel(fiscalYearOf(currentMonth()))}
+          </strong>
         </p>
         <button
           type="button"
