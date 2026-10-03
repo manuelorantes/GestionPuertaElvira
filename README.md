@@ -35,7 +35,9 @@ Después abre <http://localhost:8080>.
 | `nuevo@puertaelvira.test` | `desarrollo-nuevo` | Administración, con contraseña temporal |
 
 `make seed` las restablece y reinicia los bloqueos por intentos fallidos.
-También crea, si no hay ninguno, los 5 profesores, 18 grupos y 16 alumnos **ficticios** del diseño.
+También crea, si no hay ninguno, los 5 profesores, 18 grupos y 16 alumnos **ficticios** del diseño,
+con sus cuotas y cobros desde septiembre (dos alumnos con cuotas vencidas para probar los avisos).
+Las cuotas de cada mes se generan solas al consultarlo; `make console ARGS="app:billing:generate-charges"` las genera a mano.
 `make e2e` los reinicia antes de las pruebas, así que borra los alumnos, grupos y profesores que hayas creado en local.
 
 ### Cuentas reales y primer administrador
