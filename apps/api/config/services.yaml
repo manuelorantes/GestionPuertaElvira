@@ -42,6 +42,13 @@ services:
     App\Application\Students\Port\StudentRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Students\DoctrineStudentRepository'
     App\Application\Students\Port\StudentQuery: '@App\Infrastructure\Students\SqlStudentQuery'
     App\Application\Students\Port\Enrolments: '@App\Infrastructure\Students\ClassesEnrolments'
+    App\Application\Billing\Port\StudentDirectory: '@App\Infrastructure\Billing\SqlStudentDirectory'
+    App\Application\Billing\Port\BillingQuery: '@App\Infrastructure\Billing\SqlBillingQuery'
+    App\Application\Billing\Port\BillingSettingsRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\DoctrineBillingSettingsRepository'
+    App\Application\Billing\Port\StudentAccountRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\DoctrineStudentAccountRepository'
+    App\Application\Billing\Port\ChargeRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\DoctrineChargeRepository'
+    App\Application\Billing\Port\PaymentRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\DoctrinePaymentRepository'
+    App\Application\Billing\Port\DocumentSequence: '@App\Infrastructure\Persistence\Doctrine\Repository\Billing\SqlDocumentSequence'
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
     App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Identity\Logging\MonologSecurityEventLog'
 
@@ -82,6 +89,23 @@ when@test:
             autowire: true
             public: true
         App\Application\Teachers\RegisterTeacher:
+            autowire: true
+            public: true
+        App\Infrastructure\Billing\:
+            resource: '../src/Infrastructure/Billing/'
+            autowire: true
+            autoconfigure: true
+            public: true
+        App\Application\Billing\GenerateMonthlyCharges:
+            autowire: true
+            public: true
+        App\Application\Billing\RegisterPayment:
+            autowire: true
+            public: true
+        App\Application\Billing\IssueInvoice:
+            autowire: true
+            public: true
+        App\Application\Billing\UpdateStudentAccount:
             autowire: true
             public: true
         App\Infrastructure\Teachers\:
