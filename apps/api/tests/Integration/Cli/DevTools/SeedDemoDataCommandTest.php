@@ -33,6 +33,8 @@ final class SeedDemoDataCommandTest extends KernelTestCase
         self::assertCount(4, $students->list(\App\Application\Students\StudentFilter::Siblings, null, LocalDate::fromInstant(new DateTimeImmutable())));
         self::assertSame(16, array_sum(array_map(static fn ($g): int => $g->occupied, $groups)));
 
+        self::assertEquals(7, $container->get(\Doctrine\DBAL\Connection::class)->fetchOne('SELECT COUNT(*) FROM accounting_invoice'));
+
         $month = \App\Domain\Common\YearMonth::of(LocalDate::fromInstant(new DateTimeImmutable()));
         if (null !== \App\Domain\Common\Season::teachingSeason($month)) {
             $connection = $container->get(\Doctrine\DBAL\Connection::class);

@@ -55,6 +55,13 @@ services:
     App\Application\Payroll\Port\TimesheetRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Payroll\DoctrineTimesheetRepository'
     App\Application\Payroll\Port\SettlementRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Payroll\DoctrineSettlementRepository'
     App\Application\Payroll\Port\ProposalLog: '@App\Infrastructure\Persistence\Doctrine\Repository\Payroll\DoctrineSettlementRepository'
+    App\Application\Common\Port\ClosedPeriods: '@App\Infrastructure\Accounting\SqlClosedPeriods'
+    App\Application\Accounting\Port\LedgerQuery: '@App\Infrastructure\Accounting\SqlLedgerQuery'
+    App\Application\Accounting\Port\InvoiceQuery: '@App\Infrastructure\Accounting\SqlInvoiceQuery'
+    App\Application\Accounting\Port\DocumentStorage: '@App\Infrastructure\Accounting\LocalDocumentStorage'
+    App\Application\Accounting\Port\ManualEntryRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Accounting\DoctrineAccountingRepository'
+    App\Application\Accounting\Port\SupplierInvoiceRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Accounting\DoctrineAccountingRepository'
+    App\Application\Accounting\Port\SeasonClosingRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Accounting\DoctrineAccountingRepository'
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
     App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Identity\Logging\MonologSecurityEventLog'
 
@@ -128,6 +135,29 @@ when@test:
             public: true
         App\Application\Teachers\ChangeTeacherRate:
             autowire: true
+            public: true
+        App\Application\Accounting\RecordEntry:
+            autowire: true
+            public: true
+        App\Application\Accounting\RegisterInvoice:
+            autowire: true
+            public: true
+        App\Application\Accounting\PayInvoice:
+            autowire: true
+            public: true
+        App\Application\Accounting\MonthLedger:
+            autowire: true
+            public: true
+        App\Application\Accounting\FiscalYearSummary:
+            autowire: true
+            public: true
+        App\Application\Accounting\CloseSeason:
+            autowire: true
+            public: true
+        App\Infrastructure\Accounting\:
+            resource: '../src/Infrastructure/Accounting/'
+            autowire: true
+            autoconfigure: true
             public: true
         App\Infrastructure\Payroll\:
             resource: '../src/Infrastructure/Payroll/'
