@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
 import * as api from './api';
 
@@ -21,14 +23,6 @@ export function useStudent(id: string | undefined) {
 export function useStudentMutation<Variables, Result = void>(
   mutationFn: (variables: Variables) => Promise<Result>,
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn,
-    onSuccess: () =>
-      Promise.all(
-        ['students', 'student', 'groups'].map((key) =>
-          queryClient.invalidateQueries({ queryKey: [key] }),
-        ),
-      ),
-  });
+  const refresh = useRefreshClubData();
+  return useMutation({ mutationFn, onSuccess: refresh });
 }
