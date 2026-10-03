@@ -44,6 +44,30 @@ final readonly class SqlBillingQuery implements BillingQuery
             ['monthly' => ChargeKind::Monthly->value, 'membership' => ChargeKind::Membership->value, 'month' => $month->toString(), 'seasonStart' => $season->firstMonth()->toString()],
         );
 
+        return self::views($rows, $today);
+    }
+
+    public function overdue(LocalDate $today): array
+    {
+        $current = YearMonth::of($today);
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT c.*, s.full_name, '.self::GUARDIAN.' AS guardian_name, '.self::PHONE.' AS guardian_phone, NULL AS receipt_number
+               FROM billing_charge c JOIN students_student s ON s.id = c.student_id
+              WHERE c.kind = :monthly AND c.paid_by IS NULL AND (c.period < :current OR (c.period = :current AND :day > 5))
+              ORDER BY c.period, s.search_name',
+            ['monthly' => ChargeKind::Monthly->value, 'current' => $current->toString(), 'day' => (int) substr($today->toString(), 8, 2)],
+        );
+
+        return self::views($rows, $today);
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return list<ChargeView>
+     */
+    private static function views(array $rows, LocalDate $today): array
+    {
         return array_map(static function (array $values) use ($today): ChargeView {
             $row = new Row($values);
             $remindedOn = $row->nullableString('reminded_on');
