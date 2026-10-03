@@ -203,6 +203,41 @@ describe('Profesorado', () => {
     );
   });
 
+  it('explains why a settlement cannot be paid', async () => {
+    api({
+      'POST /api/admin/payroll/settlements/t1/2026-09/payment': [
+        409,
+        {
+          error: {
+            code: 'period_closed',
+            message: 'Esa fecha pertenece a una temporada cerrada: no se puede modificar.',
+          },
+        },
+      ],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
+
+    const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
+    await userEvent.click(
+      within(within(table).getByRole('row', { name: /Lucía/ })).getByRole('button', {
+        name: 'Marcar como pagada',
+      }),
+    );
+
+    expect(await screen.findByText(/temporada cerrada/)).toBeInTheDocument();
+  });
+
+  it('highlights «Horas» in the mobile bar only on the hours tab', async () => {
+    api();
+    renderApp('/panel/profesores?mes=2026-09&pestana=rentabilidad');
+
+    const mobile = await screen.findByRole('navigation', { name: 'Secciones móvil' });
+    expect(within(mobile).getByRole('link', { name: /Horas/ })).not.toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
   it('shows the monthly settlements, their detail and pays a pending one', async () => {
     const fetch = api({ 'POST /api/admin/payroll/settlements/t1/2026-09/payment': [204] });
     renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');

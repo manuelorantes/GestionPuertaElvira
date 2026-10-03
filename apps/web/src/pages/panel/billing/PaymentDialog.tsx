@@ -77,6 +77,7 @@ export function PaymentDialog({
               {CONCEPTS.map((c) => (
                 <ToggleButton
                   key={c.id}
+                  disabled={form.unavailable(c.id)}
                   pressed={form.concept === c.id}
                   onClick={() => form.setConcept(c.id)}
                   className="h-9 rounded-full font-medium"

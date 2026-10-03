@@ -217,6 +217,17 @@ describe('Alumnos', () => {
     });
   });
 
+  it('should keep «Alumnos» highlighted while a student card is open', async () => {
+    api();
+    renderApp('/panel/alumnos/s1');
+
+    const nav = await screen.findByRole('navigation', { name: 'Secciones' });
+    expect(within(nav).getByRole('link', { name: /Alumnos/ })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
   it('should require a guardian for minors before sending a new student', async () => {
     const user = userEvent.setup();
     const spy = api();

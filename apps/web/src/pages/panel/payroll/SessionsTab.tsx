@@ -1,12 +1,14 @@
 import { CalendarX, Lock, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
+import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { formatCents, monthLabel } from '@/features/billing/money';
 import type { Teacher } from '@/features/classes/api';
 import { deleteSession, type Session } from '@/features/payroll/api';
 import { usePayrollMutation, useSessions } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
 import { formatDate } from '@/features/students/format';
+import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
@@ -38,6 +40,12 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
 
   function renderBody() {
     if (sessions.isPending) return <p className="p-5 text-ink-muted">Cargando sesiones…</p>;
+    if (sessions.isError)
+      return (
+        <div className="p-5">
+          <Alert>{apiErrorMessage(sessions.error)}</Alert>
+        </div>
+      );
     if (items.length === 0)
       return (
         <p className="px-5 py-12 text-center text-ink-muted">
@@ -142,14 +150,18 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
           message={`Se quitará la sesión de ${removing.label} del ${formatDate(removing.date)} (${removing.teacherName}).`}
           confirmLabel="Quitar"
           busy={remove.isPending}
-          onCancel={() => setRemoving(null)}
+          error={remove.isError ? apiErrorMessage(remove.error) : null}
+          onCancel={() => {
+            remove.reset();
+            setRemoving(null);
+          }}
           onConfirm={() =>
             void remove.mutateAsync(removing.id).then(
               () => {
                 toast('Sesión quitada');
                 setRemoving(null);
               },
-              () => setRemoving(null),
+              () => undefined,
             )
           }
         />

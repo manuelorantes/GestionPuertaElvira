@@ -3,8 +3,10 @@ import { useState } from 'react';
 
 import { deleteEntry, type LedgerItem } from '@/features/accounting/api';
 import { useAccountingMutation, useLedger } from '@/features/accounting/hooks';
+import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { formatCents, monthLabel, shiftMonth } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
+import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
@@ -35,6 +37,12 @@ export function LedgerTab({
 
   function renderTable() {
     if (ledger.isPending) return <p className="p-5 text-ink-muted">Cargando movimientos…</p>;
+    if (ledger.isError)
+      return (
+        <div className="p-5">
+          <Alert>{apiErrorMessage(ledger.error)}</Alert>
+        </div>
+      );
     if (!data || data.items.length === 0)
       return <p className="px-5 py-12 text-center text-ink-muted">No hay movimientos este mes.</p>;
     return (
@@ -164,14 +172,18 @@ export function LedgerTab({
           message={`Se quitará «${removing.concept}» (${signed(removing)}).`}
           confirmLabel="Quitar"
           busy={remove.isPending}
-          onCancel={() => setRemoving(null)}
+          error={remove.isError ? apiErrorMessage(remove.error) : null}
+          onCancel={() => {
+            remove.reset();
+            setRemoving(null);
+          }}
           onConfirm={() =>
             void remove.mutateAsync(removing.sourceId).then(
               () => {
                 toast('Movimiento quitado');
                 setRemoving(null);
               },
-              () => setRemoving(null),
+              () => undefined,
             )
           }
         />

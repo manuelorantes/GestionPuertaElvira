@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 
+import { Alert } from './Alert';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
 
@@ -10,6 +11,8 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
+  /** Mensaje de error de la acción: el diálogo sigue abierto para reintentar o cancelar. */
+  error?: string | null;
 }
 
 export function ConfirmDialog({
@@ -19,6 +22,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   busy = false,
+  error = null,
 }: ConfirmDialogProps) {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -36,6 +40,7 @@ export function ConfirmDialog({
           {title}
         </h2>
         <p className="text-[15px] text-ink-soft">{message}</p>
+        {error && <Alert>{error}</Alert>}
         <div className="mt-2 flex justify-end gap-3">
           <Button ref={cancelRef} variant="secondary" onClick={onCancel}>
             Cancelar
