@@ -19,6 +19,8 @@ class TeacherRecord
         public string $fullName,
         #[ORM\Column]
         public bool $active,
+        #[ORM\Column(options: ['default' => 1500])]
+        public int $hourlyRateCents = 1500,
     ) {
     }
 }

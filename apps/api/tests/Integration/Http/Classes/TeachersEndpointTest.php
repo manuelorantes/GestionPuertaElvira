@@ -18,12 +18,12 @@ final class TeachersEndpointTest extends ApiAuthTestCase
         $id = $this->responseBody()['id'] ?? null;
         self::assertIsString($id);
 
-        $this->json('PUT', "/api/admin/teachers/{$id}", ['fullName' => 'Carlos Ruiz', 'active' => false]);
+        $this->json('PUT', "/api/admin/teachers/{$id}", ['fullName' => 'Carlos Ruiz', 'active' => false, 'hourlyRate' => '18']);
         self::assertResponseStatusCodeSame(204);
 
         $this->client->request('GET', '/api/admin/teachers');
         self::assertResponseIsSuccessful();
-        self::assertSame([['id' => $id, 'fullName' => 'Carlos Ruiz', 'active' => false, 'groupCount' => 0]], $this->responseBody()['items'] ?? null);
+        self::assertSame([['id' => $id, 'fullName' => 'Carlos Ruiz', 'active' => false, 'groupCount' => 0, 'hourlyRate' => '18.00']], $this->responseBody()['items'] ?? null);
     }
 
     public function test_should_explain_why_a_teacher_with_groups_cannot_be_deactivated(): void
