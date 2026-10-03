@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\DevTools;
 
+use App\Application\Billing\AdjustPoints;
+use App\Application\Billing\GenerateMonthlyCharges;
+use App\Application\Billing\IssueInvoice;
+use App\Application\Billing\PaymentRequest;
+use App\Application\Billing\RegisterPayment;
+use App\Application\Billing\UpdateStudentAccount;
 use App\Application\Classes\CreateClassGroup;
 use App\Application\Classes\GroupInput;
 use App\Application\Classes\Port\ClassGroupRepository;
@@ -11,6 +17,10 @@ use App\Application\Students\LinkSiblings;
 use App\Application\Students\RegisterStudent;
 use App\Application\Students\StudentInput;
 use App\Application\Teachers\RegisterTeacher;
+use App\Domain\Billing\Season;
+use App\Domain\Billing\YearMonth;
+use App\Domain\Common\Clock;
+use App\Domain\Common\LocalDate;
 use Doctrine\DBAL\Connection;
 use LogicException;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -20,7 +30,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Attribute\When;
 
 /**
- * Datos de demostración FICTICIOS del diseño (profesorado, grupos y alumnos) para desarrollo y tests.
+ * Datos de demostración FICTICIOS del diseño (profesorado, grupos, alumnos y cobros) para desarrollo y tests.
  * Se crean a través de los casos de uso, así que respetan las mismas reglas que la aplicación.
  */
 #[When(env: 'dev')]
@@ -83,6 +93,24 @@ final readonly class SeedDemoDataCommand
 
     private const array SIBLINGS = [['a1', 'a2'], ['a6', 'a7']];
 
+    /** [alumno, forma de pago preferida, socio, precio pactado de particulares, puntos] */
+    private const array ACCOUNTS = [
+        ['a1', 'three_months', true, null, 0],
+        ['a3', 'monthly', true, null, 3],
+        ['a5', 'six_months', true, null, 5],
+        ['a8', 'monthly', true, null, 0],
+        ['a15', 'monthly', false, '35', 0],
+    ];
+
+    /** Quien no ha pagado los meses anteriores (para ver cuotas vencidas). */
+    private const array OVERDUE = ['a9', 'a13'];
+
+    /** Quien ya ha pagado el mes actual, y cuántos meses de una vez. */
+    private const array PAID_THIS_MONTH = ['a1' => 3, 'a3' => 1, 'a5' => 1, 'a6' => 1, 'a7' => 1, 'a8' => 1, 'a11' => 1, 'a14' => 1];
+
+    /** Cuotas de socio ya pagadas. */
+    private const array MEMBERSHIP_PAID = ['a1', 'a3', 'a5'];
+
     public function __construct(
         private RegisterTeacher $registerTeacher,
         private CreateClassGroup $createGroup,
@@ -90,6 +118,12 @@ final readonly class SeedDemoDataCommand
         private RegisterStudent $registerStudent,
         private LinkSiblings $linkSiblings,
         private Connection $connection,
+        private UpdateStudentAccount $updateAccount,
+        private AdjustPoints $adjustPoints,
+        private GenerateMonthlyCharges $generateCharges,
+        private RegisterPayment $registerPayment,
+        private IssueInvoice $issueInvoice,
+        private Clock $clock,
     ) {
     }
 
@@ -99,6 +133,9 @@ final readonly class SeedDemoDataCommand
         bool $reset = false,
     ): int {
         if ($reset) {
+            foreach (['billing_charge', 'billing_payment', 'billing_account', 'billing_settings', 'billing_document_sequence'] as $table) {
+                $this->connection->executeStatement("DELETE FROM {$table}");
+            }
             $this->connection->executeStatement('DELETE FROM classes_enrolment');
             $this->connection->executeStatement('DELETE FROM students_student');
             $this->connection->executeStatement('DELETE FROM classes_group');
@@ -127,8 +164,64 @@ final readonly class SeedDemoDataCommand
             ($this->linkSiblings)($studentIds[$a] ?? throw new LogicException($a), $studentIds[$b] ?? throw new LogicException($b));
         }
 
-        $io->success(\sprintf('Creados %d profesores, %d grupos y %d alumnos de demostración.', \count(self::TEACHERS), \count(self::GROUPS), \count(self::STUDENTS)));
+        $payments = $this->seedBilling($studentIds);
+
+        $io->success(\sprintf('Creados %d profesores, %d grupos, %d alumnos y %d cobros de demostración.', \count(self::TEACHERS), \count(self::GROUPS), \count(self::STUDENTS), $payments));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Alta desde el inicio de temporada, cuotas de cada mes hasta hoy y cobros con fecha de hoy.
+     *
+     * @param array<string, string> $studentIds
+     */
+    private function seedBilling(array $studentIds): int
+    {
+        $today = LocalDate::fromInstant($this->clock->now());
+        $current = YearMonth::of($today);
+        $season = Season::teachingSeason($current);
+        if (null === $season) {
+            return 0;
+        }
+
+        $start = $season->firstMonth()->toString().'-01';
+        $this->connection->executeStatement('UPDATE students_student SET joined_on = :start', ['start' => $start]);
+        $this->connection->executeStatement('UPDATE classes_enrolment SET enrolled_on = :start', ['start' => $start]);
+
+        foreach (self::ACCOUNTS as [$key, $plan, $member, $rate, $points]) {
+            ($this->updateAccount)($studentIds[$key], $plan, $member, $rate);
+            if ($points > 0) {
+                ($this->adjustPoints)($studentIds[$key], $points);
+            }
+        }
+
+        $previousMonths = 0;
+        for ($month = $season->firstMonth(); !$current->isBefore($month); $month = $month->next()) {
+            ($this->generateCharges)($month->toString());
+            $previousMonths += $month->isBefore($current) ? 1 : 0;
+        }
+
+        $pay = fn (string $key, int $months, string $kind = 'monthly', string $method = 'transfer'): string => ($this->registerPayment)(new PaymentRequest($studentIds[$key], $kind, $months, $method, $today->toString(), false, null, null));
+        $count = 0;
+        foreach (array_keys($studentIds) as $key) {
+            if ($previousMonths > 0 && !\in_array($key, self::OVERDUE, true)) {
+                $pay($key, $previousMonths, method: 0 === $count % 3 ? 'cash' : 'transfer');
+                ++$count;
+            }
+        }
+        foreach (self::PAID_THIS_MONTH as $key => $months) {
+            $pay($key, min($months, $season->monthsFrom($current)));
+            ++$count;
+        }
+        foreach (self::MEMBERSHIP_PAID as $key) {
+            $paymentId = $pay($key, 1, 'membership', 'cash');
+            ++$count;
+            if ('a1' === $key) {
+                ($this->issueInvoice)($paymentId, 'Rocío Herrera', '00000000T', 'Calle Elvira 1, Granada');
+            }
+        }
+
+        return $count;
     }
 }
