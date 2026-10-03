@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\DevTools;
 
+use App\Application\Accounting\EntryInput;
+use App\Application\Accounting\InvoiceInput;
+use App\Application\Accounting\PayInvoice;
+use App\Application\Accounting\RecordEntry;
+use App\Application\Accounting\RegisterInvoice;
 use App\Application\Billing\AdjustPoints;
 use App\Application\Billing\GenerateMonthlyCharges;
 use App\Application\Billing\IssueInvoice;
@@ -48,6 +53,17 @@ final readonly class SeedDemoDataCommand
         'p3' => 'Javier Ortega Sánchez',
         'p4' => 'Ana Belén Torres',
         'p5' => 'Miguel Á. Fernández',
+    ];
+
+    /** Facturas del diseño: [día, mes relativo (0 actual, -1 anterior), nº, proveedor, concepto, categoría, importe, pagada]. */
+    private const array INVOICES = [
+        [1, 0, 'R-ALQ', 'Propietario del local', 'Alquiler del mes', 'rent', '950', true],
+        [1, 0, 'FAA-3381', 'Federación Andaluza de Ajedrez', 'Licencias federativas (12)', 'federation', '144', true],
+        [2, 0, 'E-0912', 'Escaque Material Didáctico', 'Tablero mural de demostración', 'material', '86', true],
+        [28, -1, 'E-0897', 'Escaque Material Didáctico', 'Relojes digitales (4)', 'material', '186', true],
+        [25, -1, 'TP-044', 'Organización torneo provincial', 'Inscripción por equipos', 'tournaments', '120', false],
+        [22, -1, 'S-55120', 'Compañía de suministros', 'Luz y agua', 'utilities', '86,40', true],
+        [1, -1, 'R-ALQ', 'Propietario del local', 'Alquiler del mes', 'rent', '950', true],
     ];
 
     /** Tarifa por hora del diseño. */
@@ -138,6 +154,9 @@ final readonly class SeedDemoDataCommand
         private ProposeMonthSessions $proposeSessions,
         private PaySettlement $paySettlement,
         private EntityManagerInterface $em,
+        private RegisterInvoice $registerInvoice,
+        private PayInvoice $payInvoice,
+        private RecordEntry $recordEntry,
     ) {
     }
 
@@ -147,7 +166,7 @@ final readonly class SeedDemoDataCommand
         bool $reset = false,
     ): int {
         if ($reset) {
-            foreach (['payroll_session', 'payroll_settlement', 'payroll_proposed_month', 'billing_charge', 'billing_payment', 'billing_account', 'billing_settings', 'billing_document_sequence'] as $table) {
+            foreach (['accounting_entry', 'accounting_invoice', 'accounting_closing', 'payroll_session', 'payroll_settlement', 'payroll_proposed_month', 'billing_charge', 'billing_payment', 'billing_account', 'billing_settings', 'billing_document_sequence'] as $table) {
                 $this->connection->executeStatement("DELETE FROM {$table}");
             }
             $this->connection->executeStatement('DELETE FROM classes_enrolment');
@@ -184,6 +203,7 @@ final readonly class SeedDemoDataCommand
 
         $payments = $this->seedBilling($studentIds);
         $this->seedPayroll($teacherIds);
+        $this->seedAccounting();
 
         $io->success(\sprintf('Creados %d profesores, %d grupos, %d alumnos y %d cobros de demostración.', \count(self::TEACHERS), \count(self::GROUPS), \count(self::STUDENTS), $payments));
 
@@ -269,5 +289,23 @@ final readonly class SeedDemoDataCommand
                 }
             }
         }
+    }
+
+    /** Facturas de proveedores del mes actual y del anterior, y un par de apuntes manuales. */
+    private function seedAccounting(): void
+    {
+        $current = YearMonth::of(LocalDate::fromInstant($this->clock->now()));
+        foreach (self::INVOICES as $invoice) {
+            [$day, $offset, $number, $supplier, $concept, $category, $amount, $paid] = $invoice;
+            $day = (int) $day;
+            $month = -1 === $offset ? YearMonth::fromString(\sprintf('%04d-%02d', 1 === $current->month ? $current->year - 1 : $current->year, 1 === $current->month ? 12 : $current->month - 1)) : $current;
+            $date = \sprintf('%s-%02d', $month->toString(), min($day, $month->days()));
+            $id = ($this->registerInvoice)(new InvoiceInput($date, $number, $supplier, $concept.' · '.$month->label(), $category, $amount), null);
+            if ($paid) {
+                ($this->payInvoice)($id, $date, 'transfer');
+            }
+        }
+        ($this->recordEntry)(new EntryInput($current->toString().'-02', 'expense', 'Comisión de mantenimiento de la cuenta', 'other_expenses', 'card', '6'));
+        ($this->recordEntry)(new EntryInput($current->toString().'-03', 'income', 'Venta de libros de ajedrez', 'other_income', 'cash', '45'));
     }
 }
