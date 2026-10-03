@@ -97,6 +97,38 @@ final readonly class JsonBody
         return $value;
     }
 
+    public function optionalInt(string $field): ?int
+    {
+        $value = $this->data[$field] ?? null;
+        if (null !== $value && !\is_int($value)) {
+            throw new InvalidValue($field, \sprintf('El campo «%s» debe ser un número entero.', $field));
+        }
+
+        return $value;
+    }
+
+    public function optionalObject(string $field): ?self
+    {
+        $value = $this->data[$field] ?? null;
+        if (null !== $value && !\is_array($value)) {
+            throw new InvalidValue($field, \sprintf('El campo «%s» debe ser un objeto.', $field));
+        }
+
+        return null === $value ? null : new self($value);
+    }
+
+    /** @return array<string, string> */
+    public function stringMap(string $field): array
+    {
+        $value = $this->data[$field] ?? [];
+        if (!\is_array($value) || [] !== array_filter($value, static fn ($item): bool => !\is_string($item))) {
+            throw new InvalidValue($field, \sprintf('El campo «%s» debe asociar textos.', $field));
+        }
+
+        /** @var array<string, string> $value */
+        return $value;
+    }
+
     private static function missing(string $field): InvalidValue
     {
         return new InvalidValue($field, \sprintf('El campo «%s» es obligatorio.', $field));

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Error;
 
+use App\Application\Billing\Error\BillingStudentNotFound;
+use App\Application\Billing\Error\ChargeNotFound;
+use App\Application\Billing\Error\PaymentNotFound;
 use App\Application\Classes\Error\ClassGroupNotFound;
 use App\Application\Classes\Error\ClassroomConflict;
 use App\Application\Classes\Error\LastEnrolment;
@@ -16,6 +19,9 @@ use App\Application\Identity\Error\TooManyLoginAttempts;
 use App\Application\Students\Error\StudentNotFound;
 use App\Application\Teachers\Error\TeacherHasGroups;
 use App\Application\Teachers\Error\TeacherNotFound;
+use App\Domain\Billing\Error\ChargeAlreadyPaid;
+use App\Domain\Billing\Error\InvalidPaymentRequest;
+use App\Domain\Billing\Error\InvoiceAlreadyIssued;
 use App\Domain\Classes\Error\AlreadyEnrolled;
 use App\Domain\Classes\Error\GroupFull;
 use App\Domain\Classes\Error\StudentScheduleOverlap;
@@ -70,6 +76,11 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
         LastEnrolment::class => [Response::HTTP_CONFLICT, 'last_enrolment'],
         StudentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         MissingContact::class => [Response::HTTP_UNPROCESSABLE_ENTITY, 'missing_contact'],
+        PaymentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        ChargeNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        BillingStudentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        InvoiceAlreadyIssued::class => [Response::HTTP_CONFLICT, 'invoice_already_issued'],
+        ChargeAlreadyPaid::class => [Response::HTTP_CONFLICT, 'charge_already_paid'],
     ];
 
     public function __construct(private LoggerInterface $logger)
@@ -106,6 +117,12 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
             $headers = $exception instanceof TooManyLoginAttempts ? ['Retry-After' => (string) $exception->retryAfterSeconds] : [];
 
             return self::envelope($status, $code, $exception->getMessage(), $headers);
+        }
+
+        if ($exception instanceof InvalidPaymentRequest) {
+            $status = \in_array($exception->reason(), ['beyond_season', 'nothing_to_pay'], true) ? Response::HTTP_CONFLICT : Response::HTTP_UNPROCESSABLE_ENTITY;
+
+            return self::envelope($status, $exception->reason(), $exception->getMessage());
         }
 
         if ($exception instanceof ApiProblem) {
