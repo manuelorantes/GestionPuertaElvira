@@ -1,7 +1,7 @@
 # Experience — Contabilidad
 
 - Solo administración. Movimientos del mes actual por defecto; temporada actual (sep–ago) en el cierre.
-- Los movimientos automáticos (cuotas, liquidaciones, facturas) no se editan aquí; solo los apuntes manuales se quitan (con confirmación).
+- Los movimientos automáticos (cuotas, liquidaciones, facturas) no se editan aquí: cada fila lleva un botón a su origen (recibo del cobro, hoja de la liquidación o pestaña Facturas) con la pista «Viene de …: se gestiona allí». Solo los apuntes manuales llevan papelera (con confirmación).
 - «Añadir factura»: el documento se valida en el navegador (tipo y 10 MB) y en el servidor; si «Ya está pagada», se registra el pago con la misma fecha.
   Toast «Factura registrada». Errores del servidor en `Alert` dentro del diálogo.
 - El documento se abre en una pestaña nueva (`/api/admin/accounting/invoices/{id}/attachment`).
