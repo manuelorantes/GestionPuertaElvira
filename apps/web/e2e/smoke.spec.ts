@@ -7,6 +7,16 @@ test('should show the home page connected to the API and the database', async ({
   await expect(page.getByRole('status')).toHaveText('API conectada');
 });
 
+test('should publish the season prices on the home page', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: /^Ver precios/ }).click();
+
+  const prices = page.getByRole('region', { name: /^Precios y descuentos/ });
+  await expect(prices.getByRole('listitem', { name: '3 horas semanales' })).toContainText('55 €');
+  await expect(prices).toContainText('Cuota de socio');
+});
+
 test('should answer API errors with the JSON error envelope', async ({ request }) => {
   const response = await request.get('/api/does-not-exist');
 
