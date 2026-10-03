@@ -23,7 +23,7 @@ export const PANEL_SECTIONS: PanelSection[] = [
   { id: 'clases', label: 'Clases', icon: CalendarDays, path: '/panel/clases' },
   { id: 'profesores', label: 'Profesores', icon: GraduationCap, path: '/panel/profesores' },
   { id: 'cobros', label: 'Cobros y cuotas', icon: Wallet, path: '/panel/cobros' },
-  { id: 'contabilidad', label: 'Contabilidad', icon: BookOpen, path: null },
+  { id: 'contabilidad', label: 'Contabilidad', icon: BookOpen, path: '/panel/contabilidad' },
 ];
 
 export const MOBILE_SECTIONS: PanelSection[] = [
