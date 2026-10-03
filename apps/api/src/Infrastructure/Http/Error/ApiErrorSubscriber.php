@@ -141,6 +141,11 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
             return self::envelope($status, $code, $exception->getMessage(), $headers);
         }
 
+        // Red de seguridad: dos peticiones que crean lo mismo a la vez no deben acabar en un 500.
+        if ($exception instanceof \Doctrine\DBAL\Exception\UniqueConstraintViolationException) {
+            return self::envelope(Response::HTTP_CONFLICT, 'conflict', 'Otra operación acaba de modificar estos datos. Recarga e inténtalo de nuevo.');
+        }
+
         if ($exception instanceof InvalidPaymentRequest) {
             $status = \in_array($exception->reason(), ['beyond_season', 'nothing_to_pay'], true) ? Response::HTTP_CONFLICT : Response::HTTP_UNPROCESSABLE_ENTITY;
 

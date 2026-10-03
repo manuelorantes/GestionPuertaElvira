@@ -104,7 +104,7 @@ final class BillingUseCasesTest extends TestCase
         foreach (['2026-09', '2026-10', '2026-11'] as $month) {
             self::assertTrue($this->fx->chargeFor(StudentRef::fromString($id), ChargeKind::Monthly, YearMonth::fromString($month))?->isPaid());
         }
-        self::assertSame(1, $this->fx->transactions->runs);
+        self::assertContains('billing:student:'.$id, $this->fx->locks->keys);
     }
 
     public function test_should_fill_gaps_instead_of_jumping_after_the_latest_charge(): void
@@ -207,7 +207,7 @@ final class BillingUseCasesTest extends TestCase
     {
         $id = $this->fx->student();
         $paymentId = $this->register($id, 1);
-        $issue = new IssueInvoice($this->fx, $this->fx, $this->fx->transactions, $this->fx->clock);
+        $issue = new IssueInvoice($this->fx, $this->fx, $this->fx->transactions, $this->fx->clock, $this->fx->locks);
 
         $issue($paymentId, 'Rocío Herrera', '12345678Z', 'Calle Elvira 1, Granada');
 
@@ -231,7 +231,7 @@ final class BillingUseCasesTest extends TestCase
 
     private function generate(string $month): void
     {
-        new GenerateMonthlyCharges($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock)($month);
+        new GenerateMonthlyCharges($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock, $this->fx->transactions, $this->fx->locks)($month);
     }
 
     private function quote(string $id, int $months): PaymentQuote
@@ -241,7 +241,7 @@ final class BillingUseCasesTest extends TestCase
 
     private function register(string $id, int $months, string $kind = 'monthly'): string
     {
-        $register = new RegisterPayment(new QuotePayment($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock), $this->fx, $this->fx, $this->fx, $this->fx->transactions, $this->fx);
+        $register = new RegisterPayment(new QuotePayment($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock), $this->fx, $this->fx, $this->fx, $this->fx->transactions, $this->fx, $this->fx->locks);
 
         return $register(new PaymentRequest($id, $kind, $months, 'transfer', '2026-10-02', false, null, null));
     }

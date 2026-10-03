@@ -39,11 +39,13 @@ final class PayrollFixture implements ClosedPeriods, ScheduleDirectory, TeacherR
     public bool $closed = false;
     public FrozenClock $clock;
     public ImmediateTransactionRunner $transactions;
+    public \App\Tests\Support\RecordingLocks $locks;
 
     public function __construct(string $now = '2026-10-20 10:00:00')
     {
         $this->clock = new FrozenClock($now);
         $this->transactions = new ImmediateTransactionRunner();
+        $this->locks = new \App\Tests\Support\RecordingLocks();
     }
 
     /** @param list<int> $weekdays */
