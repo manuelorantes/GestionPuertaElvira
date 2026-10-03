@@ -14,10 +14,10 @@ describe('armazón del panel', () => {
       'aria-current',
       'page',
     );
-    for (const section of ['Profesores', 'Contabilidad']) {
+    for (const section of ['Contabilidad']) {
       expect(within(nav).getByText(section).closest('[aria-disabled="true"]')).not.toBeNull();
     }
-    expect(within(nav).getAllByText('Próximamente')).toHaveLength(2);
+    expect(within(nav).getAllByText('Próximamente')).toHaveLength(1);
     expect(within(nav).getByRole('link', { name: /Cobros y cuotas/ })).toHaveAttribute(
       'href',
       '/panel/cobros',
