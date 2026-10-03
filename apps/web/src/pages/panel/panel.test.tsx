@@ -14,10 +14,14 @@ describe('armazón del panel', () => {
       'aria-current',
       'page',
     );
-    for (const section of ['Profesores', 'Cobros y cuotas', 'Contabilidad']) {
+    for (const section of ['Profesores', 'Contabilidad']) {
       expect(within(nav).getByText(section).closest('[aria-disabled="true"]')).not.toBeNull();
     }
-    expect(within(nav).getAllByText('Próximamente')).toHaveLength(3);
+    expect(within(nav).getAllByText('Próximamente')).toHaveLength(2);
+    expect(within(nav).getByRole('link', { name: /Cobros y cuotas/ })).toHaveAttribute(
+      'href',
+      '/panel/cobros',
+    );
     expect(screen.getAllByText('Lucía Moreno Gil').length).toBeGreaterThan(0);
     expect(screen.getByText('Profesorado')).toBeVisible();
     expect(screen.getByText('Hola, Lucía')).toBeVisible();
