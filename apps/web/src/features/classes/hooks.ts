@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
 import {
   createTeacher,
@@ -25,13 +27,9 @@ export function useTeachers() {
   return useQuery({ queryKey: TEACHERS_KEY, queryFn: fetchTeachers });
 }
 
+/** Grupos y profesores afectan a cuotas, horas propuestas, rentabilidad y resumen: se refresca todo. */
 function useInvalidateClasses() {
-  const queryClient = useQueryClient();
-  return () =>
-    Promise.all([
-      queryClient.invalidateQueries({ queryKey: GROUPS_KEY }),
-      queryClient.invalidateQueries({ queryKey: TEACHERS_KEY }),
-    ]);
+  return useRefreshClubData();
 }
 
 export function useSaveGroup() {

@@ -1,4 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+
+import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
 import * as api from './api';
 
@@ -34,18 +36,6 @@ export function useProfitability(month: string) {
 export function usePayrollMutation<Variables, Result = void>(
   mutationFn: (variables: Variables) => Promise<Result>,
 ) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn,
-    onSuccess: () =>
-      Promise.all(
-        [
-          'payroll-sessions',
-          'payroll-settlements',
-          'payroll-sheet',
-          'payroll-profitability',
-          'dashboard',
-        ].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
-      ),
-  });
+  const refresh = useRefreshClubData();
+  return useMutation({ mutationFn, onSuccess: refresh });
 }
