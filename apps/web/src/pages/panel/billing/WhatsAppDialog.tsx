@@ -4,6 +4,8 @@ import { useId, useState } from 'react';
 import { markReminded, type Charge } from '@/features/billing/api';
 import { useBillingMutation } from '@/features/billing/hooks';
 import { reminderText, whatsappLink } from '@/features/billing/money';
+import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Dialog } from '@/shared/ui/Dialog';
 import { useToast } from '@/shared/ui/Toast';
@@ -14,11 +16,15 @@ export function WhatsAppDialog({ charge, onClose }: { charge: Charge; onClose: (
   const toast = useToast();
   const messageId = useId();
 
-  function open() {
+  async function open() {
     window.open(whatsappLink(charge.guardianPhone, text), '_blank', 'noopener');
-    remind.mutate(undefined);
-    toast(`Aviso preparado en WhatsApp para ${charge.guardianName}`);
-    onClose();
+    await remind.mutateAsync(undefined).then(
+      () => {
+        toast(`Aviso preparado en WhatsApp para ${charge.guardianName}`);
+        onClose();
+      },
+      () => undefined,
+    );
   }
 
   return (
@@ -43,6 +49,12 @@ export function WhatsAppDialog({ charge, onClose }: { charge: Charge; onClose: (
           onChange={(e) => setText(e.target.value)}
           className="resize-y rounded-sm border border-line-strong bg-surface p-3 leading-normal outline-none focus:border-brand"
         />
+        {remind.isError && (
+          <Alert>
+            WhatsApp se ha abierto, pero no se ha podido marcar la cuota como avisada:{' '}
+            {apiErrorMessage(remind.error)}
+          </Alert>
+        )}
         <p className="text-[13px] text-ink-muted">
           Se abrirá WhatsApp con el mensaje escrito. Lo envías tú desde allí.
         </p>
@@ -50,7 +62,13 @@ export function WhatsAppDialog({ charge, onClose }: { charge: Charge; onClose: (
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={open} disabled={!text.trim()} className="inline-flex items-center gap-2">
+          <Button
+            onClick={() => void open()}
+            busy={remind.isPending}
+            busyLabel="Abriendo…"
+            disabled={!text.trim()}
+            className="inline-flex items-center gap-2"
+          >
             <MessageCircle aria-hidden size={18} />
             Abrir WhatsApp
           </Button>

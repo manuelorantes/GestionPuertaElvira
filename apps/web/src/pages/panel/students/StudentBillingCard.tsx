@@ -43,11 +43,7 @@ export function StudentBillingCard({
     <Card className="p-4">
       {title('Cuotas y cobros')}
       {account.data ? (
-        <AccountForm
-          key={JSON.stringify(account.data)}
-          studentId={studentId}
-          account={account.data}
-        />
+        <AccountForm key={studentId} studentId={studentId} account={account.data} />
       ) : (
         <p className="text-sm text-ink-muted">
           {account.isError ? 'No se han podido cargar los datos de cobro.' : 'Cargando…'}

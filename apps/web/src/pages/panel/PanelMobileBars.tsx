@@ -1,9 +1,23 @@
 import { LogOut } from 'lucide-react';
-import { NavLink } from 'react-router';
+import { NavLink, useLocation, type Location } from 'react-router';
 
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 
 import { MOBILE_SECTIONS } from './panelSections';
+
+/**
+ * Un acceso con parámetros (p. ej. «Horas» → Profesores, pestaña de horas) solo se marca si la URL los tiene:
+ * NavLink compara solo la ruta.
+ */
+function isMobileItemActive(path: string, location: Location): boolean {
+  const [pathname = '', search = ''] = path.split('?');
+  const onPath =
+    pathname === '/panel' ? location.pathname === '/panel' : location.pathname.startsWith(pathname);
+  const current = new URLSearchParams(location.search);
+  return (
+    onPath && [...new URLSearchParams(search)].every(([key, value]) => current.get(key) === value)
+  );
+}
 
 export function PanelMobileHeader({ title, onLogout }: { title: string; onLogout: () => void }) {
   return (
@@ -25,6 +39,7 @@ export function PanelMobileHeader({ title, onLogout }: { title: string; onLogout
 }
 
 export function PanelMobileNav() {
+  const location = useLocation();
   return (
     <nav
       aria-label="Secciones móvil"
@@ -35,7 +50,8 @@ export function PanelMobileNav() {
           <NavLink
             key={id}
             to={path}
-            end
+            end={path === '/panel'}
+            aria-current={isMobileItemActive(path, location) ? 'page' : 'false'}
             className="flex h-16 flex-col items-center justify-center gap-0.5 border-t-3 border-transparent text-xs font-medium text-ink-muted no-underline aria-[current=page]:border-brand aria-[current=page]:font-semibold aria-[current=page]:text-brand-strong"
           >
             <Icon aria-hidden size={22} className="shrink-0" />

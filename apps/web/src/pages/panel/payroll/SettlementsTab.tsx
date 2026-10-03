@@ -6,6 +6,8 @@ import { payAllSettlements, paySettlement, type Settlement } from '@/features/pa
 import { usePayrollMutation, useSettlements } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
 import { formatDate } from '@/features/students/format';
+import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -26,10 +28,12 @@ export function SettlementsTab({ month }: { month: string }) {
   const pending = items.filter((s) => s.status === 'pending');
 
   if (settlements.isPending) return <p className="text-ink-muted">Cargando liquidaciones…</p>;
+  if (settlements.isError) return <Alert>{apiErrorMessage(settlements.error)}</Alert>;
   if (items.length === 0) return <p className="text-ink-muted">No hay liquidaciones este mes.</p>;
 
   return (
     <div className="flex flex-col gap-6">
+      {pay.isError && <Alert>{apiErrorMessage(pay.error)}</Alert>}
       <Card className="flex flex-wrap items-center gap-6 px-6 py-5">
         <div className="flex-[1_1_280px]">
           <h2 className="font-display text-xl font-semibold tracking-[0.04em] uppercase">
@@ -170,14 +174,18 @@ export function SettlementsTab({ month }: { month: string }) {
           message={`Se marcarán como pagadas ${pending.length} liquidaciones de ${monthLabel(month).toLowerCase()} con fecha de hoy.`}
           confirmLabel="Marcar como pagadas"
           busy={payAll.isPending}
-          onCancel={() => setConfirmAll(false)}
+          error={payAll.isError ? apiErrorMessage(payAll.error) : null}
+          onCancel={() => {
+            payAll.reset();
+            setConfirmAll(false);
+          }}
           onConfirm={() =>
             void payAll.mutateAsync(undefined).then(
               (paid) => {
                 toast(`${paid} liquidaciones pagadas`);
                 setConfirmAll(false);
               },
-              () => setConfirmAll(false),
+              () => undefined,
             )
           }
         />

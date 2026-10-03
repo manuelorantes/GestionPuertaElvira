@@ -190,6 +190,64 @@ describe('Contabilidad', () => {
     );
   });
 
+  it('does not register the invoice twice when retrying a failed payment', async () => {
+    const fetch = api({
+      'POST /api/admin/accounting/invoices': [201, { id: 'i9' }],
+      'POST /api/admin/accounting/invoices/i9/payment': [
+        [
+          409,
+          {
+            error: {
+              code: 'period_closed',
+              message: 'Esa fecha pertenece a una temporada cerrada: no se puede modificar.',
+            },
+          },
+        ],
+        [204],
+      ],
+    });
+    renderApp('/panel/contabilidad?pestana=facturas');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir factura' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Añadir factura' });
+    await userEvent.type(within(dialog).getByLabelText('Proveedor'), 'Escaque');
+    await userEvent.type(within(dialog).getByLabelText('Concepto'), 'Relojes');
+    await userEvent.type(within(dialog).getByLabelText('Importe (€)'), '186');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'material');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar factura' }));
+    expect(await within(dialog).findByText(/temporada cerrada/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar factura' }));
+
+    expect(await screen.findByText('Factura registrada')).toBeInTheDocument();
+    const registrations = fetch.mock.calls.filter(
+      ([url, init]) => url === '/api/admin/accounting/invoices' && init?.method === 'POST',
+    );
+    expect(registrations).toHaveLength(1);
+  });
+
+  it('keeps the confirmation open and explains why an entry cannot be removed', async () => {
+    api({
+      'DELETE /api/admin/accounting/entries/e1': [
+        409,
+        {
+          error: {
+            code: 'period_closed',
+            message: 'Esa fecha pertenece a una temporada cerrada: no se puede modificar.',
+          },
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Quitar Subvención municipal' }),
+    );
+    const confirm = await screen.findByRole('dialog', { name: 'Quitar movimiento' });
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Quitar' }));
+
+    expect(await within(confirm).findByText(/temporada cerrada/)).toBeInTheDocument();
+  });
+
   it('refuses documents that are not a PDF or a photo', async () => {
     api();
     renderApp('/panel/contabilidad?pestana=facturas');

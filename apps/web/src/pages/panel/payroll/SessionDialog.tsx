@@ -28,7 +28,13 @@ interface SessionDialogProps {
 /** «Registrar horas» (nueva sesión) o «Editar sesión» (sustitución o cambio de horas). */
 export function SessionDialog({ session, teachers, onClose }: SessionDialogProps) {
   const groups = useGroups();
-  const [teacherId, setTeacherId] = useState(session?.teacherId ?? teachers[0]?.id ?? '');
+  const [chosenTeacher, setTeacherId] = useState(session?.teacherId ?? '');
+  // Si los profesores llegan después de abrir el diálogo, se usa el primero.
+  const teacherId = chosenTeacher || teachers[0]?.id || '';
+  const teacherOptions = teachers.map((t) => ({ value: t.id, label: t.fullName }));
+  if (session && !teachers.some((t) => t.id === session.teacherId)) {
+    teacherOptions.unshift({ value: session.teacherId, label: session.teacherName });
+  }
   const [groupId, setGroupId] = useState(session?.groupId ?? '');
   const [activity, setActivity] = useState('');
   const [date, setDate] = useState(todayIso());
@@ -84,7 +90,7 @@ export function SessionDialog({ session, teachers, onClose }: SessionDialogProps
             label="Profesor"
             value={teacherId}
             onChange={setTeacherId}
-            options={teachers.map((t) => ({ value: t.id, label: t.fullName }))}
+            options={teacherOptions}
           />
           {!session && (
             <>

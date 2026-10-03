@@ -170,14 +170,18 @@ export function InvoicesTab() {
           message={`Se quitará la factura de ${removing.supplier} (${formatCents(removing.amountCents)}) y su documento.`}
           confirmLabel="Quitar"
           busy={remove.isPending}
-          onCancel={() => setRemoving(null)}
+          error={remove.isError ? apiErrorMessage(remove.error) : null}
+          onCancel={() => {
+            remove.reset();
+            setRemoving(null);
+          }}
           onConfirm={() =>
             void remove.mutateAsync(removing.id).then(
               () => {
                 toast('Factura quitada');
                 setRemoving(null);
               },
-              () => setRemoving(null),
+              () => undefined,
             )
           }
         />

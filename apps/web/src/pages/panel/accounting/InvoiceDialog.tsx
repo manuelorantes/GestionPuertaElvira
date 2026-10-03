@@ -28,13 +28,19 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
     date: todayIso(),
   });
   const [paid, setPaid] = useState(true);
+  // Si la factura ya se registró pero falló el pago, reintentar no debe registrarla otra vez.
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const toast = useToast();
   const inputId = useId();
   const save = useAccountingMutation(async () => {
-    const form = new FormData();
-    Object.entries(values).forEach(([key, value]) => form.append(key, value.trim()));
-    if (file) form.append('file', file);
-    const id = await registerInvoice(form);
+    let id = createdId;
+    if (!id) {
+      const form = new FormData();
+      Object.entries(values).forEach(([key, value]) => form.append(key, value.trim()));
+      if (file) form.append('file', file);
+      id = await registerInvoice(form);
+      setCreatedId(id);
+    }
     if (paid) await payInvoice(id, values.date, 'transfer');
   });
   const year = new Date().getFullYear();

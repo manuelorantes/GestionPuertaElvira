@@ -61,8 +61,9 @@ export function YearTab({
         </button>
       </div>
       {close.isError && <Alert>{apiErrorMessage(close.error)}</Alert>}
+      {year.isError && <Alert>{apiErrorMessage(year.error)}</Alert>}
       {!y ? (
-        <p className="text-ink-muted">Cargando temporada…</p>
+        !year.isError && <p className="text-ink-muted">Cargando temporada…</p>
       ) : (
         <div className="flex flex-wrap items-start gap-6">
           <Card className="min-w-0 flex-[2_1_560px] overflow-x-auto">
