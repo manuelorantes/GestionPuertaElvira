@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { ADMIN, NO_SESSION, mockApi, renderApp } from '@/test/render';
 
 describe('armazón del panel', () => {
-  it('should show the sections with only the summary available, and the person with their role', async () => {
+  it('should link every section and show the person with their role', async () => {
     mockApi({ 'GET /api/auth/me': [200, { user: { ...ADMIN, role: 'teacher' } }] });
 
     renderApp('/panel');
@@ -14,14 +14,14 @@ describe('armazón del panel', () => {
       'aria-current',
       'page',
     );
-    for (const section of ['Contabilidad']) {
-      expect(within(nav).getByText(section).closest('[aria-disabled="true"]')).not.toBeNull();
+    expect(within(nav).queryByText('Próximamente')).not.toBeInTheDocument();
+    for (const [name, href] of [
+      [/Cobros y cuotas/, '/panel/cobros'],
+      [/Profesores/, '/panel/profesores'],
+      [/Contabilidad/, '/panel/contabilidad'],
+    ] as const) {
+      expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', href);
     }
-    expect(within(nav).getAllByText('Próximamente')).toHaveLength(1);
-    expect(within(nav).getByRole('link', { name: /Cobros y cuotas/ })).toHaveAttribute(
-      'href',
-      '/panel/cobros',
-    );
     expect(screen.getAllByText('Lucía Moreno Gil').length).toBeGreaterThan(0);
     expect(screen.getByText('Profesorado')).toBeVisible();
     expect(screen.getByText('Hola, Lucía')).toBeVisible();
