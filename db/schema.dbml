@@ -196,6 +196,54 @@ Table payroll_proposed_month {
   month varchar(7) [pk, note: 'meses ya propuestos desde el horario']
 }
 
+// --- Contabilidad (Accounting) ---------------------------------------------
+
+Table accounting_entry {
+  id uuid [pk, note: 'apunte manual (subvención, comisión, venta…)']
+  entry_date date [not null]
+  kind varchar(10) [not null, note: 'income | expense']
+  concept varchar(120) [not null]
+  category varchar(20) [not null, note: 'categoría fija coherente con el tipo']
+  method varchar(10) [not null, note: 'cash | transfer | card']
+  amount_cents int [not null, note: '> 0']
+
+  indexes {
+    entry_date [name: 'accounting_entry_date_idx']
+  }
+}
+
+Table accounting_invoice {
+  id uuid [pk]
+  invoice_date date [not null]
+  number varchar(40) [not null]
+  supplier varchar(120) [not null]
+  concept varchar(120) [not null]
+  category varchar(20) [not null, note: 'categoría de gasto']
+  amount_cents int [not null]
+  paid_on date [note: 'nulo = pendiente; cuenta como gasto en esta fecha']
+  method varchar(10)
+  attachment_key varchar(200) [note: 'clave en el almacenamiento de documentos']
+  attachment_name varchar(200)
+  attachment_type varchar(40) [note: 'application/pdf | image/jpeg | image/png | image/webp']
+  attachment_bytes int [note: '≤ 10 MB']
+
+  indexes {
+    paid_on [name: 'accounting_invoice_paid_idx']
+  }
+}
+
+Table accounting_closing {
+  start_year smallint [pk, note: 'ejercicio de septiembre de start_year a agosto siguiente']
+  income_cents int [not null]
+  expense_cents int [not null]
+  closed_on date [not null]
+  Note: 'Bloquea todo lo fechado en el ejercicio; su resultado pasa como saldo inicial del siguiente'
+}
+
+Note libro {
+  'El libro de movimientos no tiene tabla propia: se compone en lectura con billing_payment, payroll_settlement, accounting_invoice pagadas y accounting_entry.'
+}
+
 // --- Infraestructura ----------------------------------------------------
 
 Table cache_items {
