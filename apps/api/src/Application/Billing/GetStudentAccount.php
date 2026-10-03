@@ -37,6 +37,7 @@ final readonly class GetStudentAccount
             null === $rate ? null : number_format($rate->cents / 100, 2, '.', ''),
             $account?->points() ?? 0,
             $this->quotes->suggestion($studentId),
+            $this->quotes->remainingMonths($studentId),
         );
     }
 }

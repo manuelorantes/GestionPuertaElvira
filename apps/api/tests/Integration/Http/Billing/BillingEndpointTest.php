@@ -96,6 +96,7 @@ final class BillingEndpointTest extends ApiAuthTestCase
         self::assertSame('35.00', $account['privateRate'] ?? null);
         self::assertSame(4, $account['points'] ?? null);
         self::assertIsInt($account['suggestedMonths'] ?? null);
+        self::assertIsInt($account['remainingMonths'] ?? null);
 
         $this->json('POST', "/api/admin/billing/accounts/{$this->student}/points", ['delta' => -5]);
         $this->assertError(422, 'unprocessable');
