@@ -135,6 +135,43 @@ describe('Contabilidad', () => {
     expect(within(byCategory).getByText('1366 €')).toBeInTheDocument();
   });
 
+  it('opens the origin of automatic movements instead of removing them', async () => {
+    api({
+      'GET /api/admin/billing/payments/p1': [
+        200,
+        {
+          id: 'p1',
+          receiptNumber: 'R-2026-0001',
+          paidOn: '2026-10-02',
+          studentId: 's1',
+          studentName: 'Martina López Herrera',
+          kind: 'monthly',
+          concept: 'Octubre 2026',
+          method: 'cash',
+          totalCents: 4500,
+          invoiceNumber: null,
+          methodLabel: 'Efectivo',
+          guardianName: 'Rocío Herrera',
+          lines: [{ label: '2 h semanales · 1 mes', amountCents: 4500 }],
+          periods: ['2026-10'],
+          invoice: null,
+          club: { name: 'Club Ajedrez Puerta Elvira', taxId: 'G18000000', address: 'Granada' },
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
+    const fee = within(table).getByRole('row', { name: /Martina López Herrera/ });
+    expect(within(fee).queryByRole('button', { name: /^Quitar/ })).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole('link', { name: /Ver facturas: Propietario del local/ }),
+    ).toHaveAttribute('href', '/panel/contabilidad?pestana=facturas');
+    await userEvent.click(within(fee).getByRole('button', { name: /Ver recibo/ }));
+
+    expect(await screen.findByRole('dialog', { name: 'Recibo' })).toHaveTextContent('R-2026-0001');
+  });
+
   it('adds a manual expense', async () => {
     const fetch = api({ 'POST /api/admin/accounting/entries': [201, { id: 'e9' }] });
     renderApp('/panel/contabilidad?mes=2026-10');

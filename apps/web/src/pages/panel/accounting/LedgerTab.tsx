@@ -1,5 +1,14 @@
-import { ArrowDownLeft, ArrowUpRight, Plus, Trash2 } from 'lucide-react';
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  FileText,
+  Plus,
+  Printer,
+  Receipt,
+  Trash2,
+} from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router';
 
 import { deleteEntry, type LedgerItem } from '@/features/accounting/api';
 import { useAccountingMutation, useLedger } from '@/features/accounting/hooks';
@@ -13,7 +22,55 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { MonthNav } from '@/shared/ui/MonthNav';
 import { useToast } from '@/shared/ui/Toast';
 
+import { ReceiptDialog } from '@/pages/panel/billing/ReceiptDialog';
+import { SettlementSheetDialog } from '@/pages/panel/payroll/SettlementSheetDialog';
+
 import { EntryDialog } from './EntryDialog';
+
+const ROW_ACTION =
+  'flex size-9 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted';
+
+/** De dónde sale cada movimiento automático y dónde se gestiona (aquí no se puede quitar). */
+const ORIGINS: Record<Exclude<LedgerItem['source'], 'manual'>, { label: string; hint: string }> = {
+  payment: { label: 'Ver recibo', hint: 'Viene de Cobros y cuotas: se gestiona allí' },
+  settlement: {
+    label: 'Ver liquidación',
+    hint: 'Viene de Profesores → Liquidación: se gestiona allí',
+  },
+  invoice: { label: 'Ver facturas', hint: 'Viene de una factura pagada: se gestiona en Facturas' },
+};
+
+function OriginAction({ item, onOpen }: { item: LedgerItem; onOpen: (item: LedgerItem) => void }) {
+  if (item.source === 'manual') return null;
+  const { label, hint } = ORIGINS[item.source];
+  const name = `${label}: ${item.concept}`;
+  if (item.source === 'invoice')
+    return (
+      <Link
+        to="/panel/contabilidad?pestana=facturas"
+        aria-label={name}
+        title={hint}
+        className={ROW_ACTION}
+      >
+        <FileText aria-hidden size={16} />
+      </Link>
+    );
+  return (
+    <button
+      type="button"
+      aria-label={name}
+      title={hint}
+      onClick={() => onOpen(item)}
+      className={ROW_ACTION}
+    >
+      {item.source === 'payment' ? (
+        <Printer aria-hidden size={16} />
+      ) : (
+        <Receipt aria-hidden size={16} />
+      )}
+    </button>
+  );
+}
 
 function signed(item: LedgerItem): string {
   return `${item.kind === 'income' ? '+' : '−'}${formatCents(item.amountCents)}`;
@@ -29,6 +86,7 @@ export function LedgerTab({
   const ledger = useLedger(month);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<LedgerItem | null>(null);
+  const [origin, setOrigin] = useState<LedgerItem | null>(null);
   const remove = useAccountingMutation(deleteEntry);
   const toast = useToast();
   const data = ledger.data;
@@ -97,15 +155,18 @@ export function LedgerTab({
                     {signed(item)}
                   </td>
                   <td className="px-2 py-3">
-                    {item.source === 'manual' && (
+                    {item.source === 'manual' ? (
                       <button
                         type="button"
                         aria-label={`Quitar ${item.concept}`}
+                        title="Apunte manual: se puede quitar"
                         onClick={() => setRemoving(item)}
-                        className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                        className={ROW_ACTION}
                       >
                         <Trash2 aria-hidden size={16} />
                       </button>
+                    ) : (
+                      <OriginAction item={item} onOpen={setOrigin} />
                     )}
                   </td>
                 </tr>
@@ -113,7 +174,11 @@ export function LedgerTab({
             </tbody>
           </table>
         </div>
-        <p className="border-t border-line px-5 py-3 text-sm font-medium">
+        <p className="border-t border-line px-5 pt-3 text-[13px] text-ink-muted">
+          Solo los apuntes manuales se quitan aquí; cobros, liquidaciones y facturas se gestionan en
+          su sección.
+        </p>
+        <p className="px-5 py-3 text-sm font-medium">
           Ingresos {formatCents(data.incomeCents)} · Gastos {formatCents(data.expenseCents)} ·
           Resultado {formatCents(data.incomeCents - data.expenseCents)}
         </p>
@@ -166,6 +231,16 @@ export function LedgerTab({
         </Card>
       </div>
       {adding && <EntryDialog onClose={() => setAdding(false)} />}
+      {origin?.source === 'payment' && (
+        <ReceiptDialog paymentId={origin.sourceId} onClose={() => setOrigin(null)} />
+      )}
+      {origin?.source === 'settlement' && (
+        <SettlementSheetDialog
+          teacherId={origin.sourceId.split('/')[0] ?? ''}
+          month={origin.sourceId.split('/')[1] ?? ''}
+          onClose={() => setOrigin(null)}
+        />
+      )}
       {removing && (
         <ConfirmDialog
           title="Quitar movimiento"
