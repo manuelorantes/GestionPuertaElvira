@@ -27,4 +27,11 @@ interface BillingQuery
     public function payments(?string $studentId): array;
 
     public function payment(string $id): ?PaymentDetail;
+
+    /**
+     * Cuotas mensuales vencidas a fecha de hoy, de la más antigua a la más reciente.
+     *
+     * @return list<ChargeView>
+     */
+    public function overdue(LocalDate $today): array;
 }
