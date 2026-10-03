@@ -62,6 +62,7 @@ Ref: classes_enrolment.student_id > students_student.id
 Table teachers_teacher {
   id uuid [pk, note: 'UUIDv7']
   full_name varchar(120) [not null]
+  hourly_rate_cents int [not null, default: 1500, note: 'lo que el club le paga por hora']
   active boolean [not null]
 }
 
@@ -159,6 +160,41 @@ Table billing_document_sequence {
 }
 
 Ref: billing_charge.paid_by > billing_payment.id
+
+// --- Profesorado (Payroll) ------------------------------------------------
+
+Table payroll_session {
+  id uuid [pk, note: 'UUIDv7']
+  teacher_id uuid [not null, note: 'quién la imparte (sustituciones incluidas)']
+  session_date date [not null]
+  group_id uuid [note: 'nulo = otra actividad']
+  label varchar(80) [not null, note: 'nombre del grupo o de la actividad']
+  minutes smallint [not null, note: '30–720, múltiplo de 30']
+  from_schedule boolean [not null, note: 'propuesta desde el horario o añadida a mano']
+
+  indexes {
+    session_date [name: 'payroll_session_date_idx']
+  }
+}
+
+Table payroll_settlement {
+  teacher_id uuid [not null]
+  month varchar(7) [not null, note: 'AAAA-MM']
+  minutes int [not null]
+  rate_cents int [not null, note: 'tarifa congelada al pagar']
+  amount_cents int [not null]
+  lines json [not null, note: 'detalle por grupo [{label, minutes, amountCents}]']
+  paid_on date [not null]
+
+  indexes {
+    (teacher_id, month) [pk]
+  }
+  Note: 'Solo existe cuando la liquidación está pagada; bloquea las sesiones de ese profesor y mes'
+}
+
+Table payroll_proposed_month {
+  month varchar(7) [pk, note: 'meses ya propuestos desde el horario']
+}
 
 // --- Infraestructura ----------------------------------------------------
 
