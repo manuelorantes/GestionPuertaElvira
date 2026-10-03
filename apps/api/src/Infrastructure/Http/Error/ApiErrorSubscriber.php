@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Http\Error;
 
+use App\Application\Accounting\Error\DocumentNotFound;
+use App\Application\Accounting\Error\EntryNotFound;
+use App\Application\Accounting\Error\InvoiceAlreadyPaidCannotBeDeleted;
+use App\Application\Accounting\Error\PreviousSeasonOpen;
+use App\Application\Accounting\Error\SeasonAlreadyClosed;
+use App\Application\Accounting\Error\SeasonNotFinished;
+use App\Application\Accounting\Error\SupplierInvoiceNotFound;
 use App\Application\Billing\Error\BillingStudentNotFound;
 use App\Application\Billing\Error\ChargeNotFound;
 use App\Application\Billing\Error\PaymentNotFound;
@@ -12,6 +19,7 @@ use App\Application\Classes\Error\ClassroomConflict;
 use App\Application\Classes\Error\LastEnrolment;
 use App\Application\Classes\Error\NotEnrolled;
 use App\Application\Classes\Error\TeacherNotAvailable;
+use App\Application\Common\Error\PeriodClosed;
 use App\Application\Identity\Error\CurrentPasswordMismatch;
 use App\Application\Identity\Error\EmailAlreadyRegistered;
 use App\Application\Identity\Error\InvalidCredentials;
@@ -20,6 +28,7 @@ use App\Application\Payroll\Error\SessionNotFound;
 use App\Application\Students\Error\StudentNotFound;
 use App\Application\Teachers\Error\TeacherHasGroups;
 use App\Application\Teachers\Error\TeacherNotFound;
+use App\Domain\Accounting\Error\InvoiceAlreadyPaid;
 use App\Domain\Billing\Error\ChargeAlreadyPaid;
 use App\Domain\Billing\Error\InvalidPaymentRequest;
 use App\Domain\Billing\Error\InvoiceAlreadyIssued;
@@ -83,6 +92,15 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
         BillingStudentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         InvoiceAlreadyIssued::class => [Response::HTTP_CONFLICT, 'invoice_already_issued'],
         SessionNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        EntryNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        SupplierInvoiceNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        DocumentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        PeriodClosed::class => [Response::HTTP_CONFLICT, 'period_closed'],
+        SeasonAlreadyClosed::class => [Response::HTTP_CONFLICT, 'season_closed'],
+        SeasonNotFinished::class => [Response::HTTP_CONFLICT, 'season_not_finished'],
+        PreviousSeasonOpen::class => [Response::HTTP_CONFLICT, 'previous_season_open'],
+        InvoiceAlreadyPaid::class => [Response::HTTP_CONFLICT, 'invoice_paid'],
+        InvoiceAlreadyPaidCannotBeDeleted::class => [Response::HTTP_CONFLICT, 'invoice_paid'],
         SettlementAlreadyPaid::class => [Response::HTTP_CONFLICT, 'settlement_paid'],
         ChargeAlreadyPaid::class => [Response::HTTP_CONFLICT, 'charge_already_paid'],
     ];

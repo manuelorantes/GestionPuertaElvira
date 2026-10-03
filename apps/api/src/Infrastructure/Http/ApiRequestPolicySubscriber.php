@@ -14,11 +14,14 @@ use Symfony\Component\HttpKernel\KernelEvents;
 /**
  * Políticas transversales de /api (ver specs/decisions/api-y-web-en-el-mismo-origen.md):
  * - las peticiones que cambian estado deben ser JSON (defensa CSRF en profundidad);
+ *   solo la subida de documentos admite multipart, y entonces exige la cabecera X-Requested-With,
+ *   que un formulario de otro sitio no puede enviar;
  * - ninguna respuesta se guarda en caché.
  */
 final readonly class ApiRequestPolicySubscriber implements EventSubscriberInterface
 {
     private const array STATE_CHANGING = ['POST', 'PUT', 'PATCH', 'DELETE'];
+    private const string UPLOADS = '#^/api/admin/accounting/invoices(/[0-9a-f-]{36}/attachment)?$#';
 
     public static function getSubscribedEvents(): array
     {
@@ -33,6 +36,15 @@ final readonly class ApiRequestPolicySubscriber implements EventSubscriberInterf
     {
         $request = $event->getRequest();
         if (!$event->isMainRequest() || !self::isApi($request->getPathInfo()) || !\in_array($request->getMethod(), self::STATE_CHANGING, true)) {
+            return;
+        }
+
+        if ('form' === $request->getContentTypeFormat() && 1 === preg_match(self::UPLOADS, $request->getPathInfo())
+            && str_starts_with((string) $request->headers->get('Content-Type'), 'multipart/form-data')) {
+            if ('fetch' !== $request->headers->get('X-Requested-With')) {
+                throw new ApiProblem(Response::HTTP_FORBIDDEN, 'forbidden', 'Subida no permitida.');
+            }
+
             return;
         }
 
