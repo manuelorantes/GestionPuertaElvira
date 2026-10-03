@@ -75,6 +75,12 @@ final readonly class QuotePayment
         return $plan->monthsWithin($this->available($ref, LocalDate::fromInstant($this->clock->now())));
     }
 
+    /** Meses que aún se pueden cobrar: cuotas pendientes más los que quedan de temporada. */
+    public function remainingMonths(string $studentId): int
+    {
+        return $this->available(StudentRef::fromString($studentId), LocalDate::fromInstant($this->clock->now()));
+    }
+
     /** @return non-empty-list<YearMonth> */
     private function periods(StudentRef $ref, LocalDate $date, int $months): array
     {

@@ -83,6 +83,7 @@ final class BillingUseCasesTest extends TestCase
         $result = new QuotePayment($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock)->suggestion($id);
 
         self::assertSame(3, $result);
+        self::assertSame(9, new QuotePayment($this->fx, $this->fx, $this->fx, $this->fx, $this->fx->clock)->remainingMonths($id), 'de octubre a junio');
         self::assertSame(13200, $this->quote($id, 3)->quote->total->cents);
         self::assertSame([], $this->fx->payments);
     }

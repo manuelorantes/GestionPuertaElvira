@@ -12,6 +12,7 @@ final readonly class AccountView
         public ?string $privateRate,
         public int $points,
         public int $suggestedMonths,
+        public int $remainingMonths,
     ) {
     }
 }
