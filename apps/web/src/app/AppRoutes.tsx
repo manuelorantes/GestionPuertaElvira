@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router';
 
 import { RequireSession } from '@/features/auth/RequireSession';
 import { HomePage } from '@/pages/home/HomePage';
+import { BillingPage } from '@/pages/panel/billing/BillingPage';
 import { ChangePasswordPage } from '@/pages/panel/ChangePasswordPage';
 import { ClassesPage } from '@/pages/panel/classes/ClassesPage';
 import { PanelHomePage } from '@/pages/panel/PanelHomePage';
@@ -18,6 +19,7 @@ export function AppRoutes() {
         <Route element={<PanelLayout />}>
           <Route index element={<PanelHomePage />} />
           <Route path="clases" element={<ClassesPage />} />
+          <Route path="cobros" element={<BillingPage />} />
           <Route path="alumnos" element={<StudentsPage />}>
             <Route path=":id" element={<StudentPanel />} />
           </Route>

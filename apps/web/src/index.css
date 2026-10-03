@@ -68,3 +68,19 @@
     }
   }
 }
+
+/* Al imprimir un recibo o una factura solo sale la hoja. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .receipt-sheet,
+  .receipt-sheet * {
+    visibility: visible;
+  }
+  .receipt-sheet {
+    position: absolute;
+    inset: 0 0 auto;
+    border: none;
+  }
+}
