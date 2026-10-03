@@ -34,7 +34,7 @@ export function useBillingMutation<Variables, Result = void>(
     mutationFn,
     onSuccess: () =>
       Promise.all(
-        ['charges', 'payments', 'payment', 'account', 'billing-settings'].map((key) =>
+        ['charges', 'payments', 'payment', 'account', 'billing-settings', 'dashboard'].map((key) =>
           queryClient.invalidateQueries({ queryKey: [key] }),
         ),
       ),

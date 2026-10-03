@@ -39,9 +39,13 @@ export function usePayrollMutation<Variables, Result = void>(
     mutationFn,
     onSuccess: () =>
       Promise.all(
-        ['payroll-sessions', 'payroll-settlements', 'payroll-sheet', 'payroll-profitability'].map(
-          (key) => queryClient.invalidateQueries({ queryKey: [key] }),
-        ),
+        [
+          'payroll-sessions',
+          'payroll-settlements',
+          'payroll-sheet',
+          'payroll-profitability',
+          'dashboard',
+        ].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
       ),
   });
 }
