@@ -20,8 +20,8 @@ use App\Domain\Billing\Payment;
 use App\Domain\Billing\PaymentId;
 use App\Domain\Billing\StudentAccount;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\YearMonth;
 use App\Tests\Support\FrozenClock;
 use App\Tests\Support\ImmediateTransactionRunner;
 

@@ -12,9 +12,9 @@ use App\Domain\Billing\Charge;
 use App\Domain\Billing\ChargeId;
 use App\Domain\Billing\ChargeKind;
 use App\Domain\Billing\FeeCalculator;
-use App\Domain\Billing\Season;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
+use App\Domain\Common\Season;
+use App\Domain\Common\YearMonth;
 
 /**
  * Crea las cuotas del mes que falten (idempotente): la mensual de cada alumno activo y la de socio de la temporada.

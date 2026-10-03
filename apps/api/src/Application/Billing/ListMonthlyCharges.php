@@ -6,9 +6,9 @@ namespace App\Application\Billing;
 
 use App\Application\Billing\Port\BillingQuery;
 use App\Domain\Billing\ChargeStatus;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\Clock;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\YearMonth;
 
 /** Genera las cuotas que falten del mes y las devuelve con su estado y totales. */
 final readonly class ListMonthlyCharges

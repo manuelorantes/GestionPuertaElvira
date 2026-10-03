@@ -14,9 +14,9 @@ use App\Domain\Billing\DocumentNumber;
 use App\Domain\Billing\Payment;
 use App\Domain\Billing\PaymentId;
 use App\Domain\Billing\PaymentMethod;
-use App\Domain\Billing\Season;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
+use App\Domain\Common\Season;
+use App\Domain\Common\YearMonth;
 
 /** Registra el cobro con su recibo y deja pagadas las cuotas que cubre. */
 final readonly class RegisterPayment

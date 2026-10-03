@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Domain\Billing;
+namespace App\Domain\Common;
 
-use App\Domain\Common\InvalidValue;
-use App\Domain\Common\LocalDate;
 use DateTimeImmutable;
 use Stringable;
 

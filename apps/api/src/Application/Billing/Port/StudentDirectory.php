@@ -6,8 +6,8 @@ namespace App\Application\Billing\Port;
 
 use App\Application\Billing\BillingStudent;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\YearMonth;
 
 interface StudentDirectory
 {

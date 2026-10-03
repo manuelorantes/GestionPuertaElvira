@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Infrastructure\Billing\Cli;
 
 use App\Application\Billing\GenerateMonthlyCharges;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\Clock;
 use App\Domain\Common\InvalidValue;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\YearMonth;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
 use Symfony\Component\Console\Command\Command;

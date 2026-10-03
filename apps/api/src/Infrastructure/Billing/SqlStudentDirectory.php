@@ -8,8 +8,8 @@ use App\Application\Billing\BillingStudent;
 use App\Application\Billing\Port\StudentDirectory;
 use App\Application\Billing\PrivateEnrolment;
 use App\Domain\Billing\StudentRef;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\YearMonth;
 use App\Infrastructure\Persistence\Doctrine\Row;
 use Doctrine\DBAL\Connection;
 

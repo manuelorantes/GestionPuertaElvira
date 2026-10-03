@@ -7,8 +7,8 @@ namespace App\Application\Billing\Port;
 use App\Application\Billing\ChargeView;
 use App\Application\Billing\PaymentDetail;
 use App\Application\Billing\PaymentSummary;
-use App\Domain\Billing\YearMonth;
 use App\Domain\Common\LocalDate;
+use App\Domain\Common\YearMonth;
 
 interface BillingQuery
 {
