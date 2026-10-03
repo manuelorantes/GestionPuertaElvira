@@ -46,6 +46,14 @@ export function apiSend<T = void>(method: Method, path: string, body: unknown = 
   });
 }
 
+/**
+ * Subida de documentos (multipart). La API solo la admite en sus rutas de subida y con la cabecera
+ * X-Requested-With, que un formulario de otro sitio no puede enviar.
+ */
+export function apiUpload<T = void>(path: string, form: FormData): Promise<T> {
+  return request<T>(path, { method: 'POST', body: form, headers: { 'X-Requested-With': 'fetch' } });
+}
+
 async function request<T>(path: string, init: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,

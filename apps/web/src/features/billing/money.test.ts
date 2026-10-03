@@ -4,7 +4,7 @@ describe('billing formatting', () => {
   it('formats cents as euros in Spanish style', () => {
     expect(formatCents(4500)).toBe('45 €');
     expect(formatCents(123450)).toBe('1234,50 €');
-    expect(formatCents(-1125)).toBe('-11,25 €');
+    expect(formatCents(-1125)).toBe('−11,25 €');
   });
 
   it('labels and shifts months across years', () => {

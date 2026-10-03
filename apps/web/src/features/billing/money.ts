@@ -23,9 +23,12 @@ const MONTHS = [
   'diciembre',
 ];
 
-/** 4500 → «45 €»; 4050 → «40,50 €». */
+/** 4500 → «45 €»; 4050 → «40,50 €»; −1125 → «−11,25 €» (signo menos tipográfico). */
 export function formatCents(cents: number): string {
-  return (cents % 100 === 0 ? WHOLE : DECIMAL).format(cents / 100).replace(/\s/g, ' ');
+  return (cents % 100 === 0 ? WHOLE : DECIMAL)
+    .format(cents / 100)
+    .replace(/\s/g, ' ')
+    .replace('-', '−');
 }
 
 function parts(month: string): [number, number] {
