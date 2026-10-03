@@ -7,6 +7,10 @@ updates:
     groups:
       symfony: { patterns: ['symfony/*'] }
       quality: { patterns: ['phpstan/*', 'friendsofphp/*', 'deptrac/*', 'phpunit/*'] }
+    ignore:
+      # El proyecto usa Symfony 7.4 LTS; el salto a Symfony 8 será una migración completa y decidida.
+      - dependency-name: 'symfony/*'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: npm
     directory: /apps/web
     schedule: { interval: weekly }
