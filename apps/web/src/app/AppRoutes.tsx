@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router';
 import { RequireSession } from '@/features/auth/RequireSession';
 import { HomePage } from '@/pages/home/HomePage';
 import { AccountingPage } from '@/pages/panel/accounting/AccountingPage';
+import { AuditPage } from '@/pages/panel/audit/AuditPage';
 import { BillingPage } from '@/pages/panel/billing/BillingPage';
 import { ChangePasswordPage } from '@/pages/panel/ChangePasswordPage';
 import { ClassesPage } from '@/pages/panel/classes/ClassesPage';
@@ -24,6 +25,7 @@ export function AppRoutes() {
           <Route path="cobros" element={<BillingPage />} />
           <Route path="profesores" element={<TeachersPayPage />} />
           <Route path="contabilidad" element={<AccountingPage />} />
+          <Route path="historial" element={<AuditPage />} />
           <Route path="alumnos" element={<StudentsPage />}>
             <Route path=":id" element={<StudentPanel />} />
           </Route>

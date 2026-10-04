@@ -3,6 +3,7 @@ import {
   CalendarDays,
   Clock,
   GraduationCap,
+  History,
   LayoutDashboard,
   Users,
   Wallet,
@@ -24,6 +25,7 @@ export const PANEL_SECTIONS: PanelSection[] = [
   { id: 'profesores', label: 'Profesores', icon: GraduationCap, path: '/panel/profesores' },
   { id: 'cobros', label: 'Cobros y cuotas', icon: Wallet, path: '/panel/cobros' },
   { id: 'contabilidad', label: 'Contabilidad', icon: BookOpen, path: '/panel/contabilidad' },
+  { id: 'historial', label: 'Historial', icon: History, path: '/panel/historial' },
 ];
 
 export const MOBILE_SECTIONS: PanelSection[] = [
