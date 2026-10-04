@@ -6,6 +6,7 @@ import { AccountingPage } from '@/pages/panel/accounting/AccountingPage';
 import { AuditPage } from '@/pages/panel/audit/AuditPage';
 import { BillingPage } from '@/pages/panel/billing/BillingPage';
 import { ChangePasswordPage } from '@/pages/panel/ChangePasswordPage';
+import { ImportPage } from '@/pages/panel/import/ImportPage';
 import { ClassesPage } from '@/pages/panel/classes/ClassesPage';
 import { PanelHomePage } from '@/pages/panel/PanelHomePage';
 import { TeachersPayPage } from '@/pages/panel/payroll/TeachersPayPage';
@@ -26,6 +27,7 @@ export function AppRoutes() {
           <Route path="profesores" element={<TeachersPayPage />} />
           <Route path="contabilidad" element={<AccountingPage />} />
           <Route path="historial" element={<AuditPage />} />
+          <Route path="importar" element={<ImportPage />} />
           <Route path="alumnos" element={<StudentsPage />}>
             <Route path=":id" element={<StudentPanel />} />
           </Route>
