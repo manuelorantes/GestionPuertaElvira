@@ -64,7 +64,9 @@ services:
     App\Application\Accounting\Port\SupplierInvoiceRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Accounting\DoctrineAccountingRepository'
     App\Application\Accounting\Port\SeasonClosingRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Accounting\DoctrineAccountingRepository'
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
-    App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Identity\Logging\MonologSecurityEventLog'
+    App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Audit\AuditedSecurityEventLog'
+    App\Application\Audit\Port\AuditLog: '@App\Infrastructure\Audit\SqlAuditLog'
+    App\Application\Audit\Port\AuditReverter: '@App\Infrastructure\Audit\SqlAuditLog'
 
 
 when@test:
@@ -154,6 +156,17 @@ when@test:
             public: true
         App\Application\Accounting\CloseSeason:
             autowire: true
+            public: true
+        App\Application\Audit\UndoAction:
+            autowire: true
+            public: true
+        App\Application\Audit\RestoreToPoint:
+            autowire: true
+            public: true
+        App\Infrastructure\Audit\:
+            resource: '../src/Infrastructure/Audit/'
+            autowire: true
+            autoconfigure: true
             public: true
         App\Infrastructure\Accounting\:
             resource: '../src/Infrastructure/Accounting/'
