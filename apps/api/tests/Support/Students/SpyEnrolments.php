@@ -19,7 +19,7 @@ final class SpyEnrolments implements Enrolments
 
     public ?Throwable $failWith = null;
 
-    public function enrol(StudentId $student, array $groupIds, bool $confirmOverCapacity): void
+    public function enrol(StudentId $student, array $groupIds, bool $confirmOverCapacity, ?LocalDate $from = null): void
     {
         if (null !== $this->failWith) {
             throw $this->failWith;

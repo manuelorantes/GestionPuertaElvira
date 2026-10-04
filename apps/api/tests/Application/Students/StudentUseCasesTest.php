@@ -49,6 +49,16 @@ final class StudentUseCasesTest extends TestCase
         self::assertSame(1, $this->transactions->runs);
     }
 
+    public function test_should_accept_an_earlier_joining_date_but_never_a_future_one(): void
+    {
+        $id = new RegisterStudent($this->students, $this->enrolments, $this->transactions, $this->clock)($this->input(), ['g1'], [], false, '2026-09-01');
+
+        self::assertSame('2026-09-01', $this->students->find(StudentId::fromString($id))?->joinedOn()->toString());
+
+        $this->expectException(InvalidValue::class);
+        new RegisterStudent($this->students, $this->enrolments, $this->transactions, $this->clock)($this->input(), ['g1'], [], false, '2027-01-01');
+    }
+
     public function test_should_require_at_least_one_group(): void
     {
         try {

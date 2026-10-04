@@ -11,7 +11,7 @@ use App\Domain\Students\StudentId;
 interface Enrolments
 {
     /** @param list<string> $groupIds */
-    public function enrol(StudentId $student, array $groupIds, bool $confirmOverCapacity): void;
+    public function enrol(StudentId $student, array $groupIds, bool $confirmOverCapacity, ?LocalDate $from = null): void;
 
     public function endAll(StudentId $student, LocalDate $on): void;
 }

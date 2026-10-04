@@ -18,12 +18,13 @@ final readonly class EnrolStudent
     {
     }
 
-    public function __invoke(string $studentId, string $groupId, bool $confirmOverCapacity): void
+    /** @param LocalDate|null $from inicio de la inscripción; por defecto hoy */
+    public function __invoke(string $studentId, string $groupId, bool $confirmOverCapacity, ?LocalDate $from = null): void
     {
         new Enrolling($this->groups, $this->enrolments)->enrol(
             StudentReference::fromString($studentId),
             ClassGroupId::fromString($groupId),
-            LocalDate::fromInstant($this->clock->now()),
+            $from ?? LocalDate::fromInstant($this->clock->now()),
             OverCapacity::fromConfirmation($confirmOverCapacity),
         );
     }

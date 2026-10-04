@@ -17,10 +17,10 @@ final readonly class ClassesEnrolments implements Enrolments
     {
     }
 
-    public function enrol(StudentId $student, array $groupIds, bool $confirmOverCapacity): void
+    public function enrol(StudentId $student, array $groupIds, bool $confirmOverCapacity, ?LocalDate $from = null): void
     {
         foreach ($groupIds as $groupId) {
-            ($this->enrolStudent)($student->value, $groupId, $confirmOverCapacity);
+            ($this->enrolStudent)($student->value, $groupId, $confirmOverCapacity, $from);
         }
     }
 
