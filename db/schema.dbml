@@ -244,6 +244,37 @@ Note libro {
   'El libro de movimientos no tiene tabla propia: se compone en lectura con billing_payment, payroll_settlement, accounting_invoice pagadas y accounting_entry.'
 }
 
+// --- Historial (Audit) ------------------------------------------------------
+
+Table audit_action {
+  id uuid [pk, note: 'una petición de la web, una transacción de consola, un evento de seguridad o una reversión']
+  seq bigserial [unique, not null, note: 'orden del historial']
+  kind varchar(12) [not null, note: 'change | security | undo | restore']
+  user_id uuid [note: 'quién (nulo = Sistema)']
+  user_name varchar(120) [not null, note: 'nombre en ese momento']
+  label varchar(160) [not null, note: 'p. ej. «Registrar cobro»']
+  occurred_at timestamptz [not null]
+  reverts uuid [note: 'acción que deshace o punto al que vuelve']
+}
+
+Table audit_change {
+  id bigserial [pk]
+  action_id uuid [not null]
+  table_name varchar(63) [not null]
+  row_key jsonb [not null, note: 'clave primaria de la fila']
+  operation char(1) [not null, note: 'I | U | D']
+  before jsonb [note: 'fila completa antes']
+  after jsonb [note: 'fila completa después']
+
+  indexes {
+    action_id [name: 'audit_change_action_idx']
+    (table_name, row_key) [name: 'audit_change_row_idx']
+  }
+  Note: 'Lo rellena el trigger audit_capture de cada tabla de datos; audit_revert_change revierte un cambio'
+}
+
+Ref: audit_change.action_id > audit_action.id
+
 // --- Infraestructura ----------------------------------------------------
 
 Table cache_items {

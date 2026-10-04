@@ -3,6 +3,8 @@ doctrine:
         url: '%env(resolve:DATABASE_URL)%'
         server_version: '17'
         profiling_collect_backtrace: '%kernel.debug%'
+        # El historial (audit_*) se gestiona con SQL propio: Doctrine no lo compara ni lo borra.
+        schema_filter: '~^(?!audit_)~'
     orm:
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore
