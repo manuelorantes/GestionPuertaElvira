@@ -173,6 +173,9 @@ final readonly class SeedDemoDataCommand
             $this->connection->executeStatement('DELETE FROM students_student');
             $this->connection->executeStatement('DELETE FROM classes_group');
             $this->connection->executeStatement('DELETE FROM teachers_teacher');
+            // El historial de los datos borrados ya no se puede restaurar: se empieza de cero.
+            $this->connection->executeStatement('DELETE FROM audit_change');
+            $this->connection->executeStatement('DELETE FROM audit_action');
             $this->em->clear();
         }
 

@@ -37,11 +37,13 @@ final readonly class LocalDocumentStorage implements DocumentStorage
         return false === $contents ? throw new DocumentNotFound() : $contents;
     }
 
+    /**
+     * No se borra el fichero: el historial puede devolver la factura o el documento anterior
+     * (ver historial-de-cambios-con-triggers.md). Solo se comprueba que la clave es válida.
+     */
     public function remove(string $key): void
     {
-        if (is_file($this->path($key))) {
-            unlink($this->path($key));
-        }
+        $this->path($key);
     }
 
     /** Solo claves generadas por la aplicación: evita salir de la carpeta de documentos. */

@@ -11,6 +11,9 @@ use App\Application\Accounting\Error\PreviousSeasonOpen;
 use App\Application\Accounting\Error\SeasonAlreadyClosed;
 use App\Application\Accounting\Error\SeasonNotFinished;
 use App\Application\Accounting\Error\SupplierInvoiceNotFound;
+use App\Application\Audit\Error\AuditActionNotFound;
+use App\Application\Audit\Error\NothingToUndo;
+use App\Application\Audit\Error\UndoConflict;
 use App\Application\Billing\Error\BillingStudentNotFound;
 use App\Application\Billing\Error\ChargeNotFound;
 use App\Application\Billing\Error\PaymentNotFound;
@@ -92,6 +95,9 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
         BillingStudentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         InvoiceAlreadyIssued::class => [Response::HTTP_CONFLICT, 'invoice_already_issued'],
         SessionNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        AuditActionNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
+        NothingToUndo::class => [Response::HTTP_CONFLICT, 'nothing_to_undo'],
+        UndoConflict::class => [Response::HTTP_CONFLICT, 'undo_conflict'],
         EntryNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         SupplierInvoiceNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         DocumentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
