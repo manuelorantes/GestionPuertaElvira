@@ -1,6 +1,6 @@
-import { Search, UserPlus } from 'lucide-react';
+import { FileSpreadsheet, Search, UserPlus } from 'lucide-react';
 import { useState } from 'react';
-import { Outlet, useNavigate, useSearchParams } from 'react-router';
+import { Link, Outlet, useNavigate, useSearchParams } from 'react-router';
 
 import type { StudentFilter } from '@/features/students/api';
 import { useStudents } from '@/features/students/hooks';
@@ -107,6 +107,13 @@ export function StudentsPage() {
           <p className="shrink-0 text-sm text-ink-muted">
             {items.length} de {total} mostrados
           </p>
+          <Link
+            to="/panel/importar"
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
+          >
+            <FileSpreadsheet aria-hidden size={16} />
+            Importar hoja
+          </Link>
         </div>
         {renderList()}
       </Card>
