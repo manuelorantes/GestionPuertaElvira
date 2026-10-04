@@ -45,6 +45,7 @@ final class AuditLabels
         'api_admin_students_unlink_sibling' => 'Desvincular hermanos',
         'api_admin_teachers_create' => 'Crear profesor',
         'api_admin_teachers_update' => 'Editar profesor',
+        'api_admin_import_apply' => 'Importar hoja de cálculo',
     ];
 
     private const array TABLES = [

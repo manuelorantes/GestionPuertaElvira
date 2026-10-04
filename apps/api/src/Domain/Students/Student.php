@@ -22,11 +22,11 @@ final class Student
     ) {
     }
 
-    public static function register(StudentId $id, StudentDetails $details, LocalDate $today): self
+    public static function register(StudentId $id, StudentDetails $details, LocalDate $today, ?LocalDate $joinedOn = null): self
     {
         new ContactPolicy()->assertAcceptable($details, $today);
 
-        return new self($id, $details, $today, null, []);
+        return new self($id, $details, $joinedOn ?? $today, null, []);
     }
 
     /** @param list<StudentId> $siblings */

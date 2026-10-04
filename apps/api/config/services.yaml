@@ -65,6 +65,7 @@ services:
     App\Application\Accounting\Port\SeasonClosingRepository: '@App\Infrastructure\Persistence\Doctrine\Repository\Accounting\DoctrineAccountingRepository'
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
     App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Audit\AuditedSecurityEventLog'
+    App\Application\Import\Port\StudentMatcher: '@App\Infrastructure\Import\SqlStudentMatcher'
     App\Application\Audit\Port\AuditLog: '@App\Infrastructure\Audit\SqlAuditLog'
     App\Application\Audit\Port\AuditReverter: '@App\Infrastructure\Audit\SqlAuditLog'
 
@@ -162,6 +163,14 @@ when@test:
             public: true
         App\Application\Audit\RestoreToPoint:
             autowire: true
+            public: true
+        App\Application\Import\ApplyImport:
+            autowire: true
+            public: true
+        App\Infrastructure\Import\:
+            resource: '../src/Infrastructure/Import/'
+            autowire: true
+            autoconfigure: true
             public: true
         App\Infrastructure\Audit\:
             resource: '../src/Infrastructure/Audit/'

@@ -28,18 +28,24 @@ final readonly class RegisterStudent
      *
      * @param list<string> $groupIds
      * @param list<string> $siblingIds
+     * @param string|null  $joinedOn   fecha de alta; por defecto hoy (una importación puede traer altas anteriores)
      */
-    public function __invoke(StudentInput $input, array $groupIds, array $siblingIds, bool $confirmOverCapacity): string
+    public function __invoke(StudentInput $input, array $groupIds, array $siblingIds, bool $confirmOverCapacity, ?string $joinedOn = null): string
     {
         if ([] === $groupIds) {
             throw new InvalidValue('groupIds', 'Elige al menos un grupo.');
         }
 
-        $student = Student::register(StudentId::generate(), $input->toDetails(), LocalDate::fromInstant($this->clock->now()));
+        $today = LocalDate::fromInstant($this->clock->now());
+        $joined = null === $joinedOn ? $today : LocalDate::fromString($joinedOn);
+        if ($today->isBefore($joined)) {
+            throw new InvalidValue('joinedOn', 'La fecha de alta no puede ser futura.');
+        }
+        $student = Student::register(StudentId::generate(), $input->toDetails(), $today, $joined);
 
-        return $this->transactions->run(function () use ($student, $groupIds, $siblingIds, $confirmOverCapacity): string {
+        return $this->transactions->run(function () use ($student, $groupIds, $siblingIds, $confirmOverCapacity, $joined): string {
             $this->students->save($student);
-            $this->enrolments->enrol($student->id(), $groupIds, $confirmOverCapacity);
+            $this->enrolments->enrol($student->id(), $groupIds, $confirmOverCapacity, $joined);
             foreach ($siblingIds as $siblingId) {
                 Siblings::link($this->students, $student->id()->value, $siblingId);
             }
