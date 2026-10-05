@@ -13,7 +13,7 @@ export const PASSWORD = 'torre-de-marfil';
 
 export const TEST_CONFIG: Config = {
   databaseUrl: Deno.env.get('TEST_DATABASE_URL') ??
-    'postgresql://club:club@postgres:5432/club_test_deno',
+    'postgresql://club:club@postgres:5432/club_test',
   sessionCookieName: 'pe_session',
   sessionCookieSecure: false,
   passwordHashCost: 4,
@@ -49,7 +49,7 @@ export function db(): Db {
 /** Deja vacías las tablas de datos (no la de migraciones de PHP) antes de cada test. */
 export async function resetDatabase(): Promise<void> {
   const rows = await db()`SELECT tablename FROM pg_tables
-    WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'`;
+    WHERE schemaname = 'public'`;
   const tables = rows.map((row) => row.tablename as string);
   if (tables.length > 0) {
     await db().unsafe(

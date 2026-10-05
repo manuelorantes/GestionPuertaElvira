@@ -1,6 +1,6 @@
 # Monorepo con API Symfony y web React
 
-**Estado:** en revisión por [Backend en Deno sobre Supabase](specs/decisions/backend-en-deno-sobre-supabase.md): la API se está portando a TypeScript/Deno contexto a contexto; lo que sigue describe la API en PHP mientras conviven.
+**Estado:** sustituida por [Backend en Deno sobre Supabase](specs/decisions/backend-en-deno-sobre-supabase.md) (octubre de 2026). Lo que sigue describe la API en PHP ya retirada; se conserva porque las decisiones de arquitectura (capas, contextos, modelos separados) siguen vigentes en Deno.
 
 ## Context
 

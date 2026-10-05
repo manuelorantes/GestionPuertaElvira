@@ -26,8 +26,8 @@ y boards-ai usa JWT de corta duración más un refresh token.
 - Cerrar sesión elimina la sesión.
   Desactivar una cuenta, restablecer su contraseña o cambiarla
   elimina sus sesiones (salvo, al cambiarla, la sesión desde la que se cambia).
-- Symfony Security es solo un adaptador de entrada:
-  el autenticador delega en el caso de uso `AuthenticateSession`.
+- El framework HTTP es solo un adaptador de entrada:
+  el middleware de la API delega en el caso de uso `AuthenticateSession`.
 - La configuración de la cookie (`SESSION_COOKIE_NAME`, `SESSION_COOKIE_SECURE`) llega por variables de entorno.
 
 ## Consequences

@@ -11,8 +11,9 @@
     "serve": "deno run --allow-net --allow-env --allow-read --allow-write --watch index.ts",
     "test": "deno test --allow-net --allow-env --allow-read --allow-write",
     "coverage": "deno test --allow-net --allow-env --allow-read --allow-write --coverage=.coverage && deno coverage .coverage --lcov --output=.coverage/lcov.info",
-    "check": "deno fmt --check && deno lint && deno check index.ts scripts/console.ts tests",
+    "check": "deno fmt --check && deno lint && deno check index.ts scripts tests",
     "fix": "deno fmt && deno lint --fix",
+    "migrate": "deno run --allow-net --allow-env --allow-read scripts/migrate.ts",
     "console": "deno run --allow-net --allow-env --allow-read --allow-write scripts/console.ts"
   },
   "compilerOptions": {
