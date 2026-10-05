@@ -32,15 +32,17 @@ Nada se despliega a mano desde un ordenador.
 
 ## 2. Secretos y variables en GitHub (una vez)
 
-En el repositorio, **Settings → Environments → `produccion`** (créalo si no existe):
+En el repositorio, las **variables** van en *Settings → Secrets and variables → Actions → Variables*
+(a nivel de repositorio: los workflows se omiten sin fallar mientras no existan) y los **secretos** en
+*Settings → Environments → `produccion`* (créalo si no existe):
 
 | Tipo | Nombre | Valor |
 |---|---|---|
-| Variable | `SUPABASE_PROJECT_REF` | el *Project ref* |
-| Variable | `APP_URL` | la URL de CloudFront (paso 3); hasta entonces, `https://<ref>.supabase.co/functions/v1` |
-| Secreto | `SUPABASE_ACCESS_TOKEN` | el token personal de la CLI |
-| Secreto | `SUPABASE_DB_URL` | la URL directa (5432) |
-| Secreto | `SUPABASE_POOLER_URL` | la URL del pooler (6543) |
+| Variable (repositorio) | `SUPABASE_PROJECT_REF` | el *Project ref* |
+| Variable (repositorio) | `APP_URL` | la URL de CloudFront (paso 3); hasta entonces, `https://<ref>.supabase.co/functions/v1` |
+| Secreto (`produccion`) | `SUPABASE_ACCESS_TOKEN` | el token personal de la CLI |
+| Secreto (`produccion`) | `SUPABASE_DB_URL` | la URL directa (5432) |
+| Secreto (`produccion`) | `SUPABASE_POOLER_URL` | la URL del pooler (6543), con `?sslmode=require` |
 
 La función recibe sola `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; el workflow le fija el resto
 (`DATABASE_URL`, cookie `__Host-pe_session` con `Secure`, bucket `documentos`).
