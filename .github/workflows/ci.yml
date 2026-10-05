@@ -30,7 +30,7 @@ jobs:
       - run: echo "Origen correcto"
 
   api:
-    name: API (estilo, PHPStan, Deptrac, PHPUnit)
+    name: API (PHP y Deno)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -45,6 +45,9 @@ jobs:
       - run: make lint-api
       - run: make coverage-api
       - run: make audit-api
+      # API en Deno (ver specs/decisions/backend-en-deno-sobre-supabase.md): mismo esquema, misma base de datos.
+      - run: make lint-deno
+      - run: make coverage-deno
 
   web:
     name: Web (ESLint, Prettier, TypeScript, knip, Vitest, build)
