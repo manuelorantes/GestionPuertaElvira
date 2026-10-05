@@ -6,6 +6,7 @@ import {
   LocalDocumentStorage,
   SupabaseDocumentStorage,
 } from './infrastructure/accounting/storage.ts';
+import { registerAuditRoutes } from './infrastructure/audit/routes.ts';
 import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
 import { registerPayrollRoutes } from './infrastructure/payroll/routes.ts';
@@ -95,5 +96,6 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
       config.documents.bucket,
     );
   registerAccountingRoutes(api, storage);
+  registerAuditRoutes(api);
   return api;
 }
