@@ -116,6 +116,8 @@ final readonly class SqlStudentQuery implements StudentQuery
             $sql .= ' AND student_id = :student';
             $params['student'] = $studentId;
         }
+        // Orden estable: primero el grupo en el que se inscribió antes (el id es UUIDv7, ordenado por tiempo).
+        $sql .= ' ORDER BY enrolled_on, id';
 
         $byStudent = [];
         foreach ($this->connection->fetchAllAssociative($sql, $params) as $values) {
