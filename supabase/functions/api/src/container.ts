@@ -1,6 +1,7 @@
 import { CheckHealth } from './application/health/mod.ts';
 import { ApiApp } from './infrastructure/http/app.ts';
 import { SessionCookie } from './infrastructure/http/cookie.ts';
+import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
 import { registerAuthRoutes } from './infrastructure/identity/routes.ts';
 import { registerStudentRoutes } from './infrastructure/students/routes.ts';
@@ -63,5 +64,6 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
   registerTeacherRoutes(api);
   registerClassRoutes(api);
   registerStudentRoutes(api);
+  registerBillingRoutes(api);
   return api;
 }
