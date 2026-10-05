@@ -53,3 +53,25 @@ test('should refuse a group that clashes with another in the same classroom', as
     'Coincide en el aula Alfil con «Competición»',
   );
 });
+
+test('should name a group by its day, time, level and classroom when no name is given', async ({
+  page,
+}) => {
+  await openClasses(page);
+
+  await page.getByRole('button', { name: 'Nuevo grupo' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nuevo grupo' });
+  await dialog.getByRole('button', { name: 'Mié' }).click();
+  await dialog.getByLabel('Empieza').selectOption('16:00');
+  await dialog.getByLabel('Termina').selectOption('17:00');
+  await dialog.getByRole('button', { name: 'Aula Peón' }).click();
+  await dialog.getByRole('button', { name: 'Crear grupo' }).click();
+
+  await expect(page.getByRole('status')).toHaveText(
+    'Grupo «Miércoles 16:00 · Iniciación · Peón» creado',
+  );
+  await page.getByRole('tab', { name: 'Grupos' }).click();
+  await expect(
+    page.getByRole('cell', { name: 'Miércoles 16:00 · Iniciación · Peón', exact: true }),
+  ).toBeVisible();
+});

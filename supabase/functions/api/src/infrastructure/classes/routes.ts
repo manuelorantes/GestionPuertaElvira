@@ -48,7 +48,7 @@ export class StudentsStudentStatus implements StudentStatus {
 
 export function groupInput(body: JsonBody): GroupInput {
   return {
-    name: body.requiredString('name'),
+    name: body.optionalString('name'),
     level: body.requiredString('level'),
     teacherId: body.requiredString('teacherId'),
     days: body.stringList('days'),
@@ -63,6 +63,7 @@ function present(group: GroupSummary) {
   return {
     id: group.id,
     name: group.name,
+    customName: group.customName,
     level: group.level,
     teacher: { id: group.teacherId, fullName: group.teacherName },
     days: group.days,

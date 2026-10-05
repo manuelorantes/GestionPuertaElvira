@@ -4,15 +4,18 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { ApiError } from '@/shared/api/client';
 
 import type { ClassGroup, Classroom, GroupPayload, Level, Weekday } from './api';
+import { defaultGroupName } from './defaultName';
 import { useSaveGroup } from './hooks';
 import { toMinutes, weeklyHours, WEEKDAYS } from './schedule';
 
-type Field = 'name' | 'teacherId' | 'days' | 'end';
+type Field = 'teacherId' | 'days' | 'end';
 type FieldErrors = Partial<Record<Field, string>>;
 
 function initialValues(group: ClassGroup | null, defaultTeacherId: string): GroupPayload {
   if (group) {
-    const { name, level, days, start, end, classroom, capacity } = group;
+    const { level, days, start, end, classroom, capacity } = group;
+    // Un grupo con el nombre por defecto se edita con el campo vacío: el nombre sigue a sus datos.
+    const name = group.customName ? group.name : '';
     return { name, level, teacherId: group.teacher.id, days, start, end, classroom, capacity };
   }
   return {
@@ -59,7 +62,6 @@ export function useGroupForm(
   function submit(event: FormEvent) {
     event.preventDefault();
     const errors: FieldErrors = {
-      ...(values.name.trim() === '' && { name: 'Ponle un nombre al grupo.' }),
       ...(values.teacherId === '' && { teacherId: 'Elige un profesor.' }),
       ...(values.days.length === 0 && { days: 'Elige al menos un día.' }),
       ...(toMinutes(values.end) <= toMinutes(values.start) && {
@@ -71,7 +73,7 @@ export function useGroupForm(
 
     save.reset();
     save.mutate(group ? { payload: values, id: group.id } : { payload: values }, {
-      onSuccess: () => onSaved(values.name.trim()),
+      onSuccess: () => onSaved(values.name.trim() || defaultGroupName(values)),
     });
   }
 
@@ -80,6 +82,8 @@ export function useGroupForm(
 
   return {
     values,
+    /** Nombre que tendrá el grupo si el campo se deja vacío. */
+    defaultName: defaultGroupName(values),
     setName: (name: string) => set('name', name),
     setLevel: (level: Level) => set('level', level),
     setTeacher: (teacherId: string) => set('teacherId', teacherId),

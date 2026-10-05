@@ -67,6 +67,7 @@ Deno.test('groups should be created and shown in the schedule, then updated', as
     items: [{
       id,
       name: 'Iniciación A',
+      customName: true,
       level: 'beginner',
       teacher: { id: teacherId, fullName: 'Lucía Moreno Gil' },
       days: ['mon', 'wed'],
@@ -130,4 +131,50 @@ Deno.test('groups should reject classroom conflicts, invalid fields, unknown ids
   const teacher = new ApiClient();
   await teacher.logIn('profe@club.es');
   assertError(await teacher.get('/api/admin/groups'), 403, 'forbidden');
+});
+
+Deno.test('groups without a name take the default one and follow their day, time, level and classroom', async () => {
+  const client = await admin();
+  const teacherId = await newTeacher(client);
+  const created = await client.json(
+    'POST',
+    '/api/admin/groups',
+    groupPayload(teacherId, { name: '' }),
+  );
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const id = (created.body as { id: string }).id;
+  let shown = (await client.get(`/api/admin/groups/${id}`)).body as Record<string, unknown>;
+  assertEquals(shown.name, 'Lunes y miércoles 17:00 · Iniciación · Alfil');
+  assertEquals(shown.customName, false);
+
+  const moved = await client.json(
+    'PUT',
+    `/api/admin/groups/${id}`,
+    groupPayload(teacherId, {
+      name: null,
+      days: ['tue'],
+      start: '18:00',
+      end: '19:00',
+      classroom: 'peon',
+    }),
+  );
+  assertEquals(moved.status, 204, JSON.stringify(moved.body));
+  shown = (await client.get(`/api/admin/groups/${id}`)).body as Record<string, unknown>;
+  assertEquals(shown.name, 'Martes 18:00 · Iniciación · Peón');
+
+  const renamed = await client.json(
+    'PUT',
+    `/api/admin/groups/${id}`,
+    groupPayload(teacherId, {
+      name: 'Peques',
+      days: ['tue'],
+      start: '18:00',
+      end: '19:00',
+      classroom: 'peon',
+    }),
+  );
+  assertEquals(renamed.status, 204);
+  shown = (await client.get(`/api/admin/groups/${id}`)).body as Record<string, unknown>;
+  assertEquals(shown.name, 'Peques');
+  assertEquals(shown.customName, true);
 });
