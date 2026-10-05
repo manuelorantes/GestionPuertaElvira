@@ -6,9 +6,11 @@ namespace App\Application\Import;
 
 use App\Application\Accounting\EntryInput;
 use App\Application\Accounting\RecordEntry;
+use App\Application\Audit\Port\AuditContext;
 use App\Application\Billing\ImportPayment;
 use App\Application\Billing\Port\StudentAccountRepository;
 use App\Application\Common\Port\TransactionRunner;
+use App\Application\Import\Error\PossibleDuplicate;
 use App\Application\Import\Port\StudentMatcher;
 use App\Application\Students\RegisterStudent;
 use App\Application\Students\StudentInput;
@@ -23,8 +25,8 @@ use App\Domain\Common\Season;
 use App\Domain\Common\YearMonth;
 
 /**
- * Aplica la importación con las decisiones revisadas: alta o vínculo de cada alumno, sus cobros mes a mes,
- * la cuota de socio y los extras. Todo o nada, en una sola acción del historial.
+ * Importa una fila revisada: alta o vínculo del alumno, sus cobros mes a mes, la cuota de socio y los extras.
+ * Cada fila es una transacción y una acción del historial propias.
  */
 final readonly class ApplyImport
 {
@@ -40,50 +42,54 @@ final readonly class ApplyImport
         private RecordEntry $recordEntry,
         private TransactionRunner $transactions,
         private Clock $clock,
+        private AuditContext $audit,
     ) {
     }
 
-    /** @param list<ImportDecision> $decisions */
-    public function __invoke(string $text, array $decisions): ImportResult
+    /** Importa una sola fila (cada fila es su propia acción: si falla, no afecta a las demás). */
+    public function __invoke(string $text, ImportDecision $decision): ImportResult
     {
         $today = LocalDate::fromInstant($this->clock->now());
-        $rows = [];
-        foreach ($this->parser->parse($text, $today) as $row) {
-            $rows[$row->line] = $row;
+        $row = null;
+        foreach ($this->parser->parse($text, $today) as $parsed) {
+            if ($parsed->line === $decision->line) {
+                $row = $parsed;
+            }
+        }
+        if (null === $row) {
+            throw new InvalidValue('line', \sprintf('La fila %d no está en la hoja.', $decision->line));
+        }
+        if (ImportDecision::SKIP === $decision->action) {
+            return new ImportResult($row->line, $decision->action, null, $row->fullName, 0, false, 0);
         }
 
-        return $this->transactions->run(function () use ($rows, $decisions, $today): ImportResult {
-            $created = $linked = $skipped = $payments = $members = $entries = 0;
-            foreach ($decisions as $decision) {
-                $row = $rows[$decision->line] ?? throw new InvalidValue('line', \sprintf('La fila %d no está en la hoja.', $decision->line));
-                if (ImportDecision::SKIP === $decision->action) {
-                    ++$skipped;
-                    continue;
-                }
-                $studentId = $this->student($row, $decision, $today);
-                ImportDecision::CREATE === $decision->action ? ++$created : ++$linked;
+        return $this->transactions->run(function () use ($row, $decision, $today): ImportResult {
+            $name = $decision->fullName ?? $row->fullName;
+            // La acción del historial nace con el primer cambio: la etiqueta va antes del alta.
+            $this->audit->relabel('Importar fila de la hoja: '.$name);
+            $studentId = $this->student($row, $decision, $today);
 
-                foreach ($row->monthlyCents as $month => $cents) {
-                    $period = YearMonth::fromString($month);
-                    $payments += null === ($this->importPayment)($studentId, ChargeKind::Monthly, $period, Money::cents($cents), self::paymentDate($period, $today)) ? 0 : 1;
-                }
-                if (null !== $row->membershipCents && $row->membershipCents > 0) {
-                    $this->makeMember($studentId);
-                    $season = Season::containing(self::firstMonth($row, $today));
-                    $payments += null === ($this->importPayment)($studentId, ChargeKind::Membership, $season->firstMonth(), Money::cents($row->membershipCents), self::paymentDate($season->firstMonth(), $today)) ? 0 : 1;
-                    ++$members;
-                }
-                $name = $decision->fullName ?? $row->fullName;
-                $entryDate = self::paymentDate(self::firstMonth($row, $today), $today)->toString();
-                foreach ([['Chándal y polo', $row->kitCents], ['Licencia federativa', $row->federationCents]] as [$concept, $cents]) {
-                    if (null !== $cents && $cents > 0) {
-                        ($this->recordEntry)(new EntryInput($entryDate, 'income', $concept.' · '.$name, 'other_income', 'transfer', (string) ($cents / 100)));
-                        ++$entries;
-                    }
+            $payments = 0;
+            foreach ($row->monthlyCents as $month => $cents) {
+                $period = YearMonth::fromString($month);
+                $payments += null === ($this->importPayment)($studentId, ChargeKind::Monthly, $period, Money::cents($cents), self::paymentDate($period, $today)) ? 0 : 1;
+            }
+            $member = null !== $row->membershipCents && $row->membershipCents > 0;
+            if ($member) {
+                $this->makeMember($studentId);
+                $season = Season::containing(self::firstMonth($row, $today));
+                $payments += null === ($this->importPayment)($studentId, ChargeKind::Membership, $season->firstMonth(), Money::cents($row->membershipCents), self::paymentDate($season->firstMonth(), $today)) ? 0 : 1;
+            }
+            $entries = 0;
+            $entryDate = self::paymentDate(self::firstMonth($row, $today), $today)->toString();
+            foreach ([['Chándal y polo', $row->kitCents], ['Licencia federativa', $row->federationCents]] as [$concept, $cents]) {
+                if (null !== $cents && $cents > 0) {
+                    ($this->recordEntry)(new EntryInput($entryDate, 'income', $concept.' · '.$name, 'other_income', 'transfer', (string) ($cents / 100)));
+                    ++$entries;
                 }
             }
 
-            return new ImportResult($created, $linked, $skipped, $payments, $members, $entries);
+            return new ImportResult($row->line, $decision->action, $studentId, $name, $payments, $member, $entries);
         });
     }
 
@@ -99,6 +105,14 @@ final readonly class ApplyImport
         }
         if (ImportDecision::CREATE !== $decision->action) {
             throw new InvalidValue('action', \sprintf('Fila %d: decisión desconocida.', $row->line));
+        }
+        $name = $decision->fullName ?? $row->fullName;
+        if (!$decision->confirmDuplicate) {
+            $exact = $this->students->byName($name);
+            $candidates = null !== $exact ? [$exact] : $this->students->similar($name);
+            if ([] !== $candidates) {
+                throw new PossibleDuplicate($candidates);
+            }
         }
 
         $guardianName = $decision->guardianName ?? $row->guardianName;

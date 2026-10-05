@@ -30,26 +30,24 @@ final readonly class ImportController
         ], $rows)]);
     }
 
-    #[Route('/apply', name: 'apply', methods: ['POST'])]
-    public function apply(Request $request, ApplyImport $apply): JsonResponse
+    #[Route('/rows', name: 'row', methods: ['POST'])]
+    public function row(Request $request, ApplyImport $apply): JsonResponse
     {
         $body = JsonBody::from($request);
-        $decisions = array_map(static function (array $raw): ImportDecision {
-            $d = JsonBody::fromArray($raw);
+        $d = $body->optionalObject('row') ?? throw new \App\Domain\Common\InvalidValue('row', 'Falta la fila.');
+        $decision = new ImportDecision(
+            $d->requiredInt('line'),
+            $d->requiredString('action'),
+            $d->optionalString('studentId'),
+            $d->stringList('groupIds'),
+            $d->optionalString('fullName'),
+            $d->optionalString('birthDate'),
+            $d->optionalString('guardianName'),
+            $d->optionalString('guardianPhone'),
+            $d->optionalString('email'),
+            $d->bool('confirmDuplicate'),
+        );
 
-            return new ImportDecision(
-                $d->requiredInt('line'),
-                $d->requiredString('action'),
-                $d->optionalString('studentId'),
-                $d->stringList('groupIds'),
-                $d->optionalString('fullName'),
-                $d->optionalString('birthDate'),
-                $d->optionalString('guardianName'),
-                $d->optionalString('guardianPhone'),
-                $d->optionalString('email'),
-            );
-        }, $body->objectList('rows'));
-
-        return new JsonResponse($apply($body->requiredString('text'), $decisions));
+        return new JsonResponse($apply($body->requiredString('text'), $decision));
     }
 }

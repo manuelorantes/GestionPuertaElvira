@@ -27,6 +27,7 @@ use App\Application\Identity\Error\CurrentPasswordMismatch;
 use App\Application\Identity\Error\EmailAlreadyRegistered;
 use App\Application\Identity\Error\InvalidCredentials;
 use App\Application\Identity\Error\TooManyLoginAttempts;
+use App\Application\Import\Error\PossibleDuplicate;
 use App\Application\Payroll\Error\SessionNotFound;
 use App\Application\Students\Error\StudentNotFound;
 use App\Application\Teachers\Error\TeacherHasGroups;
@@ -98,6 +99,7 @@ final readonly class ApiErrorSubscriber implements EventSubscriberInterface
         AuditActionNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         NothingToUndo::class => [Response::HTTP_CONFLICT, 'nothing_to_undo'],
         UndoConflict::class => [Response::HTTP_CONFLICT, 'undo_conflict'],
+        PossibleDuplicate::class => [Response::HTTP_CONFLICT, 'possible_duplicate'],
         EntryNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         SupplierInvoiceNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
         DocumentNotFound::class => [Response::HTTP_NOT_FOUND, 'not_found'],
