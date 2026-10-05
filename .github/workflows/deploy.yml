@@ -66,16 +66,17 @@ jobs:
         run: echo "HOST_UID=$(id -u)" >> "$GITHUB_ENV" && echo "HOST_GID=$(id -g)" >> "$GITHUB_ENV"
       - run: docker compose run --rm --no-deps -T vite npm ci --no-audit --no-fund
       - run: make build-web
-      - uses: supabase/setup-cli@v1
-        with:
-          version: ${{ env.SUPABASE_CLI_VERSION }}
       - name: Subir la web (los ficheros con hash se cachean un año; el resto nunca)
+        # La API REST de Storage con x-upsert sobrescribe; la CLI no (409) y detecta mal el tipo del HTML.
+        # La clave de servicio se obtiene con el token de la CLI y nunca se imprime.
         run: |
-          cp="supabase storage cp --experimental --project-ref $SUPABASE_PROJECT_REF"
-          rm="supabase storage rm --experimental --project-ref $SUPABASE_PROJECT_REF"
+          key=$(curl -fsS -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
+            | jq -r '.[] | select(.name == "service_role") | .api_key')
+          test -n "$key" || { echo "::error::No se pudo obtener la clave de servicio"; exit 1; }
+          echo "::add-mask::$key"
+          storage="https://$SUPABASE_PROJECT_REF.supabase.co/storage/v1"
           cd apps/web/dist
-          # La CLI no sobrescribe ni detecta bien el tipo del HTML: se borra el objeto anterior
-          # y se sube cada fichero con su tipo MIME. index.html va el último.
           upload() {
             case "$1" in
               *.html) type=text/html ;;
@@ -88,12 +89,13 @@ jobs:
               *.woff2) type=font/woff2 ;;
               *.txt) type=text/plain ;;
               *.json|*.webmanifest|*.map) type=application/json ;;
-              *) type=auto-detect ;;
+              *) type=application/octet-stream ;;
             esac
-            $rm "ss:///$WEB_BUCKET/$1" >/dev/null 2>&1 || true
-            $cp --cache-control "$2" --content-type "$type" "$1" "ss:///$WEB_BUCKET/$1"
+            curl -fsS -o /dev/null -X POST "$storage/object/$WEB_BUCKET/$1" \
+              -H "Authorization: Bearer $key" -H "x-upsert: true" \
+              -H "Content-Type: $type" -H "Cache-Control: $2" --data-binary "@$1"
+            echo "subido $1 ($type)"
           }
-          $rm -r "ss:///$WEB_BUCKET/assets/assets" >/dev/null 2>&1 || true
           find assets -type f | while read -r f; do
             upload "$f" "public, max-age=31536000, immutable"
           done
@@ -101,6 +103,14 @@ jobs:
             upload "$f" no-cache
           done
           upload index.html no-cache
+          # Restos de despliegues anteriores (la CLI anidó assets/assets).
+          stale=$(curl -fsS -X POST "$storage/object/list/$WEB_BUCKET" -H "Authorization: Bearer $key" \
+            -H "Content-Type: application/json" -d '{"prefix":"assets/assets","limit":1000}' \
+            | jq -c '[.[] | "assets/assets/" + .name]')
+          if [ "$stale" != "[]" ]; then
+            curl -fsS -o /dev/null -X DELETE "$storage/object/$WEB_BUCKET" -H "Authorization: Bearer $key" \
+              -H "Content-Type: application/json" -d "{\"prefixes\":$stale}" && echo "limpiado assets/assets"
+          fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
