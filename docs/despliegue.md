@@ -71,9 +71,10 @@ y vuelve a lanzar el workflow para que la comprobación final use esa URL.
 La web no necesita invalidaciones: los ficheros con hash se suben con un año de caché e `index.html`
 sin caché, y CloudFront respeta esas cabeceras.
 
-Supabase Storage sirve el HTML de los buckets públicos como `text/plain` (medida de seguridad suya, sin
-opción en el plan gratuito), así que la web **solo funciona a través de CloudFront**, cuya función de
-respuesta restaura `text/html`. La URL directa del bucket no sirve para usar la aplicación.
+Supabase Storage sirve el HTML de los buckets públicos como `text/plain` y con una CSP que bloquea
+scripts y estilos (medidas de seguridad suyas, sin opción en el plan gratuito), así que la web **solo
+funciona a través de CloudFront**, cuya función de respuesta restaura `text/html` y quita esa CSP.
+La URL directa del bucket no sirve para usar la aplicación.
 
 ## 4. Primer administrador
 
