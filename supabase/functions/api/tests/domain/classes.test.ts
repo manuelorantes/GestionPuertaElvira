@@ -142,6 +142,9 @@ Deno.test('Group values should validate capacity, classroom, name and level', ()
   assertThrows(() => levelFromName('adults'), InvalidValue);
   assertEquals(GroupName.fromString('  Iniciación   A ').value, 'Iniciación A');
   assertThrows(() => GroupName.fromString('X'), InvalidValue);
+  assertEquals(GroupName.optional('   '), null);
+  assertEquals(GroupName.optional(null), null);
+  assertEquals(GroupName.optional(' Peques ')?.value, 'Peques');
   assertEquals(levelFromName('private_lesson'), 'private_lesson');
   assertThrows(() => levelFromName('expert'), InvalidValue);
 });
@@ -177,4 +180,31 @@ Deno.test('WeeklySlot should overlap only when sharing a day and intersecting in
     assertEquals(slot(da, sa, ea).overlaps(slot(db, sb, eb)), expected);
     assertEquals(slot(db, sb, eb).overlaps(slot(da, sa, ea)), expected);
   }
+});
+
+Deno.test('GroupDetails should name the group by day, time, level and classroom when no name is given', () => {
+  const one = GroupFactory.details({ name: null, days: [1], start: '17:00', end: '18:00' });
+  assertEquals(one.name.value, 'Lunes 17:00 · Iniciación · Alfil');
+  assertEquals(one.customName, false);
+  const two = GroupFactory.details({
+    name: null,
+    days: [1, 3],
+    start: '18:30',
+    end: '19:30',
+    level: 'intermediate',
+    classroom: 'peon',
+  });
+  assertEquals(two.name.value, 'Lunes y miércoles 18:30 · Intermedio · Peón');
+  const three = GroupFactory.details({
+    name: null,
+    days: [2, 4, 5],
+    start: '19:30',
+    end: '21:00',
+    level: 'private_lesson',
+    classroom: 'caballo',
+  });
+  assertEquals(three.name.value, 'Martes, jueves y viernes 19:30 · Particular · Caballo');
+  const named = GroupFactory.details({ name: 'Competición' });
+  assertEquals(named.name.value, 'Competición');
+  assertEquals(named.customName, true);
 });

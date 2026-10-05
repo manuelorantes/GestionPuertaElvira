@@ -72,10 +72,10 @@ function GroupForm({
           {form.errorMessage && <Alert>{form.errorMessage}</Alert>}
           <TextField
             label="Nombre del grupo"
-            placeholder="p. ej. Iniciación F"
+            placeholder={form.defaultName}
+            help="Opcional. Sin nombre, el grupo se llama por su día, hora, nivel y aula."
             value={form.values.name}
             onChange={(event) => form.setName(event.target.value)}
-            error={form.fieldErrors.name}
           />
           <div className="grid gap-4 sm:grid-cols-2">
             <Select

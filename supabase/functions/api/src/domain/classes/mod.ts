@@ -63,16 +63,33 @@ export class GroupName {
   static fromString(name: string): GroupName {
     const normalised = name.replace(/\s+/gu, ' ').trim();
     const length = [...normalised].length;
-    if (length < 2 || length > 60) {
-      throw new InvalidValue('name', 'El nombre del grupo debe tener entre 2 y 60 caracteres.');
+    if (length < 2 || length > 80) {
+      throw new InvalidValue('name', 'El nombre del grupo debe tener entre 2 y 80 caracteres.');
     }
     return new GroupName(normalised);
+  }
+
+  /** El nombre es opcional: vacío (o solo espacios) significa «el nombre por defecto». */
+  static optional(name: string | null | undefined): GroupName | null {
+    return name === null || name === undefined || name.trim() === ''
+      ? null
+      : GroupName.fromString(name);
   }
 }
 
 /** Niveles de los grupos: iniciación, intermedio, avanzado (y competición) y clases particulares. */
 export type Level = 'beginner' | 'intermediate' | 'advanced' | 'private_lesson';
 const LEVELS: readonly Level[] = ['beginner', 'intermediate', 'advanced', 'private_lesson'];
+const LEVEL_LABELS: Record<Level, string> = {
+  beginner: 'Iniciación',
+  intermediate: 'Intermedio',
+  advanced: 'Avanzado',
+  private_lesson: 'Particular',
+};
+
+export function levelLabel(level: Level): string {
+  return LEVEL_LABELS[level];
+}
 
 export function levelFromName(name: string): Level {
   if (!(LEVELS as readonly string[]).includes(name)) {
@@ -121,6 +138,7 @@ export class HalfHour {
 export type Weekday = 1 | 2 | 3 | 4 | 5;
 const WEEKDAY_CODES = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie'] as const;
+const WEEKDAY_NAMES = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'] as const;
 
 export function weekdayFromName(name: string): Weekday {
   const index = (WEEKDAY_CODES as readonly string[]).indexOf(name);
@@ -160,6 +178,15 @@ export class WeeklySlot {
     return new WeeklySlot(unique, start, end);
   }
 
+  /** «Lunes», «Lunes y miércoles», «Lunes, miércoles y viernes». */
+  daysLabel(): string {
+    const names = this.days.map((day) => WEEKDAY_NAMES[day - 1] ?? 'lunes');
+    const joined = names.length === 1
+      ? names[0] ?? ''
+      : `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`;
+    return joined.charAt(0).toUpperCase() + joined.slice(1);
+  }
+
   overlaps(other: WeeklySlot): boolean {
     const sharesDay = this.days.some((day) => other.days.includes(day));
     return sharesDay && this.start.isBefore(other.end) && other.start.isBefore(this.end);
@@ -194,16 +221,33 @@ export function weeklyPlanFor(level: Level, slot: WeeklySlot): WeeklyPlan {
   return 'one_hour';
 }
 
-/** Datos editables de un grupo; cada parte ya viene validada por su value object. */
+/**
+ * Datos editables de un grupo; cada parte ya viene validada por su value object.
+ * El nombre es opcional: sin él, el grupo se llama por su día, hora, nivel y aula
+ * («Lunes 17:00 · Iniciación · Peón»), y ese nombre sigue a esos datos cuando cambian.
+ */
 export class GroupDetails {
+  readonly name: GroupName;
+  /** true si el nombre lo puso administración; false si es el nombre por defecto. */
+  readonly customName: boolean;
+
   constructor(
-    readonly name: GroupName,
+    name: GroupName | null,
     readonly level: Level,
     readonly teacher: TeacherReference,
     readonly slot: WeeklySlot,
     readonly classroom: Classroom,
     readonly capacity: Capacity,
-  ) {}
+  ) {
+    this.customName = name !== null;
+    this.name = name ?? GroupName.fromString(GroupDetails.defaultName(level, slot, classroom));
+  }
+
+  static defaultName(level: Level, slot: WeeklySlot, classroom: Classroom): string {
+    return `${slot.daysLabel()} ${slot.start.toString()} · ${
+      levelLabel(level)
+    } · ${classroom.name()}`;
+  }
 
   weeklyPlan(): WeeklyPlan {
     return weeklyPlanFor(this.level, this.slot);

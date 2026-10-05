@@ -74,7 +74,9 @@ export function WeeklySchedule({
                         gridColumn: classroomColumn(group.classroom),
                       }}
                     >
-                      <span className="text-[13px] leading-tight font-semibold">{group.name}</span>
+                      <span className="text-[13px] leading-tight font-semibold">
+                        {group.customName ? group.name : LEVELS[group.level].label}
+                      </span>
                       <span className="text-[11px] opacity-85">
                         {group.start}–{group.end}
                       </span>

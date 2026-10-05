@@ -23,7 +23,7 @@ ClassesPage (/panel/clases)
 │   └── Fila por profesor: nombre | «N grupos» | badge Activo/Inactivo | botón «Editar» → edición en línea: nombre, interruptor «Activo», «Guardar» y «Cancelar»
 └── ClassGroupDialog (alta o edición)
     ├── Título «Nuevo grupo» | «Editar grupo», botón cerrar
-    ├── Nombre del grupo (placeholder «p. ej. Iniciación F»)
+    ├── Nombre del grupo (opcional; el placeholder muestra el nombre por defecto que tendrá: día, hora, nivel y aula)
     ├── Nivel (select) | Profesor (select, solo activos)
     ├── Días: botones conmutables Lun Mar Mié Jue Vie
     ├── Empieza (select 16:00…20:30) | Termina (select 16:30…21:00)
@@ -37,7 +37,7 @@ ClassesPage (/panel/clases)
 
 | Elemento | Etiqueta | Tipo | Obligatorio | Notas |
 |---|---|---|---|---|
-| Nombre | «Nombre del grupo» | texto | sí | 2–60 caracteres |
+| Nombre | «Nombre del grupo» | texto | no | 2–80 caracteres; vacío = nombre por defecto («Lunes 17:00 · Iniciación · Peón») |
 | Nivel | «Nivel» | select | sí | Iniciación, Intermedio, Avanzado, Particular |
 | Profesor | «Profesor» | select | sí | Profesores activos por nombre; sin profesores, aviso «Añade antes un profesor en la pestaña Profesores» |
 | Días | «Días» | botones conmutables (`aria-pressed`) | al menos uno | Lun–Vie |

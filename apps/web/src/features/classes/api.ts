@@ -10,6 +10,8 @@ export type WeeklyPlan =
 export interface ClassGroup {
   id: string;
   name: string;
+  /** false cuando el nombre es el de por defecto (día, hora, nivel y aula). */
+  customName: boolean;
   level: Level;
   teacher: { id: string; fullName: string };
   days: Weekday[];
@@ -31,6 +33,7 @@ export interface Teacher {
 }
 
 export interface GroupPayload {
+  /** Vacío = nombre por defecto. */
   name: string;
   level: Level;
   teacherId: string;

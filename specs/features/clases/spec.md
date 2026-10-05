@@ -4,13 +4,19 @@ Grupos de clase del club, su horario semanal en las tres aulas (Alfil, Caballo y
 Solo administración puede verlos y gestionarlos.
 
 ### Requirement: Grupos
-Cada grupo MUST tener nombre (2–60 caracteres), nivel (iniciación, intermedio, avanzado o particular),
+Cada grupo MUST tener nivel (iniciación, intermedio, avanzado o particular),
 profesor activo, uno o más días de lunes a viernes, hora de inicio y de fin entre las 16:00 y las 21:00
-en medias horas, aula (Alfil, Caballo o Peón) y plazas (1–30).
+en medias horas, aula (Alfil, Caballo o Peón) y plazas (1–30). El nombre (2–80 caracteres) es opcional:
+sin nombre, el grupo se llama por su día, hora de inicio, nivel y aula («Lunes 17:00 · Iniciación · Peón»,
+«Lunes y miércoles 18:30 · Intermedio · Alfil»), y ese nombre MUST seguir a esos datos cuando cambien.
 
 #### Scenario: Alta de un grupo válido
 - **WHEN** administración crea un grupo con todos sus datos válidos
 - **THEN** el grupo aparece en el horario semanal y en la lista de grupos
+
+#### Scenario: Grupo sin nombre
+- **WHEN** administración crea o edita un grupo dejando el nombre vacío
+- **THEN** el grupo se llama por su día, hora, nivel y aula, y al cambiar cualquiera de ellos el nombre cambia con ellos
 
 #### Scenario: Horario incoherente
 - **WHEN** la hora de fin no es posterior a la de inicio, o no se elige ningún día

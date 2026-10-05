@@ -22,6 +22,7 @@ const GROUP = {
   classroom: 'alfil',
   capacity: 12,
   occupied: 13,
+  customName: true,
   weeklyPlan: 'two_hours',
 };
 
@@ -59,6 +60,34 @@ describe('Clases', () => {
     expect(within(row).getByText('Iniciación')).toBeVisible();
     expect(within(row).getByText('2 h semanales')).toBeVisible();
     expect(within(row).getByText('Sobre el cupo')).toBeVisible();
+  });
+
+  it('should preview the default name and create a group without one', async () => {
+    const user = userEvent.setup();
+    const fetchSpy = api({
+      'POST /api/admin/groups': [201, { id: 'g9' }],
+    });
+    renderApp('/panel/clases');
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo grupo' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo grupo' });
+    await user.click(within(dialog).getByRole('button', { name: 'Mié' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Aula Peón' }));
+    expect(within(dialog).getByLabelText('Nombre del grupo')).toHaveAttribute(
+      'placeholder',
+      'Miércoles 17:00 · Iniciación · Peón',
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Crear grupo' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Grupo «Miércoles 17:00 · Iniciación · Peón» creado',
+    );
+    const sent = fetchSpy.mock.calls.find(
+      ([url, init]) => url === '/api/admin/groups' && init?.method === 'POST',
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual(
+      expect.objectContaining({ name: '', classroom: 'peon' }),
+    );
   });
 
   it('should create a group and report a classroom conflict without closing the dialog', async () => {

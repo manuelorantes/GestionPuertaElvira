@@ -20,6 +20,7 @@ const GROUPS = [
     classroom: 'alfil',
     capacity: 12,
     occupied: 10,
+    customName: true,
     weeklyPlan: 'two_hours',
   },
 ];
