@@ -1,0 +1,1 @@
+# Caché de módulos de Deno (bind mount de compose.yaml): el fichero existe para que la carpeta nazca con el usuario del host, no como root.

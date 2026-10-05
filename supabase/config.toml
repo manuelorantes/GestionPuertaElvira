@@ -1,0 +1,18 @@
+# Proyecto de Supabase (ver specs/decisions/backend-en-deno-sobre-supabase.md).
+# En local la función corre con Deno contra el PostgreSQL de Compose; este fichero lo usa la CLI
+# al desplegar (supabase functions deploy, supabase db push).
+project_id = "puerta-elvira"
+
+[db]
+major_version = 17
+
+[edge_runtime]
+enabled = true
+deno_version = 2
+
+[functions.api]
+enabled = true
+# La API tiene su propia autenticación por cookie: no se exige el JWT de Supabase.
+verify_jwt = false
+import_map = "./functions/api/deno.json"
+entrypoint = "./functions/api/index.ts"

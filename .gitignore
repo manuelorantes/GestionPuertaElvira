@@ -6,3 +6,8 @@ node_modules/
 .idea/
 .vscode/
 .DS_Store
+
+# API en Deno
+supabase/.deno-cache/*
+!supabase/.deno-cache/.gitkeep
+supabase/.temp/

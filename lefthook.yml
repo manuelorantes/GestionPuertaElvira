@@ -12,6 +12,9 @@ pre-commit:
     php-cs-fixer:
       glob: 'apps/api/**/*.php'
       run: docker compose exec -T php-fpm vendor/bin/php-cs-fixer fix --dry-run --diff
+    deno-fmt:
+      glob: 'supabase/**/*.ts'
+      run: docker compose run --rm --no-deps -T api deno fmt --check
     web-lint:
       glob: 'apps/web/**/*.{ts,tsx,js,json,css,md}'
       run: docker compose run --rm --no-deps -T vite sh -c "npx eslint . && npx prettier --check ."
