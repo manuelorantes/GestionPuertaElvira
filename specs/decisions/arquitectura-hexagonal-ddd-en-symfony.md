@@ -1,5 +1,7 @@
 # Arquitectura hexagonal y DDD en Symfony
 
+**Estado:** en revisión por [Backend en Deno sobre Supabase](specs/decisions/backend-en-deno-sobre-supabase.md): la API se está portando a TypeScript/Deno contexto a contexto; lo que sigue describe la API en PHP mientras conviven.
+
 ## Context
 
 El dominio tiene reglas de negocio con peso propio
