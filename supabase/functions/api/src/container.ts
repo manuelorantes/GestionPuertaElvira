@@ -3,6 +3,7 @@ import { ApiApp } from './infrastructure/http/app.ts';
 import { SessionCookie } from './infrastructure/http/cookie.ts';
 import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
+import { registerPayrollRoutes } from './infrastructure/payroll/routes.ts';
 import { registerAuthRoutes } from './infrastructure/identity/routes.ts';
 import { registerStudentRoutes } from './infrastructure/students/routes.ts';
 import { registerTeacherRoutes } from './infrastructure/teachers/routes.ts';
@@ -65,5 +66,6 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
   registerClassRoutes(api);
   registerStudentRoutes(api);
   registerBillingRoutes(api);
+  registerPayrollRoutes(api);
   return api;
 }
