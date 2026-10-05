@@ -12,6 +12,7 @@ export HOST_UID HOST_GID
 COMPOSE := docker compose
 TTY := $(shell if [ -t 0 ] && [ -t 1 ]; then echo ""; else echo "-T"; fi)
 PHP := $(COMPOSE) exec $(TTY) php-fpm
+DENO := $(COMPOSE) run --rm --no-deps $(TTY) api deno
 NODE := $(COMPOSE) run --rm --no-deps $(TTY) vite
 PHP_TEST := $(PHP) env APP_ENV=test APP_DEBUG=1
 E2E_BASE_URL ?= http://nginx
@@ -125,9 +126,14 @@ db-reset: ## Recrea la base de datos de desarrollo
 .PHONY: seed
 seed: ## Datos de desarrollo: usuarios de prueba (contraseñas conocidas) y demostración del diseño
 	$(PHP) bin/console app:dev:seed-users
+	$(DENO) task console app:dev:seed-users
 	$(PHP) bin/console app:dev:seed-demo
 
-##@ Cuentas de usuario
+##@ Cuentas de usuario (API en Deno: ver scripts/console.ts)
+
+.PHONY: deno-console
+deno-console: ## Consola de la API en Deno: ARGS="app:user:create email 'Nombre' administrator"
+	$(DENO) task console $(ARGS)
 
 .PHONY: user-create
 user-create: ## Alta de cuenta: ARGS="email@club.es 'Nombre Apellidos' administrator|teacher"
@@ -152,7 +158,16 @@ user-reset-password: ## Contraseña temporal nueva: ARGS="email@club.es"
 ##@ Calidad
 
 .PHONY: test
-test: test-api test-web ## Todos los tests (sin e2e)
+test: test-api test-deno test-web ## Todos los tests (sin e2e)
+
+.PHONY: test-deno
+test-deno: ## Tests de la API en Deno (ARGS="tests/domain")
+	$(DENO) task test $(ARGS)
+
+.PHONY: coverage-deno
+coverage-deno: ## Tests de la API en Deno con cobertura (mínimo 75 % de líneas)
+	$(DENO) task coverage
+	$(DENO) run --allow-read scripts/coverage-check.ts .coverage/lcov.info 75
 
 .PHONY: test-api
 test-api: ## Tests de la API (ARGS="--testsuite domain")
@@ -163,7 +178,7 @@ test-web: ## Tests de la web (ARGS="src/pages")
 	$(NODE) npm run test -- $(ARGS)
 
 .PHONY: coverage
-coverage: coverage-api coverage-web ## Tests con cobertura y umbral mínimo (75 %)
+coverage: coverage-api coverage-deno coverage-web ## Tests con cobertura y umbral mínimo (75 %)
 
 .PHONY: coverage-api
 coverage-api: ## Tests de la API con cobertura (mínimo 75 % de líneas)
@@ -180,7 +195,11 @@ e2e: seed ## Tests de extremo a extremo con Playwright (¡reinicia alumnos, grup
 	$(COMPOSE) run --rm $(TTY) -e E2E_BASE_URL=$(E2E_BASE_URL) e2e
 
 .PHONY: lint
-lint: lint-api lint-web ## Todas las comprobaciones estáticas
+lint: lint-api lint-deno lint-web ## Todas las comprobaciones estáticas
+
+.PHONY: lint-deno
+lint-deno: ## deno fmt, deno lint y deno check de la API en Deno
+	$(DENO) task check
 
 .PHONY: lint-api
 lint-api: ## PHP-CS-Fixer (dry-run), PHPStan, Deptrac, contenedor y esquema
@@ -199,8 +218,9 @@ lint-web: ## ESLint, Prettier, TypeScript y knip
 	$(NODE) npm run knip
 
 .PHONY: fix
-fix: ## Aplica los formateadores (PHP-CS-Fixer, ESLint --fix, Prettier)
+fix: ## Aplica los formateadores (PHP-CS-Fixer, deno fmt, ESLint --fix, Prettier)
 	$(PHP) vendor/bin/php-cs-fixer fix
+	$(DENO) task fix
 	$(NODE) npm run lint -- --fix
 	$(NODE) npm run format
 
