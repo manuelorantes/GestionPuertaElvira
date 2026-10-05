@@ -7,6 +7,7 @@ namespace App\Tests\Integration\Http\Import;
 use App\Domain\Common\LocalDate;
 use App\Domain\Common\Season;
 use App\Domain\Common\YearMonth;
+use App\Domain\Identity\Role;
 use App\Tests\Support\Identity\ApiAuthTestCase;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -30,7 +31,7 @@ final class ImportEndpointTest extends ApiAuthTestCase
         parent::setUp();
         $today = LocalDate::fromInstant(new DateTimeImmutable('now', new DateTimeZone('Europe/Madrid')));
         $this->seasonStart = Season::containing(YearMonth::of($today))->firstMonth()->toString();
-        $this->createUser('junta@club.es');
+        $this->createUser('junta@club.es', Role::Superadministrator);
         $this->logIn('junta@club.es');
         $this->json('POST', '/api/admin/teachers', ['fullName' => 'Lucía Moreno Gil']);
         $teacher = $this->responseBody()['id'];

@@ -91,8 +91,10 @@ y su titular MUST elegir una nueva antes de usar el panel.
 - **THEN** entra al panel con normalidad
 
 ### Requirement: Roles
-Cada cuenta MUST tener un rol, administración o profesorado,
-y las secciones reservadas a administración MUST rechazar al profesorado.
+Cada cuenta MUST tener un rol: superadministración, administración o profesorado.
+Las secciones reservadas a administración MUST rechazar al profesorado.
+Superadministración puede todo lo que puede administración y, además, es la única que accede al historial
+(ver quién hizo qué, deshacer y volver a un punto).
 
 #### Scenario: Profesorado en una sección de administración
 - **WHEN** una cuenta de profesorado intenta acceder a una sección reservada a administración

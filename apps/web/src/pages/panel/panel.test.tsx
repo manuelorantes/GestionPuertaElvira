@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ADMIN, NO_SESSION, mockApi, renderApp } from '@/test/render';
+import { ADMIN, NO_SESSION, SUPERADMIN, mockApi, renderApp } from '@/test/render';
 
 describe('armazón del panel', () => {
   it('should link every section and show the person with their role', async () => {
@@ -136,5 +136,24 @@ describe('cambio de contraseña obligatorio', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'La contraseña actual no es correcta.',
     );
+  });
+
+  it('shows the history section only to superadministrators', async () => {
+    mockApi({ 'GET /api/auth/me': [200, { user: ADMIN }] });
+    renderApp('/panel');
+    const nav = await screen.findByRole('navigation', { name: 'Secciones' });
+    expect(within(nav).queryByRole('link', { name: /Historial/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Administración')).toBeInTheDocument();
+  });
+
+  it('shows the history section to superadministrators', async () => {
+    mockApi({ 'GET /api/auth/me': [200, { user: SUPERADMIN }] });
+    renderApp('/panel');
+    const nav = await screen.findByRole('navigation', { name: 'Secciones' });
+    expect(within(nav).getByRole('link', { name: /Historial/ })).toHaveAttribute(
+      'href',
+      '/panel/historial',
+    );
+    expect(screen.getByText('Superadministración')).toBeInTheDocument();
   });
 });

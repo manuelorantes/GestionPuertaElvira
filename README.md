@@ -30,7 +30,8 @@ Después abre <http://localhost:8080>.
 
 | Email | Contraseña | Rol |
 |---|---|---|
-| `admin@puertaelvira.test` | `desarrollo-admin` | Administración |
+| `admin@puertaelvira.test` | `desarrollo-admin` | Superadministración (también el historial) |
+| `junta@puertaelvira.test` | `desarrollo-junta` | Administración |
 | `profe@puertaelvira.test` | `desarrollo-profe` | Profesorado |
 | `nuevo@puertaelvira.test` | `desarrollo-nuevo` | Administración, con contraseña temporal |
 

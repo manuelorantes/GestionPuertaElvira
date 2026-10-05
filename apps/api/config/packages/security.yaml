@@ -20,6 +20,7 @@ security:
                 - App\Infrastructure\Identity\Http\SessionCookieAuthenticator
 
     role_hierarchy:
+        ROLE_SUPERADMIN: [ROLE_ADMIN]
         ROLE_ADMIN: [ROLE_USER]
         ROLE_TEACHER: [ROLE_USER]
 
@@ -28,6 +29,8 @@ security:
         - { path: ^/api/doc\.json$, roles: PUBLIC_ACCESS }
         - { path: ^/api/auth/(login|logout)$, roles: PUBLIC_ACCESS }
         - { path: ^/api/public/, roles: PUBLIC_ACCESS }
+        # El historial (ver, deshacer y volver atrás) es solo de superadministración.
+        - { path: ^/api/admin/audit, roles: ROLE_SUPERADMIN }
         - { path: ^/api/admin, roles: ROLE_ADMIN }
         - { path: ^/api, roles: ROLE_USER }
 
