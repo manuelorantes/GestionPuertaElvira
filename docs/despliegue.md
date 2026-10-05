@@ -24,9 +24,11 @@ Nada se despliega a mano desde un ordenador.
    - `web`, **público** (la web compilada);
    - `documentos`, **privado** (adjuntos de facturas; la función los sirve con su clave de servicio).
 3. **Settings → API**: apunta el *Project ref* (`<ref>` en `https://<ref>.supabase.co`).
-4. **Settings → Database → Connection string**: copia dos URL,
-   - la **directa** (puerto 5432) para las migraciones;
-   - la del **pooler en modo transacción** (puerto 6543) para la función.
+4. Botón **Connect** (arriba) → pestañas del *pooler*: copia dos URL,
+   - **Session pooler** (puerto 5432) para las migraciones: la conexión «directa» es solo IPv6
+     y GitHub Actions no la alcanza;
+   - **Transaction pooler** (puerto 6543) para la función.
+   Son de la forma `postgresql://postgres.<ref>:[CONTRASEÑA]@aws-0-eu-west-1.pooler.supabase.com:<puerto>/postgres`.
    Si la contraseña lleva caracteres especiales, codifícala en percent-encoding.
 5. **Account → Access tokens**: crea un token personal para la CLI (solo lo usará GitHub Actions).
 
@@ -41,8 +43,8 @@ En el repositorio, las **variables** van en *Settings → Secrets and variables 
 | Variable (repositorio) | `SUPABASE_PROJECT_REF` | el *Project ref* |
 | Variable (repositorio) | `APP_URL` | la URL de CloudFront (paso 3); hasta entonces, `https://<ref>.supabase.co/functions/v1` |
 | Secreto (`produccion`) | `SUPABASE_ACCESS_TOKEN` | el token personal de la CLI |
-| Secreto (`produccion`) | `SUPABASE_DB_URL` | la URL directa (5432) |
-| Secreto (`produccion`) | `SUPABASE_POOLER_URL` | la URL del pooler (6543), con `?sslmode=require` |
+| Secreto (`produccion`) | `SUPABASE_DB_URL` | la URL del *session pooler* (5432) |
+| Secreto (`produccion`) | `SUPABASE_POOLER_URL` | la URL del *transaction pooler* (6543), con `?sslmode=require` |
 
 La función recibe sola `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; el workflow le fija el resto
 (`DATABASE_URL`, cookie `__Host-pe_session` con `Secure`, bucket `documentos`).
