@@ -1,10 +1,11 @@
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, History, LogIn, RotateCcw, Undo2 } from 'lucide-react';
 import { Fragment, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Navigate, useSearchParams } from 'react-router';
 
 import { fieldLabel, fieldValue } from '@/features/audit/fields';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { useSession } from '@/features/auth/useSession';
 import {
   fetchAction,
   fetchActions,
@@ -84,6 +85,13 @@ function ActionDetail({ id }: { id: string }) {
 type Pending = { type: 'undo' | 'restore'; action: AuditAction } | null;
 
 export function AuditPage() {
+  const { data: user } = useSession();
+  if (user && user.role !== 'superadministrator') return <Navigate to="/panel" replace />;
+
+  return <AuditHistory />;
+}
+
+function AuditHistory() {
   const [searchParams, setSearchParams] = useSearchParams();
   const userId = searchParams.get('persona') ?? '';
   const [open, setOpen] = useState<string | null>(null);

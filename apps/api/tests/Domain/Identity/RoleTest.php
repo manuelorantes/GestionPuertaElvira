@@ -12,6 +12,7 @@ final class RoleTest extends TestCase
 {
     public function test_should_parse_known_roles_when_given_their_names(): void
     {
+        self::assertSame(Role::Superadministrator, Role::fromName('superadministrator'));
         self::assertSame(Role::Administrator, Role::fromName('administrator'));
         self::assertSame(Role::Teacher, Role::fromName('teacher'));
     }

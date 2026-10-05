@@ -223,7 +223,7 @@ function Summary({ data }: { data: Dashboard }) {
 export function PanelHomePage() {
   const { data: user } = useSession();
   const firstName = user?.fullName.split(' ')[0] ?? '';
-  const isAdmin = user?.role === 'administrator';
+  const isAdmin = user?.role === 'administrator' || user?.role === 'superadministrator';
   const dashboard = useQuery({
     queryKey: ['dashboard'],
     queryFn: fetchDashboard,

@@ -10,11 +10,20 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+import type { Role } from '@/features/auth/api';
+
 export interface PanelSection {
   id: string;
   label: string;
   icon: LucideIcon;
   path: string | null;
+  /** Roles que la ven; sin lista, la ven todos. */
+  roles?: Role[];
+}
+
+/** Secciones visibles para un rol. */
+export function sectionsFor(sections: PanelSection[], role: Role): PanelSection[] {
+  return sections.filter((section) => !section.roles || section.roles.includes(role));
 }
 
 /** Secciones del panel según el diseño. `path: null` = «Próximamente». */
@@ -25,7 +34,13 @@ export const PANEL_SECTIONS: PanelSection[] = [
   { id: 'profesores', label: 'Profesores', icon: GraduationCap, path: '/panel/profesores' },
   { id: 'cobros', label: 'Cobros y cuotas', icon: Wallet, path: '/panel/cobros' },
   { id: 'contabilidad', label: 'Contabilidad', icon: BookOpen, path: '/panel/contabilidad' },
-  { id: 'historial', label: 'Historial', icon: History, path: '/panel/historial' },
+  {
+    id: 'historial',
+    label: 'Historial',
+    icon: History,
+    path: '/panel/historial',
+    roles: ['superadministrator'],
+  },
 ];
 
 export const MOBILE_SECTIONS: PanelSection[] = [

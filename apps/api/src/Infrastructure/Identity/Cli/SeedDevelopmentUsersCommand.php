@@ -31,7 +31,8 @@ final readonly class SeedDevelopmentUsersCommand
 {
     /** email => [nombre, rol, contraseña, debe cambiarla] */
     public const array USERS = [
-        'admin@puertaelvira.test' => ['Administración Pruebas', Role::Administrator, 'desarrollo-admin', false],
+        'admin@puertaelvira.test' => ['Administración Pruebas', Role::Superadministrator, 'desarrollo-admin', false],
+        'junta@puertaelvira.test' => ['Junta Pruebas', Role::Administrator, 'desarrollo-junta', false],
         'profe@puertaelvira.test' => ['Profesora Pruebas', Role::Teacher, 'desarrollo-profe', false],
         'nuevo@puertaelvira.test' => ['Cuenta Nueva Pruebas', Role::Administrator, 'desarrollo-nuevo', true],
     ];
@@ -52,6 +53,8 @@ final readonly class SeedDevelopmentUsersCommand
             $user = $this->users->findByEmail(EmailAddress::fromString($email)) ?? $this->register($email, $name, $role, $password);
             $hash = $this->hasher->hash(PlainPassword::fromString($password));
             $mustChange ? $user->resetPassword($hash, $this->clock->now()) : $user->changePassword($hash, $this->clock->now());
+            // Las cuentas de prueba siempre quedan con el rol de la lista (p. ej. al pasar admin a superadministración).
+            $user->changeRole($role);
             $user->enable();
             $this->users->save($user);
             $rows[] = [$email, $role->value, $password, $mustChange ? 'sí' : 'no'];

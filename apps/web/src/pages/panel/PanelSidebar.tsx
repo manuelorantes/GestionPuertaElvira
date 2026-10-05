@@ -7,7 +7,7 @@ import { currentMonth } from '@/features/billing/money';
 import { ROLE_LABEL, type SessionUser } from '@/features/auth/api';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 
-import { PANEL_SECTIONS } from './panelSections';
+import { PANEL_SECTIONS, sectionsFor } from './panelSections';
 
 interface PanelSidebarProps {
   user: SessionUser;
@@ -26,7 +26,7 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
         </p>
       </div>
       <nav aria-label="Secciones" className="flex flex-col gap-1">
-        {PANEL_SECTIONS.map(({ id, label, icon: Icon, path }) =>
+        {sectionsFor(PANEL_SECTIONS, user.role).map(({ id, label, icon: Icon, path }) =>
           path ? (
             <NavLink
               key={id}

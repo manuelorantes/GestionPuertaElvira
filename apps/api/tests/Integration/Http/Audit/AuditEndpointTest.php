@@ -12,8 +12,21 @@ final class AuditEndpointTest extends ApiAuthTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->createUser('junta@club.es');
+        $this->createUser('junta@club.es', Role::Superadministrator);
         $this->logIn('junta@club.es');
+    }
+
+    public function test_should_be_reserved_to_superadministrators(): void
+    {
+        $this->createUser('admin@club.es');
+        $this->logIn('admin@club.es');
+
+        $this->client->request('GET', '/api/admin/audit/actions');
+        self::assertResponseStatusCodeSame(403);
+        $this->json('POST', '/api/admin/audit/actions/01990000-0000-7000-8000-000000000000/undo');
+        self::assertResponseStatusCodeSame(403);
+        $this->client->request('GET', '/api/admin/students?filter=all');
+        self::assertResponseIsSuccessful();
     }
 
     public function test_should_record_who_did_each_action_with_a_field_by_field_detail(): void

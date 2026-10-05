@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, SUPERADMIN, mockApi, renderApp } from '@/test/render';
 
 const action = (overrides: Record<string, unknown>) => ({
   id: 'a1',
@@ -59,7 +59,7 @@ const DETAIL = {
 
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
-    'GET /api/auth/me': [200, { user: ADMIN }],
+    'GET /api/auth/me': [200, { user: SUPERADMIN }],
     'GET /api/admin/audit/actions': [200, ACTIONS],
     'GET /api/admin/audit/actions/a1': [200, DETAIL],
     ...extra,
@@ -155,5 +155,32 @@ describe('Historial', () => {
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith('/api/admin/audit/actions?userId=u1', expect.anything()),
     );
+  });
+
+  it('sends a plain administrator back to the summary', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/dashboard': [
+        200,
+        {
+          month: '2026-10',
+          today: '2026-10-04',
+          collectedCents: 0,
+          expectedCents: 0,
+          pendingCents: 0,
+          expensesCents: 0,
+          activeStudents: 0,
+          registeredStudents: 0,
+          chart: [],
+          occupancy: { percent: 0, fullGroups: 0, emptiest: [] },
+          overdue: [],
+          latest: [],
+        },
+      ],
+    });
+    renderApp('/panel/historial');
+
+    expect(await screen.findByRole('heading', { name: 'Resumen del club' })).toBeInTheDocument();
+    expect(screen.queryByRole('table', { name: 'Historial de acciones' })).not.toBeInTheDocument();
   });
 });

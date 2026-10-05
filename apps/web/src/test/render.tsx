@@ -64,6 +64,13 @@ export const ADMIN = {
   mustChangePassword: false,
 } as const;
 
+export const SUPERADMIN = {
+  ...ADMIN,
+  id: 'u0',
+  fullName: 'Administración Pruebas',
+  role: 'superadministrator',
+} as const;
+
 export const NO_SESSION: Reply = [
   401,
   { error: { code: 'unauthorized', message: 'Necesitas iniciar sesión.' } },

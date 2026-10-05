@@ -16,6 +16,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 final readonly class SessionUser implements UserInterface
 {
     private const array ROLES = [
+        Role::Superadministrator->value => ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPERADMIN'],
         Role::Administrator->value => ['ROLE_USER', 'ROLE_ADMIN'],
         Role::Teacher->value => ['ROLE_USER', 'ROLE_TEACHER'],
     ];
