@@ -22,6 +22,8 @@ final readonly class ImportDecision
         public ?string $guardianName = null,
         public ?string $guardianPhone = null,
         public ?string $email = null,
+        /** Crear aunque haya un alumno parecido (ya avisado). */
+        public bool $confirmDuplicate = false,
     ) {
     }
 }

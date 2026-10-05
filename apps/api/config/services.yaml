@@ -66,6 +66,7 @@ services:
     App\Domain\Common\Clock: '@App\Infrastructure\Clock\SystemClock'
     App\Application\Identity\Port\SecurityEventLog: '@App\Infrastructure\Audit\AuditedSecurityEventLog'
     App\Application\Import\Port\StudentMatcher: '@App\Infrastructure\Import\SqlStudentMatcher'
+    App\Application\Audit\Port\AuditContext: '@App\Infrastructure\Audit\SqlAuditContext'
     App\Application\Audit\Port\AuditLog: '@App\Infrastructure\Audit\SqlAuditLog'
     App\Application\Audit\Port\AuditReverter: '@App\Infrastructure\Audit\SqlAuditLog'
 
