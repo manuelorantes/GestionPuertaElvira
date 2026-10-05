@@ -47,6 +47,7 @@ En el repositorio, las **variables** van en *Settings → Secrets and variables 
 | Secreto (`produccion`) | `SUPABASE_ACCESS_TOKEN` | el token personal de la CLI |
 | Secreto (`produccion`) | `SUPABASE_DB_URL` | la URL del *session pooler* (5432) |
 | Secreto (`produccion`) | `SUPABASE_POOLER_URL` | la URL del *transaction pooler* (6543), con `?sslmode=require` |
+| Secreto (`produccion`) | `BACKUP_PASSPHRASE` | contraseña larga para cifrar las copias de seguridad (guárdala en el gestor de contraseñas) |
 
 La función recibe sola `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; el workflow le fija el resto
 (`DATABASE_URL`, cookie `__Host-pe_session` con `Secure`, bucket `documentos`).
@@ -94,10 +95,26 @@ Supabase pausa los proyectos gratuitos tras una semana sin peticiones. El workfl
 [Mantener activo](../.github/workflows/keep-alive.yml) consulta `/api/health` (que lee de la base de datos)
 cada tres días. Si el proyecto llegara a pausarse, se reactiva desde el panel de Supabase sin perder datos.
 
+## Copias de seguridad
+
+El workflow [Copia de seguridad](../.github/workflows/copia-seguridad.yml) hace un `pg_dump` el día 1 de
+cada mes (también a mano con *Run workflow*), lo cifra con la contraseña del secreto `BACKUP_PASSPHRASE`
+(el repositorio es público) y lo guarda como artefacto del run durante 90 días: siempre hay tres copias
+recientes fuera de Supabase. Se descargan desde *Actions → Copia de seguridad → el run → Artifacts*.
+
+Para restaurar en un proyecto nuevo o en el mismo (borra lo que haya):
+
+```sh
+gpg -d copia-2026-11-01.dump.gpg > copia.dump          # pide la contraseña del secreto
+docker compose run --rm --no-deps -v "$PWD:/copia" postgres \
+  pg_restore -d 'postgresql://...session pooler...' --no-owner --no-privileges --clean --if-exists /copia/copia.dump
+```
+
+Conviene probar la restauración una vez al año contra la base local (`make db-reset` después).
+
 ## Qué vigilar
 
 - **Supabase → Edge Functions → Logs** para errores de la API (los logs son JSON con `requestId`).
-- **Supabase → Database → Backups**: el plan gratuito no hace copias; `pg_dump` ocasional desde
-  `docker compose run --rm --no-deps -e PGPASSWORD=... postgres pg_dump -h ... -U postgres -d postgres > copia.sql`.
+- **Copias de seguridad**: el plan gratuito de Supabase no las hace; las hace el workflow de abajo.
 - **Límites gratuitos** (500 MB de base de datos, 1 GB de Storage, 500 000 invocaciones de funciones al mes):
   muy por encima del uso del club.
