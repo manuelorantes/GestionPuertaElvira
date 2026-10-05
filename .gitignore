@@ -11,3 +11,4 @@ node_modules/
 supabase/.deno-cache/*
 !supabase/.deno-cache/.gitkeep
 supabase/.temp/
+supabase/functions/api/.storage/

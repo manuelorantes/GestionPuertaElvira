@@ -43,6 +43,8 @@ services:
       SESSION_COOKIE_NAME: pe_session
       SESSION_COOKIE_SECURE: "0"
       PASSWORD_HASH_COST: "${PASSWORD_HASH_COST:-10}"
+      # Adjuntos de facturas en local (ignorado por git); en producción, Supabase Storage.
+      DOCUMENT_STORAGE_DIR: /app/supabase/functions/api/.storage
     volumes:
       - ./:/app
       # Caché de módulos de Deno dentro del repo (ignorada por git): el volumen con nombre sería de root.
