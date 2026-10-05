@@ -28,3 +28,8 @@ export class PeriodClosed extends Error {
     if (await periods.isClosed(date)) throw new PeriodClosed();
   }
 }
+
+/** Etiqueta de la acción del historial en curso (por defecto la da la ruta). */
+export interface AuditContext {
+  relabel(label: string): Promise<void>;
+}
