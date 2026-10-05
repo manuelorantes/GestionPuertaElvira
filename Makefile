@@ -15,6 +15,8 @@ PHP := $(COMPOSE) exec $(TTY) php-fpm
 DENO := $(COMPOSE) run --rm --no-deps $(TTY) api deno
 NODE := $(COMPOSE) run --rm --no-deps $(TTY) vite
 PHP_TEST := $(PHP) env APP_ENV=test APP_DEBUG=1
+# Base de datos de los tests de la API en Deno (club_test_deno): separada de la de PHPUnit, que espera vacía la suya.
+PHP_TEST_DENO := $(PHP) env APP_ENV=test APP_DEBUG=1 TEST_TOKEN=_deno
 E2E_BASE_URL ?= http://nginx
 
 ##@ Entorno
@@ -108,11 +110,15 @@ db-init: ## Crea las bases de datos (desarrollo y test) y aplica las migraciones
 	$(PHP) bin/console doctrine:migrations:migrate --allow-no-migration -n
 	$(PHP_TEST) bin/console doctrine:database:create --if-not-exists -n
 	$(PHP_TEST) bin/console doctrine:migrations:migrate --allow-no-migration -n
+	$(PHP_TEST_DENO) bin/console doctrine:database:create --if-not-exists -n
+	$(PHP_TEST_DENO) bin/console doctrine:migrations:migrate --allow-no-migration -n
 
 .PHONY: migrate
 migrate: ## Aplica las migraciones pendientes
 	$(PHP) bin/console doctrine:migrations:migrate --allow-no-migration -n
 	$(PHP_TEST) bin/console doctrine:migrations:migrate --allow-no-migration -n
+	$(PHP_TEST_DENO) bin/console doctrine:database:create --if-not-exists -n
+	$(PHP_TEST_DENO) bin/console doctrine:migrations:migrate --allow-no-migration -n
 
 .PHONY: migration
 migration: ## Genera una migración a partir de los modelos de Doctrine
