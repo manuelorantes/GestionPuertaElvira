@@ -73,8 +73,10 @@ export class SqlDatabaseHealth implements DatabaseHealth {
 export class Row {
   constructor(private readonly values: Record<string, unknown>) {}
 
-  static all(rows: Iterable<Record<string, unknown>>): Row[] {
-    return [...rows].map((values) => new Row(values));
+  static all(rows: Iterable<object | undefined>): Row[] {
+    return [...rows].flatMap((values) =>
+      values ? [new Row(values as Record<string, unknown>)] : []
+    );
   }
 
   string(column: string): string {
