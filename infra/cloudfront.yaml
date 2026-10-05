@@ -1,0 +1,93 @@
+# CloudFront delante de Supabase: web y API en el mismo origen con el subdominio gratuito *.cloudfront.net
+# (ver specs/decisions/api-y-web-en-el-mismo-origen.md y docs/despliegue.md).
+#   /api/*  → Edge Function `api` (sin caché, con cookies y cabeceras del visitante)
+#   /*      → bucket público `web` de Supabase Storage (las rutas de la SPA se sirven como index.html)
+# Se despliega con `make cloudfront ARGS=<project-ref>` (aws-cli en Docker) o desde la consola de AWS.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Gestion Puerta Elvira - CloudFront delante de Supabase (web + API)
+
+Parameters:
+  SupabaseProjectRef:
+    Type: String
+    Description: Referencia del proyecto de Supabase (la parte de <ref>.supabase.co)
+    AllowedPattern: '^[a-z]{20}$'
+  WebBucket:
+    Type: String
+    Default: web
+    Description: Bucket público de Storage con la web compilada
+
+Resources:
+  # Las rutas de la SPA (sin extensión) se resuelven a index.html antes de ir al origen,
+  # así los 404 de la API siguen llegando tal cual a la web.
+  SpaRouting:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub '${AWS::StackName}-spa-routing'
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Rutas de la SPA a index.html
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          if (request.uri.indexOf('.') === -1) {
+            request.uri = '/index.html';
+          }
+          return request;
+        }
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: Gestion Puerta Elvira
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        DefaultRootObject: index.html
+        Origins:
+          - Id: web
+            DomainName: !Sub '${SupabaseProjectRef}.supabase.co'
+            OriginPath: !Sub '/storage/v1/object/public/${WebBucket}'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+          - Id: api
+            DomainName: !Sub '${SupabaseProjectRef}.supabase.co'
+            OriginPath: /functions/v1
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+              OriginReadTimeout: 60
+        DefaultCacheBehavior:
+          TargetOriginId: web
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          # CachingOptimized: respeta el Cache-Control con el que se subió cada fichero.
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          # SecurityHeadersPolicy: HSTS, nosniff, frame DENY, referrer-policy.
+          ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt SpaRouting.FunctionMetadata.FunctionARN
+        CacheBehaviors:
+          - PathPattern: /api/*
+            TargetOriginId: api
+            ViewerProtocolPolicy: https-only
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            # CachingDisabled: la API ya responde Cache-Control: no-store.
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            # AllViewerExceptHostHeader: cookies, query y cabeceras (X-Requested-With, X-Forwarded-For) llegan a la función.
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+            ResponseHeadersPolicyId: 67f7725c-6f97-4210-82d7-5512b31e9d03
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+
+Outputs:
+  AppUrl:
+    Description: URL pública de la aplicación (APP_URL en GitHub)
+    Value: !Sub 'https://${Distribution.DomainName}'

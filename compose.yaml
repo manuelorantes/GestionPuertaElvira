@@ -65,6 +65,14 @@ services:
     depends_on:
       - nginx
 
+  # aws-cli solo para `make cloudfront` (perfil aparte: no arranca con `make up`).
+  aws:
+    image: amazon/aws-cli:2.33.17
+    profiles: [aws]
+    working_dir: /app
+    volumes:
+      - ./:/app:ro
+
   postgres:
     image: postgres:17-alpine
     environment:
