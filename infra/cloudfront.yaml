@@ -36,6 +36,28 @@ Resources:
           return request;
         }
 
+  # Supabase Storage sirve el HTML de los buckets públicos como text/plain (medida de seguridad suya):
+  # se restaura el tipo correcto para index.html y las rutas de la SPA.
+  HtmlContentType:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub '${AWS::StackName}-html-content-type'
+      AutoPublish: true
+      FunctionConfig:
+        Comment: index.html como text/html
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var response = event.response;
+          var uri = event.request.uri;
+          var header = response.headers['content-type'];
+          var type = header ? header.value : '';
+          if (type.indexOf('text/plain') === 0 && (uri.indexOf('.') === -1 || uri.slice(-5) === '.html')) {
+            response.headers['content-type'] = { value: 'text/html; charset=utf-8' };
+          }
+          return response;
+        }
+
   Distribution:
     Type: AWS::CloudFront::Distribution
     Properties:
@@ -72,6 +94,8 @@ Resources:
           FunctionAssociations:
             - EventType: viewer-request
               FunctionARN: !GetAtt SpaRouting.FunctionMetadata.FunctionARN
+            - EventType: viewer-response
+              FunctionARN: !GetAtt HtmlContentType.FunctionMetadata.FunctionARN
         CacheBehaviors:
           - PathPattern: /api/*
             TargetOriginId: api
