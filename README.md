@@ -113,7 +113,7 @@ Más detalle en las [ADRs](specs/decisions/).
 La API se está reescribiendo en TypeScript/Deno como Edge Function de Supabase
 ([ADR](specs/decisions/backend-en-deno-sobre-supabase.md)), contexto a contexto y con la misma API HTTP.
 Mientras dura, conviven las dos: nginx envía a Deno (`supabase/functions/api`) los prefijos ya portados
-(`/api/auth`, `/api/health`, `/api/admin/teachers`, `/api/admin/groups`, `/api/admin/students`, `/api/admin/billing`, `/api/public`) y el resto a PHP (`apps/api`). Tests: `make test-deno`; consola: `make deno-console`.
+(`/api/auth`, `/api/health`, `/api/admin/teachers`, `/api/admin/groups`, `/api/admin/students`, `/api/admin/billing`, `/api/admin/payroll`, `/api/public`) y el resto a PHP (`apps/api`). Tests: `make test-deno`; consola: `make deno-console`.
 
 ## Despliegue
 
