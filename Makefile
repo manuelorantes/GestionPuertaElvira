@@ -199,5 +199,17 @@ audit-web:
 build-web: ## Compila la web para producción
 	$(NODE) npm run build
 
+##@ Producción (ver docs/despliegue.md)
+
+.PHONY: cloudfront
+cloudfront: ## Crea o actualiza la distribución de CloudFront: ARGS=<project-ref de Supabase> (credenciales de AWS por entorno)
+	@test -n "$(ARGS)" || (echo "Falta la referencia del proyecto: make cloudfront ARGS=<ref>" >&2; exit 1)
+	$(COMPOSE) run --rm --no-deps $(TTY) -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN -e AWS_REGION \
+		--entrypoint aws aws cloudformation deploy --template-file infra/cloudfront.yaml \
+		--stack-name puerta-elvira --parameter-overrides SupabaseProjectRef=$(ARGS)
+	$(COMPOSE) run --rm --no-deps $(TTY) -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN -e AWS_REGION \
+		--entrypoint aws aws cloudformation describe-stacks --stack-name puerta-elvira \
+		--query 'Stacks[0].Outputs[?OutputKey==`AppUrl`].OutputValue' --output text
+
 .PHONY: ci
 ci: lint coverage audit build-web e2e ## Lo mismo que GitHub Actions

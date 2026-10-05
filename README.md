@@ -116,9 +116,11 @@ Más detalle en las [ADRs](specs/decisions/), empezando por
 
 ## Despliegue
 
-Por ahora solo en local. Producción será Supabase (base de datos, adjuntos y la Edge Function)
-con CloudFront delante para el mismo origen
+Producción es Supabase (base de datos, adjuntos y la Edge Function) con CloudFront delante para servir
+web y API desde el mismo origen, todo en capas gratuitas
 ([ADR](specs/decisions/backend-en-deno-sobre-supabase.md)).
+Cada release (push a `main`) lanza el workflow **Despliegue**: migraciones, función y web.
+La puesta en marcha paso a paso está en [`docs/despliegue.md`](docs/despliegue.md).
 
 ## Estándares de desarrollo
 
@@ -129,4 +131,4 @@ con CloudFront delante para el mismo origen
 | E2E | Smoke de Playwright en cada PR |
 | Lint | `deno lint`, `deno check` estricto, test de arquitectura, ESLint strict, Prettier, knip: cero errores |
 | Seguridad | `npm audit` (alta/crítica) en CI; sin secretos en el repo |
-| Despliegue | Pendiente |
+| Despliegue | Automático desde `main` (Supabase + CloudFront); ping cada 3 días para no pausar el proyecto |

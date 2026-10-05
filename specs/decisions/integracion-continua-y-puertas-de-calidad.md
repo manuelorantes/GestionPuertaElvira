@@ -28,6 +28,8 @@ y `make ci` lanza el conjunto completo.
   y Playwright solo para recorridos críticos.
 - **Hooks locales (Lefthook):** `commit-msg` (commitlint), `pre-commit` (formato) y `pre-push` (tests).
 - **Dependabot:** semanal, contra `staging`.
+- **Despliegue:** el workflow `Despliegue` se ejecuta con cada push a `main` (es decir, con cada release
+  ya validada por CI) y `Mantener activo` consulta la API cada tres días (ver `docs/despliegue.md`).
 
 ## Consequences
 

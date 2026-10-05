@@ -13,7 +13,8 @@ siguiendo la convención de Aircury de un `Makefile` como punto de entrada.
   - `api` (`denoland/deno`), la Edge Function ejecutada tal cual contra el PostgreSQL local;
   - `vite` (`node:24-alpine`);
   - `postgres` (`postgres:17-alpine`);
-  - `e2e`, con la imagen oficial de Playwright y el perfil `e2e`.
+  - `e2e`, con la imagen oficial de Playwright y el perfil `e2e`;
+  - `aws` (`amazon/aws-cli`), con el perfil `aws`, solo para `make cloudfront`.
 - Los contenedores se ejecutan con el UID/GID del usuario del host
   para no generar ficheros de root.
 - Toda orden documentada pasa por `make` (`make help` lista los objetivos).

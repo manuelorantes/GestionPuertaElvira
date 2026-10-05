@@ -24,8 +24,10 @@ jobs:
     steps:
       - name: Solo staging puede entrar en main
         if: github.event_name == 'pull_request' && github.base_ref == 'main' && github.head_ref != 'staging'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          echo "::error::Los PR a main solo pueden venir de staging (este viene de '${{ github.head_ref }}')."
+          echo "::error::Los PR a main solo pueden venir de staging (este viene de '$HEAD_REF')."
           exit 1
       - run: echo "Origen correcto"
 
