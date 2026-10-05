@@ -1,6 +1,6 @@
 import { apiSend } from '@/shared/api/client';
 
-interface Candidate {
+export interface Candidate {
   id: string;
   fullName: string;
 }
@@ -34,14 +34,18 @@ export interface Decision {
   guardianName?: string;
   guardianPhone?: string;
   email?: string;
+  /** Crear aunque haya un alumno parecido (ya avisado). */
+  confirmDuplicate?: boolean;
 }
 
+/** Resultado de importar una fila. */
 export interface ImportResult {
-  created: number;
-  linked: number;
-  skipped: number;
+  line: number;
+  action: DecisionAction;
+  studentId: string | null;
+  studentName: string;
   payments: number;
-  members: number;
+  member: boolean;
   entries: number;
 }
 
@@ -50,6 +54,7 @@ export async function previewImport(text: string): Promise<PreviewRow[]> {
     .rows;
 }
 
-export function applyImport(text: string, rows: Decision[]): Promise<ImportResult> {
-  return apiSend('POST', '/api/admin/import/apply', { text, rows });
+/** Importa una sola fila: cada una es su propia acción del historial. */
+export function importRow(text: string, row: Decision): Promise<ImportResult> {
+  return apiSend('POST', '/api/admin/import/rows', { text, row });
 }

@@ -12,8 +12,8 @@ Lo que no se entiende MUST avisarse y quedar vacío. Los meses de septiembre a d
 
 ### Requirement: Revisión antes de importar
 Cada fila MUST casarse con el alumno de nombre igual (sin tildes ni mayúsculas) y, si no lo hay, proponer el alta con los datos de la hoja
-y hasta tres alumnos parecidos. Administración decide por fila: vincular a un alumno, crear uno (corrigiendo los datos y eligiendo su grupo) u omitir.
-Nada se guarda hasta aceptar.
+y hasta tres alumnos parecidos. Administración decide por fila: vincular a un alumno, crear uno (corrigiendo los datos y eligiendo su grupo) u omitir,
+y acepta cada fila por separado (o todas las revisadas de una vez, en orden). Nada se guarda hasta aceptar la fila.
 
 #### Scenario: Alumno nuevo
 - **WHEN** una fila no coincide con ningún alumno
@@ -26,9 +26,17 @@ Al importar, por cada fila aceptada:
 - «Chándal y polo» y «Federativa» con importe MUST registrarse como ingresos en Contabilidad a nombre del alumno;
 - un alumno nuevo MUST darse de alta desde el primer mes con cobro (o el inicio de temporada).
 
-#### Scenario: Todo o nada
-- **WHEN** una fila falla al importar (por ejemplo, un menor sin teléfono)
-- **THEN** no se guarda nada de ninguna fila y se explica el motivo
+#### Scenario: Una fila falla
+- **WHEN** una fila falla al aceptarla (por ejemplo, un menor sin teléfono)
+- **THEN** no se guarda nada de esa fila, se explica el motivo en la propia fila y las demás filas no se ven afectadas
+
+### Requirement: Posibles duplicados
+Antes de crear un alumno cuyo nombre coincide con otro o se parece a uno existente, el sistema MUST avisar del posible duplicado
+y ofrecer vincular la fila a ese alumno o confirmar que es otra persona. Sin esa confirmación no se crea.
+
+#### Scenario: Nombre parecido
+- **WHEN** administración acepta crear «Pablo Lopez» y existe «Pablo López Herrera»
+- **THEN** se muestra el aviso con ese alumno y las opciones «Es la misma persona: vincular» y «Es otra persona: crear igualmente»
 
 ### Requirement: Historial
-La importación MUST ser una sola acción del historial («Importar hoja de cálculo») firmada por quien la hace, y MUST poder deshacerse entera.
+Cada fila importada MUST ser una acción del historial («Importar fila de la hoja: <nombre>») firmada por quien la acepta, y MUST poder deshacerse por separado.
