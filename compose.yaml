@@ -27,6 +27,30 @@ services:
       postgres:
         condition: service_healthy
 
+  # API en Deno (la Edge Function de Supabase, ejecutada tal cual contra el PostgreSQL local).
+  api:
+    image: denoland/deno:2.9.7
+    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
+    working_dir: /app/supabase/functions/api
+    command: deno task serve
+    environment:
+      HOME: /tmp
+      DENO_DIR: /tmp/deno
+      PORT: "8000"
+      DATABASE_URL: postgresql://club:club@postgres:5432/club
+      TEST_DATABASE_URL: postgresql://club:club@postgres:5432/club_test
+      # En producción: __Host-pe_session y Secure (exige HTTPS).
+      SESSION_COOKIE_NAME: pe_session
+      SESSION_COOKIE_SECURE: "0"
+      PASSWORD_HASH_COST: "${PASSWORD_HASH_COST:-10}"
+    volumes:
+      - ./:/app
+      # Caché de módulos de Deno dentro del repo (ignorada por git): el volumen con nombre sería de root.
+      - ./supabase/.deno-cache:/tmp/deno
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   nginx:
     image: nginx:1.27-alpine
     volumes:
@@ -36,6 +60,7 @@ services:
       - "${APP_PORT:-8080}:80"
     depends_on:
       - php-fpm
+      - api
       - vite
 
   vite:
