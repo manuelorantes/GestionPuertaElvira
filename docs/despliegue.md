@@ -31,6 +31,8 @@ Nada se despliega a mano desde un ordenador.
    Son de la forma `postgresql://postgres.<ref>:[CONTRASEÑA]@aws-0-eu-west-1.pooler.supabase.com:<puerto>/postgres`.
    Si la contraseña lleva caracteres especiales, codifícala en percent-encoding.
 5. **Account → Access tokens**: crea un token personal para la CLI (solo lo usará GitHub Actions).
+   Los tokens caducan como mucho al año: cuando el workflow empiece a fallar con un 401, genera otro
+   y actualiza el secreto `SUPABASE_ACCESS_TOKEN`.
 
 ## 2. Secretos y variables en GitHub (una vez)
 
