@@ -1,5 +1,6 @@
 # Despliegue en producción (ver docs/despliegue.md): migraciones y Edge Function a Supabase,
 # web compilada al bucket público de Storage. Se lanza con cada release (push a main).
+# Hasta que exista la variable SUPABASE_PROJECT_REF (repositorio) los trabajos se omiten sin fallar.
 name: Despliegue
 
 on:
@@ -21,6 +22,7 @@ env:
 jobs:
   api:
     name: Base de datos y Edge Function
+    if: vars.SUPABASE_PROJECT_REF != ''
     runs-on: ubuntu-latest
     environment: produccion
     permissions:
@@ -53,6 +55,7 @@ jobs:
 
   web:
     name: Web al bucket público
+    if: vars.SUPABASE_PROJECT_REF != ''
     runs-on: ubuntu-latest
     environment: produccion
     permissions:
@@ -82,6 +85,7 @@ jobs:
 
   comprobacion:
     name: La API responde
+    if: vars.APP_URL != ''
     needs: [api, web]
     runs-on: ubuntu-latest
     environment: produccion

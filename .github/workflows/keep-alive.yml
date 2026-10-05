@@ -12,6 +12,7 @@ permissions: {}
 jobs:
   ping:
     name: Consulta /api/health
+    if: vars.APP_URL != ''
     runs-on: ubuntu-latest
     environment: produccion
     steps:
