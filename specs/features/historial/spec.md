@@ -2,7 +2,7 @@
 
 Registro de todo lo que cambia los datos del club, con quién lo hizo y cómo estaban los datos antes y después,
 para poder deshacer una acción o volver a cualquier punto.
-Solo administración puede verlo y usarlo.
+Solo superadministración puede verlo y usarlo; administración no lo ve.
 Decisión de diseño: [historial de cambios con triggers](../../decisions/historial-de-cambios-con-triggers.md).
 
 ### Requirement: Registro de acciones
@@ -14,7 +14,7 @@ Los inicios de sesión, cierres de sesión, intentos fallidos y cambios de cuent
 Las consultas (ver pantallas) no se registran.
 
 #### Scenario: Ver quién hizo qué
-- **WHEN** administración abre el historial
+- **WHEN** superadministración abre el historial
 - **THEN** ve las acciones de la más reciente a la más antigua con fecha y hora (de Madrid), persona, acción y lo que afectó, puede filtrar por persona y ver el detalle campo a campo (sin contraseñas)
 
 ### Requirement: Deshacer una acción
@@ -29,7 +29,7 @@ Administración MUST poder devolver todos los datos del club al estado justo des
 se deshacen, en orden inverso, todos los cambios posteriores de todas las personas.
 
 #### Scenario: Deshacer una vuelta atrás
-- **WHEN** administración vuelve a un punto y después deshace esa vuelta atrás
+- **WHEN** superadministración vuelve a un punto y después deshace esa vuelta atrás
 - **THEN** los datos quedan como estaban antes de volver atrás
 
 ### Requirement: Límites
