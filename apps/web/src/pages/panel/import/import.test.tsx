@@ -86,6 +86,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             classroom: 'alfil',
             capacity: 12,
             occupied: 3,
+            customName: true,
             weeklyPlan: 'one_hour',
           },
           {
@@ -100,6 +101,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             classroom: 'peon',
             capacity: 12,
             occupied: 0,
+            customName: true,
             weeklyPlan: 'one_hour',
           },
         ],

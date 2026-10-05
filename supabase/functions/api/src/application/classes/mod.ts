@@ -49,6 +49,8 @@ export interface StudentStatus {
 export interface GroupSummary {
   id: string;
   name: string;
+  /** false cuando es el nombre por defecto (día, hora, nivel y aula). */
+  customName: boolean;
   level: string;
   teacherId: string;
   teacherName: string;
@@ -123,7 +125,8 @@ export class TeacherNotAvailable extends Error {
 
 /** Datos de un grupo tal y como llegan del exterior; `toDetails()` los valida. */
 export interface GroupInput {
-  name: string;
+  /** Opcional: vacío o null es «nombre por defecto». */
+  name: string | null;
   level: string;
   teacherId: string;
   days: string[];
@@ -135,7 +138,7 @@ export interface GroupInput {
 
 export function groupDetails(input: GroupInput): GroupDetails {
   return new GroupDetails(
-    GroupName.fromString(input.name),
+    GroupName.optional(input.name),
     levelFromName(input.level),
     TeacherReference.fromString(input.teacherId),
     WeeklySlot.of(

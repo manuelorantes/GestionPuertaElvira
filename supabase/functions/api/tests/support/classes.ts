@@ -31,7 +31,8 @@ export class ImmediateTransactionRunner implements TransactionRunner {
 }
 
 export interface GroupOptions {
-  name?: string;
+  /** null = sin nombre (por defecto). */
+  name?: string | null;
   days?: Weekday[];
   start?: string;
   end?: string;
@@ -44,7 +45,7 @@ export interface GroupOptions {
 export const GroupFactory = {
   details(options: GroupOptions = {}): GroupDetails {
     return new GroupDetails(
-      GroupName.fromString(options.name ?? 'Iniciación A'),
+      options.name === null ? null : GroupName.fromString(options.name ?? 'Iniciación A'),
       options.level ?? 'beginner',
       options.teacher ?? TeacherReference.generate(),
       WeeklySlot.of(

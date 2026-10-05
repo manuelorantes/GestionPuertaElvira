@@ -29,7 +29,7 @@ function toGroup(row: Row): ClassGroup {
   return ClassGroup.restore(
     ClassGroupId.fromString(row.string('id')),
     new GroupDetails(
-      GroupName.fromString(row.string('name')),
+      row.bool('custom_name') ? GroupName.fromString(row.string('name')) : null,
       levelFromName(row.string('level')),
       TeacherReference.fromString(row.string('teacher_id')),
       WeeklySlot.of(
@@ -60,6 +60,7 @@ export class SqlClassGroupRepository implements ClassGroupRepository {
     const record = {
       id: group.id.value,
       name: d.name.value,
+      custom_name: d.customName,
       level: d.level,
       teacher_id: d.teacher.value,
       // Columna json: postgres.js serializa el array (una cadena quedaría codificada dos veces).
@@ -74,6 +75,7 @@ export class SqlClassGroupRepository implements ClassGroupRepository {
       this.sql(
         record,
         'name',
+        'custom_name',
         'level',
         'teacher_id',
         'days',
@@ -144,7 +146,7 @@ export class SqlClassQuery implements ClassQuery {
 
   private select(on: LocalDate) {
     return this.sql`
-      SELECT g.id, g.name, g.level, g.teacher_id, g.days, g.start_minutes, g.end_minutes, g.classroom, g.capacity,
+      SELECT g.id, g.name, g.custom_name, g.level, g.teacher_id, g.days, g.start_minutes, g.end_minutes, g.classroom, g.capacity,
              t.full_name AS teacher_name,
              (SELECT COUNT(*) FROM classes_enrolment e
                WHERE e.class_group_id = g.id AND e.enrolled_on <= ${on.toString()} AND (e.ends_on IS NULL OR e.ends_on > ${on.toString()})) AS occupied
@@ -192,6 +194,7 @@ function toSummary(row: Row): GroupSummary {
   return {
     id: group.id.value,
     name: d.name.value,
+    customName: d.customName,
     level: d.level,
     teacherId: d.teacher.value,
     teacherName: row.string('teacher_name'),
