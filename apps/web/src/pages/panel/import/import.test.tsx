@@ -88,6 +88,20 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             occupied: 3,
             weeklyPlan: 'one_hour',
           },
+          {
+            id: 'g2',
+            name: 'Iniciación miércoles 17:00',
+            level: 'beginner',
+            teacher: { id: 't2', fullName: 'Roxanny' },
+            days: ['wed'],
+            start: '17:00',
+            end: '18:00',
+            slotLabel: 'Mié · 17:00–18:00',
+            classroom: 'peon',
+            capacity: 12,
+            occupied: 0,
+            weeklyPlan: 'one_hour',
+          },
         ],
       },
     ],
@@ -186,6 +200,9 @@ describe('Importar hoja', () => {
 
     await userEvent.type(within(julio).getByLabelText('Teléfono del tutor'), '690666005');
     await userEvent.selectOptions(within(julio).getByLabelText('Grupo'), 'g1');
+    // Quien viene dos días se apunta a dos grupos de un día.
+    await userEvent.click(within(julio).getByRole('button', { name: 'Añadir otro grupo' }));
+    await userEvent.selectOptions(within(julio).getByLabelText('Otro grupo'), 'g2');
     await userEvent.click(
       within(julio).getByRole('button', { name: 'Aceptar fila Julio Requena Montenegro' }),
     );
@@ -201,7 +218,7 @@ describe('Importar hoja', () => {
       expect.objectContaining({
         line: 3,
         action: 'create',
-        groupIds: ['g1'],
+        groupIds: ['g1', 'g2'],
         guardianPhone: '690666005',
       }),
     ]);

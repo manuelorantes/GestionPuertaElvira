@@ -12,12 +12,12 @@ Lo que no se entiende MUST avisarse y quedar vacío. Los meses de septiembre a d
 
 ### Requirement: Revisión antes de importar
 Cada fila MUST casarse con el alumno de nombre igual (sin tildes ni mayúsculas) y, si no lo hay, proponer el alta con los datos de la hoja
-y hasta tres alumnos parecidos. Administración decide por fila: vincular a un alumno, crear uno (corrigiendo los datos y eligiendo su grupo) u omitir,
+y hasta tres alumnos parecidos. Administración decide por fila: vincular a un alumno, crear uno (corrigiendo los datos y eligiendo uno o varios grupos, porque quien viene dos días puede ir a dos grupos de un día) u omitir,
 y acepta cada fila por separado (o todas las revisadas de una vez, en orden). Nada se guarda hasta aceptar la fila.
 
 #### Scenario: Alumno nuevo
 - **WHEN** una fila no coincide con ningún alumno
-- **THEN** se proponen nombre, fecha de nacimiento, tutor, teléfono y email, y no se puede importar hasta elegir un grupo (y un teléfono de tutor si es menor)
+- **THEN** se proponen nombre, fecha de nacimiento, tutor, teléfono y email, y no se puede importar hasta elegir al menos un grupo (y un teléfono de tutor si es menor); se pueden añadir más grupos
 
 ### Requirement: Qué se registra
 Al importar, por cada fila aceptada:
