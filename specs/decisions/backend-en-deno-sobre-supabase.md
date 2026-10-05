@@ -47,4 +47,7 @@ del historial) y la API HTTP que consume la web (rutas, JSON, códigos de error 
 - Las Edge Functions limitan el tiempo de CPU por petición (2 s en el plan gratuito): las operaciones pesadas
   (generar cuotas, volver a un punto) se apoyan en SQL, no en bucles en memoria.
 - Supabase gratis pausa el proyecto tras 7 días sin uso; un workflow programado consulta `/api/health`.
+- El despliegue sale solo de `main` (`.github/workflows/deploy.yml`: `supabase db push`, `functions deploy`,
+  web al bucket público); CloudFront se define en `infra/cloudfront.yaml` (CloudFormation) y una CloudFront
+  Function resuelve las rutas de la SPA a `index.html` sin tocar los 404 de la API. Guía: `docs/despliegue.md`.
 - OpenAPI (`/api/doc.json`) deja de generarse automáticamente; el contrato son `specs/features/` y los `api.ts` de la web.

@@ -1,0 +1,91 @@
+# Despliegue en producción (ver docs/despliegue.md): migraciones y Edge Function a Supabase,
+# web compilada al bucket público de Storage. Se lanza con cada release (push a main).
+name: Despliegue
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  HOST_UID: '1001'
+  HOST_GID: '1001'
+  SUPABASE_CLI_VERSION: 2.119.0
+
+jobs:
+  api:
+    name: Base de datos y Edge Function
+    runs-on: ubuntu-latest
+    environment: produccion
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - name: Migraciones pendientes
+        run: supabase db push --db-url "$SUPABASE_DB_URL" --yes
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      - name: Secretos de la función
+        run: |
+          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
+            DATABASE_URL="$DATABASE_URL" \
+            SESSION_COOKIE_NAME=__Host-pe_session \
+            SESSION_COOKIE_SECURE=1 \
+            DOCUMENT_BUCKET=documentos
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          DATABASE_URL: ${{ secrets.SUPABASE_POOLER_URL }}
+      - name: Edge Function
+        run: supabase functions deploy api --project-ref "$SUPABASE_PROJECT_REF" --use-api
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+
+  web:
+    name: Web al bucket público
+    runs-on: ubuntu-latest
+    environment: produccion
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Preparar el usuario del runner
+        run: echo "HOST_UID=$(id -u)" >> "$GITHUB_ENV" && echo "HOST_GID=$(id -g)" >> "$GITHUB_ENV"
+      - run: docker compose run --rm --no-deps -T vite npm ci --no-audit --no-fund
+      - run: make build-web
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - name: Subir la web (los ficheros con hash se cachean un año; index.html nunca)
+        run: |
+          supabase storage cp --experimental --project-ref "$SUPABASE_PROJECT_REF" -r -j 4 \
+            --cache-control "public, max-age=31536000, immutable" apps/web/dist/assets "ss:///$WEB_BUCKET/assets"
+          for f in apps/web/dist/*; do
+            [ -f "$f" ] || continue
+            supabase storage cp --experimental --project-ref "$SUPABASE_PROJECT_REF" \
+              --cache-control "no-cache" "$f" "ss:///$WEB_BUCKET/$(basename "$f")"
+          done
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+          WEB_BUCKET: web
+
+  comprobacion:
+    name: La API responde
+    needs: [api, web]
+    runs-on: ubuntu-latest
+    environment: produccion
+    steps:
+      - run: curl -fsS --retry 5 --retry-delay 10 "$APP_URL/api/health"
+        env:
+          APP_URL: ${{ vars.APP_URL }}
