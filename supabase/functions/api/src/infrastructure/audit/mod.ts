@@ -1,4 +1,5 @@
 import { generateUuidV7 } from '../../domain/common/mod.ts';
+import type { AuditContext } from '../../application/common/mod.ts';
 import type { UserId } from '../../domain/identity/mod.ts';
 import type {
   AuthenticatedUser,
@@ -7,11 +8,6 @@ import type {
 } from '../../application/identity/mod.ts';
 import type { Sql } from '../persistence/sql.ts';
 import type { Logger } from '../logging/mod.ts';
-
-/** Etiqueta de la acción del historial en curso (por defecto la da la ruta). */
-export interface AuditContext {
-  relabel(label: string): Promise<void>;
-}
 
 /** Nombres legibles de las acciones (por método y ruta) y de lo que tocan (por tabla). */
 export class AuditLabels {

@@ -9,6 +9,8 @@ import {
 import { registerAuditRoutes } from './infrastructure/audit/routes.ts';
 import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
+import { registerDashboardRoutes } from './infrastructure/dashboard/routes.ts';
+import { registerImportRoutes } from './infrastructure/import/routes.ts';
 import { registerPayrollRoutes } from './infrastructure/payroll/routes.ts';
 import { registerAuthRoutes } from './infrastructure/identity/routes.ts';
 import { registerStudentRoutes } from './infrastructure/students/routes.ts';
@@ -97,5 +99,7 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
     );
   registerAccountingRoutes(api, storage);
   registerAuditRoutes(api);
+  registerImportRoutes(api);
+  registerDashboardRoutes(api);
   return api;
 }
