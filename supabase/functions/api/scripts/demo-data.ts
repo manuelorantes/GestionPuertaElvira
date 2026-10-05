@@ -58,26 +58,26 @@ const RATES: Record<string, string> = { p1: '16', p2: '18', p3: '20', p4: '15', 
 /** Profesor con la liquidación del mes anterior aún pendiente. */
 const UNPAID_TEACHER = 'p5';
 
-/** [nombre, nivel, profesor, días, inicio, fin, aula, plazas] */
-const GROUPS: [string, string, string, string[], string, string, number, number][] = [
-  ['Iniciación A', 'beginner', 'p1', ['mon', 'wed'], '17:00', '18:00', 1, 12],
-  ['Intermedio A', 'intermediate', 'p2', ['mon', 'wed'], '18:00', '19:30', 1, 12],
-  ['Avanzado A', 'advanced', 'p3', ['mon', 'wed'], '19:30', '21:00', 1, 10],
-  ['Iniciación C', 'beginner', 'p4', ['mon', 'wed'], '16:00', '17:00', 2, 12],
-  ['Intermedio C', 'intermediate', 'p5', ['mon', 'wed'], '17:00', '18:30', 2, 12],
-  ['Iniciación D', 'beginner', 'p1', ['mon', 'wed'], '18:30', '19:30', 2, 12],
-  ['Iniciación B', 'beginner', 'p4', ['tue', 'thu'], '17:00', '18:00', 1, 12],
-  ['Intermedio B', 'intermediate', 'p5', ['tue', 'thu'], '18:00', '19:30', 1, 12],
-  ['Adultos I', 'adults', 'p2', ['tue'], '19:30', '21:00', 1, 12],
-  ['Adultos II', 'adults', 'p5', ['thu'], '19:30', '21:00', 1, 12],
-  ['Peques B', 'juniors', 'p1', ['tue'], '16:00', '17:00', 2, 10],
-  ['Iniciación E', 'beginner', 'p2', ['tue', 'thu'], '17:00', '18:00', 2, 12],
-  ['Avanzado B', 'advanced', 'p3', ['tue', 'thu'], '18:00', '19:30', 2, 10],
-  ['Peques A', 'juniors', 'p1', ['fri'], '16:30', '17:30', 1, 10],
-  ['Competición', 'advanced', 'p3', ['fri'], '17:30', '19:00', 1, 12],
-  ['Jóvenes talentos', 'juniors', 'p4', ['fri'], '19:00', '20:00', 1, 10],
-  ['Particular · jueves', 'private_lesson', 'p5', ['thu'], '19:30', '21:00', 2, 2],
-  ['Particular · viernes', 'private_lesson', 'p3', ['fri'], '17:30', '19:00', 2, 2],
+/** [nombre, nivel, profesor, días, inicio, fin, aula, plazas]. Las aulas: alfil, caballo y peon. */
+const GROUPS: [string, string, string, string[], string, string, string, number][] = [
+  ['Iniciación A', 'beginner', 'p1', ['mon', 'wed'], '17:00', '18:00', 'alfil', 12],
+  ['Intermedio A', 'intermediate', 'p2', ['mon', 'wed'], '18:00', '19:30', 'alfil', 12],
+  ['Avanzado A', 'advanced', 'p3', ['mon', 'wed'], '19:30', '21:00', 'alfil', 10],
+  ['Iniciación C', 'beginner', 'p4', ['mon', 'wed'], '16:00', '17:00', 'caballo', 12],
+  ['Intermedio C', 'intermediate', 'p5', ['mon', 'wed'], '17:00', '18:30', 'caballo', 12],
+  ['Iniciación D', 'beginner', 'p1', ['mon', 'wed'], '18:30', '19:30', 'caballo', 12],
+  ['Iniciación B', 'beginner', 'p4', ['tue', 'thu'], '17:00', '18:00', 'alfil', 12],
+  ['Intermedio B', 'intermediate', 'p5', ['tue', 'thu'], '18:00', '19:30', 'alfil', 12],
+  ['Adultos I', 'intermediate', 'p2', ['tue'], '19:30', '21:00', 'alfil', 12],
+  ['Adultos II', 'intermediate', 'p5', ['thu'], '19:30', '21:00', 'alfil', 12],
+  ['Peques B', 'beginner', 'p1', ['tue'], '16:00', '17:00', 'peon', 10],
+  ['Iniciación E', 'beginner', 'p2', ['tue', 'thu'], '17:00', '18:00', 'caballo', 12],
+  ['Avanzado B', 'advanced', 'p3', ['tue', 'thu'], '18:00', '19:30', 'caballo', 10],
+  ['Peques A', 'beginner', 'p1', ['fri'], '16:30', '17:30', 'alfil', 10],
+  ['Competición', 'advanced', 'p3', ['fri'], '17:30', '19:00', 'alfil', 12],
+  ['Jóvenes talentos', 'beginner', 'p4', ['fri'], '19:00', '20:00', 'alfil', 10],
+  ['Particular · jueves', 'private_lesson', 'p5', ['thu'], '19:30', '21:00', 'peon', 2],
+  ['Particular · viernes', 'private_lesson', 'p3', ['fri'], '17:30', '19:00', 'peon', 2],
 ];
 
 /**

@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { classroomLabel } from '@/features/classes/classrooms';
 import { useGroups } from '@/features/classes/hooks';
 import * as api from '@/features/students/api';
 import { formatDate, telHref } from '@/features/students/format';
@@ -163,7 +164,7 @@ export function StudentPanel() {
                   <p className="font-medium">{g.name}</p>
                   <p className="text-[13px] text-ink-muted">{g.slotLabel}</p>
                   <p className="text-[13px] text-ink-muted">
-                    Aula {g.classroom} · {g.teacherName}
+                    {classroomLabel(g.classroom)} · {g.teacherName}
                   </p>
                 </div>
                 {!isWithdrawn && (

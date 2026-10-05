@@ -22,12 +22,12 @@ test('should create a teacher and a group and show it in the weekly schedule', a
   await page.getByRole('button', { name: 'Nuevo grupo' }).click();
   const dialog = page.getByRole('dialog', { name: 'Nuevo grupo' });
   await dialog.getByLabel('Nombre del grupo').fill('Adultos III');
-  await dialog.getByLabel('Nivel').selectOption({ label: 'Adultos' });
+  await dialog.getByLabel('Nivel').selectOption({ label: 'Intermedio' });
   await dialog.getByLabel('Profesor').selectOption({ label: 'Elena Prueba Ruiz' });
   await dialog.getByRole('button', { name: 'Lun' }).click();
   await dialog.getByLabel('Empieza').selectOption('19:30');
   await dialog.getByLabel('Termina').selectOption('21:00');
-  await dialog.getByRole('button', { name: 'Aula 2' }).click();
+  await dialog.getByRole('button', { name: 'Aula Caballo' }).click();
   await expect(dialog.getByText('1,5 h semanales', { exact: false })).toBeVisible();
   await dialog.getByRole('button', { name: 'Crear grupo' }).click();
 
@@ -49,5 +49,7 @@ test('should refuse a group that clashes with another in the same classroom', as
   await dialog.getByLabel('Termina').selectOption('19:00');
   await dialog.getByRole('button', { name: 'Crear grupo' }).click();
 
-  await expect(dialog.getByRole('alert')).toContainText('Coincide en el aula 1 con «Competición»');
+  await expect(dialog.getByRole('alert')).toContainText(
+    'Coincide en el aula Alfil con «Competición»',
+  );
 });

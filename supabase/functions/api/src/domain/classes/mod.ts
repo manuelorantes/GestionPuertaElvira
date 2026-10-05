@@ -18,18 +18,42 @@ export class Capacity {
   }
 }
 
-export class Classroom {
-  private constructor(readonly number: number) {}
+/** Las tres aulas del club, con nombre de pieza. El orden es el de las columnas del horario. */
+export type ClassroomCode = 'alfil' | 'caballo' | 'peon';
+export const CLASSROOMS: readonly ClassroomCode[] = ['alfil', 'caballo', 'peon'];
+const CLASSROOM_NAMES: Record<ClassroomCode, string> = {
+  alfil: 'Alfil',
+  caballo: 'Caballo',
+  peon: 'Peón',
+};
 
-  static of(number: number): Classroom {
-    if (number !== 1 && number !== 2) {
-      throw new InvalidValue('classroom', 'El club tiene las aulas 1 y 2.');
+export class Classroom {
+  private constructor(readonly code: ClassroomCode) {}
+
+  static fromString(code: string): Classroom {
+    if (!(CLASSROOMS as readonly string[]).includes(code)) {
+      throw new InvalidValue('classroom', 'El club tiene las aulas Alfil, Caballo y Peón.');
     }
-    return new Classroom(number);
+    return new Classroom(code as ClassroomCode);
+  }
+
+  /** «Alfil», «Caballo» o «Peón». */
+  name(): string {
+    return CLASSROOM_NAMES[this.code];
+  }
+
+  /** «Aula Alfil». */
+  label(): string {
+    return `Aula ${this.name()}`;
+  }
+
+  /** Posición en el horario (0, 1, 2). */
+  position(): number {
+    return CLASSROOMS.indexOf(this.code);
   }
 
   equals(other: Classroom): boolean {
-    return this.number === other.number;
+    return this.code === other.code;
   }
 }
 
@@ -46,21 +70,9 @@ export class GroupName {
   }
 }
 
-export type Level =
-  | 'beginner'
-  | 'intermediate'
-  | 'advanced'
-  | 'juniors'
-  | 'adults'
-  | 'private_lesson';
-const LEVELS: readonly Level[] = [
-  'beginner',
-  'intermediate',
-  'advanced',
-  'juniors',
-  'adults',
-  'private_lesson',
-];
+/** Niveles de los grupos: iniciación, intermedio, avanzado (y competición) y clases particulares. */
+export type Level = 'beginner' | 'intermediate' | 'advanced' | 'private_lesson';
+const LEVELS: readonly Level[] = ['beginner', 'intermediate', 'advanced', 'private_lesson'];
 
 export function levelFromName(name: string): Level {
   if (!(LEVELS as readonly string[]).includes(name)) {

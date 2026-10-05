@@ -23,16 +23,6 @@ export const LEVELS: Record<Level, LevelStyle> = {
     legend: 'Avanzado y competición',
     className: 'bg-ink-strong text-paper border-ink-strong',
   },
-  juniors: {
-    label: 'Peques y jóvenes',
-    legend: 'Peques y jóvenes',
-    className: 'bg-sand text-ink-soft border-line-strong',
-  },
-  adults: {
-    label: 'Adultos',
-    legend: 'Adultos',
-    className: 'bg-sage text-brand-strong border-brand-tint',
-  },
   private_lesson: {
     label: 'Particular',
     legend: 'Particulares',

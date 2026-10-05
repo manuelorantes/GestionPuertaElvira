@@ -3,7 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { ApiError } from '@/shared/api/client';
 
-import type { ClassGroup, GroupPayload, Level, Weekday } from './api';
+import type { ClassGroup, Classroom, GroupPayload, Level, Weekday } from './api';
 import { useSaveGroup } from './hooks';
 import { toMinutes, weeklyHours, WEEKDAYS } from './schedule';
 
@@ -22,7 +22,7 @@ function initialValues(group: ClassGroup | null, defaultTeacherId: string): Grou
     days: [],
     start: '17:00',
     end: '18:00',
-    classroom: 1,
+    classroom: 'alfil',
     capacity: 12,
   };
 }
@@ -85,7 +85,7 @@ export function useGroupForm(
     setTeacher: (teacherId: string) => set('teacherId', teacherId),
     setStart: (start: string) => set('start', start),
     setEnd: (end: string) => set('end', end),
-    setClassroom: (classroom: 1 | 2) => set('classroom', classroom),
+    setClassroom: (classroom: Classroom) => set('classroom', classroom),
     toggleDay,
     stepCapacity,
     weeklyHours: weeklyHours(values.days.length, values.start, values.end),

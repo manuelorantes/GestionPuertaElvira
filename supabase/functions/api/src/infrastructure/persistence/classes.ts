@@ -37,7 +37,7 @@ function toGroup(row: Row): ClassGroup {
         HalfHour.fromMinutes(row.int('start_minutes')),
         HalfHour.fromMinutes(row.int('end_minutes')),
       ),
-      Classroom.of(row.int('classroom')),
+      Classroom.fromString(row.string('classroom')),
       Capacity.of(row.int('capacity')),
     ),
   );
@@ -66,7 +66,7 @@ export class SqlClassGroupRepository implements ClassGroupRepository {
       days: [...d.slot.days],
       start_minutes: d.slot.start.minutes,
       end_minutes: d.slot.end.minutes,
-      classroom: d.classroom.number,
+      classroom: d.classroom.code,
       capacity: d.capacity.value,
     };
     await this.sql`INSERT INTO classes_group ${this.sql(record)}
@@ -155,7 +155,8 @@ export class SqlClassQuery implements ClassQuery {
   async groups(on: LocalDate): Promise<GroupSummary[]> {
     const rows = await this.sql`${this.select(on)} ORDER BY g.classroom, g.start_minutes, g.name`;
     const groups = Row.all(rows).map(toSummary);
-    const key = (g: GroupSummary) => [g.days[0] ?? 'mon', g.start, g.classroom, g.name] as const;
+    const key = (g: GroupSummary) =>
+      [g.days[0] ?? 'mon', g.start, Classroom.fromString(g.classroom).position(), g.name] as const;
     const dayIndex = (code: string) => ['mon', 'tue', 'wed', 'thu', 'fri'].indexOf(code);
     return groups.sort((a, b) => {
       const [da, sa, ca, na] = key(a);
@@ -198,7 +199,7 @@ function toSummary(row: Row): GroupSummary {
     start: d.slot.start.toString(),
     end: d.slot.end.toString(),
     slotLabel: d.slot.label(),
-    classroom: d.classroom.number,
+    classroom: d.classroom.code,
     capacity: d.capacity.value,
     occupied: row.int('occupied'),
     weeklyPlan: d.weeklyPlan(),

@@ -26,8 +26,8 @@ const slot = (days: Weekday[], start: string, end: string) =>
 
 Deno.test('ClassGroup should derive the weekly plan from its weekly hours', () => {
   const cases: [Weekday[], string, string, Level, string][] = [
-    [[5], '16:30', '17:30', 'juniors', 'one_hour'],
-    [[2], '19:30', '21:00', 'adults', 'hour_and_half'],
+    [[5], '16:30', '17:30', 'beginner', 'one_hour'],
+    [[2], '19:30', '21:00', 'intermediate', 'hour_and_half'],
     [[1, 3], '17:00', '18:00', 'beginner', 'two_hours'],
     [[1, 3], '18:00', '19:30', 'intermediate', 'three_hours'],
     [[4], '19:30', '21:00', 'private_lesson', 'private_lesson'],
@@ -39,36 +39,36 @@ Deno.test('ClassGroup should derive the weekly plan from its weekly hours', () =
 
 Deno.test('ClassGroup should replace its details when updated and find classroom clashes only', () => {
   const group = GroupFactory.group();
-  group.update(GroupFactory.details({ name: 'Iniciación B', classroom: 2, capacity: 10 }));
+  group.update(GroupFactory.details({ name: 'Iniciación B', classroom: 'caballo', capacity: 10 }));
   assertEquals(group.details().name.value, 'Iniciación B');
-  assertEquals(group.details().classroom.number, 2);
+  assertEquals(group.details().classroom.code, 'caballo');
 
   const sameRoomClash = GroupFactory.group({
     days: [1],
     start: '17:30',
     end: '18:30',
-    classroom: 1,
+    classroom: 'alfil',
     name: 'Choca',
   });
   const otherRoom = GroupFactory.group({
     days: [1],
     start: '17:00',
     end: '18:00',
-    classroom: 2,
+    classroom: 'caballo',
     name: 'Otra aula',
   });
   const backToBack = GroupFactory.group({
     days: [1],
     start: '18:00',
     end: '19:00',
-    classroom: 1,
+    classroom: 'alfil',
     name: 'Seguido',
   });
   const proposed = GroupFactory.group({
     days: [1, 3],
     start: '17:00',
     end: '18:00',
-    classroom: 1,
+    classroom: 'alfil',
     name: 'Nuevo',
   });
   const conflicts = new ClassroomSchedule().conflictsFor(proposed.id, proposed.details(), [
@@ -116,7 +116,7 @@ Deno.test('EnrolmentPolicy should accept free seats without clashes and refuse d
     days: [1, 3],
     start: '17:00',
     end: '18:00',
-    classroom: 2,
+    classroom: 'caballo',
     name: 'Iniciación A',
   });
   const overlap = assertThrows(
@@ -136,8 +136,10 @@ Deno.test('Group values should validate capacity, classroom, name and level', ()
   assertEquals(Capacity.of(1).value, 1);
   assertEquals(Capacity.of(30).value, 30);
   assertThrows(() => Capacity.of(31), InvalidValue);
-  assertEquals(Classroom.of(2).number, 2);
-  assertThrows(() => Classroom.of(3), InvalidValue);
+  assertEquals(Classroom.fromString('peon').label(), 'Aula Peón');
+  assertEquals(Classroom.fromString('caballo').position(), 1);
+  assertThrows(() => Classroom.fromString('3'), InvalidValue);
+  assertThrows(() => levelFromName('adults'), InvalidValue);
   assertEquals(GroupName.fromString('  Iniciación   A ').value, 'Iniciación A');
   assertThrows(() => GroupName.fromString('X'), InvalidValue);
   assertEquals(levelFromName('private_lesson'), 'private_lesson');

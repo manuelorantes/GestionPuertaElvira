@@ -56,7 +56,7 @@ export interface GroupSummary {
   start: string;
   end: string;
   slotLabel: string;
-  classroom: number;
+  classroom: string;
   capacity: number;
   occupied: number;
   weeklyPlan: string;
@@ -86,7 +86,7 @@ export class ClassroomConflict extends Error implements HasErrorDetails {
   constructor(private readonly conflicting: ClassGroup) {
     const details = conflicting.details();
     super(
-      `Coincide en el aula ${details.classroom.number} con «${details.name.value}» (${details.slot.label()}).`,
+      `Coincide en el aula ${details.classroom.name()} con «${details.name.value}» (${details.slot.label()}).`,
     );
     this.name = 'ClassroomConflict';
   }
@@ -129,7 +129,7 @@ export interface GroupInput {
   days: string[];
   start: string;
   end: string;
-  classroom: number;
+  classroom: string;
   capacity: number;
 }
 
@@ -143,7 +143,7 @@ export function groupDetails(input: GroupInput): GroupDetails {
       HalfHour.fromString(input.start),
       HalfHour.fromString(input.end),
     ),
-    Classroom.of(input.classroom),
+    Classroom.fromString(input.classroom),
     Capacity.of(input.capacity),
   );
 }

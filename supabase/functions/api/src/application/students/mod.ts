@@ -46,7 +46,7 @@ export interface StudentGroup {
   name: string;
   slotLabel: string;
   teacherName: string;
-  classroom: number;
+  classroom: string;
 }
 
 export interface StudentSummary {
