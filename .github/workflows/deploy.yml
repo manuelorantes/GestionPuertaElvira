@@ -69,14 +69,26 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: ${{ env.SUPABASE_CLI_VERSION }}
-      - name: Subir la web (los ficheros con hash se cachean un año; index.html nunca)
+      - name: Subir la web (los ficheros con hash se cachean un año; el resto nunca)
         run: |
-          supabase storage cp --experimental --project-ref "$SUPABASE_PROJECT_REF" -r -j 4 \
-            --cache-control "public, max-age=31536000, immutable" apps/web/dist/assets "ss:///$WEB_BUCKET/assets"
-          for f in apps/web/dist/*; do
-            [ -f "$f" ] || continue
-            supabase storage cp --experimental --project-ref "$SUPABASE_PROJECT_REF" \
-              --cache-control "no-cache" "$f" "ss:///$WEB_BUCKET/$(basename "$f")"
+          cp="supabase storage cp --experimental --project-ref $SUPABASE_PROJECT_REF"
+          $cp -r -j 4 --cache-control "public, max-age=31536000, immutable" \
+            apps/web/dist/assets "ss:///$WEB_BUCKET/assets"
+          # El resto (index.html, img/...) con su tipo MIME explícito: la detección automática
+          # de la CLI sirve el HTML como texto plano.
+          cd apps/web/dist
+          find . -type f -not -path './assets/*' | sed 's#^\./##' | while read -r f; do
+            case "$f" in
+              *.html) type=text/html ;;
+              *.svg) type=image/svg+xml ;;
+              *.png) type=image/png ;;
+              *.jpg|*.jpeg) type=image/jpeg ;;
+              *.ico) type=image/x-icon ;;
+              *.txt) type=text/plain ;;
+              *.json|*.webmanifest) type=application/json ;;
+              *) type=auto-detect ;;
+            esac
+            $cp --cache-control no-cache --content-type "$type" "$f" "ss:///$WEB_BUCKET/$f"
           done
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
