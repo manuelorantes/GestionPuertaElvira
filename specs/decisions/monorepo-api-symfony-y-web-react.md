@@ -1,5 +1,7 @@
 # Monorepo con API Symfony y web React
 
+**Estado:** en revisión por [Backend en Deno sobre Supabase](specs/decisions/backend-en-deno-sobre-supabase.md): la API se está portando a TypeScript/Deno contexto a contexto; lo que sigue describe la API en PHP mientras conviven.
+
 ## Context
 
 El club necesita una aplicación de gestión (alumnos, clases, profesores, cobros, contabilidad)

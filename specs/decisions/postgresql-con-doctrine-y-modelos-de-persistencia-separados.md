@@ -1,5 +1,7 @@
 # PostgreSQL con Doctrine y modelos de persistencia separados
 
+**Estado:** en revisión por [Backend en Deno sobre Supabase](specs/decisions/backend-en-deno-sobre-supabase.md): la API se está portando a TypeScript/Deno contexto a contexto; lo que sigue describe la API en PHP mientras conviven.
+
 ## Context
 
 Los datos son relacionales (alumnos, grupos, cobros, facturas)
