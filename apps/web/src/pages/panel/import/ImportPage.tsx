@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, FileSpreadsheet, Upload } from 'lucide-react';
+import { ArrowLeft, Check, FileSpreadsheet, Plus, Upload } from 'lucide-react';
 import { useId, useState, type ChangeEvent } from 'react';
 import { Link } from 'react-router';
 
@@ -89,7 +89,9 @@ function problem(decision: Decision): string | null {
   if (decision.action === 'link')
     return decision.studentId ? null : 'Elige el alumno al que vincular.';
   if (decision.action !== 'create') return null;
-  if ((decision.groupIds ?? []).length === 0) return 'Elige un grupo para crear el alumno.';
+  if ((decision.groupIds ?? []).filter(Boolean).length === 0) {
+    return 'Elige un grupo para crear el alumno.';
+  }
   if (!decision.birthDate) return 'Falta la fecha de nacimiento.';
   const age = new Date().getFullYear() - Number(decision.birthDate.slice(0, 4));
   if (age < 18 && (!decision.guardianName || !decision.guardianPhone))
@@ -224,12 +226,32 @@ function RowCard({
                 value={decision.email ?? ''}
                 onChange={(e) => set({ email: e.target.value })}
               />
-              <Select
-                label="Grupo"
-                value={decision.groupIds?.[0] ?? ''}
-                onChange={(groupId) => set({ groupIds: groupId ? [groupId] : [] })}
-                options={[{ value: '', label: 'Elige un grupo' }, ...groups]}
-              />
+              <div className="flex flex-col gap-3 sm:col-span-2">
+                {/* Quien viene dos días puede ir a dos grupos de un solo día. */}
+                {(decision.groupIds?.length ? decision.groupIds : ['']).map((groupId, index) => (
+                  <Select
+                    key={index}
+                    label={index === 0 ? 'Grupo' : 'Otro grupo'}
+                    value={groupId}
+                    onChange={(value) =>
+                      set({
+                        groupIds: (decision.groupIds?.length ? decision.groupIds : ['']).map(
+                          (g, i) => (i === index ? value : g),
+                        ),
+                      })
+                    }
+                    options={[{ value: '', label: 'Elige un grupo' }, ...groups]}
+                  />
+                ))}
+                <Button
+                  variant="ghost"
+                  className="self-start"
+                  onClick={() => set({ groupIds: [...(decision.groupIds ?? ['']), ''] })}
+                >
+                  <Plus aria-hidden size={16} />
+                  Añadir otro grupo
+                </Button>
+              </div>
             </div>
           )}
           {decision.action !== 'skip' && (
@@ -318,8 +340,12 @@ export function ImportPage() {
 
   /** Importa una fila; un posible duplicado abre el aviso en vez de marcar error. */
   async function accept(row: PreviewRow, override: Partial<Decision> = {}): Promise<boolean> {
-    const current = { ...decision(row), ...override };
-    setDecisions((d) => ({ ...d, [row.line]: current }));
+    const chosen = { ...decision(row), ...override };
+    // Los huecos de «Otro grupo» sin elegir no se envían.
+    const current = chosen.groupIds
+      ? { ...chosen, groupIds: chosen.groupIds.filter(Boolean) }
+      : chosen;
+    setDecisions((d) => ({ ...d, [row.line]: chosen }));
     setBusyLine(row.line);
     try {
       const result = await importRow(text, current);
