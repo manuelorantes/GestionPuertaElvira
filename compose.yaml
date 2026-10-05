@@ -38,7 +38,7 @@ services:
       DENO_DIR: /tmp/deno
       PORT: "8000"
       DATABASE_URL: postgresql://club:club@postgres:5432/club
-      TEST_DATABASE_URL: postgresql://club:club@postgres:5432/club_test
+      TEST_DATABASE_URL: postgresql://club:club@postgres:5432/club_test_deno
       # En producción: __Host-pe_session y Secure (exige HTTPS).
       SESSION_COOKIE_NAME: pe_session
       SESSION_COOKIE_SECURE: "0"

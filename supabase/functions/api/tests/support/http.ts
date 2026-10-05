@@ -13,7 +13,7 @@ export const PASSWORD = 'torre-de-marfil';
 
 export const TEST_CONFIG: Config = {
   databaseUrl: Deno.env.get('TEST_DATABASE_URL') ??
-    'postgresql://club:club@postgres:5432/club_test',
+    'postgresql://club:club@postgres:5432/club_test_deno',
   sessionCookieName: 'pe_session',
   sessionCookieSecure: false,
   passwordHashCost: 4,

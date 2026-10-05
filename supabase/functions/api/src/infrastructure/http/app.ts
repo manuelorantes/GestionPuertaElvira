@@ -204,6 +204,13 @@ function enforceAccess(user: AuthenticatedUser | null, options: RouteOptions): v
   }
 }
 
+/** Parámetro de la ruta (`:id`); Hono lo tipa como opcional en rutas registradas por texto. */
+export function param(c: ApiContext, name: string): string {
+  const value = c.req.param(name);
+  if (value === undefined) throw httpError(404);
+  return value;
+}
+
 /** La IP real llega en X-Viewer-Ip (función de borde de CloudFront) o en X-Forwarded-For (nginx en local). */
 function clientIp(c: ApiContext): string {
   const viewer = c.req.header('x-viewer-ip');

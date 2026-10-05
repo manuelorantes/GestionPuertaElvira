@@ -8,8 +8,8 @@
   },
   "tasks": {
     "serve": "deno run --allow-net --allow-env --allow-read --watch index.ts",
-    "test": "deno test --allow-net --allow-env --allow-read --parallel",
-    "coverage": "deno test --allow-net --allow-env --allow-read --parallel --coverage=.coverage && deno coverage .coverage --lcov --output=.coverage/lcov.info",
+    "test": "deno test --allow-net --allow-env --allow-read",
+    "coverage": "deno test --allow-net --allow-env --allow-read --coverage=.coverage && deno coverage .coverage --lcov --output=.coverage/lcov.info",
     "check": "deno fmt --check && deno lint && deno check index.ts scripts/console.ts tests",
     "fix": "deno fmt && deno lint --fix",
     "console": "deno run --allow-net --allow-env --allow-read scripts/console.ts"

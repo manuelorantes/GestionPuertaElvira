@@ -1,7 +1,10 @@
 import { CheckHealth } from './application/health/mod.ts';
 import { ApiApp } from './infrastructure/http/app.ts';
 import { SessionCookie } from './infrastructure/http/cookie.ts';
+import { registerClassRoutes } from './infrastructure/classes/routes.ts';
 import { registerAuthRoutes } from './infrastructure/identity/routes.ts';
+import { registerStudentRoutes } from './infrastructure/students/routes.ts';
+import { registerTeacherRoutes } from './infrastructure/teachers/routes.ts';
 import {
   BcryptPasswordHasher,
   RandomSessionTokenGenerator,
@@ -57,5 +60,8 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
 
   api.useRequestScope();
   registerAuthRoutes(api);
+  registerTeacherRoutes(api);
+  registerClassRoutes(api);
+  registerStudentRoutes(api);
   return api;
 }
