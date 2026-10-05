@@ -1,9 +1,0 @@
-parameters:
-    level: max
-    paths:
-        - src
-        - tests
-    tmpDir: var/cache/phpstan
-    treatPhpDocTypesAsCertain: false
-    symfony:
-        containerXmlPath: var/cache/dev/App_Infrastructure_KernelDevDebugContainer.xml

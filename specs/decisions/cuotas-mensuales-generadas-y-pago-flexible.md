@@ -9,7 +9,7 @@ y el histórico no debe cambiar si después cambian las tarifas o los grupos del
 
 ## Decision
 
-- Contexto **Billing**, con su propia capa de dominio en Deptrac.
+- Contexto **Billing**, con su propia capa de dominio (reglas de dependencia comprobadas por el test de arquitectura).
   Obtiene de Alumnado y Clases el perfil de facturación de cada alumno mediante el puerto `StudentDirectory`:
   horas semanales de sus grupos normales, sus clases particulares y si tiene hermanos activos.
 - Cada mes de la temporada, cada alumno activo tiene una **cuota guardada** (`Charge`).

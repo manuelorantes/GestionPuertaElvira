@@ -16,15 +16,14 @@ y `make ci` lanza el conjunto completo.
 
 | Job | Puertas |
 |---|---|
-| `api` | PHP-CS-Fixer (`@Symfony`, `strict_types`), `lint:container`, PHPStan nivel máximo, Deptrac, validación del mapeo de Doctrine, migraciones al día, PHPUnit con cobertura ≥ 75 %, `composer audit` |
+| `api` | `deno fmt --check`, `deno lint`, `deno check` (TypeScript estricto), test de arquitectura, tests de Deno con cobertura ≥ 75 % |
 | `web` | ESLint (typescript-eslint strict), Prettier, `tsc`, knip, Vitest con cobertura ≥ 75 %, build, `npm audit` (alta/crítica) |
 | `e2e` | Playwright contra la pila completa en Docker (escritorio y móvil) |
 | `release-source` | Los PR a `main` solo pueden venir de `staging` |
 | `CI` | Agregado; es el único check obligatorio en la protección de ramas |
 
-- **Tests de la API:** PHPUnit con una suite por capa
-  (`domain`, `application`, `infrastructure`, `integration`),
-  orden aleatorio y fallo ante deprecaciones, avisos y warnings.
+- **Tests de la API:** `deno test` por capa (`domain`, `application`, `integration`),
+  en serie porque comparten la base de datos de test, con cobertura por `lcov`.
 - **Tests de la web:** Vitest con Testing Library (consultas por rol y texto),
   y Playwright solo para recorridos críticos.
 - **Hooks locales (Lefthook):** `commit-msg` (commitlint), `pre-commit` (formato) y `pre-push` (tests).

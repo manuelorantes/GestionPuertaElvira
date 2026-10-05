@@ -11,12 +11,9 @@ export HOST_UID HOST_GID
 
 COMPOSE := docker compose
 TTY := $(shell if [ -t 0 ] && [ -t 1 ]; then echo ""; else echo "-T"; fi)
-PHP := $(COMPOSE) exec $(TTY) php-fpm
 DENO := $(COMPOSE) run --rm --no-deps $(TTY) api deno
 NODE := $(COMPOSE) run --rm --no-deps $(TTY) vite
-PHP_TEST := $(PHP) env APP_ENV=test APP_DEBUG=1
-# Base de datos de los tests de la API en Deno (club_test_deno): separada de la de PHPUnit, que espera vacía la suya.
-PHP_TEST_DENO := $(PHP) env APP_ENV=test APP_DEBUG=1 TEST_TOKEN=_deno
+PSQL := $(COMPOSE) exec $(TTY) postgres psql -U club -d postgres
 E2E_BASE_URL ?= http://nginx
 
 ##@ Entorno
@@ -28,12 +25,8 @@ help: ## Muestra esta ayuda
 		/^[a-zA-Z0-9_-]+:.*## / { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
 .PHONY: init
-init: build deps up db-init seed hooks ## Prepara el proyecto desde cero (primera vez)
+init: deps up db-init seed hooks ## Prepara el proyecto desde cero (primera vez)
 	@echo "\nListo: http://localhost:$${APP_PORT:-8080}"
-
-.PHONY: build
-build: ## Construye las imágenes
-	$(COMPOSE) build
 
 .PHONY: wait
 wait: ## Espera a que la API responda a través de nginx
@@ -43,7 +36,7 @@ wait: ## Espera a que la API responda a través de nginx
 
 .PHONY: up
 up: ## Arranca el entorno
-	$(COMPOSE) up -d --wait php-fpm postgres
+	$(COMPOSE) up -d --wait postgres
 	$(COMPOSE) up -d
 
 .PHONY: down
@@ -63,24 +56,16 @@ logs: ## Logs en vivo (ARGS=servicio para filtrar)
 	$(COMPOSE) logs -f $(ARGS)
 
 .PHONY: sh
-sh: ## Shell en un contenedor (SVC=php-fpm por defecto)
-	$(COMPOSE) exec $(or $(SVC),php-fpm) sh
+sh: ## Shell en un contenedor (SVC=api por defecto)
+	$(COMPOSE) exec $(or $(SVC),api) sh
 
 ##@ Dependencias y herramientas
 
 .PHONY: deps
 deps: ## Instala las dependencias de API, web y repositorio
-	$(COMPOSE) run --rm --no-deps php-fpm composer install --no-interaction
+	$(DENO) install
 	$(NODE) npm ci --no-audit --no-fund
 	$(COMPOSE) run --rm --no-deps -w /app $(TTY) vite npm ci --no-audit --no-fund
-
-.PHONY: composer
-composer: ## Ejecuta composer (ARGS="require foo/bar")
-	$(PHP) composer $(ARGS)
-
-.PHONY: console
-console: ## Ejecuta bin/console (ARGS="debug:router")
-	$(PHP) bin/console $(ARGS)
 
 .PHONY: npm
 npm: ## Ejecuta npm en la web (ARGS="install foo")
@@ -105,91 +90,74 @@ sync-staging: ## Tras una release: rebasa staging sobre main y lo sube (force-pu
 ##@ Base de datos
 
 .PHONY: db-init
-db-init: ## Crea las bases de datos (desarrollo y test) y aplica las migraciones
-	$(PHP) bin/console doctrine:database:create --if-not-exists -n
-	$(PHP) bin/console doctrine:migrations:migrate --allow-no-migration -n
-	$(PHP_TEST) bin/console doctrine:database:create --if-not-exists -n
-	$(PHP_TEST) bin/console doctrine:migrations:migrate --allow-no-migration -n
-	$(PHP_TEST_DENO) bin/console doctrine:database:create --if-not-exists -n
-	$(PHP_TEST_DENO) bin/console doctrine:migrations:migrate --allow-no-migration -n
+db-init: migrate ## Crea las bases de datos (desarrollo y test) y aplica las migraciones
 
 .PHONY: migrate
-migrate: ## Aplica las migraciones pendientes
-	$(PHP) bin/console doctrine:migrations:migrate --allow-no-migration -n
-	$(PHP_TEST) bin/console doctrine:migrations:migrate --allow-no-migration -n
-	$(PHP_TEST_DENO) bin/console doctrine:database:create --if-not-exists -n
-	$(PHP_TEST_DENO) bin/console doctrine:migrations:migrate --allow-no-migration -n
+migrate: ## Aplica las migraciones pendientes de supabase/migrations (desarrollo y test)
+	$(DENO) task migrate
+	$(DENO) task migrate --test
 
 .PHONY: migration
-migration: ## Genera una migración a partir de los modelos de Doctrine
-	$(PHP) bin/console doctrine:migrations:diff -n
+migration: ## Crea una migración SQL vacía: ARGS=nombre_en_snake_case
+	@test -n "$(ARGS)" || (echo "Falta el nombre: make migration ARGS=nombre" >&2; exit 1)
+	@f=supabase/migrations/$$(date -u +%Y%m%d%H%M%S)_$(ARGS).sql; printf -- "-- $(ARGS)\n" > $$f; echo $$f
 
 .PHONY: db-reset
 db-reset: ## Recrea la base de datos de desarrollo
-	$(PHP) bin/console doctrine:database:drop --force --if-exists -n
+	$(PSQL) -c 'DROP DATABASE IF EXISTS club WITH (FORCE)'
 	$(MAKE) db-init
 
 .PHONY: seed
 seed: ## Datos de desarrollo: usuarios de prueba (contraseñas conocidas) y demostración del diseño
-	$(PHP) bin/console app:dev:seed-users
 	$(DENO) task console app:dev:seed-users
-	$(PHP) bin/console app:dev:seed-demo
+	$(DENO) task console app:dev:seed-demo
 
-##@ Cuentas de usuario (API en Deno: ver scripts/console.ts)
+##@ Cuentas de usuario (ver supabase/functions/api/scripts/console.ts)
 
-.PHONY: deno-console
-deno-console: ## Consola de la API en Deno: ARGS="app:user:create email 'Nombre' administrator"
+.PHONY: console
+console: ## Consola de la API: ARGS="app:billing:generate-charges --month=2026-10"
 	$(DENO) task console $(ARGS)
 
 .PHONY: user-create
-user-create: ## Alta de cuenta: ARGS="email@club.es 'Nombre Apellidos' administrator|teacher"
-	$(PHP) bin/console app:user:create $(ARGS)
+user-create: ## Alta de cuenta: ARGS="email@club.es 'Nombre Apellidos' superadministrator|administrator|teacher"
+	$(DENO) task console app:user:create $(ARGS)
 
 .PHONY: user-disable
 user-disable: ## Desactiva una cuenta y cierra sus sesiones: ARGS="email@club.es"
-	$(PHP) bin/console app:user:disable $(ARGS)
+	$(DENO) task console app:user:disable $(ARGS)
 
 .PHONY: user-enable
 user-enable: ## Reactiva una cuenta: ARGS="email@club.es"
-	$(PHP) bin/console app:user:enable $(ARGS)
+	$(DENO) task console app:user:enable $(ARGS)
 
 .PHONY: user-role
 user-role: ## Cambia el rol: ARGS="email@club.es administrator|teacher"
-	$(PHP) bin/console app:user:role $(ARGS)
+	$(DENO) task console app:user:role $(ARGS)
 
 .PHONY: user-reset-password
 user-reset-password: ## Contraseña temporal nueva: ARGS="email@club.es"
-	$(PHP) bin/console app:user:reset-password $(ARGS)
+	$(DENO) task console app:user:reset-password $(ARGS)
 
 ##@ Calidad
 
 .PHONY: test
-test: test-api test-deno test-web ## Todos los tests (sin e2e)
-
-.PHONY: test-deno
-test-deno: ## Tests de la API en Deno (ARGS="tests/domain")
-	$(DENO) task test $(ARGS)
-
-.PHONY: coverage-deno
-coverage-deno: ## Tests de la API en Deno con cobertura (mínimo 75 % de líneas)
-	$(DENO) task coverage
-	$(DENO) run --allow-read scripts/coverage-check.ts .coverage/lcov.info 75
+test: test-api test-web ## Todos los tests (sin e2e)
 
 .PHONY: test-api
-test-api: ## Tests de la API (ARGS="--testsuite domain")
-	$(PHP_TEST) vendor/bin/phpunit $(ARGS)
+test-api: ## Tests de la API (ARGS="tests/domain")
+	$(DENO) task test $(ARGS)
 
 .PHONY: test-web
 test-web: ## Tests de la web (ARGS="src/pages")
 	$(NODE) npm run test -- $(ARGS)
 
 .PHONY: coverage
-coverage: coverage-api coverage-deno coverage-web ## Tests con cobertura y umbral mínimo (75 %)
+coverage: coverage-api coverage-web ## Tests con cobertura y umbral mínimo (75 %)
 
 .PHONY: coverage-api
 coverage-api: ## Tests de la API con cobertura (mínimo 75 % de líneas)
-	$(PHP_TEST) vendor/bin/phpunit --coverage-text --coverage-clover=var/coverage/clover.xml
-	$(PHP) php bin/coverage-check.php var/coverage/clover.xml 75
+	$(DENO) task coverage
+	$(DENO) run --allow-read scripts/coverage-check.ts .coverage/lcov.info 75
 
 .PHONY: coverage-web
 coverage-web: ## Tests de la web con cobertura (mínimo 75 %)
@@ -197,24 +165,15 @@ coverage-web: ## Tests de la web con cobertura (mínimo 75 %)
 
 .PHONY: e2e
 e2e: seed ## Tests de extremo a extremo con Playwright (¡reinicia alumnos, grupos y profesores locales!)
-	$(PHP) bin/console app:dev:seed-demo --reset
+	$(DENO) task console app:dev:seed-demo --reset
 	$(COMPOSE) run --rm $(TTY) -e E2E_BASE_URL=$(E2E_BASE_URL) e2e
 
 .PHONY: lint
-lint: lint-api lint-deno lint-web ## Todas las comprobaciones estáticas
-
-.PHONY: lint-deno
-lint-deno: ## deno fmt, deno lint y deno check de la API en Deno
-	$(DENO) task check
+lint: lint-api lint-web ## Todas las comprobaciones estáticas
 
 .PHONY: lint-api
-lint-api: ## PHP-CS-Fixer (dry-run), PHPStan, Deptrac, contenedor y esquema
-	$(PHP) vendor/bin/php-cs-fixer fix --dry-run --diff
-	$(PHP) bin/console lint:container
-	$(PHP) vendor/bin/phpstan analyse --no-progress
-	$(PHP) vendor/bin/deptrac analyse --no-progress --report-uncovered
-	$(PHP) bin/console doctrine:schema:validate --skip-sync
-	$(PHP) bin/console doctrine:migrations:up-to-date
+lint-api: ## deno fmt (comprobación), deno lint y deno check de la API
+	$(DENO) task check
 
 .PHONY: lint-web
 lint-web: ## ESLint, Prettier, TypeScript y knip
@@ -224,18 +183,13 @@ lint-web: ## ESLint, Prettier, TypeScript y knip
 	$(NODE) npm run knip
 
 .PHONY: fix
-fix: ## Aplica los formateadores (PHP-CS-Fixer, deno fmt, ESLint --fix, Prettier)
-	$(PHP) vendor/bin/php-cs-fixer fix
+fix: ## Aplica los formateadores (deno fmt, deno lint --fix, ESLint --fix, Prettier)
 	$(DENO) task fix
 	$(NODE) npm run lint -- --fix
 	$(NODE) npm run format
 
 .PHONY: audit
-audit: audit-api audit-web ## Vulnerabilidades conocidas en dependencias
-
-.PHONY: audit-api
-audit-api:
-	$(PHP) composer audit
+audit: audit-web ## Vulnerabilidades conocidas en dependencias
 
 .PHONY: audit-web
 audit-web:

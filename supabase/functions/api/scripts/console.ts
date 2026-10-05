@@ -4,6 +4,8 @@
 //   deno task console app:user:disable|enable email@club.es
 //   deno task console app:user:role email@club.es teacher
 //   deno task console app:dev:seed-users          (solo desarrollo: usuarios con contraseñas conocidas)
+//   deno task console app:dev:seed-demo [--reset]  (solo desarrollo: datos ficticios del diseño)
+//   deno task console app:billing:generate-charges [--month=AAAA-MM]
 // Se conecta con DATABASE_URL (en local, el PostgreSQL de Compose; en producción, el pooler de Supabase).
 import { EmailAddress, FullName, InvalidValue } from '../src/domain/common/mod.ts';
 import { PlainPassword, type Role, User, UserId } from '../src/domain/identity/mod.ts';
@@ -28,7 +30,13 @@ import {
   SqlSessionRepository,
   SqlUserRepository,
 } from '../src/infrastructure/persistence/identity.ts';
-import { createDb, inTransaction, type Sql } from '../src/infrastructure/persistence/sql.ts';
+import {
+  createDb,
+  inTransaction,
+  type Sql,
+  type TransactionSql,
+} from '../src/infrastructure/persistence/sql.ts';
+import { generateCharges, seedDemoData } from './demo-data.ts';
 
 /** email => [nombre, rol, contraseña, debe cambiarla]. SOLO para desarrollo y tests. */
 export const DEVELOPMENT_USERS: Record<string, [string, Role, string, boolean]> = {
@@ -49,7 +57,7 @@ function showTemporary(temporary: string): void {
 }
 
 export async function runCommand(
-  sql: Sql,
+  sql: TransactionSql,
   hashCost: number,
   [command, ...args]: string[],
 ): Promise<number> {
@@ -102,6 +110,14 @@ export async function runCommand(
       case 'app:dev:seed-users':
         await seedDevelopmentUsers(sql, hasher, clock.now());
         return 0;
+      case 'app:dev:seed-demo':
+        console.log(await seedDemoData(sql, clock, args.includes('--reset')));
+        return 0;
+      case 'app:billing:generate-charges': {
+        const month = args.find((a) => a.startsWith('--month='))?.slice('--month='.length) ?? null;
+        console.log(await generateCharges(sql, clock, month));
+        return 0;
+      }
       default:
         console.error(`Comando desconocido: ${command ?? '(ninguno)'}`);
         return 2;

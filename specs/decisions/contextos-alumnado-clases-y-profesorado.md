@@ -15,7 +15,7 @@ La [arquitectura hexagonal](specs/decisions/arquitectura-hexagonal-ddd-en-symfon
 ## Decision
 
 - **Tres contextos acotados**: `Students`, `Classes` y `Teachers`.
-  Cada uno tiene su capa de dominio en Deptrac, que solo puede usar `DomainCommon`.
+  Cada uno tiene su capa de dominio, que solo puede usar `domain/common` (lo comprueba el test de arquitectura).
 - **La inscripción (`Enrolment`) es un agregado de `Classes`**, con fecha de inicio y de fin.
   La ocupación de un grupo cuenta las inscripciones activas en la fecha de hoy,
   y no necesita consultar el estado del alumno.

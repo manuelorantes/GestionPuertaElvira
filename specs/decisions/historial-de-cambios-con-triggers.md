@@ -2,7 +2,7 @@
 
 ## Context
 El club quiere saber quién hizo cada acción con consecuencias y poder deshacer una acción o volver a cualquier punto.
-Los cambios llegan desde muchos casos de uso, repositorios Doctrine, SQL directo (secuencias, seed) y la consola.
+Los cambios llegan desde muchos casos de uso, repositorios SQL, SQL directo (secuencias, seed) y la consola.
 
 ## Decision
 - **Captura en la base de datos**: un trigger `AFTER INSERT/UPDATE/DELETE` en cada tabla de datos del club guarda en `audit_change`
@@ -16,7 +16,7 @@ Los cambios llegan desde muchos casos de uso, repositorios Doctrine, SQL directo
   La reversión se ejecuta como una acción más (queda registrada y se puede deshacer).
 - `identity_user` se registra pero no se revierte; las sesiones, la caché y las migraciones no se registran.
 - Los documentos de facturas no se borran físicamente.
-- Doctrine ignora las tablas `audit_*` (`schema_filter`).
+- Las funciones y triggers viven en las migraciones SQL (`supabase/migrations`), como el resto del esquema.
 
 ## Consequences
 - Cada escritura cuesta una fila más en `audit_change`; para el volumen del club es despreciable.
