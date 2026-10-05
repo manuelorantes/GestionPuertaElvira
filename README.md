@@ -108,11 +108,18 @@ apps/web/src/
 Las dependencias van `Infrastructure → Application → Domain`, y Deptrac lo comprueba en CI.
 Más detalle en las [ADRs](specs/decisions/).
 
+## Migración a Deno sobre Supabase
+
+La API se está reescribiendo en TypeScript/Deno como Edge Function de Supabase
+([ADR](specs/decisions/backend-en-deno-sobre-supabase.md)), contexto a contexto y con la misma API HTTP.
+Mientras dura, conviven las dos: nginx envía a Deno (`supabase/functions/api`) los prefijos ya portados
+(`/api/auth`, `/api/health`) y el resto a PHP (`apps/api`). Tests: `make test-deno`; consola: `make deno-console`.
+
 ## Despliegue
 
-Por ahora solo en local.
-Está previsto en AWS, con un entorno de staging y otro de producción
-([ADR](specs/decisions/despliegue-en-aws-pendiente.md)).
+Por ahora solo en local. Al terminar la migración, producción será Supabase (base de datos, adjuntos y la
+Edge Function) con CloudFront delante para el mismo origen
+([ADR](specs/decisions/backend-en-deno-sobre-supabase.md)).
 
 ## Estándares de desarrollo
 
