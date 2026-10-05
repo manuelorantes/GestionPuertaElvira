@@ -36,15 +36,17 @@ Resources:
           return request;
         }
 
-  # Supabase Storage sirve el HTML de los buckets públicos como text/plain (medida de seguridad suya):
-  # se restaura el tipo correcto para index.html y las rutas de la SPA.
+  # Supabase Storage sirve el HTML de los buckets públicos como text/plain y con una CSP que lo deja en
+  # blanco (default-src 'none'; sandbox), medidas de seguridad suyas: se restaura el tipo correcto y se
+  # quita esa CSP para index.html y las rutas de la SPA. Las cabeceras de seguridad propias las pone la
+  # política de respuesta (SecurityHeadersPolicy).
   HtmlContentType:
     Type: AWS::CloudFront::Function
     Properties:
       Name: !Sub '${AWS::StackName}-html-content-type'
       AutoPublish: true
       FunctionConfig:
-        Comment: index.html como text/html
+        Comment: index.html como text/html y sin la CSP de Storage
         Runtime: cloudfront-js-2.0
       FunctionCode: |
         function handler(event) {
@@ -52,8 +54,11 @@ Resources:
           var uri = event.request.uri;
           var header = response.headers['content-type'];
           var type = header ? header.value : '';
-          if (type.indexOf('text/plain') === 0 && (uri.indexOf('.') === -1 || uri.slice(-5) === '.html')) {
-            response.headers['content-type'] = { value: 'text/html; charset=utf-8' };
+          if (uri.indexOf('.') === -1 || uri.slice(-5) === '.html') {
+            if (type.indexOf('text/plain') === 0) {
+              response.headers['content-type'] = { value: 'text/html; charset=utf-8' };
+            }
+            delete response.headers['content-security-policy'];
           }
           return response;
         }
