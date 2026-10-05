@@ -17,6 +17,7 @@ export const TEST_CONFIG: Config = {
   sessionCookieName: 'pe_session',
   sessionCookieSecure: false,
   passwordHashCost: 4,
+  documents: { kind: 'local', directory: '/tmp/puerta-elvira-test-documents' },
 };
 
 interface Shared {
@@ -88,11 +89,12 @@ export interface ApiResponse {
 export class ApiClient {
   private cookie: string | null = null;
 
-  async request(
+  /** Respuesta tal cual (p. ej. un documento descargado). */
+  async raw(
     method: string,
     path: string,
     init: RequestInit & { ip?: string } = {},
-  ): Promise<ApiResponse> {
+  ): Promise<Response> {
     const headers = new Headers(init.headers);
     headers.set('Accept', 'application/json');
     if (this.cookie !== null) headers.set('Cookie', this.cookie);
@@ -101,6 +103,15 @@ export class ApiClient {
       new Request(`http://localhost${path}`, { ...init, method, headers }),
     );
     this.remember(response);
+    return response;
+  }
+
+  async request(
+    method: string,
+    path: string,
+    init: RequestInit & { ip?: string } = {},
+  ): Promise<ApiResponse> {
+    const response = await this.raw(method, path, init);
     const text = await response.text();
     return {
       status: response.status,
