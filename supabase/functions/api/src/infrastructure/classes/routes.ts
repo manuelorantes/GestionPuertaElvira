@@ -54,7 +54,7 @@ export function groupInput(body: JsonBody): GroupInput {
     days: body.stringList('days'),
     start: body.requiredString('start'),
     end: body.requiredString('end'),
-    classroom: body.requiredInt('classroom'),
+    classroom: body.requiredString('classroom'),
     capacity: body.requiredInt('capacity'),
   };
 }

@@ -83,7 +83,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             start: '17:00',
             end: '18:00',
             slotLabel: 'Lun · 17:00–18:00',
-            classroom: 1,
+            classroom: 'alfil',
             capacity: 12,
             occupied: 3,
             weeklyPlan: 'one_hour',

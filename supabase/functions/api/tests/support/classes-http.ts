@@ -16,7 +16,7 @@ export function groupPayload(teacherId: string, overrides: Record<string, unknow
     days: ['mon', 'wed'],
     start: '17:00',
     end: '18:00',
-    classroom: 1,
+    classroom: 'alfil',
     capacity: 12,
     ...overrides,
   };

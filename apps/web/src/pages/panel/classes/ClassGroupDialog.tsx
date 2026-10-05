@@ -1,6 +1,7 @@
 import { Minus, Plus, X } from 'lucide-react';
 
 import type { ClassGroup, Teacher } from '@/features/classes/api';
+import { CLASSROOMS, classroomLabel } from '@/features/classes/classrooms';
 import { LEVEL_OPTIONS } from '@/features/classes/levels';
 import { formatHours, halfHours, WEEKDAYS } from '@/features/classes/schedule';
 import { useGroupForm } from '@/features/classes/useGroupForm';
@@ -134,14 +135,14 @@ function GroupForm({
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium">Aula</legend>
               <div className="flex gap-2">
-                {([1, 2] as const).map((classroom) => (
+                {CLASSROOMS.map((classroom) => (
                   <ToggleButton
                     key={classroom}
                     tone="ink"
                     pressed={form.values.classroom === classroom}
                     onClick={() => form.setClassroom(classroom)}
                   >
-                    Aula {classroom}
+                    {classroomLabel(classroom)}
                   </ToggleButton>
                 ))}
               </div>

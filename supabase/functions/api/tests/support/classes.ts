@@ -35,7 +35,7 @@ export interface GroupOptions {
   days?: Weekday[];
   start?: string;
   end?: string;
-  classroom?: number;
+  classroom?: string;
   capacity?: number;
   level?: Level;
   teacher?: TeacherReference;
@@ -52,7 +52,7 @@ export const GroupFactory = {
         HalfHour.fromString(options.start ?? '17:00'),
         HalfHour.fromString(options.end ?? '18:00'),
       ),
-      Classroom.of(options.classroom ?? 1),
+      Classroom.fromString(options.classroom ?? 'alfil'),
       Capacity.of(options.capacity ?? 12),
     );
   },

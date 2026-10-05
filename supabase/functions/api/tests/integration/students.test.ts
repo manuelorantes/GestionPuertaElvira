@@ -24,7 +24,7 @@ async function fixture(): Promise<Fixture> {
       days: ['mon', 'wed'],
       start: '17:00',
       end: '18:00',
-      classroom: 1,
+      classroom: 'alfil',
       capacity: 12,
     }),
     groupB: await newGroup(client, teacher, {
@@ -32,7 +32,7 @@ async function fixture(): Promise<Fixture> {
       days: ['fri'],
       start: '17:30',
       end: '19:00',
-      classroom: 2,
+      classroom: 'caballo',
       capacity: 2,
     }),
     tiny: await newGroup(client, teacher, {
@@ -40,7 +40,7 @@ async function fixture(): Promise<Fixture> {
       days: ['tue'],
       start: '16:00',
       end: '17:00',
-      classroom: 2,
+      classroom: 'caballo',
       capacity: 1,
     }),
   };
