@@ -1,6 +1,11 @@
 import { CheckHealth } from './application/health/mod.ts';
 import { ApiApp } from './infrastructure/http/app.ts';
 import { SessionCookie } from './infrastructure/http/cookie.ts';
+import { registerAccountingRoutes } from './infrastructure/accounting/routes.ts';
+import {
+  LocalDocumentStorage,
+  SupabaseDocumentStorage,
+} from './infrastructure/accounting/storage.ts';
 import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
 import { registerPayrollRoutes } from './infrastructure/payroll/routes.ts';
@@ -21,6 +26,13 @@ export interface Config {
   sessionCookieSecure: boolean;
   /** Coste de bcrypt: 10 en producción; los tests lo bajan. */
   passwordHashCost: number;
+  /** Adjuntos de facturas: carpeta local, o bucket privado de Supabase Storage en producción. */
+  documents: { kind: 'local'; directory: string } | {
+    kind: 'supabase';
+    url: string;
+    serviceKey: string;
+    bucket: string;
+  };
 }
 
 /** La configuración llega por variables de entorno (compose.yaml en local, secretos de Supabase en producción). */
@@ -35,6 +47,14 @@ export function configFromEnv(env: (name: string) => string | undefined = Deno.e
     sessionCookieName: env('SESSION_COOKIE_NAME') ?? '__Host-pe_session',
     sessionCookieSecure: (env('SESSION_COOKIE_SECURE') ?? '1') !== '0',
     passwordHashCost: Number(env('PASSWORD_HASH_COST') ?? 10),
+    documents: env('DOCUMENT_STORAGE_DIR')
+      ? { kind: 'local', directory: env('DOCUMENT_STORAGE_DIR') ?? '' }
+      : {
+        kind: 'supabase',
+        url: required('SUPABASE_URL'),
+        serviceKey: required('SUPABASE_SERVICE_ROLE_KEY'),
+        bucket: env('DOCUMENT_BUCKET') ?? 'documentos',
+      },
   };
 }
 
@@ -67,5 +87,13 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
   registerStudentRoutes(api);
   registerBillingRoutes(api);
   registerPayrollRoutes(api);
+  const storage = config.documents.kind === 'local'
+    ? new LocalDocumentStorage(config.documents.directory)
+    : new SupabaseDocumentStorage(
+      config.documents.url,
+      config.documents.serviceKey,
+      config.documents.bucket,
+    );
+  registerAccountingRoutes(api, storage);
   return api;
 }
