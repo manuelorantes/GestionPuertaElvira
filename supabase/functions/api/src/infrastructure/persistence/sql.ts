@@ -5,6 +5,7 @@ import type { DatabaseHealth } from '../../application/health/mod.ts';
 
 /** Conexión (o transacción) de postgres.js con la que trabajan los adaptadores. */
 export type Sql = postgres.Sql | postgres.TransactionSql;
+export type TransactionSql = postgres.TransactionSql;
 export type Db = postgres.Sql;
 
 /**

@@ -4,7 +4,8 @@ Aplicación de gestión del **Club Ajedrez Puerta Elvira** (Granada):
 alumnos, clases y horario, profesores y sus horas, cuotas y cobros, y contabilidad.
 Incluye también la web pública con los precios de la temporada.
 
-- `apps/api`: API JSON en Symfony 7.4 LTS (PHP 8.5) con arquitectura hexagonal.
+- `supabase/functions/api`: API JSON en TypeScript sobre Deno (Edge Function de Supabase) con arquitectura hexagonal.
+- `supabase/migrations`: esquema de la base de datos (migraciones SQL).
 - `apps/web`: SPA en React 19 + Vite + TypeScript + Tailwind.
 - PostgreSQL 17. Todo se ejecuta en Docker a través de `make`.
 
@@ -12,7 +13,7 @@ Incluye también la web pública con los precios de la temporada.
 
 - Docker con Compose v2.
 - `make`.
-- Nada más: PHP, Composer, Node y PostgreSQL viven en contenedores.
+- Nada más: Deno, Node y PostgreSQL viven en contenedores.
 
 ## Primera vez
 
@@ -20,7 +21,7 @@ Incluye también la web pública con los precios de la temporada.
 make init
 ```
 
-Construye las imágenes, instala dependencias, crea las bases de datos (desarrollo y test),
+Instala dependencias, crea las bases de datos (desarrollo y test),
 aplica migraciones e instala los hooks de git.
 Después abre <http://localhost:8080>.
 
@@ -60,20 +61,20 @@ y la persona tendrá que cambiarla al entrar.
 | Comando | Qué hace |
 |---|---|
 | `make up` / `make down` | Arranca o para el entorno |
-| `make logs ARGS=php-fpm` | Logs de un servicio |
+| `make logs ARGS=api` | Logs de un servicio |
 | `make test` | Tests de API y web |
 | `make lint` | Todas las comprobaciones estáticas |
 | `make fix` | Aplica los formateadores |
 | `make e2e` | Tests de extremo a extremo (Playwright) |
 | `make ci` | Lo mismo que GitHub Actions |
-| `make console ARGS="debug:router"` | Consola de Symfony |
+| `make migrate` | Aplica las migraciones pendientes (`make migration ARGS=nombre` crea una) |
+| `make console ARGS="app:billing:generate-charges"` | Consola de la API |
 | `make help` | Todos los objetivos |
 
 URLs locales:
 
 - Web: <http://localhost:8080>
 - API: <http://localhost:8080/api/health>
-- OpenAPI: <http://localhost:8080/api/doc.json>
 - PostgreSQL: `localhost:5432` (usuario `club`, contraseña `club`; solo desarrollo)
 
 Los puertos se cambian con `APP_PORT` y `DB_PORT`.
@@ -95,30 +96,28 @@ con las adaptaciones de [`FRAMEWORK.local.md`](FRAMEWORK.local.md).
 ## Arquitectura
 
 ```
-apps/api/src/
-  Domain/          reglas de negocio puras (sin framework)
-  Application/     casos de uso y puertos
-  Infrastructure/  HTTP, Doctrine, Symfony, logging
+supabase/functions/api/
+  index.ts           arranque de la Edge Function
+  src/domain/        reglas de negocio puras (sin framework), un directorio por contexto
+  src/application/   casos de uso y puertos
+  src/infrastructure/ HTTP (Hono), SQL (postgres.js), almacenamiento, historial, logging
+  scripts/           consola (cuentas, semillas, cuotas) y migraciones
+  tests/             tests por capa (domain, application, integration) y de arquitectura
+supabase/migrations/ esquema SQL (lo aplica `make migrate` en local y la CLI de Supabase en producción)
 apps/web/src/
   app/             arranque, proveedores y rutas
   pages/           pantallas
   shared/          cliente de API, UI común
 ```
 
-Las dependencias van `Infrastructure → Application → Domain`, y Deptrac lo comprueba en CI.
-Más detalle en las [ADRs](specs/decisions/).
-
-## Migración a Deno sobre Supabase
-
-La API se está reescribiendo en TypeScript/Deno como Edge Function de Supabase
-([ADR](specs/decisions/backend-en-deno-sobre-supabase.md)), contexto a contexto y con la misma API HTTP.
-Mientras dura, conviven las dos: nginx envía a Deno (`supabase/functions/api`) los prefijos ya portados
-(`/api/auth`, `/api/health`, `/api/admin/teachers`, `/api/admin/groups`, `/api/admin/students`, `/api/admin/billing`, `/api/admin/payroll`, `/api/admin/accounting`, `/api/admin/audit`, `/api/admin/import`, `/api/admin/dashboard`, `/api/public`): toda la API ya está en Deno y PHP solo queda hasta retirar sus semillas y migraciones (`apps/api`). Tests: `make test-deno`; consola: `make deno-console`.
+Las dependencias van `infrastructure → application → domain`, y un test de arquitectura lo comprueba en CI.
+Más detalle en las [ADRs](specs/decisions/), empezando por
+[Backend en Deno sobre Supabase](specs/decisions/backend-en-deno-sobre-supabase.md).
 
 ## Despliegue
 
-Por ahora solo en local. Al terminar la migración, producción será Supabase (base de datos, adjuntos y la
-Edge Function) con CloudFront delante para el mismo origen
+Por ahora solo en local. Producción será Supabase (base de datos, adjuntos y la Edge Function)
+con CloudFront delante para el mismo origen
 ([ADR](specs/decisions/backend-en-deno-sobre-supabase.md)).
 
 ## Estándares de desarrollo
@@ -128,6 +127,6 @@ Edge Function) con CloudFront delante para el mismo origen
 | Revisión | PR obligatorio + CI en verde (0 aprobaciones mientras haya un solo desarrollador) |
 | Cobertura | ≥ 75 % de líneas en API y web |
 | E2E | Smoke de Playwright en cada PR |
-| Lint | PHPStan nivel máximo, Deptrac, ESLint strict, Prettier, knip: cero errores |
-| Seguridad | `composer audit` y `npm audit` (alta/crítica) en CI; sin secretos en el repo |
+| Lint | `deno lint`, `deno check` estricto, test de arquitectura, ESLint strict, Prettier, knip: cero errores |
+| Seguridad | `npm audit` (alta/crítica) en CI; sin secretos en el repo |
 | Despliegue | Pendiente |

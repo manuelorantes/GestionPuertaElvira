@@ -1,8 +1,0 @@
-framework:
-    cache:
-        # Almacén compartido en PostgreSQL: el limitador de intentos debe valer igual
-        # con varios procesos PHP o en Lambda (ver plan de autenticación).
-        default_doctrine_dbal_provider: doctrine.dbal.default_connection
-        pools:
-            cache.rate_limiter:
-                adapter: cache.adapter.doctrine_dbal

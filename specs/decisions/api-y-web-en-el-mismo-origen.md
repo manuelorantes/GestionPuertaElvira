@@ -10,7 +10,7 @@ cookies `SameSite=None` y más superficie de ataque CSRF.
 
 La web y la API se sirven desde el mismo origen:
 
-- En local, nginx (`http://localhost:8080`) envía `/api/*` a php-fpm
+- En local, nginx (`http://localhost:8080`) envía `/api/*` a la API en Deno
   y el resto al servidor de desarrollo de Vite.
 - En producción, el mismo reparto lo hará el CDN o el balanceador
   (por ejemplo, CloudFront con dos orígenes).

@@ -1,16 +1,7 @@
 version: 2
 updates:
-  - package-ecosystem: composer
-    directory: /apps/api
-    schedule: { interval: weekly }
-    target-branch: staging
-    groups:
-      symfony: { patterns: ['symfony/*'] }
-      quality: { patterns: ['phpstan/*', 'friendsofphp/*', 'deptrac/*', 'phpunit/*'] }
-    ignore:
-      # El proyecto usa Symfony 7.4 LTS; el salto a Symfony 8 será una migración completa y decidida.
-      - dependency-name: 'symfony/*'
-        update-types: ['version-update:semver-major']
+  # La API en Deno declara sus dependencias en supabase/functions/api/deno.json (JSR y npm):
+  # Dependabot aún no las gestiona; se revisan a mano con `deno outdated` desde `make sh`.
   - package-ecosystem: npm
     directory: /apps/web
     schedule: { interval: weekly }
@@ -32,7 +23,7 @@ updates:
     directory: /
     schedule: { interval: monthly }
     target-branch: staging
-  - package-ecosystem: docker
-    directory: /docker/php
+  - package-ecosystem: docker-compose
+    directory: /
     schedule: { interval: monthly }
     target-branch: staging

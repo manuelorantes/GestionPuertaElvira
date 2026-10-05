@@ -36,13 +36,14 @@ del historial) y la API HTTP que consume la web (rutas, JSON, códigos de error 
   ([API y web en el mismo origen](specs/decisions/api-y-web-en-el-mismo-origen.md) sigue vigente).
 - **En local**, la función se ejecuta con Deno (`deno serve`) contra el PostgreSQL de Compose; no hace falta la
   pila completa de Supabase. nginx reparte `/api/*` a Deno.
-- **Migración por contextos**, cada uno en su PR a `staging`: mientras dura, nginx envía a Deno solo los prefijos ya
-  portados y el resto a PHP, y los tests de Playwright son la prueba de equivalencia. Al terminar se elimina `apps/api`.
+- **Migración por contextos**, cada uno en su PR a `staging`: mientras duró, nginx envió a Deno solo los prefijos ya
+  portados y el resto a PHP, con los tests de Playwright como prueba de equivalencia. Terminada (octubre de 2026),
+  `apps/api` se eliminó y el esquema quedó volcado en `supabase/migrations/20261005000000_esquema_inicial.sql`.
 - Calidad: `deno fmt`, `deno lint`, `deno check`, tests de Deno por capa con cobertura ≥ 75 %, test de arquitectura.
 
 ## Consequences
 
-- Los 370 tests de PHPUnit se reescriben en Deno siguiendo los mismos casos; mientras conviven, CI ejecuta ambos.
+- Los 370 tests de PHPUnit se reescribieron en Deno siguiendo los mismos casos (más los de arquitectura y HTTP).
 - Las Edge Functions limitan el tiempo de CPU por petición (2 s en el plan gratuito): las operaciones pesadas
   (generar cuotas, volver a un punto) se apoyan en SQL, no en bucles en memoria.
 - Supabase gratis pausa el proyecto tras 7 días sin uso; un workflow programado consulta `/api/health`.

@@ -1,32 +1,7 @@
 # Entorno local. Todo se lanza a través del Makefile (make help).
 name: puerta-elvira
 
-x-api-env: &api-env
-  APP_ENV: ${APP_ENV:-dev}
-  APP_DEBUG: ${APP_DEBUG:-1}
-  APP_SECRET: ${APP_SECRET:-dev-secret-not-for-production}
-  DEFAULT_URI: http://localhost:${APP_PORT:-8080}
-  DATABASE_URL: postgresql://club:club@postgres:5432/club?serverVersion=17&charset=utf8
-  # En producción: __Host-pe_session y Secure=1 (exige HTTPS).
-  SESSION_COOKIE_NAME: pe_session
-  SESSION_COOKIE_SECURE: "0"
-
 services:
-  php-fpm:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-      target: dev
-    image: puerta-elvira/php:dev
-    user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
-    environment: *api-env
-    volumes:
-      - ./:/app
-      - composer-cache:/tmp/composer
-    depends_on:
-      postgres:
-        condition: service_healthy
-
   # API en Deno (la Edge Function de Supabase, ejecutada tal cual contra el PostgreSQL local).
   api:
     image: denoland/deno:2.9.7
@@ -38,7 +13,7 @@ services:
       DENO_DIR: /tmp/deno
       PORT: "8000"
       DATABASE_URL: postgresql://club:club@postgres:5432/club
-      TEST_DATABASE_URL: postgresql://club:club@postgres:5432/club_test_deno
+      TEST_DATABASE_URL: postgresql://club:club@postgres:5432/club_test
       # En producción: __Host-pe_session y Secure (exige HTTPS).
       SESSION_COOKIE_NAME: pe_session
       SESSION_COOKIE_SECURE: "0"
@@ -57,11 +32,9 @@ services:
     image: nginx:1.27-alpine
     volumes:
       - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./apps/api/public:/app/apps/api/public:ro
     ports:
       - "${APP_PORT:-8080}:80"
     depends_on:
-      - php-fpm
       - api
       - vite
 
@@ -110,4 +83,3 @@ services:
 
 volumes:
   postgres-data:
-  composer-cache:

@@ -1,6 +1,6 @@
 # Despliegue en AWS pendiente
 
-**Estado:** propuesto. Por ahora el proyecto solo funciona en local.
+**Estado:** sustituida por [Backend en Deno sobre Supabase](specs/decisions/backend-en-deno-sobre-supabase.md): producción será Supabase con CloudFront delante, no AWS.
 
 ## Context
 
