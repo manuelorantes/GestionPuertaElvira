@@ -13,7 +13,7 @@ const GROUPS = [
     start: '17:00',
     end: '18:00',
     slotLabel: 'Lun y Mié · 17:00–18:00',
-    classroom: 1,
+    classroom: 'alfil',
     capacity: 12,
     occupied: 11,
     weeklyPlan: 'two_hours',
@@ -21,13 +21,13 @@ const GROUPS = [
   {
     id: 'g2',
     name: 'Peques B',
-    level: 'juniors',
+    level: 'beginner',
     teacher: { id: 't1', fullName: 'Lucía Moreno Gil' },
     days: ['tue'],
     start: '16:00',
     end: '17:00',
     slotLabel: 'Mar · 16:00–17:00',
-    classroom: 2,
+    classroom: 'caballo',
     capacity: 1,
     occupied: 1,
     weeklyPlan: 'one_hour',
@@ -69,7 +69,7 @@ const DETAIL = {
       name: 'Iniciación A',
       slotLabel: 'Lun y Mié · 17:00–18:00',
       teacherName: 'Lucía Moreno Gil',
-      classroom: 1,
+      classroom: 'alfil',
     },
   ],
   siblings: [{ id: 's3', fullName: 'Pablo López Herrera' }],
@@ -140,7 +140,7 @@ describe('Alumnos', () => {
       'tel:612481930',
     );
     expect(within(card).getByText('Pablo López Herrera')).toBeVisible();
-    expect(within(card).getByText('Aula 1 · Lucía Moreno Gil')).toBeVisible();
+    expect(within(card).getByText('Aula Alfil · Lucía Moreno Gil')).toBeVisible();
   });
 
   it('should manage billing preferences, points and history from the student card', async () => {

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { classroomLabel } from '@/features/classes/classrooms';
 import type { ClassGroup } from '@/features/classes/api';
 import { useGroup } from '@/features/classes/hooks';
 import { LEVELS, WEEKLY_PLAN_LABEL } from '@/features/classes/levels';
@@ -83,7 +84,7 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
               {g.name}
             </h2>
             <p className="text-sm text-ink-muted">
-              {g.slotLabel} · Aula {g.classroom}
+              {g.slotLabel} · {classroomLabel(g.classroom)}
             </p>
             <p className="text-sm text-ink-muted">
               {g.teacher.fullName} · {WEEKLY_PLAN_LABEL[g.weeklyPlan]}

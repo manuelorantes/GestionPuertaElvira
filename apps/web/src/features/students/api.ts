@@ -30,7 +30,7 @@ export interface StudentDetail {
   joinedOn: string;
   withdrawnOn: string | null;
   status: 'active' | 'withdrawn';
-  groups: { id: string; name: string; slotLabel: string; teacherName: string; classroom: number }[];
+  groups: { id: string; name: string; slotLabel: string; teacherName: string; classroom: string }[];
   siblings: { id: string; fullName: string }[];
 }
 

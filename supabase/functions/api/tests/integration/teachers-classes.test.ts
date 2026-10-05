@@ -73,7 +73,7 @@ Deno.test('groups should be created and shown in the schedule, then updated', as
       start: '17:00',
       end: '18:00',
       slotLabel: 'Lun y Mié · 17:00–18:00',
-      classroom: 1,
+      classroom: 'alfil',
       capacity: 12,
       occupied: 0,
       weeklyPlan: 'two_hours',

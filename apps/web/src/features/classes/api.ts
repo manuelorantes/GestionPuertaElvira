@@ -1,7 +1,8 @@
 import { apiGet, apiSend } from '@/shared/api/client';
 
-export type Level =
-  'beginner' | 'intermediate' | 'advanced' | 'juniors' | 'adults' | 'private_lesson';
+export type Level = 'beginner' | 'intermediate' | 'advanced' | 'private_lesson';
+/** Las tres aulas del club, con nombre de pieza. */
+export type Classroom = 'alfil' | 'caballo' | 'peon';
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
 export type WeeklyPlan =
   'one_hour' | 'hour_and_half' | 'two_hours' | 'three_hours' | 'private_lesson';
@@ -15,7 +16,7 @@ export interface ClassGroup {
   start: string;
   end: string;
   slotLabel: string;
-  classroom: 1 | 2;
+  classroom: Classroom;
   capacity: number;
   occupied: number;
   weeklyPlan: WeeklyPlan;
@@ -36,7 +37,7 @@ export interface GroupPayload {
   days: Weekday[];
   start: string;
   end: string;
-  classroom: 1 | 2;
+  classroom: Classroom;
   capacity: number;
 }
 

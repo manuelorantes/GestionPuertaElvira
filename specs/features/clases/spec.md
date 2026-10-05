@@ -1,12 +1,12 @@
 # Clases
 
-Grupos de clase del club, su horario semanal en las dos aulas y su ocupación.
+Grupos de clase del club, su horario semanal en las tres aulas (Alfil, Caballo y Peón) y su ocupación.
 Solo administración puede verlos y gestionarlos.
 
 ### Requirement: Grupos
-Cada grupo MUST tener nombre (2–60 caracteres), nivel, profesor activo,
-uno o más días de lunes a viernes, hora de inicio y de fin entre las 16:00 y las 21:00 en medias horas,
-aula (1 o 2) y plazas (1–30).
+Cada grupo MUST tener nombre (2–60 caracteres), nivel (iniciación, intermedio, avanzado o particular),
+profesor activo, uno o más días de lunes a viernes, hora de inicio y de fin entre las 16:00 y las 21:00
+en medias horas, aula (Alfil, Caballo o Peón) y plazas (1–30).
 
 #### Scenario: Alta de un grupo válido
 - **WHEN** administración crea un grupo con todos sus datos válidos
@@ -32,8 +32,8 @@ Dos grupos seguidos (uno termina cuando empieza el otro) no coinciden.
 - **WHEN** un grupo nuevo o editado coincide en aula, día y hora con otro
 - **THEN** el sistema no lo guarda e indica con qué grupo coincide y en qué horario
 
-#### Scenario: Misma hora en la otra aula
-- **WHEN** un grupo coincide en día y hora con otro, pero en la otra aula
+#### Scenario: Misma hora en otra aula
+- **WHEN** un grupo coincide en día y hora con otro, pero en otra aula
 - **THEN** el sistema lo guarda
 
 ### Requirement: Modalidad por horas semanales
@@ -51,7 +51,7 @@ con su nombre, horas, profesor y ocupación, coloreado por nivel y con una leyen
 
 #### Scenario: Consultar el horario
 - **WHEN** administración abre «Clases»
-- **THEN** ve el horario semanal de las dos aulas y puede abrir cualquier grupo para editarlo
+- **THEN** ve el horario semanal de las tres aulas y puede abrir cualquier grupo para editarlo
 
 ### Requirement: Ocupación
 La ocupación de un grupo MUST ser el número de inscripciones activas en la fecha actual frente a sus plazas.

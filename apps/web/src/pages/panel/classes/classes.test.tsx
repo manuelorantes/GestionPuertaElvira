@@ -19,7 +19,7 @@ const GROUP = {
   start: '17:00',
   end: '18:00',
   slotLabel: 'Lun y Mié · 17:00–18:00',
-  classroom: 1,
+  classroom: 'alfil',
   capacity: 12,
   occupied: 13,
   weeklyPlan: 'two_hours',
@@ -40,11 +40,11 @@ describe('Clases', () => {
     renderApp('/panel/clases');
 
     expect(await screen.findByRole('heading', { name: 'Clases' })).toBeVisible();
-    expect(await screen.findByText('Lunes a viernes · 2 aulas · 1 grupos')).toBeVisible();
+    expect(await screen.findByText('Lunes a viernes · 3 aulas · 1 grupos')).toBeVisible();
     const blocks = await screen.findAllByRole('button', { name: /iniciación a/i });
     expect(blocks).toHaveLength(2);
     expect(blocks[0]).toHaveTextContent('Lucía Moreno · 13/12');
-    expect(screen.getByText('Peques y jóvenes')).toBeVisible();
+    expect(screen.getByText('Particulares')).toBeVisible();
   });
 
   it('should list groups with level, schedule, plan and an over capacity warning', async () => {
@@ -105,7 +105,7 @@ describe('Clases', () => {
       days: ['mon'],
       start: '17:00',
       end: '18:00',
-      classroom: 1,
+      classroom: 'alfil',
       capacity: 12,
     });
   });

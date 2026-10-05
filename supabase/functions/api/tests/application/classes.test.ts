@@ -45,7 +45,7 @@ function management() {
     days: ['mon', 'wed'],
     start: '17:00',
     end: '18:00',
-    classroom: 1,
+    classroom: 'alfil',
     capacity: 12,
     ...overrides,
   });
@@ -67,7 +67,7 @@ Deno.test('CreateClassGroup should reject a classroom clash naming the other gro
   const conflict = await assertRejects(() => create(input()), ClassroomConflict);
   assertEquals(conflict.details().groupName, 'Intermedio A');
   assertEquals(conflict.details().slotLabel, 'Lun y Mié · 17:30–19:00');
-  await create(input({ classroom: 2 }));
+  await create(input({ classroom: 'caballo' }));
   assertEquals((await groups.all()).length, 2);
 });
 
@@ -109,7 +109,7 @@ function enrolling() {
     days: Weekday[],
     start: string,
     end: string,
-    classroom = 1,
+    classroom = 'alfil',
     capacity = 12,
   ): Promise<ClassGroup> => {
     const g = GroupFactory.group({ days, start, end, classroom, name, capacity });
@@ -125,7 +125,7 @@ function enrolling() {
 Deno.test('EnrolStudent should enrol today and refuse overlapping groups', async () => {
   const { enrolments, student, today, group, enrol } = enrolling();
   const first = await group('Iniciación A', [1], '17:00', '18:00');
-  const second = await group('Particular', [1], '17:30', '18:30', 2);
+  const second = await group('Particular', [1], '17:30', '18:30', 'caballo');
   await enrol.execute(student, first.id.value, false);
   assertEquals(await enrolments.activeCount(first.id, today), 1);
   await assertRejects(() => enrol.execute(student, second.id.value, false), StudentScheduleOverlap);
@@ -133,7 +133,7 @@ Deno.test('EnrolStudent should enrol today and refuse overlapping groups', async
 
 Deno.test('EnrolStudent should ask for confirmation when full and accept it when confirmed', async () => {
   const { enrolments, student, today, group, enrol } = enrolling();
-  const tiny = await group('Particular', [5], '17:30', '19:00', 1, 1);
+  const tiny = await group('Particular', [5], '17:30', '19:00', 'alfil', 1);
   await enrol.execute(StudentReference.generate().value, tiny.id.value, false);
   await assertRejects(() => enrol.execute(student, tiny.id.value, false), GroupFull);
   await enrol.execute(student, tiny.id.value, true);
@@ -158,7 +158,7 @@ Deno.test('UnenrolStudent should leave one group when another remains, keep the 
 Deno.test('MoveStudent should move atomically ignoring the group being left for overlaps', async () => {
   const { groups, enrolments, clock, transactions, student, today, group, enrol } = enrolling();
   const from = await group('Iniciación A', [1], '17:00', '18:00');
-  const to = await group('Iniciación C', [1], '17:00', '18:00', 2);
+  const to = await group('Iniciación C', [1], '17:00', '18:00', 'caballo');
   await enrol.execute(student, from.id.value, false);
   await new MoveStudent(groups, enrolments, clock, transactions).execute(
     student,

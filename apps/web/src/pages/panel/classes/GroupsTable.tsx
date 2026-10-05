@@ -1,6 +1,7 @@
 import { Pencil } from 'lucide-react';
 
 import type { ClassGroup } from '@/features/classes/api';
+import { classroomLabel } from '@/features/classes/classrooms';
 import { LEVELS, WEEKLY_PLAN_LABEL } from '@/features/classes/levels';
 import { Card } from '@/shared/ui/Card';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
@@ -48,7 +49,7 @@ export function GroupsTable({
                 <p>{group.slotLabel}</p>
                 <p className="text-xs text-ink-muted">{WEEKLY_PLAN_LABEL[group.weeklyPlan]}</p>
               </td>
-              <td className="px-4 py-3">Aula {group.classroom}</td>
+              <td className="px-4 py-3">{classroomLabel(group.classroom)}</td>
               <td className="px-4 py-3">
                 <OccupancyBar occupied={group.occupied} capacity={group.capacity} />
               </td>

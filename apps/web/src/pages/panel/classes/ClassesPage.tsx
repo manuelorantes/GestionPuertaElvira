@@ -53,7 +53,7 @@ export function ClassesPage() {
   return (
     <main className="mx-auto max-w-[1280px] px-4 py-6 md:px-8 md:py-8">
       <SectionHeader
-        eyebrow={`Lunes a viernes · 2 aulas · ${groupList.length} grupos`}
+        eyebrow={`Lunes a viernes · 3 aulas · ${groupList.length} grupos`}
         title="Clases"
         action={{
           label: 'Nuevo grupo',

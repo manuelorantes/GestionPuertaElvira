@@ -17,7 +17,7 @@ const GROUPS = [
     start: '17:00',
     end: '18:00',
     slotLabel: 'Lun y Mié · 17:00–18:00',
-    classroom: 1,
+    classroom: 'alfil',
     capacity: 12,
     occupied: 10,
     weeklyPlan: 'two_hours',
