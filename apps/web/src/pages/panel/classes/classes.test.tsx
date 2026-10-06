@@ -50,6 +50,27 @@ describe('Clases', () => {
     expect(screen.getByText('Particulares')).toBeVisible();
   });
 
+  it('shows a single classroom with full details when it is selected', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/clases');
+
+    const [block] = await screen.findAllByRole('button', { name: /iniciación a/i });
+    expect(block).not.toHaveTextContent('17:00');
+
+    await user.click(screen.getByRole('button', { name: 'Aula Alfil' }));
+    const detailed = await screen.findAllByRole('button', { name: /iniciación a/i });
+    expect(detailed[0]).toHaveTextContent('Iniciación');
+    expect(detailed[0]).toHaveTextContent('17:00–18:00');
+    expect(detailed[0]).toHaveTextContent('Lucía Moreno Gil · 13/12');
+
+    await user.click(screen.getByRole('button', { name: 'Aula Peón' }));
+    expect(screen.queryByRole('button', { name: /iniciación a/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Todas' }));
+    expect(await screen.findAllByRole('button', { name: /iniciación a/i })).toHaveLength(2);
+  });
+
   it('should list groups with level, schedule, plan and an over capacity warning', async () => {
     const user = userEvent.setup();
     api();

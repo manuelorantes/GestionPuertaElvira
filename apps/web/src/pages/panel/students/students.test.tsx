@@ -451,6 +451,10 @@ describe('ficha de grupo', () => {
     const panel = await screen.findByRole('dialog', { name: 'Iniciación A' });
     expect(within(panel).getByText('Martina López Herrera')).toBeVisible();
 
+    await user.type(within(panel).getByLabelText('Buscar alumno'), 'villar');
+    expect(
+      within(panel).getByRole('option', { name: /Elige un alumno \(1\)/ }),
+    ).toBeInTheDocument();
     await user.selectOptions(within(panel).getByLabelText('Inscribir alumno'), 's4');
     await user.click(within(panel).getByRole('button', { name: 'Inscribir' }));
 
