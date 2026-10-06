@@ -291,6 +291,29 @@ Deno.test({
     );
     assertEquals(ledger.items.find((i) => i.sourceId === payment)?.method, 'cash');
 
+    const firstOfMonth = `${today.slice(0, 7)}-01`;
+    const moved = await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/date`, {
+      date: firstOfMonth,
+    });
+    assertEquals(moved.status, 204, JSON.stringify(moved.body));
+    const corrected = await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/amount`, {
+      amountCents: 6000,
+      reason: 'Incluye el carné',
+    });
+    assertEquals(corrected.status, 204, JSON.stringify(corrected.body));
+    const after = body<{ paidOn: string; totalCents: number; lines: { label: string }[] }>(
+      await fx.client.get(`/api/admin/billing/payments/${payment}`),
+    );
+    assertEquals([after.paidOn, after.totalCents], [firstOfMonth, 6000]);
+    assertEquals(after.lines.at(-1)?.label, 'Corrección: Incluye el carné');
+    assertError(
+      await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/date`, {
+        date: '2099-01-01',
+      }),
+      422,
+      'unprocessable',
+    );
+
     assertError(
       await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/method`, {
         method: 'bizum',

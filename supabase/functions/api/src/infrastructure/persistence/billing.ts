@@ -276,7 +276,8 @@ export class SqlPaymentRepository implements PaymentRepository {
       invoice: invoice === null ? null : this.sql.json(invoiceData(invoice)),
     };
     await this.sql`INSERT INTO billing_payment ${this.sql(record)}
-      ON CONFLICT (id) DO UPDATE SET method = EXCLUDED.method,
+      ON CONFLICT (id) DO UPDATE SET method = EXCLUDED.method, paid_on = EXCLUDED.paid_on,
+        lines = EXCLUDED.lines, total_cents = EXCLUDED.total_cents,
         invoice_number = EXCLUDED.invoice_number, invoice = EXCLUDED.invoice`;
   }
 }
