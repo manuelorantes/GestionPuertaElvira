@@ -1,6 +1,6 @@
 import { ApiError, apiGet, apiSend } from '@/shared/api/client';
 
-export type Role = 'superadministrator' | 'administrator' | 'teacher';
+export type Role = 'superadministrator' | 'administrator' | 'teacher' | 'assistant';
 
 export interface SessionUser {
   id: string;
@@ -40,4 +40,5 @@ export const ROLE_LABEL: Record<Role, string> = {
   superadministrator: 'Superadministración',
   administrator: 'Administración',
   teacher: 'Profesorado',
+  assistant: 'Asistente',
 };

@@ -187,12 +187,18 @@ function enforceJsonPolicy(c: ApiContext, options: RouteOptions): void {
   if (!/^application\/([a-z0-9.+-]+\+)?json\b/i.test(contentType)) throw httpError(415);
 }
 
+/** Roles con acceso de administración (el asistente actúa en nombre de la junta). */
+const ADMIN_ROLES: ReadonlySet<string> = new Set([
+  'administrator',
+  'superadministrator',
+  'assistant',
+]);
+
 function enforceAccess(user: AuthenticatedUser | null, options: RouteOptions): void {
   if (options.access === 'public') return;
   if (user === null) throw httpError(401);
   const allowed = options.access === 'user' ||
-    (options.access === 'admin' &&
-      (user.role === 'administrator' || user.role === 'superadministrator')) ||
+    (options.access === 'admin' && ADMIN_ROLES.has(user.role)) ||
     (options.access === 'superadmin' && user.role === 'superadministrator');
   if (!allowed) throw httpError(403);
   if (user.mustChangePassword && !options.allowWithTemporaryPassword) {

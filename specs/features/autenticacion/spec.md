@@ -91,10 +91,17 @@ y su titular MUST elegir una nueva antes de usar el panel.
 - **THEN** entra al panel con normalidad
 
 ### Requirement: Roles
-Cada cuenta MUST tener un rol: superadministración, administración o profesorado.
+Cada cuenta MUST tener un rol: superadministración, administración, profesorado o asistente.
 Las secciones reservadas a administración MUST rechazar al profesorado.
 Superadministración puede todo lo que puede administración y, además, es la única que accede al historial
-(ver quién hizo qué, deshacer y volver a un punto).
+(ver quién hizo qué, deshacer y volver a un punto) y a la importación de hojas de cálculo.
+El asistente es la cuenta con la que la inteligencia artificial consulta y cambia datos a petición de la
+junta: MUST tener los mismos permisos que administración (ni historial ni importación) y todo lo que hace
+MUST quedar en el historial a su nombre, como el resto de cuentas.
+
+#### Scenario: Asistente en el historial
+- **WHEN** la cuenta de asistente intenta acceder al historial
+- **THEN** el sistema se lo impide indicando que no tiene permiso
 
 #### Scenario: Profesorado en una sección de administración
 - **WHEN** una cuenta de profesorado intenta acceder a una sección reservada a administración

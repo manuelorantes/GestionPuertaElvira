@@ -22,6 +22,7 @@ Deno.test('Role should parse known roles and reject unknown ones', () => {
   assertEquals(roleFromName('superadministrator'), 'superadministrator');
   assertEquals(roleFromName('administrator'), 'administrator');
   assertEquals(roleFromName('teacher'), 'teacher');
+  assertEquals(roleFromName('assistant'), 'assistant');
   assertThrows(() => roleFromName('superuser'), InvalidValue);
 });
 

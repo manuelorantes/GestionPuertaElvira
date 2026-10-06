@@ -89,6 +89,9 @@ docker compose run --rm --no-deps -e DATABASE_URL='postgresql://...' api \
 
 La contraseña temporal se muestra una sola vez; habrá que cambiarla al entrar.
 
+La cuenta con la que la inteligencia artificial usa la aplicación (rol `assistant`) se explica en
+[asistente.md](./asistente.md).
+
 ## Mantener el proyecto activo
 
 Supabase pausa los proyectos gratuitos tras una semana sin peticiones. El workflow
