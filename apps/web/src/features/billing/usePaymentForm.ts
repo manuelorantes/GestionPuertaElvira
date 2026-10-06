@@ -77,7 +77,8 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     redeemPoints: points,
   };
   // Se espera a una pausa en la escritura comparando el texto de la petición (un objeto nuevo en cada render no se asentaría nunca).
-  const requestKey = JSON.stringify(request);
+  // La forma de pago no cambia el importe: no entra en la cotización (cambiarla no recalcula nada).
+  const requestKey = JSON.stringify({ ...request, method: 'cash' });
   const debouncedKey = useDebouncedValue(requestKey, 250);
   const debounced = useMemo(() => JSON.parse(debouncedKey) as api.PaymentRequest, [debouncedKey]);
   const ready = Boolean(debounced.studentId) && Boolean(debounced.date) && debounced.months > 0;
