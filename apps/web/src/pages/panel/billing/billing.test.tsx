@@ -190,6 +190,27 @@ describe('Cobros y cuotas', () => {
     });
   });
 
+  it('does not quote again when only the payment method changes', async () => {
+    const fetch = api();
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const row = within(await screen.findByRole('table')).getByRole('row', { name: /Martina/ });
+    await userEvent.click(within(row).getByRole('button', { name: 'Cobrar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' });
+    expect(await within(dialog).findByText('40,50 €')).toBeInTheDocument();
+    const quotesBefore = fetch.mock.calls.filter(
+      ([url]) => url === '/api/admin/billing/quote',
+    ).length;
+
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Datáfono' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Transferencia' }));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/admin/billing/quote')).toHaveLength(
+      quotesBefore,
+    );
+    expect(within(dialog).getByText('40,50 €')).toBeInTheDocument();
+  });
+
   it('proposes the membership fee for a member without classes', async () => {
     api({
       'GET /api/admin/billing/accounts/s1': [
