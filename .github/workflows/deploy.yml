@@ -37,18 +37,28 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       - name: Secretos de la función
+        # La API de gestión de Supabase falla a ratos (500, «FGA Authentication Error»): se reintenta.
         run: |
-          supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
-            DATABASE_URL="$DATABASE_URL" \
-            SESSION_COOKIE_NAME=__Host-pe_session \
-            SESSION_COOKIE_SECURE=1 \
-            DOCUMENT_BUCKET=documentos
+          for intento in 1 2 3 4 5; do
+            supabase secrets set --project-ref "$SUPABASE_PROJECT_REF" \
+              DATABASE_URL="$DATABASE_URL" \
+              SESSION_COOKIE_NAME=__Host-pe_session \
+              SESSION_COOKIE_SECURE=1 \
+              DOCUMENT_BUCKET=documentos && exit 0
+            echo "Intento $intento fallido; espero 20 s"; sleep 20
+          done
+          exit 1
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
           DATABASE_URL: ${{ secrets.SUPABASE_POOLER_URL }}
       - name: Edge Function
-        run: supabase functions deploy api --project-ref "$SUPABASE_PROJECT_REF" --use-api
+        run: |
+          for intento in 1 2 3; do
+            supabase functions deploy api --project-ref "$SUPABASE_PROJECT_REF" --use-api && exit 0
+            echo "Intento $intento fallido; espero 20 s"; sleep 20
+          done
+          exit 1
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
@@ -70,7 +80,8 @@ jobs:
         # La API REST de Storage con x-upsert sobrescribe; la CLI no (409) y detecta mal el tipo del HTML.
         # La clave de servicio se obtiene con el token de la CLI y nunca se imprime.
         run: |
-          key=$(curl -fsS -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+          key=$(curl -fsS --retry 5 --retry-all-errors --retry-delay 10 \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/api-keys?reveal=true" \
             | jq -r '.[] | select(.name == "service_role") | .api_key')
           test -n "$key" || { echo "::error::No se pudo obtener la clave de servicio"; exit 1; }
@@ -91,7 +102,7 @@ jobs:
               *.json|*.webmanifest|*.map) type=application/json ;;
               *) type=application/octet-stream ;;
             esac
-            curl -fsS -o /dev/null -X POST "$storage/object/$WEB_BUCKET/$1" \
+            curl -fsS --retry 3 --retry-all-errors --retry-delay 5 -o /dev/null -X POST "$storage/object/$WEB_BUCKET/$1" \
               -H "Authorization: Bearer $key" -H "x-upsert: true" \
               -H "Content-Type: $type" -H "Cache-Control: $2" --data-binary "@$1"
             echo "subido $1 ($type)"
