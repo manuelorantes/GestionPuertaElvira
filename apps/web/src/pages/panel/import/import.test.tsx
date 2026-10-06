@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
 const SHEET =
   ',Cuota Anual,Septiembre,Octubre,Fecha Nacimiento,Madre ó Padre,Telefono,e-mail\nHector Perez Ratkovsky,50,55,55,19/9/2016,Lenka,699615279,lenka@ejemplo.com\nJulio Requena Montenegro,50,20,,7/2/17,Torcuato,690666005,torcuato@ejemplo.com\nHector Perez,,30,,11/8/2017,Luis,678810154,luis@ejemplo.com';
@@ -72,7 +72,7 @@ const result = (overrides: Record<string, unknown>) => ({
 
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
-    'GET /api/auth/me': [200, { user: ADMIN }],
+    'GET /api/auth/me': [200, { user: SUPERADMIN }],
     'GET /api/admin/groups': [
       200,
       {
@@ -152,6 +152,32 @@ function sentRows(fetch: ReturnType<typeof api>) {
 }
 
 describe('Importar hoja', () => {
+  it('sends a plain administrator back to the summary', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/dashboard': [
+        200,
+        {
+          month: '2026-10',
+          today: '2026-10-04',
+          collectedCents: 0,
+          expectedCents: 0,
+          pendingCents: 0,
+          expensesCents: 0,
+          activeStudents: 0,
+          registeredStudents: 0,
+          chart: [],
+          occupancy: { percent: 0, fullGroups: 0, emptiest: [] },
+          overdue: [],
+          latest: [],
+        },
+      ],
+    });
+    renderApp('/panel/importar');
+    expect(await screen.findByRole('heading', { name: 'Resumen del club' })).toBeInTheDocument();
+    expect(screen.queryByText('Revisar la hoja')).not.toBeInTheDocument();
+  });
+
   it('reviews the sheet: matched rows link, unknown rows propose a new student, lookalikes are flagged', async () => {
     api();
     const { hector, julio, lookalike } = await review();

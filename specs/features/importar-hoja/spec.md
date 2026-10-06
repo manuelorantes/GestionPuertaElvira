@@ -1,7 +1,7 @@
 # Importar hoja de cálculo
 
 Pasar a la aplicación la hoja de cálculo del club (una fila por alumno con lo cobrado cada mes y sus datos de contacto),
-revisando fila a fila antes de guardar nada. Solo administración.
+revisando fila a fila antes de guardar nada. Solo superadministración: el resto de cuentas no ve la importación ni puede usarla.
 
 ### Requirement: Lectura de la hoja
 El sistema MUST aceptar el CSV exportado (coma o punto y coma) o las celdas pegadas (tabulador), con la fila de cabecera.
