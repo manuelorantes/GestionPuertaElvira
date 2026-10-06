@@ -15,6 +15,7 @@ import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
+import { OccupancyByDay } from './OccupancyByDay';
 import { Select } from '@/shared/ui/Select';
 import { SidePanel } from '@/shared/ui/SidePanel';
 import { useToast } from '@/shared/ui/Toast';
@@ -101,6 +102,7 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
         </div>
         <div className="mt-4">
           <OccupancyBar occupied={g.occupied} capacity={g.capacity} />
+          <OccupancyByDay group={g} />
         </div>
         <Button variant="secondary" className="mt-4" onClick={() => onEdit(g)}>
           <Pencil aria-hidden size={16} />
@@ -124,6 +126,11 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
                   <span className="text-[13px] text-ink-muted">
                     · {s.age === null ? 'edad sin indicar' : `${s.age} años`}
                   </span>
+                  {s.attendanceLabel && (
+                    <span className="block text-[13px] font-medium text-warning-fg">
+                      Horario especial: {s.attendanceLabel}
+                    </span>
+                  )}
                 </span>
                 <Button variant="ghost" onClick={() => void navigate(`/panel/alumnos/${s.id}`)}>
                   Ver ficha

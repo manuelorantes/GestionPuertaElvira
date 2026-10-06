@@ -192,8 +192,72 @@ Deno.test('students should add, move and remove groups keeping at least one', as
     students: unknown[];
     occupied: number;
   };
-  assertEquals(group.students, [{ id, fullName: 'Martina López Herrera', age: 12 }]);
+  assertEquals(group.students, [
+    { id, fullName: 'Martina López Herrera', age: 12, attendanceLabel: null },
+  ]);
   assertEquals(group.occupied, 1);
+});
+
+Deno.test('students can attend only some days or part of the time of a group, taking a seat only then', async () => {
+  const fx = await fixture();
+  // Grupo A: lunes y miércoles 17:00–18:00 (plazas 12). Martina va a todo; Pablo solo los lunes, de 17:30.
+  const martina = await register(fx);
+  const pablo = await register(fx, { fullName: 'Pablo López Herrera', groupIds: [] });
+  const enrol = await fx.client.json('POST', `/api/admin/students/${pablo}/enrolments`, {
+    groupId: fx.groupA,
+    attendance: { days: ['mon'], start: '17:30' },
+  });
+  assertEquals(enrol.status, 204, JSON.stringify(enrol.body));
+
+  const detail = body<{ groups: Record<string, unknown>[] }>(
+    await fx.client.get(`/api/admin/students/${pablo}`),
+  );
+  assertEquals(detail.groups[0]?.attendance, { days: ['mon'], start: '17:30', end: '18:00' });
+  assertEquals(detail.groups[0]?.attendanceLabel, 'Lun · 17:30–18:00');
+
+  const group = body<Record<string, unknown>>(
+    await fx.client.get(`/api/admin/groups/${fx.groupA}`),
+  );
+  assertEquals(group.occupancyByDay, { mon: 2, wed: 1 });
+  assertEquals(group.occupied, 2);
+  assertEquals(
+    (group.students as { fullName: string; attendanceLabel: string | null }[]).map((
+      s,
+    ) => [s.fullName, s.attendanceLabel]),
+    [['Martina López Herrera', null], ['Pablo López Herrera', 'Lun · 17:30–18:00']],
+  );
+
+  // Cambiar el horario: ahora todo el grupo.
+  const changed = await fx.client.json(
+    'PUT',
+    `/api/admin/students/${pablo}/enrolments/${fx.groupA}`,
+    {
+      attendance: null,
+    },
+  );
+  assertEquals(changed.status, 204, JSON.stringify(changed.body));
+  assertEquals(
+    body<{ occupancyByDay: unknown }>(await fx.client.get(`/api/admin/groups/${fx.groupA}`))
+      .occupancyByDay,
+    { mon: 2, wed: 2 },
+  );
+
+  // Fuera del horario del grupo o en un día que no es suyo: no vale.
+  assertError(
+    await fx.client.json('PUT', `/api/admin/students/${pablo}/enrolments/${fx.groupA}`, {
+      attendance: { days: ['tue'] },
+    }),
+    422,
+    'unprocessable',
+  );
+  assertError(
+    await fx.client.json('PUT', `/api/admin/students/${pablo}/enrolments/${fx.groupA}`, {
+      attendance: { end: '19:00' },
+    }),
+    422,
+    'unprocessable',
+  );
+  assertEquals(martina.length, 36);
 });
 
 Deno.test('students should be updated, withdrawn and linked as siblings', async () => {

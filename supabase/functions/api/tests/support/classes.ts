@@ -101,10 +101,15 @@ export class InMemoryEnrolmentRepository implements EnrolmentRepository {
     return (await this.activeForStudent(student, on)).find((e) => e.group.equals(group)) ?? null;
   }
 
-  activeCount(group: ClassGroupId, on: LocalDate): Promise<number> {
+  activeInGroup(group: ClassGroupId, on: LocalDate): Promise<Enrolment[]> {
     return Promise.resolve(
-      [...this.enrolments.values()].filter((e) => e.group.equals(group) && e.isActiveOn(on)).length,
+      [...this.enrolments.values()].filter((e) => e.group.equals(group) && e.isActiveOn(on)),
     );
+  }
+
+  /** Cuántos alumnos hay en el grupo ese día (cualquier horario). */
+  async activeCount(group: ClassGroupId, on: LocalDate): Promise<number> {
+    return (await this.activeInGroup(group, on)).length;
   }
 }
 

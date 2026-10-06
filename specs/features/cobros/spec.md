@@ -34,6 +34,14 @@ El total MUST redondearse a céntimos, y las líneas del desglose MUST sumar exa
 - **WHEN** un alumno con hermanos y tramo de 55 € paga 3 meses
 - **THEN** el bruto es 165 €, el descuento es del 20 % y el total es 132 €
 
+### Requirement: Horas semanales
+Las horas semanales de un alumno, de las que sale su tarifa, MUST ser la suma de lo que realmente hace en cada grupo:
+el horario del grupo o, si tiene horario especial, solo los días y la franja a los que viene.
+
+#### Scenario: Horario especial
+- **WHEN** un alumno hace media hora en un grupo y una hora entera en otro
+- **THEN** sus horas semanales son 1,5 y paga la cuota de 1 h y media
+
 ### Requirement: Cuotas del mes
 Cada mes de la temporada (septiembre a junio), cada alumno activo MUST tener una cuota pendiente de ese mes,
 con el importe de un mes y su descuento familiar, salvo que ya la tenga pagada por adelantado.

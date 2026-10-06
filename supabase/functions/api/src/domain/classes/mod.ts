@@ -296,6 +296,105 @@ export class ClassroomSchedule {
   }
 }
 
+/**
+ * Horario propio de una inscripción dentro de su grupo: qué días viene y de qué hora a qué hora.
+ * Por defecto, todo el horario del grupo. Permite a un alumno ir solo los lunes a un grupo de lunes y
+ * miércoles, o media hora de un grupo y la hora entera del siguiente, ocupando plaza en ambos.
+ */
+export class Attendance {
+  private constructor(
+    /** Días del grupo a los que viene, o null si a todos. */
+    readonly days: readonly Weekday[] | null,
+    /** Hora de inicio propia, o null si la del grupo. */
+    readonly start: HalfHour | null,
+    /** Hora de fin propia, o null si la del grupo. */
+    readonly end: HalfHour | null,
+  ) {}
+
+  /** Todo el horario del grupo. */
+  static full(): Attendance {
+    return new Attendance(null, null, null);
+  }
+
+  /** Un recorte del horario del grupo; lo que coincide con el grupo se guarda como «todo». */
+  static within(
+    group: GroupDetails,
+    days: readonly Weekday[] | null,
+    start: HalfHour | null,
+    end: HalfHour | null,
+  ): Attendance {
+    const slot = group.slot;
+    let chosenDays: readonly Weekday[] | null = null;
+    if (days !== null) {
+      const unique = [...new Set(days)].sort((a, b) => a - b);
+      if (unique.length === 0) throw new InvalidValue('days', 'Elige al menos un día del grupo.');
+      if (unique.some((day) => !slot.days.includes(day))) {
+        throw new InvalidValue('days', 'Los días tienen que ser de los del grupo.');
+      }
+      chosenDays = unique.length === slot.days.length ? null : unique;
+    }
+    const from = start ?? slot.start;
+    const to = end ?? slot.end;
+    if (from.isBefore(slot.start) || slot.end.isBefore(to)) {
+      throw new InvalidValue('time', 'El horario tiene que estar dentro del horario del grupo.');
+    }
+    if (!from.isBefore(to)) {
+      throw new InvalidValue('end', 'La hora de fin debe ser posterior a la de inicio.');
+    }
+    return new Attendance(
+      chosenDays,
+      from.minutes === slot.start.minutes ? null : from,
+      to.minutes === slot.end.minutes ? null : to,
+    );
+  }
+
+  /** Tal como se guardó, sin volver a validar. */
+  static restore(
+    days: readonly Weekday[] | null,
+    start: HalfHour | null,
+    end: HalfHour | null,
+  ): Attendance {
+    return new Attendance(days, start, end);
+  }
+
+  isFull(): boolean {
+    return this.days === null && this.start === null && this.end === null;
+  }
+
+  /** Días en los que ocupa plaza. */
+  daysIn(group: GroupDetails): readonly Weekday[] {
+    return this.days ?? group.slot.days;
+  }
+
+  /** Franja real del alumno en el grupo. */
+  slotIn(group: GroupDetails): WeeklySlot {
+    return WeeklySlot.of(
+      this.daysIn(group),
+      this.start ?? group.slot.start,
+      this.end ?? group.slot.end,
+    );
+  }
+
+  /** «Lun · 18:30–19:00», o null si va a todo el grupo. */
+  labelIn(group: GroupDetails): string | null {
+    return this.isFull() ? null : this.slotIn(group).label();
+  }
+}
+
+/** Plazas ocupadas cada día del grupo: quien viene solo algunos días solo cuenta esos días. */
+export function occupancyByDay(
+  group: GroupDetails,
+  enrolments: readonly Enrolment[],
+): Map<Weekday, number> {
+  const counts = new Map<Weekday, number>(group.slot.days.map((day) => [day, 0]));
+  for (const enrolment of enrolments) {
+    for (const day of enrolment.attendance().daysIn(group)) {
+      counts.set(day, (counts.get(day) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 /** Inscripción de un alumno en un grupo, desde una fecha y, opcionalmente, hasta otra (no incluida). */
 export class Enrolment {
   private constructor(
@@ -304,6 +403,7 @@ export class Enrolment {
     readonly group: ClassGroupId,
     readonly enrolledOn: LocalDate,
     private ends: LocalDate | null,
+    private attending: Attendance,
   ) {}
 
   static start(
@@ -311,8 +411,9 @@ export class Enrolment {
     student: StudentReference,
     group: ClassGroupId,
     on: LocalDate,
+    attendance: Attendance = Attendance.full(),
   ): Enrolment {
-    return new Enrolment(id, student, group, on, null);
+    return new Enrolment(id, student, group, on, null, attendance);
   }
 
   static restore(
@@ -321,8 +422,17 @@ export class Enrolment {
     group: ClassGroupId,
     enrolledOn: LocalDate,
     endsOn: LocalDate | null,
+    attendance: Attendance = Attendance.full(),
   ): Enrolment {
-    return new Enrolment(id, student, group, enrolledOn, endsOn);
+    return new Enrolment(id, student, group, enrolledOn, endsOn, attendance);
+  }
+
+  attendance(): Attendance {
+    return this.attending;
+  }
+
+  changeAttendance(attendance: Attendance): void {
+    this.attending = attendance;
   }
 
   endOn(day: LocalDate): void {
@@ -381,22 +491,36 @@ export class StudentScheduleOverlap extends Error implements HasErrorDetails {
   }
 }
 
-/** Reglas para inscribir a un alumno en un grupo. */
+/** Un grupo del alumno con el horario que hace en él. */
+export interface CurrentEnrolment {
+  group: ClassGroup;
+  attendance: Attendance;
+}
+
+/** Reglas para inscribir a un alumno en un grupo (o cambiar su horario en él). */
 export class EnrolmentPolicy {
-  /** @param studentGroups grupos en los que el alumno ya está inscrito */
+  /**
+   * @param current grupos en los que el alumno ya está, con su horario real
+   * @param occupied plazas ocupadas cada día del grupo destino (sin contar al propio alumno)
+   * @param attendance horario con el que se inscribe
+   */
   assertCanEnrol(
     target: ClassGroup,
-    studentGroups: readonly ClassGroup[],
-    occupied: number,
+    current: readonly CurrentEnrolment[],
+    occupied: ReadonlyMap<Weekday, number>,
+    attendance: Attendance,
     overCapacityConfirmed: boolean,
   ): void {
-    for (const group of studentGroups) {
+    const mine = attendance.slotIn(target.details());
+    for (const { group, attendance: theirs } of current) {
       if (group.id.equals(target.id)) throw new AlreadyEnrolled();
-      if (group.details().slot.overlaps(target.details().slot)) {
-        throw new StudentScheduleOverlap(group);
-      }
+      if (theirs.slotIn(group.details()).overlaps(mine)) throw new StudentScheduleOverlap(group);
     }
     const capacity = target.details().capacity.value;
-    if (occupied >= capacity && !overCapacityConfirmed) throw new GroupFull(occupied, capacity);
+    const busiest = Math.max(
+      0,
+      ...attendance.daysIn(target.details()).map((day) => occupied.get(day) ?? 0),
+    );
+    if (busiest >= capacity && !overCapacityConfirmed) throw new GroupFull(busiest, capacity);
   }
 }

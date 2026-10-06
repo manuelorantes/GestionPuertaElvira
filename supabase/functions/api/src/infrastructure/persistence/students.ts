@@ -1,3 +1,10 @@
+import {
+  HalfHour,
+  weekdayCode,
+  weekdayFromName,
+  weekdayFromNumber,
+  WeeklySlot,
+} from '../../domain/classes/mod.ts';
 import { EmailAddress, FullName, LocalDate, PhoneNumber } from '../../domain/common/mod.ts';
 import {
   FederationLicence,
@@ -7,7 +14,7 @@ import {
   StudentDetails,
   StudentId,
 } from '../../domain/students/mod.ts';
-import type { ClassQuery } from '../../application/classes/mod.ts';
+import type { ClassQuery, GroupSummary } from '../../application/classes/mod.ts';
 import type {
   StudentDetail,
   StudentFilter,
@@ -36,6 +43,24 @@ function guardians(row: Row): { name: string; phone: string | null }[] {
 function age(row: Row, on: LocalDate): number | null {
   const birth = row.nullableString('birth_date');
   return birth === null ? null : LocalDate.fromString(birth).ageOn(on);
+}
+
+/** Horario especial de una inscripción, completado con el del grupo; null si va a todo el grupo. */
+function specialAttendance(
+  row: Row,
+  group: GroupSummary,
+): { days: string[]; start: string; end: string } | null {
+  const days = row.json('attendance_days');
+  const start = row.nullableInt('attendance_start_minutes');
+  const end = row.nullableInt('attendance_end_minutes');
+  if (!Array.isArray(days) && start === null && end === null) return null;
+  return {
+    days: Array.isArray(days)
+      ? (days as number[]).map((d) => weekdayCode(weekdayFromNumber(d)))
+      : [...group.days],
+    start: start === null ? group.start : HalfHour.fromMinutes(start).toString(),
+    end: end === null ? group.end : HalfHour.fromMinutes(end).toString(),
+  };
 }
 
 function toStudent(row: Row): Student {
@@ -206,7 +231,9 @@ export class SqlStudentQuery implements StudentQuery {
     const day = on.toString();
     const forStudent = studentId ? this.sql`AND student_id = ${studentId}` : this.sql``;
     // Orden estable: primero el grupo en el que se inscribió antes (el id es UUIDv7, ordenado por tiempo).
-    const rows = await this.sql`SELECT student_id, class_group_id FROM classes_enrolment
+    const rows = await this.sql`SELECT student_id, class_group_id,
+             attendance_days, attendance_start_minutes, attendance_end_minutes
+        FROM classes_enrolment
       WHERE enrolled_on <= ${day} AND (ends_on IS NULL OR ends_on > ${day}) ${forStudent}
       ORDER BY enrolled_on, id`;
     const byStudent = new Map<string, StudentGroup[]>();
@@ -214,12 +241,19 @@ export class SqlStudentQuery implements StudentQuery {
       const group = groups.get(row.string('class_group_id'));
       if (!group) continue;
       const list = byStudent.get(row.string('student_id')) ?? [];
+      const attendance = specialAttendance(row, group);
       list.push({
         id: group.id,
         name: group.name,
         slotLabel: group.slotLabel,
         teacherName: group.teacherName,
         classroom: group.classroom,
+        attendance,
+        attendanceLabel: attendance === null ? null : WeeklySlot.of(
+          attendance.days.map(weekdayFromName),
+          HalfHour.fromString(attendance.start),
+          HalfHour.fromString(attendance.end),
+        ).label(),
       });
       byStudent.set(row.string('student_id'), list);
     }

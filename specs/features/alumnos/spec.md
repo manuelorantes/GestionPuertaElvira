@@ -99,9 +99,28 @@ Desde esa fecha deja de contar en la ocupación de todos sus grupos y aparece «
 - **THEN** el alumno sigue activo y ocupando plaza hasta ese día
 
 ### Requirement: Inscripciones en grupos
-Un alumno MAY estar en varios grupos, pero MUST NOT estar en dos que coincidan en algún día y hora,
+Un alumno MAY estar en varios grupos, pero MUST NOT estar en dos cuyos horarios reales coincidan en algún día y hora,
 ni dos veces en el mismo grupo.
-Un alumno activo MUST conservar al menos un grupo.
+Un alumno con grupos MUST conservar al menos uno (quitarle el último se impide; un socio sin clases no tiene ninguno).
+
+### Requirement: Horario especial
+Una inscripción MAY llevar un horario especial dentro del grupo: solo algunos de sus días, o solo parte de
+su franja (en medias horas, dentro del horario del grupo). Por defecto el alumno va a todo el grupo.
+El alumno ocupa plaza solo los días a los que viene; sus horas semanales (para la cuota) son las que
+realmente hace; la ficha del alumno y la del grupo muestran «Horario especial: Lun · 18:30–19:00».
+El horario especial MUST poder cambiarse o quitarse después, con las mismas comprobaciones que una inscripción.
+
+#### Scenario: Media hora de un grupo y la hora del siguiente
+- **WHEN** un alumno se inscribe en el grupo de 18:00–19:00 solo de 18:30 a 19:00 y en el de 19:00–20:00 entero
+- **THEN** ocupa plaza en los dos, no hay conflicto de horario entre ambos y su cuota es la de 1 h y media semanal
+
+#### Scenario: Solo los lunes
+- **WHEN** un alumno se inscribe solo los lunes en un grupo de lunes y miércoles de hora y media
+- **THEN** ocupa plaza solo el lunes y su cuota es la de 1 h y media semanal
+
+#### Scenario: Fuera del grupo
+- **WHEN** el horario especial indica un día que no es del grupo o una hora fuera de su franja
+- **THEN** el sistema lo rechaza indicando el dato
 
 #### Scenario: Añadir un grupo
 - **WHEN** administración añade a un alumno un grupo que no coincide con los suyos
