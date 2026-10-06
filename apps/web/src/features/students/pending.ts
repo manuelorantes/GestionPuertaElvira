@@ -9,7 +9,7 @@ export const MISSING_LABELS: { key: MissingDatum; label: string; plural: string 
   { key: 'email', label: 'email', plural: 'Sin email' },
 ];
 
-export function missingLabel(key: MissingDatum): string {
+function missingLabel(key: MissingDatum): string {
   return MISSING_LABELS.find((m) => m.key === key)?.label ?? key;
 }
 
