@@ -134,7 +134,12 @@ export function ProfitabilityTab({ month }: { month: string }) {
                           </span>
                         )}
                       </span>
-                      <span className="block text-xs text-ink-muted">{row.groups.join(' · ')}</span>
+                      {/* Cada grupo en su línea: los nombres por defecto son largos. */}
+                      {row.groups.map((group) => (
+                        <span key={group} className="block text-xs text-ink-muted">
+                          {group}
+                        </span>
+                      ))}
                     </span>
                   </span>
                 </td>
