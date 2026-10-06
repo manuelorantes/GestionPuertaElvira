@@ -80,11 +80,16 @@ function LedgerFilters({
   onChange: (filter: LedgerFilter) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-3">
-      <div role="group" aria-label="Tipo de movimiento" className="flex flex-wrap gap-1.5">
+    <div className="border-b border-line">
+      <div
+        role="group"
+        aria-label="Tipo de movimiento"
+        className="flex flex-wrap gap-1.5 px-5 py-3"
+      >
         {KIND_OPTIONS.map((k) => (
           <ToggleButton
             key={k.id}
+            tone="ink"
             pressed={filter.kind === k.id}
             onClick={() => onChange({ kind: k.id, method: 'all' })}
             className="h-9 rounded-full font-medium"
@@ -94,18 +99,30 @@ function LedgerFilters({
         ))}
       </div>
       {filter.kind === 'income' && (
-        <div role="group" aria-label="Forma de pago" className="flex flex-wrap gap-1.5">
-          {METHOD_OPTIONS.map((m) => (
-            <ToggleButton
-              key={m.id}
-              tone="ink"
-              pressed={filter.method === m.id}
-              onClick={() => onChange({ kind: 'income', method: m.id })}
-              className="h-9 rounded-full font-medium"
-            >
-              {m.label}
-            </ToggleButton>
-          ))}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line-soft bg-surface-muted px-5 py-2.5">
+          <span
+            id="ledger-method-label"
+            className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase"
+          >
+            Forma de pago
+          </span>
+          <div
+            role="group"
+            aria-labelledby="ledger-method-label"
+            className="flex flex-wrap gap-1.5"
+          >
+            {METHOD_OPTIONS.map((m) => (
+              <ToggleButton
+                key={m.id}
+                tone="soft"
+                pressed={filter.method === m.id}
+                onClick={() => onChange({ kind: 'income', method: m.id })}
+                className="h-8 min-w-0 rounded-full px-3 text-[13px] font-medium"
+              >
+                {m.label}
+              </ToggleButton>
+            ))}
+          </div>
         </div>
       )}
     </div>
