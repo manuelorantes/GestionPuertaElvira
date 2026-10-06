@@ -1,4 +1,5 @@
 import {
+  looksLikeSamePerson,
   normaliseText,
   type StudentCandidate,
   type StudentMatcher,
@@ -17,18 +18,17 @@ export class SqlStudentMatcher implements StudentMatcher {
     return rows[0] ? candidate(new Row(rows[0])) : null;
   }
 
+  /** Mismo nombre de pila y apellidos compatibles; los más completos primero. */
   async similar(fullName: string): Promise<StudentCandidate[]> {
-    const tokens = normaliseText(fullName).split(' ').filter((t) => [...t].length >= 3);
-    if (tokens.length === 0) return [];
+    if (normaliseText(fullName) === '') return [];
     const scored: { score: number; name: string; candidate: StudentCandidate }[] = [];
     for (
       const row of Row.all(await this.sql`SELECT id, full_name, search_name FROM students_student`)
     ) {
+      if (!looksLikeSamePerson(fullName, row.string('search_name'))) continue;
       const words = row.string('search_name').split(' ');
-      const score = tokens.filter((t) => words.includes(t)).length;
-      if (score > 0) {
-        scored.push({ score, name: row.string('full_name'), candidate: candidate(row) });
-      }
+      const score = normaliseText(fullName).split(' ').filter((t) => words.includes(t)).length;
+      scored.push({ score, name: row.string('full_name'), candidate: candidate(row) });
     }
     return scored
       .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name))

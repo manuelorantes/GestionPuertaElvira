@@ -36,6 +36,12 @@ async function fixture(): Promise<Fixture> {
     groupIds: [group],
   });
   assertEquals(response.status, 201);
+  const brother = await client.json('POST', '/api/admin/students', {
+    fullName: 'Rafael Pérez Ratkovsky',
+    guardians: [{ name: 'Lenka', phone: '699615279' }],
+    groupIds: [group],
+  });
+  assertEquals(brother.status, 201);
   return { client, group, hector: (response.body as { id: string }).id };
 }
 
@@ -60,11 +66,11 @@ Deno.test('import should preview matches and proposals without saving', async ()
   assertEquals(rows[0]?.groups, [{ text: 'Grupo inexistente', groupId: null }]);
   assert((rows[0]?.warnings as string[]).includes('No se encuentra el grupo «Grupo inexistente».'));
   assertEquals(
-    (rows[2]?.suggestions as { fullName: string }[])[0]?.fullName,
-    'Héctor Pérez Ratkovsky',
-    'parecido por apellido',
+    (rows[2]?.suggestions as { fullName: string }[]).map((c) => c.fullName),
+    ['Héctor Pérez Ratkovsky'],
+    'mismo nombre de pila y apellido compatible; no el hermano con otro nombre',
   );
-  assertEquals(await total(fx), 1, 'la revisión no guarda nada');
+  assertEquals(await total(fx), 2, 'la revisión no guarda nada');
   assertError(
     await fx.client.json('POST', '/api/admin/import/preview', { text: 'a,b\n1,2' }),
     422,
@@ -120,7 +126,7 @@ Deno.test('import should import each row on its own as an undoable action', asyn
     (await fx.client.json('POST', `/api/admin/audit/actions/${actions[0]?.id}/undo`)).status,
     204,
   );
-  assertEquals(await total(fx), 1, 'solo se deshace la fila de Julio');
+  assertEquals(await total(fx), 2, 'solo se deshace la fila de Julio');
   assertEquals(
     body<{ items: unknown[] }>(
       await fx.client.get(`/api/admin/billing/payments?studentId=${fx.hector}`),
@@ -155,7 +161,7 @@ Deno.test('import should warn about a possible duplicate before creating', async
     })).status,
     200,
   );
-  assertEquals(await total(fx), 2);
+  assertEquals(await total(fx), 3);
 });
 
 Deno.test('import should fail only the bad row and save nothing of it', async () => {
@@ -174,5 +180,5 @@ Deno.test('import should fail only the bad row and save nothing of it', async ()
     (await importRow(fx, { line: 2, action: 'link', studentId: fx.hector })).status,
     200,
   );
-  assertEquals(await total(fx), 1);
+  assertEquals(await total(fx), 2);
 });
