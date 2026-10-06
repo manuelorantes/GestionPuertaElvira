@@ -48,7 +48,7 @@ export interface Attendance {
   end: string;
 }
 
-export interface StudentGroup {
+interface StudentGroup {
   id: string;
   name: string;
   slotLabel: string;
