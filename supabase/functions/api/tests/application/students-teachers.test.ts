@@ -52,7 +52,7 @@ function students() {
   const register = (groupIds: string[], siblingIds: string[] = [], joinedOn?: string) =>
     new RegisterStudent(repo, enrolments, transactions, clock, membership).execute(
       input(),
-      groupIds,
+      groupIds.map((groupId) => ({ groupId, attendance: null })),
       siblingIds,
       false,
       joinedOn,
@@ -186,7 +186,7 @@ Deno.test('ListPendingData should list active students with what they are missin
   )
     .execute(
       input({ fullName: 'Pepe Sin Datos', birthDate: null, guardians: [], contactEmail: null }),
-      ['g1'],
+      [{ groupId: 'g1', attendance: null }],
       [],
       false,
     );

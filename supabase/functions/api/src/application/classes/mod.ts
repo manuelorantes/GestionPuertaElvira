@@ -15,9 +15,13 @@ import {
   HalfHour,
   levelFromName,
   occupancyByDay,
+  resolveSchedule,
   StudentReference,
   TeacherReference,
+  type Weekday,
+  weekdayCode,
   weekdayFromName,
+  weekdayShortLabel,
   WeeklySlot,
 } from '../../domain/classes/mod.ts';
 import type { TransactionRunner } from '../common/mod.ts';
@@ -416,5 +420,86 @@ export class EndStudentEnrolments {
       enrolment.endOn(on);
       await this.enrolments.save(enrolment);
     }
+  }
+}
+
+/** Tramo del horario tal como llega del exterior. */
+export interface ScheduleBlockInput {
+  day: string;
+  start: string;
+  end: string;
+  classroom: string | null;
+}
+
+export interface ResolvedEnrolmentView {
+  groupId: string;
+  groupName: string;
+  slotLabel: string;
+  attendance: { days: string[]; start: string; end: string } | null;
+  attendanceLabel: string | null;
+}
+
+export interface ScheduleResolutionView {
+  enrolments: ResolvedEnrolmentView[];
+  uncovered: { day: string; start: string; end: string; label: string }[];
+  choices: {
+    day: string;
+    start: string;
+    end: string;
+    label: string;
+    groups: { id: string; name: string; classroom: string }[];
+  }[];
+  problems: string[];
+}
+
+/** Traduce el horario que hará un alumno a grupos (completos o con horario especial), sin guardar nada. */
+export class ResolveSchedule {
+  constructor(private readonly groups: ClassGroupRepository) {}
+
+  async execute(blocks: ScheduleBlockInput[]): Promise<ScheduleResolutionView> {
+    const parsed = blocks.map((b) => ({
+      day: weekdayFromName(b.day),
+      start: HalfHour.fromString(b.start),
+      end: HalfHour.fromString(b.end),
+      classroom: b.classroom === null ? null : Classroom.fromString(b.classroom),
+    }));
+    const result = resolveSchedule(parsed, await this.groups.all());
+    const label = (s: { day: Weekday; start: HalfHour; end: HalfHour }) =>
+      `${weekdayShortLabel(s.day)} · ${s.start.toString()}–${s.end.toString()}`;
+    return {
+      enrolments: result.enrolments.map(({ group, attendance }) => {
+        const d = group.details();
+        const slot = attendance.slotIn(d);
+        return {
+          groupId: group.id.value,
+          groupName: d.name.value,
+          slotLabel: d.slot.label(),
+          attendance: attendance.isFull() ? null : {
+            days: slot.days.map(weekdayCode),
+            start: slot.start.toString(),
+            end: slot.end.toString(),
+          },
+          attendanceLabel: attendance.labelIn(d),
+        };
+      }),
+      uncovered: result.uncovered.map((s) => ({
+        day: weekdayCode(s.day),
+        start: s.start.toString(),
+        end: s.end.toString(),
+        label: label(s),
+      })),
+      choices: result.choices.map((c) => ({
+        day: weekdayCode(c.day),
+        start: c.start.toString(),
+        end: c.end.toString(),
+        label: label(c),
+        groups: c.groups.map((g) => ({
+          id: g.id.value,
+          name: g.details().name.value,
+          classroom: g.details().classroom.code,
+        })),
+      })),
+      problems: result.problems,
+    };
   }
 }

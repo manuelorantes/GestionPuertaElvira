@@ -53,7 +53,7 @@ ClassGroupPanel (Clases → pulsar un grupo; ficha lateral)
 | guardians[1] | «Tutor 2 (opcional)» + «Teléfono tutor 2» | texto + tel | no | — |
 | ownPhone | «Teléfono del alumno» | tel | sí si es adulto sin tutor | visible si la edad calculada es ≥ 18 |
 | siblingId | «Hermano en el club (opcional)» | select | no | solo en el alta |
-| groupIds | «Grupo» (+ «Otro grupo») | select(s) | al menos uno | solo en el alta; después se gestionan desde la ficha |
+| schedule | «Horario N»: «Día», «Empieza», «Termina» (+ «Aula para …» si hay varias aulas) | selects | no (sin horario = socio sin clases) | la API traduce cada tramo a un grupo, completo o con horario especial; vista previa debajo |
 | federationLicence | interruptor «Federado» + «Nº de licencia federativa» | switch + texto | licencia si está federado | placeholder «AND-00000» |
 | imageConsent | interruptor «Autorización de imagen» | switch | — | ayuda: «Permite usar fotos del alumno en redes y cartelería del club.» |
 | withdrawal date | «Fecha de baja» | `DateField` | sí | no anterior a hoy |
