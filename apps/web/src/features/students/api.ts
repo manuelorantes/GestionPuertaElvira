@@ -9,6 +9,8 @@ export type MissingDatum = 'birth_date' | 'guardian' | 'guardian_phone' | 'phone
 
 export interface StudentSummary {
   id: string;
+  /** Número de socio: único, en orden de alta y nunca reutilizado. */
+  memberNumber: number;
   fullName: string;
   /** null si no consta la fecha de nacimiento. */
   age: number | null;
@@ -24,6 +26,7 @@ interface Guardian {
 
 export interface StudentDetail {
   id: string;
+  memberNumber: number;
   fullName: string;
   birthDate: string | null;
   age: number | null;

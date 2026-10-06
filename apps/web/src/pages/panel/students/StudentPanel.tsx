@@ -121,6 +121,8 @@ export function StudentPanel() {
               {s.fullName}
             </h2>
             <p className="text-sm text-ink-muted">
+              <span className="font-semibold text-ink">Socio nº {s.memberNumber}</span>
+              {' · '}
               {s.age === null ? 'Edad sin indicar' : `${s.age} años`}
               {s.groups[0] ? ` · ${s.groups[0].name}` : ' · Socio sin clases'}
             </p>
