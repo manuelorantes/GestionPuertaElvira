@@ -1,8 +1,11 @@
+import { GroupDetails } from '../../domain/classes/mod.ts';
 import { InvalidValue } from '../../domain/common/mod.ts';
 import { RecordEntry } from '../../application/accounting/mod.ts';
 import { ImportPayment } from '../../application/billing/mod.ts';
 import {
   ApplyImport,
+  type GroupCandidate,
+  type GroupDirectory,
   type ImportDecision,
   PreviewImport,
   SpreadsheetParser,
@@ -20,10 +23,27 @@ import {
   SqlPaymentRepository,
   SqlStudentAccountRepository,
 } from '../persistence/billing.ts';
+import { SqlClassGroupRepository } from '../persistence/classes.ts';
 import { SqlStudentMatcher } from '../persistence/import.ts';
-import { SavepointTransactionRunner } from '../persistence/sql.ts';
+import { SavepointTransactionRunner, type Sql } from '../persistence/sql.ts';
 import { SqlStudentRepository } from '../persistence/students.ts';
 import { ClassesEnrolments } from '../students/routes.ts';
+
+/** Los grupos del contexto Clases tal como se pueden nombrar en la hoja. */
+class ImportGroupDirectory implements GroupDirectory {
+  constructor(private readonly sql: Sql) {}
+
+  async all(): Promise<GroupCandidate[]> {
+    return (await new SqlClassGroupRepository(this.sql).all()).map((group) => {
+      const d = group.details();
+      return {
+        id: group.id.value,
+        name: d.name.value,
+        defaultName: GroupDetails.defaultName(d.level, d.slot, d.classroom),
+      };
+    });
+  }
+}
 
 /** Rutas de importación de la hoja de cálculo: /api/admin/import */
 export function registerImportRoutes(api: ApiApp): void {
@@ -35,11 +55,19 @@ export function registerImportRoutes(api: ApiApp): void {
     { method: 'POST', path: '/api/admin/import/preview', access: 'admin' },
     async (c, scope) => {
       const text = (await JsonBody.from(c.req.raw)).requiredString('text');
-      const rows = await new PreviewImport(new SpreadsheetParser(), matcher(scope), clock).execute(
-        text,
-      );
+      const rows = await new PreviewImport(
+        new SpreadsheetParser(),
+        matcher(scope),
+        new ImportGroupDirectory(scope.tx),
+        clock,
+      ).execute(text);
       return c.json({
-        rows: rows.map((r) => ({ ...r.row, match: r.match, suggestions: r.suggestions })),
+        rows: rows.map((r) => ({
+          ...r.row,
+          match: r.match,
+          suggestions: r.suggestions,
+          groups: r.groups,
+        })),
       });
     },
   );

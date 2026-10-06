@@ -5,9 +5,9 @@ import { newGroup, newTeacher } from '../support/classes-http.ts';
 import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
 
 const SHEET = [
-  ',Fotos,,Cuota Anual,Chandal y polo,Federativa,Septiembre,Octubre,Noviembre,Diciembre,Enero,Febrero,Marzo,Abril,Mayo,Junio,Fecha Nacimiento,Madre ó Padre,Telefono,e-mail',
-  'Hector Perez Ratkovsky,,Tarjetero,50,,,55,55,,,,,,,,,19/9/2016,Lenka,699615279,lenka@ejemplo.com',
-  'Julio Requena Montenegro,,,50,25,,20,,,,,,,,,,7/2/17,Torcuato,690666005,torcuato@ejemplo.com',
+  ',Fotos,,Cuota Anual,Chandal y polo,Federativa,Septiembre,Octubre,Noviembre,Diciembre,Enero,Febrero,Marzo,Abril,Mayo,Junio,Fecha Nacimiento,Madre ó Padre,Telefono,e-mail,Grupo',
+  'Hector Perez Ratkovsky,,Tarjetero,50,,,55,55,,,,,,,,,19/9/2016,Lenka,699615279,lenka@ejemplo.com,Grupo inexistente',
+  'Julio Requena Montenegro,,,50,25,,20,,,,,,,,,,7/2/17,Torcuato,690666005,torcuato@ejemplo.com,Lun 17:00',
   'Hector Perez,,,,,,30,,,,,,,,,,11/8/2017,Luis,678810154,lclemor@ejemplo.com',
   'Peque Sin Telefono,,,,,,20,,,,,,,,,,1/1/2019,,,',
 ].join('\n');
@@ -56,6 +56,9 @@ Deno.test('import should preview matches and proposals without saving', async ()
   assertEquals(rows[1]?.birthDate, '2017-02-07');
   assertEquals(rows[1]?.monthlyCents, { [seasonStart]: 2000 });
   assertEquals(rows[1]?.kitCents, 2500);
+  assertEquals(rows[1]?.groups, [{ text: 'Lun 17:00', groupId: fx.group }], 'grupo por día y hora');
+  assertEquals(rows[0]?.groups, [{ text: 'Grupo inexistente', groupId: null }]);
+  assert((rows[0]?.warnings as string[]).includes('No se encuentra el grupo «Grupo inexistente».'));
   assertEquals(
     (rows[2]?.suggestions as { fullName: string }[])[0]?.fullName,
     'Héctor Pérez Ratkovsky',

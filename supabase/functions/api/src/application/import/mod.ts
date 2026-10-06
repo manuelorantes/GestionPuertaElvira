@@ -30,6 +30,8 @@ export interface ImportedRow {
   federationCents: number | null;
   /** Cobrado cada mes (AAAA-MM → céntimos). */
   monthlyCents: Record<string, number>;
+  /** Textos de las columnas de grupo («Lunes 17:00», «Iniciación A»), uno por grupo. */
+  groups: string[];
   warnings: string[];
 }
 
@@ -157,6 +159,11 @@ export class SpreadsheetParser {
       if (value === null) warnings.push(`«${raw}» no es un importe (${key}).`);
       return value;
     };
+    const groups = [...columns.keys()]
+      .filter((key) => key.startsWith('group:'))
+      .flatMap((key) => cell(key).split(';'))
+      .map((g) => g.replace(/\s+/gu, ' ').trim())
+      .filter((g) => g !== '');
     const season = Season.containing(YearMonth.of(today));
     const monthly: Record<string, number> = {};
     for (const [name, number] of Object.entries(MONTHS)) {
@@ -202,6 +209,7 @@ export class SpreadsheetParser {
       kitCents: amount('kit'),
       federationCents: amount('federation'),
       monthlyCents: monthly,
+      groups,
       warnings,
     };
   }
@@ -226,6 +234,8 @@ export class SpreadsheetParser {
       else if (h.includes('madre') || h.includes('padre') || h.includes('tutor')) key = 'guardian';
       else if (h.includes('telef') || h.includes('movil')) key = 'phone';
       else if (h.includes('mail')) key = 'email';
+      // Puede haber varias columnas de grupo («Grupo 1», «Grupo 2», «Clases»).
+      else if (h.includes('grupo') || h.includes('clase')) key = `group:${index}`;
       if (key !== null && !columns.has(key)) columns.set(key, index);
     });
     return columns;
@@ -248,30 +258,92 @@ export interface StudentMatcher {
   exists(studentId: string): Promise<boolean>;
 }
 
-/** Fila de la revisión: lo leído, con quién coincide y qué se propone. */
+/** Grupo del club con lo que se puede escribir en la hoja para referirse a él. */
+export interface GroupCandidate {
+  id: string;
+  /** Nombre que muestra la aplicación. */
+  name: string;
+  /** Nombre por defecto («Lunes y miércoles 17:00 · Iniciación · Alfil»), aunque tenga nombre propio. */
+  defaultName: string;
+}
+
+export interface GroupDirectory {
+  all(): Promise<GroupCandidate[]>;
+}
+
+/** Lo escrito en una columna de grupo y el grupo al que corresponde, si se ha encontrado uno solo. */
+export interface GroupMention {
+  text: string;
+  groupId: string | null;
+}
+
+function tokens(text: string): string[] {
+  return normaliseText(text.replace(/[·,;/]/g, ' '))
+    .split(' ')
+    .filter((t) => t !== '' && t !== 'y' && t !== 'aula');
+}
+
+/**
+ * Casa el texto de una celda con los grupos: el nombre completo (propio o por defecto), o palabras que
+ * los describan («Lun 17:00», «Jueves 18:30 Alfil», «Martes 17:00 Intermedio»); las abreviaturas de
+ * tres letras o más valen como principio de palabra. Devuelve los grupos que encajan.
+ */
+export function matchGroups(text: string, groups: GroupCandidate[]): GroupCandidate[] {
+  const wanted = normaliseText(text);
+  const exact = groups.filter((g) =>
+    normaliseText(g.name) === wanted || normaliseText(g.defaultName) === wanted
+  );
+  if (exact.length > 0) return exact;
+  const words = tokens(text);
+  if (words.length === 0) return [];
+  return groups.filter((g) => {
+    const own = [...new Set([...tokens(g.name), ...tokens(g.defaultName)])];
+    return words.every((w) => own.some((o) => o === w || (w.length >= 3 && o.startsWith(w))));
+  });
+}
+
+/** Fila de la revisión: lo leído, con quién coincide, qué se propone y a qué grupos apunta. */
 export interface ImportPreviewRow {
   row: ImportedRow;
   match: StudentCandidate | null;
   suggestions: StudentCandidate[];
+  groups: GroupMention[];
 }
 
-/** Lee la hoja y la casa con los alumnos existentes, sin guardar nada. */
+/** Lee la hoja y la casa con los alumnos y grupos existentes, sin guardar nada. */
 export class PreviewImport {
   constructor(
     private readonly parser: SpreadsheetParser,
     private readonly students: StudentMatcher,
+    private readonly groups: GroupDirectory,
     private readonly clock: Clock,
   ) {}
 
   async execute(text: string): Promise<ImportPreviewRow[]> {
     const today = LocalDate.fromInstant(this.clock.now());
+    const parsed = this.parser.parse(text, today);
+    const groups = parsed.some((r) => r.groups.length > 0) ? await this.groups.all() : [];
     const rows: ImportPreviewRow[] = [];
-    for (const row of this.parser.parse(text, today)) {
+    for (const row of parsed) {
       const match = await this.students.byName(row.fullName);
+      const warnings = [...row.warnings];
+      const mentions = row.groups.map((text): GroupMention => {
+        const found = matchGroups(text, groups);
+        if (found.length === 1) return { text, groupId: found[0]?.id ?? null };
+        warnings.push(
+          found.length === 0
+            ? `No se encuentra el grupo «${text}».`
+            : `«${text}» puede ser ${
+              found.map((g) => `«${g.name}»`).join(' o ')
+            }: indica el aula o el nivel.`,
+        );
+        return { text, groupId: null };
+      });
       rows.push({
-        row,
+        row: { ...row, warnings },
         match,
         suggestions: match === null ? await this.students.similar(row.fullName) : [],
+        groups: mentions,
       });
     }
     return rows;
