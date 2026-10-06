@@ -112,6 +112,14 @@ docker compose run --rm --no-deps -v "$PWD:/copia" postgres \
 
 Conviene probar la restauración una vez al año contra la base local (`make db-reset` después).
 
+## Si el despliegue falla por el token
+
+Si los pasos «Secretos de la función» o «Subir la web» fallan con `FGA Authentication Error. Unauthorized`
+o con un 500 al pedir la clave de servicio, y la API de Supabase responde con normalidad sin token,
+el token de acceso ha dejado de valer. Revócalo en *Account → Access tokens*, genera otro, actualiza
+el secreto `SUPABASE_ACCESS_TOKEN` del entorno `produccion` y vuelve a lanzar **Despliegue** a mano.
+Las migraciones no dependen del token, así que la base de datos queda al día aunque la función y la web no.
+
 ## Qué vigilar
 
 - **Supabase → Edge Functions → Logs** para errores de la API (los logs son JSON con `requestId`).
