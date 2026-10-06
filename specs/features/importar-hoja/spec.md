@@ -18,7 +18,8 @@ Lo que no se entiende MUST avisarse y quedar vacío. Los meses de septiembre a d
 
 ### Requirement: Revisión antes de importar
 Cada fila MUST casarse con el alumno de nombre igual (sin tildes ni mayúsculas) y, si no lo hay, proponer el alta con los datos de la hoja
-y hasta tres alumnos parecidos. Administración decide por fila: vincular a un alumno, crear uno (corrigiendo los datos y eligiendo uno o varios grupos, porque quien viene dos días puede ir a dos grupos de un día) u omitir,
+y hasta tres alumnos parecidos. «Parecido» significa el mismo nombre de pila y apellidos compatibles («Francisco» o «Francisco Rodríguez»
+se parecen a «Francisco Rodríguez Gil»); compartir solo el apellido no basta («Mar García» no se parece a «Rafa García»). Administración decide por fila: vincular a un alumno, crear uno (corrigiendo los datos y eligiendo uno o varios grupos, porque quien viene dos días puede ir a dos grupos de un día) u omitir,
 y acepta cada fila por separado (o todas las revisadas de una vez, en orden). Nada se guarda hasta aceptar la fila.
 
 #### Scenario: Alumno nuevo

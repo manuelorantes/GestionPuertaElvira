@@ -244,6 +244,18 @@ export class SpreadsheetParser {
 
 // ---- Revisión e importación ------------------------------------------------------------------
 
+/**
+ * Un nombre «se parece» a otro si tienen el mismo nombre de pila y todos los demás apellidos o
+ * nombres escritos aparecen en el otro: «Francisco» o «Francisco Rodríguez» se parecen a
+ * «Francisco Rodríguez Gil»; «Mar García» no se parece a «Rafa García».
+ */
+export function looksLikeSamePerson(written: string, existing: string): boolean {
+  const a = normaliseText(written).split(' ').filter(Boolean);
+  const b = normaliseText(existing).split(' ').filter(Boolean);
+  if (a.length === 0 || b.length === 0 || a[0] !== b[0]) return false;
+  return a.slice(1).every((word) => b.includes(word));
+}
+
 export interface StudentCandidate {
   id: string;
   fullName: string;
