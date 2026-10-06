@@ -599,7 +599,7 @@ export class Payment {
     readonly id: PaymentId,
     readonly student: StudentRef,
     readonly paidOn: LocalDate,
-    readonly method: PaymentMethod,
+    private paidWith: PaymentMethod,
     readonly receipt: DocumentNumber,
     readonly kind: ChargeKind,
     readonly concept: string,
@@ -657,6 +657,15 @@ export class Payment {
 
   invoice(): Invoice | null {
     return this.issued;
+  }
+
+  get method(): PaymentMethod {
+    return this.paidWith;
+  }
+
+  /** Corrige cómo se cobró (p. ej. se anotó como transferencia y fue en efectivo); el importe no cambia. */
+  changeMethod(method: PaymentMethod): void {
+    this.paidWith = method;
   }
 }
 

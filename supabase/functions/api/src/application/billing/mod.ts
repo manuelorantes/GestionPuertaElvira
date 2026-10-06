@@ -583,6 +583,18 @@ export class ImportPayment {
 }
 
 /** Emite, bajo petición, la factura de un cobro (una sola vez). */
+/** Corrige la forma de pago de un cobro ya registrado (se refleja en el recibo y en Contabilidad). */
+export class ChangePaymentMethod {
+  constructor(private readonly payments: PaymentRepository) {}
+
+  async execute(paymentId: string, method: string): Promise<void> {
+    const payment = await this.payments.payment(PaymentId.fromString(paymentId));
+    if (payment === null) throw new PaymentNotFound();
+    payment.changeMethod(paymentMethodFromName(method));
+    await this.payments.savePayment(payment);
+  }
+}
+
 export class IssueInvoice {
   constructor(
     private readonly payments: PaymentRepository,

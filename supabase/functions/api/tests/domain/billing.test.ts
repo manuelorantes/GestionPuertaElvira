@@ -209,6 +209,14 @@ function payment(total: Money): Payment {
   });
 }
 
+Deno.test('Payment should change its payment method, keeping everything else', () => {
+  const p = payment(Money.cents(4500));
+  p.changeMethod('cash');
+  assertEquals(p.method, 'cash');
+  assertEquals(p.total.cents, 4500);
+  assertEquals(p.receipt.toString(), 'R-2026-0001');
+});
+
 Deno.test('Payment should number documents per season and issue one invoice with VAT included in the price', () => {
   assertEquals(DocumentNumber.receipt(2026, 42).toString(), 'R-2026-0042');
   assertEquals(DocumentNumber.invoice(2026, 1).toString(), 'F-2026-0001');
