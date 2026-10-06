@@ -44,7 +44,6 @@ export interface PaymentRequest {
   months: number;
   method: PaymentMethod;
   date: string;
-  prorate: boolean;
   /** Descuento especial: en porcentaje o en céntimos, con motivo. */
   specialDiscount: { percent: number | null; amountCents: number | null; concept: string } | null;
   /** Puntos a canjear (1 punto = 1 % de una cuota mensual; máximo 5; solo cuotas mensuales). */

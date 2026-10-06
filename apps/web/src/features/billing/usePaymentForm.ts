@@ -35,7 +35,6 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
   );
   const [method, setMethod] = useState<api.PaymentMethod>('cash');
   const [date, setDate] = useState(todayIso());
-  const [prorate, setProrate] = useState(false);
   const [special, setSpecial] = useState<SpecialState>({
     enabled: false,
     mode: 'percent',
@@ -44,7 +43,15 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
   });
   const [redeemPoints, setRedeemPoints] = useState(false);
   const account = useAccount(studentId);
-  const concept = chosenConcept ?? 'month';
+  // Un socio sin clases viene a pagar la cuota de socio; el alumnado, su mes.
+  const defaultConcept: Concept =
+    account.data &&
+    account.data.weeklyHours === 0 &&
+    !account.data.hasPrivateLessons &&
+    !account.data.membershipPaid
+      ? 'membership'
+      : 'month';
+  const concept = chosenConcept ?? defaultConcept;
   const remaining = account.data?.remainingMonths ?? null;
   const months = { month: 1, three: 3, six: 6, nine: 9, membership: 1 }[concept];
   const specialValue = Number(special.value.replace(',', '.'));
@@ -66,7 +73,6 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     months,
     method,
     date,
-    prorate: prorate && concept === 'month',
     specialDiscount,
     redeemPoints: points,
   };
@@ -95,6 +101,7 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     },
     concept,
     setConcept,
+    remainingMonths: remaining,
     /** Conceptos que no caben en lo que queda por cobrar (se muestran desactivados). */
     unavailable: (id: Concept) =>
       remaining !== null &&
@@ -104,8 +111,6 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     setMethod,
     date,
     setDate,
-    prorate,
-    setProrate,
     special,
     setSpecial,
     /** Si el alumno tiene al menos 5 puntos (y el cobro es de cuotas) puede canjearlos. */
