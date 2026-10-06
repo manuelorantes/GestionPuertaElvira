@@ -14,7 +14,7 @@ ClassesPage (/panel/clases)
 │   ├── Leyenda de niveles: Iniciación, Intermedio, Avanzado y competición, Particulares
 │   ├── Columna de horas: 16:00, 17:00, 18:00, 19:00, 20:00
 │   └── Por día (Lunes…Viernes): cabecera con el día y «Alfil | Caballo | Peón», rejilla de medias horas 16:00–21:00
-│       └── ScheduleBlock por grupo: nombre, «17:00–18:00», «Profesor · 9/12» (borde discontinuo si es particular)
+│       └── ScheduleBlock por grupo (el color ya dice el nivel): **Profesor** en negrita y «9/10 plazas»; en particulares, **nombre** en negrita y «Profesor · 1/1» (borde discontinuo). Sin hora: la da la rejilla
 ├── [Grupos] GroupsTable (tarjeta)
 │   ├── Cabecera: Grupo | Nivel | Profesor | Horario | Aula | Ocupación | (acciones)
 │   └── Fila: color de nivel + nombre | nivel | profesor | horario + modalidad | «Aula Alfil» | barra + «9/12» (+ «Sobre el cupo») | botón «Editar» (icono lápiz)
