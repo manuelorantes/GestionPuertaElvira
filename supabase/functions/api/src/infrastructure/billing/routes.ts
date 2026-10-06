@@ -1,5 +1,5 @@
 import { LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
-import { paymentMethodLabel, StudentRef } from '../../domain/billing/mod.ts';
+import { paymentMethodFromName, paymentMethodLabel, StudentRef } from '../../domain/billing/mod.ts';
 import {
   AdjustPoints,
   BillingStudentNotFound,
@@ -168,7 +168,7 @@ export function registerBillingRoutes(api: ApiApp): void {
     const club = (await b.settings.get()).club;
     return c.json({
       ...detail.summary,
-      methodLabel: paymentMethodLabel(detail.summary.method === 'cash' ? 'cash' : 'transfer'),
+      methodLabel: paymentMethodLabel(paymentMethodFromName(detail.summary.method)),
       guardianName: detail.guardianName,
       lines: detail.lines,
       periods: detail.periods,

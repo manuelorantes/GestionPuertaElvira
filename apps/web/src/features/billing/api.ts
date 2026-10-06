@@ -2,7 +2,13 @@ import { apiGet, apiSend } from '@/shared/api/client';
 
 export type ChargeStatus = 'paid' | 'due' | 'overdue' | 'upcoming';
 export type ChargeKind = 'monthly' | 'membership';
-export type PaymentMethod = 'cash' | 'transfer';
+export type PaymentMethod = 'cash' | 'card' | 'transfer';
+
+export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
+  cash: 'Efectivo',
+  card: 'Datáfono',
+  transfer: 'Transferencia',
+};
 export type PreferredPlan = 'monthly' | 'three_months' | 'six_months' | 'rest_of_season';
 
 export interface Charge {

@@ -1,5 +1,6 @@
-import { Banknote, Landmark, Printer } from 'lucide-react';
+import { Banknote, CreditCard, Landmark, Printer } from 'lucide-react';
 
+import { PAYMENT_METHOD_LABEL, type PaymentMethod } from '@/features/billing/api';
 import { usePayments } from '@/features/billing/hooks';
 import { formatCents } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
@@ -14,8 +15,28 @@ export function PaymentsTab({ onOpenReceipt }: { onOpenReceipt: (paymentId: stri
   if (items.length === 0)
     return <p className="text-ink-muted">Todavía no hay cobros registrados.</p>;
 
+  const byMethod = (['cash', 'card', 'transfer'] as const).map((method) => ({
+    method,
+    label: PAYMENT_METHOD_LABEL[method],
+    totalCents: items.filter((p) => p.method === method).reduce((sum, p) => sum + p.totalCents, 0),
+  }));
+
   return (
     <Card className="overflow-x-auto">
+      <dl
+        aria-label="Totales por forma de pago"
+        className="flex flex-wrap gap-x-6 gap-y-2 border-b border-line px-5 py-3 text-sm"
+      >
+        {byMethod.map((m) => (
+          <div key={m.method} className="flex items-center gap-2">
+            <dt className="inline-flex items-center gap-1.5 text-ink-muted">
+              <MethodIcon method={m.method} />
+              {m.label}
+            </dt>
+            <dd className="font-semibold">{formatCents(m.totalCents)}</dd>
+          </div>
+        ))}
+      </dl>
       <table className="w-full min-w-[860px] text-left text-sm">
         <caption className="sr-only">Cobros registrados</caption>
         <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
@@ -49,12 +70,8 @@ export function PaymentsTab({ onOpenReceipt }: { onOpenReceipt: (paymentId: stri
               <td className="px-5 py-3">{payment.concept}</td>
               <td className="px-5 py-3 text-ink-soft">
                 <span className="inline-flex items-center gap-2">
-                  {payment.method === 'cash' ? (
-                    <Banknote aria-hidden size={16} />
-                  ) : (
-                    <Landmark aria-hidden size={16} />
-                  )}
-                  {payment.method === 'cash' ? 'Efectivo' : 'Transferencia'}
+                  <MethodIcon method={payment.method} />
+                  {PAYMENT_METHOD_LABEL[payment.method]}
                 </span>
               </td>
               <td className="px-5 py-3 text-right font-semibold text-brand-strong">
@@ -77,4 +94,10 @@ export function PaymentsTab({ onOpenReceipt }: { onOpenReceipt: (paymentId: stri
       </table>
     </Card>
   );
+}
+
+function MethodIcon({ method }: { method: PaymentMethod }) {
+  if (method === 'cash') return <Banknote aria-hidden size={16} />;
+  if (method === 'card') return <CreditCard aria-hidden size={16} />;
+  return <Landmark aria-hidden size={16} />;
 }

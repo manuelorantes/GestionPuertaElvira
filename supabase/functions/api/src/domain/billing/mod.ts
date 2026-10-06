@@ -16,17 +16,17 @@ export class TeacherRef extends Uuid {}
 export type ChargeKind = 'monthly' | 'membership';
 export type ChargeStatus = 'paid' | 'due' | 'overdue' | 'upcoming';
 
-export type PaymentMethod = 'cash' | 'transfer';
+export type PaymentMethod = 'cash' | 'card' | 'transfer';
 
 export function paymentMethodFromName(name: string): PaymentMethod {
-  if (name !== 'cash' && name !== 'transfer') {
+  if (name !== 'cash' && name !== 'card' && name !== 'transfer') {
     throw new InvalidValue('method', 'Forma de pago desconocida: usa cash o transfer.');
   }
   return name;
 }
 
 export function paymentMethodLabel(method: PaymentMethod): string {
-  return method === 'cash' ? 'Efectivo' : 'Transferencia';
+  return { cash: 'Efectivo', card: 'Datáfono', transfer: 'Transferencia' }[method];
 }
 
 /** Forma de pago preferida: solo propone cuántos meses cobrar. */
@@ -101,7 +101,7 @@ export class InvalidPaymentRequest extends Error implements HasErrorDetails {
 
   static points(available: number): InvalidPaymentRequest {
     return new InvalidPaymentRequest(
-      `Se pueden canjear entre 1 y ${PointsRedemption.MAX_POINTS} puntos, y el alumno tiene ${available}.`,
+      `Los puntos se canjean de ${PointsRedemption.REQUIRED_POINTS} en ${PointsRedemption.REQUIRED_POINTS} (un ${PointsRedemption.PERCENT} % de una cuota), y el alumno tiene ${available}.`,
       'invalid_points',
     );
   }
@@ -171,8 +171,9 @@ export class Tariff {
   }
 
   /** Descuento por pago adelantado según los meses cubiertos. */
+  /** 3 meses o más: el primer tramo; 6 o más: el segundo; 9 o más (la temporada): el tercero. */
   prepaymentPercent(months: number): number {
-    if (months >= 7) return this.seasonPercent;
+    if (months >= 9) return this.seasonPercent;
     if (months >= 6) return this.sixMonthsPercent;
     if (months >= 3) return this.threeMonthsPercent;
     return 0;
@@ -410,26 +411,23 @@ export class SpecialDiscount {
 }
 
 /**
- * Canje de puntos al cobrar: cada punto descuenta un 1 % de UNA cuota mensual (la del primer mes),
- * aunque se paguen varios meses; como mucho 5 puntos.
+ * Canje de puntos al cobrar: 5 puntos descuentan un 5 % de UNA cuota mensual (la del primer mes),
+ * aunque se paguen varios meses. Con menos de 5 puntos no hay descuento; los puntos tendrán más usos.
  */
 export class PointsRedemption {
-  static readonly MAX_POINTS = 5;
+  static readonly REQUIRED_POINTS = 5;
+  static readonly PERCENT = 5;
 
   constructor(readonly points: number) {
-    if (!Number.isInteger(points) || points < 1 || points > PointsRedemption.MAX_POINTS) {
-      throw InvalidPaymentRequest.points(points);
-    }
+    if (points !== PointsRedemption.REQUIRED_POINTS) throw InvalidPaymentRequest.points(points);
   }
 
   discountOn(oneMonth: Money): Money {
-    return oneMonth.percent(this.points);
+    return oneMonth.percent(PointsRedemption.PERCENT);
   }
 
   label(): string {
-    return `Canje de ${this.points} ${
-      this.points === 1 ? 'punto' : 'puntos'
-    } (${this.points} % de un mes)`;
+    return `Canje de ${this.points} puntos (${PointsRedemption.PERCENT} % de un mes)`;
   }
 }
 

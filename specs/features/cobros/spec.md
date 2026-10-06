@@ -25,14 +25,15 @@ más sus clases particulares:
 Los descuentos en porcentaje MUST sumarse sobre el importe bruto del cobro:
 
 - familiar (10 %), si tiene hermanos activos;
-- pago adelantado: 3 meses o más, 10 %; 6 meses o más, 15 %; 7 meses o más (resto de temporada), 20 %;
+- pago adelantado: 3 meses o más, 10 %; 6 meses o más, 15 %; 9 meses (la temporada), 20 %. Solo se puede
+  cobrar un bloque de 3, 6 o 9 meses si quedan al menos esos meses por cobrar;
 - descuento especial en porcentaje, con motivo.
 
 Después se restan los descuentos en euros, sin bajar de 0 €:
 
-- canje de puntos: cada punto descuenta un 1 % de UNA cuota mensual (la del primer mes), aunque se paguen
-  varios meses; como mucho 5 puntos por cobro y nunca más de los que tiene el alumno; solo en cuotas mensuales.
-  Al registrar el cobro, los puntos canjeados se restan;
+- canje de puntos: 5 puntos descuentan un 5 % de UNA cuota mensual (la del primer mes), aunque se paguen
+  varios meses; con menos de 5 no hay descuento y no se canjean de uno en uno; solo en cuotas mensuales.
+  Al registrar el cobro, los 5 puntos se restan. Los puntos tendrán otros usos en el futuro;
 - descuento especial en cantidad fija, con motivo.
 
 El descuento especial MUST poder aplicarse a cualquier cobro, incluida la cuota de socio, y siempre lleva motivo.
@@ -45,6 +46,10 @@ El total MUST redondearse a céntimos, y las líneas del desglose MUST sumar exa
 #### Scenario: Puntos en un cobro de seis meses
 - **WHEN** un alumno de tramo 45 € con 5 puntos paga 6 meses canjeando los 5
 - **THEN** al total con el 15 % de pago adelantado se le restan 2,25 € (5 % de una cuota), y el alumno se queda con 0 puntos
+
+#### Scenario: Menos de nueve meses
+- **WHEN** a un alumno le quedan 8 meses por cobrar
+- **THEN** no puede acogerse al cobro de 9 meses ni a su 20 %; 6 meses sigue disponible con el 15 %
 
 ### Requirement: Horas semanales
 Las horas semanales de un alumno, de las que sale su tarifa, MUST ser la suma de lo que realmente hace en cada grupo:
@@ -71,8 +76,9 @@ El importe de una cuota no cambia aunque después cambien las tarifas o los grup
 - **THEN** no hay cuotas
 
 ### Requirement: Registrar un cobro
-Un cobro MUST indicar el alumno, el concepto (1 mes, 3 meses, 6 meses, resto de temporada o cuota de socio),
-la forma de pago (efectivo o transferencia) y la fecha, y MUST mostrar el desglose antes de guardarlo.
+Un cobro MUST indicar el alumno, el concepto (1 mes, 3 meses, 6 meses, 9 meses o cuota de socio),
+la forma de pago (efectivo, datáfono o transferencia) y la fecha, y MUST mostrar el desglose antes de guardarlo.
+La lista de cobros MUST mostrar los totales por forma de pago.
 Un cobro de N meses MUST pagar primero las cuotas pendientes más antiguas y después los meses siguientes, sin pasar de junio.
 El prorrateo MUST permitirse solo al cobrar un mes, y cobra los días que quedan desde la fecha hasta fin de mes.
 

@@ -153,7 +153,8 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
         <span>
           Puntos: <strong>{account.points}</strong>
           <span className="block text-[12px] text-ink-muted">
-            Se canjean al cobrar: 1 punto = 1 % de una cuota mensual (máximo 5).
+            Con 5 puntos se descuenta un 5 % de una cuota mensual al cobrar; los puntos tendrán más
+            usos.
           </span>
         </span>
         <span className="flex gap-2">
