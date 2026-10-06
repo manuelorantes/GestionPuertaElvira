@@ -45,7 +45,8 @@ describe('Clases', () => {
     expect(await screen.findByText('Lunes a viernes · 3 aulas · 1 grupos')).toBeVisible();
     const blocks = await screen.findAllByRole('button', { name: /iniciación a/i });
     expect(blocks).toHaveLength(2);
-    expect(blocks[0]).toHaveTextContent('Lucía Moreno · 13/12');
+    expect(blocks[0]).toHaveTextContent('Lucía Moreno13/12 plazas');
+    expect(blocks[0]).not.toHaveTextContent('17:00');
     expect(screen.getByText('Particulares')).toBeVisible();
   });
 
