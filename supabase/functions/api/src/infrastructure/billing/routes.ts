@@ -4,6 +4,7 @@ import {
   AdjustPoints,
   BillingStudentNotFound,
   ChangePaymentMethod,
+  CorrectPaymentAmount,
   decimal,
   GenerateMonthlyCharges,
   GetStudentAccount,
@@ -14,6 +15,7 @@ import {
   type PaymentRequest,
   QuotePayment,
   RegisterPayment,
+  ReschedulePayment,
   UpdateBillingSettings,
   UpdateStudentAccount,
 } from '../../application/billing/mod.ts';
@@ -175,6 +177,25 @@ export function registerBillingRoutes(api: ApiApp): void {
       invoice: detail.invoice,
       club: { name: club.name, taxId: club.taxId, address: club.address },
     });
+  });
+
+  api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/date'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await new ReschedulePayment(new SqlPaymentRepository(scope.tx), api.deps.clock).execute(
+      param(c, 'id'),
+      body.requiredString('date'),
+    );
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/amount'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await new CorrectPaymentAmount(new SqlPaymentRepository(scope.tx)).execute(
+      param(c, 'id'),
+      body.requiredInt('amountCents'),
+      body.requiredString('reason'),
+    );
+    return c.body(null, 204);
   });
 
   api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/method'), async (c, scope) => {

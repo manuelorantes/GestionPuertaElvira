@@ -217,6 +217,27 @@ Deno.test('Payment should change its payment method, keeping everything else', (
   assertEquals(p.receipt.toString(), 'R-2026-0001');
 });
 
+Deno.test('Payment should move its date within its season and correct its amount with a line', () => {
+  const p = payment(Money.cents(2000));
+  const today = LocalDate.fromString('2026-10-07');
+  p.reschedule(LocalDate.fromString('2026-09-15'), today);
+  assertEquals(p.paidOn.toString(), '2026-09-15');
+  assertThrows(
+    () => p.reschedule(LocalDate.fromString('2026-06-30'), today),
+    InvalidValue,
+    'temporada',
+  );
+  assertThrows(() => p.reschedule(LocalDate.fromString('2026-10-08'), today), InvalidValue);
+
+  p.correctTotal(Money.cents(4000), 'Septiembre completo');
+  assertEquals(p.total.cents, 4000);
+  assertEquals(p.lines.at(-1)?.label, 'Corrección: Septiembre completo');
+  assertEquals(p.lines.at(-1)?.amount.cents, 2000);
+  assert(p.lines.reduce((sum, l) => sum.plus(l.amount), Money.zero()).equals(p.total));
+  assertThrows(() => p.correctTotal(Money.cents(-1), 'x'), InvalidValue);
+  assertThrows(() => p.correctTotal(Money.cents(3000), '  '), InvalidValue);
+});
+
 Deno.test('Payment should number documents per season and issue one invoice with VAT included in the price', () => {
   assertEquals(DocumentNumber.receipt(2026, 42).toString(), 'R-2026-0042');
   assertEquals(DocumentNumber.invoice(2026, 1).toString(), 'F-2026-0001');

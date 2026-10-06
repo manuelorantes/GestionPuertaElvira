@@ -584,6 +584,33 @@ export class ImportPayment {
 
 /** Emite, bajo petición, la factura de un cobro (una sola vez). */
 /** Corrige la forma de pago de un cobro ya registrado (se refleja en el recibo y en Contabilidad). */
+/** Corrige el día de un cobro ya registrado (dentro de la temporada de su recibo). */
+export class ReschedulePayment {
+  constructor(
+    private readonly payments: PaymentRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(paymentId: string, date: string): Promise<void> {
+    const payment = await this.payments.payment(PaymentId.fromString(paymentId));
+    if (payment === null) throw new PaymentNotFound();
+    payment.reschedule(LocalDate.fromString(date), LocalDate.fromInstant(this.clock.now()));
+    await this.payments.savePayment(payment);
+  }
+}
+
+/** Corrige el importe de un cobro ya registrado, con el motivo como línea del recibo. */
+export class CorrectPaymentAmount {
+  constructor(private readonly payments: PaymentRepository) {}
+
+  async execute(paymentId: string, amountCents: number, reason: string): Promise<void> {
+    const payment = await this.payments.payment(PaymentId.fromString(paymentId));
+    if (payment === null) throw new PaymentNotFound();
+    payment.correctTotal(Money.cents(amountCents), reason);
+    await this.payments.savePayment(payment);
+  }
+}
+
 export class ChangePaymentMethod {
   constructor(private readonly payments: PaymentRepository) {}
 

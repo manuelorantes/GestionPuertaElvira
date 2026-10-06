@@ -4,6 +4,7 @@ import {
   type LocalDate,
   Money,
   roundHalfAwayFromZero,
+  Season,
   Uuid,
   YearMonth,
 } from '../common/mod.ts';
@@ -598,13 +599,13 @@ export class Payment {
   private constructor(
     readonly id: PaymentId,
     readonly student: StudentRef,
-    readonly paidOn: LocalDate,
+    private paidDay: LocalDate,
     private paidWith: PaymentMethod,
     readonly receipt: DocumentNumber,
     readonly kind: ChargeKind,
     readonly concept: string,
-    readonly lines: readonly QuoteLine[],
-    readonly total: Money,
+    private quoteLines: readonly QuoteLine[],
+    private amount: Money,
     readonly periods: readonly YearMonth[],
     private issued: Invoice | null,
   ) {}
@@ -661,6 +662,49 @@ export class Payment {
 
   get method(): PaymentMethod {
     return this.paidWith;
+  }
+
+  get paidOn(): LocalDate {
+    return this.paidDay;
+  }
+
+  get lines(): readonly QuoteLine[] {
+    return this.quoteLines;
+  }
+
+  get total(): Money {
+    return this.amount;
+  }
+
+  /** Corrige el día del cobro: dentro de la temporada de su recibo y nunca en el futuro. */
+  reschedule(on: LocalDate, today: LocalDate): void {
+    if (Season.containing(YearMonth.of(on)).startYear !== this.receipt.seasonYear) {
+      throw new InvalidValue(
+        'date',
+        `La fecha debe ser de la temporada ${this.receipt.seasonYear}/${
+          String((this.receipt.seasonYear + 1) % 100).padStart(2, '0')
+        } del recibo.`,
+      );
+    }
+    if (today.isBefore(on)) throw new InvalidValue('date', 'La fecha no puede ser futura.');
+    this.paidDay = on;
+  }
+
+  /** Corrige el importe cobrado añadiendo una línea con la diferencia y el motivo (las líneas siguen sumando el total). */
+  correctTotal(total: Money, reason: string): void {
+    if (total.isNegative()) {
+      throw new InvalidValue('amountCents', 'El importe no puede ser negativo.');
+    }
+    if (reason.trim() === '') {
+      throw new InvalidValue('reason', 'Indica el motivo de la corrección.');
+    }
+    const difference = total.minus(this.amount);
+    if (difference.equals(Money.zero())) return;
+    this.quoteLines = [
+      ...this.quoteLines,
+      new QuoteLine(`Corrección: ${reason.trim()}`, difference),
+    ];
+    this.amount = total;
   }
 
   /** Corrige cómo se cobró (p. ej. se anotó como transferencia y fue en efectivo); el importe no cambia. */

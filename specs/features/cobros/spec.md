@@ -89,10 +89,15 @@ Un cobro de N meses MUST pagar primero las cuotas pendientes más antiguas y des
 - **WHEN** se intentan cobrar más meses de los que quedan de temporada
 - **THEN** el cobro se rechaza indicando cuántos meses quedan
 
-### Requirement: Corregir la forma de pago
-Administración MUST poder corregir la forma de pago (efectivo, datáfono o transferencia) de un cobro ya
-registrado. El importe, el recibo y los meses cobrados no cambian; el recibo y Contabilidad muestran la nueva
-forma de pago y el cambio queda en el historial.
+### Requirement: Corregir un cobro
+Administración MUST poder corregir de un cobro ya registrado:
+
+- la forma de pago (efectivo, datáfono o transferencia);
+- la fecha, dentro de la temporada de su recibo y nunca futura;
+- el importe, indicando el motivo, que queda como línea «Corrección: <motivo>» del recibo con la diferencia.
+
+El número de recibo y los meses cobrados no cambian. El recibo y Contabilidad muestran los datos corregidos y
+cada cambio queda en el historial.
 
 #### Scenario: Anotado como transferencia y pagado en efectivo
 - **WHEN** administración cambia a «Efectivo» un cobro registrado como transferencia
