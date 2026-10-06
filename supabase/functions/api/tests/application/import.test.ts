@@ -1,7 +1,12 @@
-import { assertEquals, assertThrows } from '@std/assert';
+import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
 
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
-import { matchGroups, normaliseText, SpreadsheetParser } from '../../src/application/import/mod.ts';
+import {
+  looksLikeSamePerson,
+  matchGroups,
+  normaliseText,
+  SpreadsheetParser,
+} from '../../src/application/import/mod.ts';
 
 const SHEET = [
   ',Fotos,,Cuota Anual,Chandal y polo,Federativa,Septiembre,Octubre,Noviembre,Diciembre,Enero,Febrero,Marzo,Abril,Mayo,Junio,Fecha Nacimiento,Madre ó Padre,Telefono,e-mail',
@@ -98,4 +103,13 @@ Deno.test('matchGroups should find a group by its name, its default name or word
   assertEquals(ids('Vie 17:30'), ['c']);
   assertEquals(ids('Jueves 17:00'), []);
   assertEquals(ids('   '), []);
+});
+
+Deno.test('looksLikeSamePerson should need the same first name and compatible surnames', () => {
+  assert(looksLikeSamePerson('Francisco', 'Francisco Rodríguez Gil'));
+  assert(looksLikeSamePerson('Francisco Rodriguez', 'Francisco Rodríguez Gil'));
+  assert(looksLikeSamePerson('hector perez', 'Héctor Pérez Ratkovsky'));
+  assertFalse(looksLikeSamePerson('Mar García', 'Rafa García'));
+  assertFalse(looksLikeSamePerson('Francisco Orantes', 'Francisco Rodríguez Gil'));
+  assertFalse(looksLikeSamePerson('', 'Francisco Rodríguez'));
 });
