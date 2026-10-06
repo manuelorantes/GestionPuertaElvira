@@ -1,4 +1,5 @@
 import { Minus, Plus, Printer, Wallet } from 'lucide-react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -9,6 +10,7 @@ import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import { Card } from '@/shared/ui/Card';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
@@ -93,7 +95,18 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
       privateRate: rate.trim() || null,
     }),
   );
-  const points = useBillingMutation((delta: number) => adjustPoints(studentId, delta));
+  const queryClient = useQueryClient();
+  const refresh = useRefreshClubData();
+  // Los puntos se ven al instante: la respuesta actualiza la ficha y el resto se recarga en segundo plano.
+  const points = useMutation({
+    mutationFn: (delta: number) => adjustPoints(studentId, delta),
+    onSuccess: (total) => {
+      queryClient.setQueryData<Account>(['account', studentId], (old) =>
+        old ? { ...old, points: total } : old,
+      );
+      refresh();
+    },
+  });
   const toast = useToast();
   const error = save.error ?? points.error;
 
