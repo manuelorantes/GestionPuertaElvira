@@ -45,14 +45,14 @@ class ImportGroupDirectory implements GroupDirectory {
   }
 }
 
-/** Rutas de importación de la hoja de cálculo: /api/admin/import */
+/** Rutas de importación de la hoja de cálculo: /api/admin/import (solo superadministración). */
 export function registerImportRoutes(api: ApiApp): void {
   registerDomainErrors({ PossibleDuplicate: [409, 'possible_duplicate'] });
   const { clock } = api.deps;
   const matcher = (scope: RequestScope) => new SqlStudentMatcher(scope.tx);
 
   api.defineRoute(
-    { method: 'POST', path: '/api/admin/import/preview', access: 'admin' },
+    { method: 'POST', path: '/api/admin/import/preview', access: 'superadmin' },
     async (c, scope) => {
       const text = (await JsonBody.from(c.req.raw)).requiredString('text');
       const rows = await new PreviewImport(
@@ -73,7 +73,7 @@ export function registerImportRoutes(api: ApiApp): void {
   );
 
   api.defineRoute(
-    { method: 'POST', path: '/api/admin/import/rows', access: 'admin' },
+    { method: 'POST', path: '/api/admin/import/rows', access: 'superadmin' },
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
       const d = body.optionalObject('row');

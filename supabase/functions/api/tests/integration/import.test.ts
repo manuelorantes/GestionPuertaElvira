@@ -182,3 +182,23 @@ Deno.test('import should fail only the bad row and save nothing of it', async ()
   );
   assertEquals(await total(fx), 2);
 });
+
+Deno.test('import is reserved to superadministrators', async () => {
+  await resetDatabase();
+  await createUser('junta@club.es', 'administrator');
+  const client = new ApiClient();
+  await client.logIn('junta@club.es');
+  assertError(
+    await client.json('POST', '/api/admin/import/preview', { text: SHEET }),
+    403,
+    'forbidden',
+  );
+  assertError(
+    await client.json('POST', '/api/admin/import/rows', {
+      text: SHEET,
+      row: { line: 2, action: 'skip' },
+    }),
+    403,
+    'forbidden',
+  );
+});
