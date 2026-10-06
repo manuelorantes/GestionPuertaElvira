@@ -22,6 +22,10 @@ ClassesPage (/panel/clases)
 ├── [Profesores] TeachersPanel (tarjeta)
 │   ├── Formulario en línea: campo «Nombre y apellidos» + botón «Añadir profesor»
 │   └── Fila por profesor: nombre | «N grupos» | badge Activo/Inactivo | botón «Editar» → edición en línea: nombre, interruptor «Activo», «Guardar» y «Cancelar»
+├── ClassGroupPanel (panel lateral al pulsar un grupo)
+│   ├── Cabecera: color de nivel, nombre, «Profesor · modalidad», aula, ocupación (por día si hay horarios especiales), botón «Editar»
+│   ├── Tarjeta «Alumnos inscritos»: fila por alumno «Nombre · N años» + «Ver ficha»
+│   └── Tarjeta «Inscribir alumno»: desplegable con búsqueda (al abrirlo salen todos los alumnos activos no inscritos; al escribir se filtran por nombre o apellidos, sin tildes ni mayúsculas) + botón «Inscribir»
 └── ClassGroupDialog (alta o edición)
     ├── Título «Nuevo grupo» | «Editar grupo», botón cerrar
     ├── Nombre del grupo (opcional; el placeholder muestra el nombre por defecto que tendrá: día, hora, nivel y aula)

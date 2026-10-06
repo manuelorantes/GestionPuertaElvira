@@ -451,11 +451,13 @@ describe('ficha de grupo', () => {
     const panel = await screen.findByRole('dialog', { name: 'Iniciación A' });
     expect(within(panel).getByText('Martina López Herrera')).toBeVisible();
 
-    await user.type(within(panel).getByLabelText('Buscar alumno'), 'villar');
-    expect(
-      within(panel).getByRole('option', { name: /Elige un alumno \(1\)/ }),
-    ).toBeInTheDocument();
-    await user.selectOptions(within(panel).getByLabelText('Inscribir alumno'), 's4');
+    const picker = within(panel).getByRole('combobox', { name: 'Inscribir alumno' });
+    await user.click(picker);
+    expect(within(panel).getAllByRole('option')).toHaveLength(1);
+    await user.type(picker, 'villar');
+    expect(within(panel).getAllByRole('option')).toHaveLength(1);
+    await user.click(within(panel).getByRole('option', { name: 'Nerea Villar Campos' }));
+    expect(picker).toHaveValue('Nerea Villar Campos');
     await user.click(within(panel).getByRole('button', { name: 'Inscribir' }));
 
     await waitFor(() =>
