@@ -1,4 +1,4 @@
-import { Banknote, Landmark } from 'lucide-react';
+import { Banknote, CreditCard, Landmark } from 'lucide-react';
 import type { FormEvent } from 'react';
 
 import type { ChargeKind } from '@/features/billing/api';
@@ -105,6 +105,14 @@ export function PaymentDialog({
                   Efectivo
                 </ToggleButton>
                 <ToggleButton
+                  pressed={form.method === 'card'}
+                  onClick={() => form.setMethod('card')}
+                  className="inline-flex h-11 flex-1 items-center justify-center gap-1.5"
+                >
+                  <CreditCard aria-hidden size={16} />
+                  Datáfono
+                </ToggleButton>
+                <ToggleButton
                   pressed={form.method === 'transfer'}
                   onClick={() => form.setMethod('transfer')}
                   className="inline-flex h-11 flex-1 items-center justify-center gap-1.5"
@@ -129,24 +137,20 @@ export function PaymentDialog({
               onChange={form.setProrate}
             />
           )}
-          {form.concept !== 'membership' && form.availablePoints > 0 && (
-            <Select
-              label="Canjear puntos"
-              value={String(form.redeemPoints)}
-              onChange={(v) => form.setRedeemPoints(Number(v))}
-              options={Array.from({ length: form.availablePoints + 1 }, (_, n) => ({
-                value: String(n),
-                label:
-                  n === 0
-                    ? 'Sin canje'
-                    : `${n} ${n === 1 ? 'punto' : 'puntos'} (−${n} % de un mes)`,
-              }))}
-            />
-          )}
-          {form.concept !== 'membership' && form.availablePoints > 0 && (
-            <p className="-mt-3 text-[13px] text-ink-muted">
-              1 punto = 1 % de una cuota mensual, aunque se paguen varios meses. Máximo 5.
-            </p>
+          {form.concept !== 'membership' && form.account && (
+            <div className="flex flex-col gap-1">
+              <Switch
+                label="Canjear 5 puntos (−5 % de una cuota mensual)"
+                checked={form.redeemPoints}
+                onChange={form.setRedeemPoints}
+                disabled={!form.canRedeem}
+              />
+              <p className="text-[13px] text-ink-muted">
+                {form.canRedeem
+                  ? `Tiene ${form.account.points} puntos. Se canjean de 5 en 5 y descuentan un 5 % de una sola cuota, aunque se paguen varios meses.`
+                  : `Tiene ${form.account.points} ${form.account.points === 1 ? 'punto' : 'puntos'}: hacen falta 5 para un descuento.`}
+              </p>
+            </div>
           )}
           <Switch
             label="Descuento especial"

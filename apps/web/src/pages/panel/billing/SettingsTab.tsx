@@ -24,7 +24,7 @@ const PERCENTS: { key: PercentKey; label: string }[] = [
   { key: 'familyPercent', label: 'Familiar (hermanos en el club)' },
   { key: 'threeMonthsPercent', label: 'Pago adelantado de 3 meses' },
   { key: 'sixMonthsPercent', label: 'Pago adelantado de 6 meses' },
-  { key: 'seasonPercent', label: 'Resto de temporada (7 meses o más)' },
+  { key: 'seasonPercent', label: '9 meses (la temporada)' },
 ];
 
 function Title({ children }: { children: ReactNode }) {

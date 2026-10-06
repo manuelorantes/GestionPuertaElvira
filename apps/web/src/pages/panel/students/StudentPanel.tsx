@@ -195,6 +195,7 @@ export function StudentPanel() {
                     <button
                       type="button"
                       aria-label={`Mover de ${g.name}`}
+                      title="Mover a otro grupo"
                       onClick={() => setAction({ kind: 'move', groupId: g.id, groupName: g.name })}
                       className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
                     >
@@ -203,6 +204,7 @@ export function StudentPanel() {
                     <button
                       type="button"
                       aria-label={`Quitar de ${g.name}`}
+                      title="Quitar del grupo"
                       onClick={() => void removeGroup(g.id, g.name)}
                       className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
                     >
