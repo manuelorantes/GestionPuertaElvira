@@ -80,7 +80,10 @@ Deno.test('FeeCalculator should add up discounts for siblings and prepayment', (
     'Pago adelantado 3 meses −10 %',
   ]);
   for (
-    const [months, percent] of [[1, 0], [2, 0], [3, 10], [5, 10], [6, 15], [7, 20], [10, 20]] as [
+    const [months, percent] of [[1, 0], [2, 0], [3, 10], [5, 10], [6, 15], [7, 15], [8, 15], [
+      9,
+      20,
+    ], [10, 20]] as [
       number,
       number,
     ][]
@@ -304,7 +307,21 @@ Deno.test('FeeCalculator should redeem points on a single month and take fixed s
   );
   assertEquals(membership.total.cents, 2500);
 
+  // Solo de 5 en 5: con 3 puntos no hay descuento.
+  assertThrows(() => new PointsRedemption(3), InvalidPaymentRequest);
   assertThrows(() => new PointsRedemption(6), InvalidPaymentRequest);
   assertThrows(() => new PointsRedemption(0), InvalidPaymentRequest);
+
+  // Pago adelantado: 20 % solo a partir de 9 meses; 7 u 8 meses siguen al 15 %.
+  const tariff = BillingSettings.defaults().tariff;
+  assertEquals([1, 3, 6, 7, 8, 9, 10].map((m) => tariff.prepaymentPercent(m)), [
+    0,
+    10,
+    15,
+    15,
+    15,
+    20,
+    20,
+  ]);
   assertThrows(() => new SpecialDiscount(Money.zero(), 'Nada'), InvalidValue);
 });

@@ -192,14 +192,18 @@ describe('Cobros y cuotas', () => {
 
   it('lets administration redeem points and add a fixed special discount with a reason', async () => {
     const fetch = api({
-      'GET /api/admin/billing/accounts/s1': [200, { ...ACCOUNT, points: 4 }],
+      'GET /api/admin/billing/accounts/s1': [200, { ...ACCOUNT, points: 6 }],
     });
     renderApp('/panel/cobros?mes=2026-10');
 
     const row = within(await screen.findByRole('table')).getByRole('row', { name: /Martina/ });
     await userEvent.click(within(row).getByRole('button', { name: 'Cobrar' }));
     const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' });
-    await userEvent.selectOptions(await within(dialog).findByLabelText('Canjear puntos'), '3');
+    await userEvent.click(
+      await within(dialog).findByRole('switch', {
+        name: 'Canjear 5 puntos (−5 % de una cuota mensual)',
+      }),
+    );
     await userEvent.click(within(dialog).getByRole('switch', { name: 'Descuento especial' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cantidad fija' }));
     await userEvent.type(within(dialog).getByLabelText('Descuento (€)'), '10');
@@ -208,7 +212,7 @@ describe('Cobros y cuotas', () => {
     await waitFor(() => {
       const quotes = fetch.mock.calls.filter(([url]) => url === '/api/admin/billing/quote');
       expect(JSON.parse(String(quotes.at(-1)?.[1]?.body))).toMatchObject({
-        redeemPoints: 3,
+        redeemPoints: 5,
         specialDiscount: { percent: null, amountCents: 1000, concept: 'Beca del club' },
       });
     });

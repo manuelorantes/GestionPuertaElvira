@@ -8,13 +8,13 @@ import { useDebouncedValue } from '@/shared/useDebouncedValue';
 import * as api from './api';
 import { useAccount, useBillingMutation } from './hooks';
 
-export type Concept = 'month' | 'three' | 'six' | 'rest' | 'membership';
+export type Concept = 'month' | 'three' | 'six' | 'nine' | 'membership';
 
 export const CONCEPTS: { id: Concept; label: string }[] = [
   { id: 'month', label: 'Mes' },
   { id: 'three', label: '3 meses' },
   { id: 'six', label: '6 meses' },
-  { id: 'rest', label: 'Resto de temporada' },
+  { id: 'nine', label: '9 meses' },
   { id: 'membership', label: 'Cuota de socio' },
 ];
 
@@ -42,11 +42,11 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     value: '',
     concept: '',
   });
-  const [redeemPoints, setRedeemPoints] = useState(0);
+  const [redeemPoints, setRedeemPoints] = useState(false);
   const account = useAccount(studentId);
   const concept = chosenConcept ?? 'month';
   const remaining = account.data?.remainingMonths ?? null;
-  const months = { month: 1, three: 3, six: 6, rest: remaining ?? 0, membership: 1 }[concept];
+  const months = { month: 1, three: 3, six: 6, nine: 9, membership: 1 }[concept];
   const specialValue = Number(special.value.replace(',', '.'));
   const specialDiscount =
     special.enabled && specialValue > 0 && special.concept.trim()
@@ -56,8 +56,9 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
           concept: special.concept.trim(),
         }
       : null;
-  const availablePoints = Math.min(5, account.data?.points ?? 0);
-  const points = concept === 'membership' ? 0 : Math.min(redeemPoints, availablePoints);
+  // Los puntos se canjean de 5 en 5: con menos de 5 no hay descuento.
+  const canRedeem = (account.data?.points ?? 0) >= 5 && concept !== 'membership';
+  const points = canRedeem && redeemPoints ? 5 : 0;
 
   const request: api.PaymentRequest = {
     studentId,
@@ -73,11 +74,7 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
   const requestKey = JSON.stringify(request);
   const debouncedKey = useDebouncedValue(requestKey, 250);
   const debounced = useMemo(() => JSON.parse(debouncedKey) as api.PaymentRequest, [debouncedKey]);
-  const ready =
-    Boolean(debounced.studentId) &&
-    Boolean(debounced.date) &&
-    debounced.months > 0 &&
-    (concept !== 'rest' || remaining !== null);
+  const ready = Boolean(debounced.studentId) && Boolean(debounced.date) && debounced.months > 0;
   const quote = useQuery({
     queryKey: ['quote', debouncedKey],
     queryFn: () => api.quotePayment(debounced),
@@ -102,7 +99,7 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     unavailable: (id: Concept) =>
       remaining !== null &&
       id !== 'membership' &&
-      ({ month: 1, three: 3, six: 6, rest: 1 } as const)[id] > remaining,
+      ({ month: 1, three: 3, six: 6, nine: 9 } as const)[id] > remaining,
     method,
     setMethod,
     date,
@@ -111,9 +108,9 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     setProrate,
     special,
     setSpecial,
-    /** Puntos que se pueden canjear en este cobro (hasta 5 y los que tenga el alumno). */
-    availablePoints,
-    redeemPoints: points,
+    /** Si el alumno tiene al menos 5 puntos (y el cobro es de cuotas) puede canjearlos. */
+    canRedeem,
+    redeemPoints: points > 0,
     setRedeemPoints,
     account: account.data,
     quote: quote.data,

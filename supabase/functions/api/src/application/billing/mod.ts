@@ -378,7 +378,11 @@ export class QuotePayment {
     const periods = await this.periods(ref, date, request.months);
     const account = await this.accounts.account(ref);
     const available = account?.points() ?? 0;
-    if (request.redeemPoints < 0 || request.redeemPoints > available) {
+    if (
+      request.redeemPoints !== 0 &&
+      (request.redeemPoints !== PointsRedemption.REQUIRED_POINTS ||
+        request.redeemPoints > available)
+    ) {
       throw InvalidPaymentRequest.points(available);
     }
     const points = request.redeemPoints === 0 ? null : new PointsRedemption(request.redeemPoints);

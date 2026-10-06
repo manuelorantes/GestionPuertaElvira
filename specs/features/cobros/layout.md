@@ -31,13 +31,13 @@ BillingPage (/panel/cobros)
 │       └── badge «Factura F-2026-0001» si la tiene
 ├── SettingsTab (formulario en tres tarjetas, con «Guardar ajustes» al pie)
 │   ├── Tarjeta «Cuotas de clases»: 3 h o más · 2 h · 1 h y media · 1 h (€ al mes) · Cuota de socio (€ por temporada)
-│   ├── Tarjeta «Descuentos»: Familiar % · Pago adelantado 3 meses % · 6 meses % · Resto de temporada %
+│   ├── Tarjeta «Descuentos»: Familiar % · Pago adelantado 3 meses % · 6 meses % · 9 meses %
 │   │   └── nota: «Los descuentos se suman sobre la cuota base…»
 │   ├── Tarjeta «Clases particulares»: precio por hora por defecto + uno por profesor activo (€/h, vacío = el de por defecto)
 │   └── Tarjeta «Datos fiscales del club»: Nombre · NIF · Dirección (salen en recibos y facturas)
 ├── PaymentDialog («Registrar cobro»)
 │   ├── Select «Alumno» (alumnos activos) + texto con sus grupos
-│   ├── Chips «Concepto»: Mes · 3 meses · 6 meses · Resto de temporada · Cuota de socio (propuesto según la preferencia de la ficha)
+│   ├── Chips «Concepto»: Mes · 3 meses · 6 meses · 9 meses · Cuota de socio (propuesto según la preferencia de la ficha)
 │   ├── Forma de pago (Efectivo / Transferencia, ToggleButton con icono) | DateField «Fecha»
 │   ├── Switch «Prorratear desde la fecha» (solo con «Mes»)
 │   ├── Switch «Descuento especial» → % y «Motivo» (p. ej. «Canje de 5 puntos»)
