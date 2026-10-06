@@ -332,3 +332,50 @@ Deno.test('students should answer not found and forbid teachers', async () => {
   await teacher.logIn('profe@club.es');
   assertError(await teacher.get('/api/admin/students'), 403, 'forbidden');
 });
+
+Deno.test('registration takes the hours a student attends and turns them into groups', async () => {
+  const fx = await fixture();
+  // Grupo A: lunes y miércoles 17:00–18:00 (Alfil). Horario pedido: lunes 17:00–18:00 y viernes 18:00–19:00.
+  const resolved = body<Record<string, unknown[]>>(
+    await fx.client.json('POST', '/api/admin/groups/resolve-schedule', {
+      blocks: [
+        { day: 'mon', start: '17:00', end: '18:00' },
+        { day: 'fri', start: '18:00', end: '19:00' },
+        { day: 'thu', start: '16:00', end: '17:00' },
+      ],
+    }),
+  );
+  assertEquals(resolved.enrolments, [
+    {
+      groupId: fx.groupA,
+      groupName: 'Iniciación A',
+      slotLabel: 'Lun y Mié · 17:00–18:00',
+      attendance: { days: ['mon'], start: '17:00', end: '18:00' },
+      attendanceLabel: 'Lun · 17:00–18:00',
+    },
+    {
+      groupId: fx.groupB,
+      groupName: 'Particular',
+      slotLabel: 'Vie · 17:30–19:00',
+      attendance: { days: ['fri'], start: '18:00', end: '19:00' },
+      attendanceLabel: 'Vie · 18:00–19:00',
+    },
+  ]);
+  assertEquals(resolved.uncovered, [{
+    day: 'thu',
+    start: '16:00',
+    end: '17:00',
+    label: 'Jue · 16:00–17:00',
+  }]);
+  assertEquals(resolved.choices, []);
+
+  const created = await fx.client.json('POST', '/api/admin/students', {
+    ...student(fx, { groupIds: [] }),
+    enrolments: [{ groupId: fx.groupA, attendance: { days: ['mon'] } }],
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const detail = body<{ groups: { attendanceLabel: string | null }[] }>(
+    await fx.client.get(`/api/admin/students/${(created.body as { id: string }).id}`),
+  );
+  assertEquals(detail.groups.map((g) => g.attendanceLabel), ['Lun · 17:00–18:00']);
+});

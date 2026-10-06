@@ -7,6 +7,7 @@ import {
   CreateClassGroup,
   type GroupInput,
   type GroupSummary,
+  ResolveSchedule,
   type StudentStatus,
   type TeacherDirectory,
   UpdateClassGroup,
@@ -84,6 +85,23 @@ export function today(api: ApiApp): LocalDate {
 
 /** Rutas de clases: /api/admin/groups */
 export function registerClassRoutes(api: ApiApp): void {
+  // Traduce el horario que hará un alumno a grupos, para el alta.
+  api.defineRoute(
+    { method: 'POST', path: '/api/admin/groups/resolve-schedule', access: 'admin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      const blocks = body.objectList('blocks').map((b) => ({
+        day: b.requiredString('day'),
+        start: b.requiredString('start'),
+        end: b.requiredString('end'),
+        classroom: b.optionalString('classroom'),
+      }));
+      return c.json(
+        await new ResolveSchedule(new SqlClassGroupRepository(scope.tx)).execute(blocks),
+      );
+    },
+  );
+
   registerDomainErrors({
     ClassGroupNotFound: [404, 'not_found'],
     ClassroomConflict: [409, 'classroom_conflict'],

@@ -38,7 +38,6 @@ export interface StudentFormValues {
   federated: boolean;
   federationLicence: string;
   imageConsent: boolean;
-  groupIds: string[];
   siblingId: string;
 }
 
@@ -54,10 +53,9 @@ const API_FIELD: Record<string, Field> = {
   ownPhone: 'ownPhone',
   federationLicence: 'federationLicence',
   phone: 'guardian1Phone',
-  groupIds: 'groupIds',
 };
 
-function fromDetail(detail: StudentDetail | null, defaultGroupId: string): StudentFormValues {
+function fromDetail(detail: StudentDetail | null): StudentFormValues {
   const [g1, g2] = detail?.guardians ?? [];
   return {
     fullName: detail?.fullName ?? '',
@@ -72,7 +70,6 @@ function fromDetail(detail: StudentDetail | null, defaultGroupId: string): Stude
     federated: Boolean(detail?.federationLicence),
     federationLicence: detail?.federationLicence ?? '',
     imageConsent: detail?.imageConsent ?? true,
-    groupIds: defaultGroupId ? [defaultGroupId] : [],
     siblingId: '',
   };
 }
@@ -102,11 +99,10 @@ export function toPayload(values: StudentFormValues): StudentPayload {
  */
 export function useStudentForm(
   detail: StudentDetail | null,
-  defaultGroupId: string,
   submitToApi: (values: StudentFormValues) => Promise<unknown>,
 ) {
   const isEdit = detail !== null;
-  const [values, setValues] = useState(() => fromDetail(detail, defaultGroupId));
+  const [values, setValues] = useState(() => fromDetail(detail));
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setSubmitting] = useState(false);
@@ -162,10 +158,13 @@ export function useStudentForm(
   };
 }
 
-export function toRegistration(values: StudentFormValues): Registration {
+export function toRegistration(
+  values: StudentFormValues,
+  enrolments: Registration['enrolments'],
+): Registration {
   return {
     ...toPayload(values),
-    groupIds: values.groupIds.filter(Boolean),
+    enrolments,
     siblingIds: values.siblingId ? [values.siblingId] : [],
   };
 }

@@ -8,6 +8,7 @@ import {
 } from '../../src/domain/students/mod.ts';
 import type { Teacher, TeacherId } from '../../src/domain/teachers/mod.ts';
 import type {
+  EnrolmentRequest,
   Enrolments,
   Membership,
   StudentRepository,
@@ -72,11 +73,15 @@ export class SpyEnrolments implements Enrolments {
   ended: { student: string; on: string }[] = [];
   failWith: Error | null = null;
 
-  enrol(student: StudentId, groupIds: string[], confirmOverCapacity: boolean): Promise<void> {
+  enrol(
+    student: StudentId,
+    requests: EnrolmentRequest[],
+    confirmOverCapacity: boolean,
+  ): Promise<void> {
     if (this.failWith) return Promise.reject(this.failWith);
     this.enrolled.push({
       student: student.value,
-      groups: groupIds,
+      groups: requests.map((r) => r.groupId),
       confirmed: confirmOverCapacity,
     });
     return Promise.resolve();

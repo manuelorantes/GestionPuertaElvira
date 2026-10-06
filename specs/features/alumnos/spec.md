@@ -43,12 +43,20 @@ La ficha MUST mostrar:
 Para dar de alta a un alumno solo MUST ser obligatorio el nombre y apellidos; todo lo demás es opcional.
 La fecha de nacimiento, si se indica, no puede ser futura ni de hace más de cien años,
 y el DNI o NIE, si se indica, MUST tener una letra de control válida.
-Se pueden indicar hermanos ya inscritos. Un alumno MAY darse de alta sin ningún grupo:
+En el alta no se eligen grupos: se indican las **horas a las que va a venir** (día, hora de inicio y de fin, en
+medias horas) y el sistema MUST traducirlas a grupos: el grupo que da clase a esa hora ese día, completo si
+cubre todo su horario o con horario especial si solo cubre parte (o solo algunos de sus días). Si a una hora
+hay clase en varias aulas, MUST pedirse el aula; si no hay clase, MUST avisarse y no se puede dar de alta
+hasta corregirlo. Se pueden indicar hermanos ya inscritos. Un alumno MAY darse de alta sin ningún horario:
 es un socio sin clases, queda marcado como socio (se le pedirá la cuota de socio) y se podrá inscribir más adelante.
 
 #### Scenario: Alta en dos grupos
-- **WHEN** administración da de alta a un alumno en dos grupos que no coinciden en horario
-- **THEN** el alumno queda activo, inscrito en ambos, y cuenta en la ocupación de los dos
+- **WHEN** administración da de alta a un alumno con horario lunes 17:00–18:00 (aula Alfil) y viernes 16:30–17:30
+- **THEN** el alumno queda activo, inscrito en el grupo de cada tramo, y cuenta en la ocupación de los dos
+
+#### Scenario: Alta con horario a caballo de dos grupos
+- **WHEN** el horario es lunes 18:30–20:00 y hay grupos de 18:00–19:00 y 19:00–20:00 en esa aula
+- **THEN** queda inscrito en el primero con horario especial 18:30–19:00 y en el segundo completo
 
 #### Scenario: Alta fallida
 - **WHEN** el alta no puede completarse (por ejemplo, por un grupo completo sin confirmar)

@@ -44,13 +44,25 @@ test('should register a minor in two groups, with the guardian added before savi
   await dialog.getByLabel('Día').selectOption('7');
   await dialog.getByLabel('Mes').selectOption({ label: 'marzo' });
   await dialog.getByLabel('Año').selectOption('2015');
-  await selectStartingWith(dialog.getByLabel('Grupo'), 'Iniciación A');
   await expect(dialog.getByText(/pendiente: tutor y email/i)).toBeVisible();
-
   await dialog.getByLabel('Tutor 1', { exact: true }).fill('Carmen Ortiz');
   await dialog.getByLabel('Teléfono tutor 1').fill('612000111');
-  await dialog.getByRole('button', { name: 'Añadir otro grupo' }).click();
-  await selectStartingWith(dialog.getByLabel('Otro grupo'), 'Peques A');
+
+  // Lunes 17:00–18:00: hay clase en Alfil (Iniciación A) y en Caballo (Intermedio C): se elige el aula.
+  await dialog.getByRole('button', { name: 'Añadir horario' }).click();
+  const first = dialog.getByRole('group', { name: 'Horario 1' });
+  await first.getByLabel('Día').selectOption('mon');
+  await first.getByLabel('Empieza').selectOption('17:00');
+  await first.getByLabel('Termina').selectOption('18:00');
+  await first.getByLabel(/Aula para/).selectOption('alfil');
+  await expect(dialog.getByText('Iniciación A', { exact: true })).toBeVisible();
+  // Viernes 16:30–17:30: solo Peques A.
+  await dialog.getByRole('button', { name: 'Añadir horario' }).click();
+  const second = dialog.getByRole('group', { name: 'Horario 2' });
+  await second.getByLabel('Día').selectOption('fri');
+  await second.getByLabel('Empieza').selectOption('16:30');
+  await second.getByLabel('Termina').selectOption('17:30');
+  await expect(dialog.getByText('Peques A', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Dar de alta' }).click();
 
   const card = page.getByRole('dialog', { name: 'Lucía Fernández Ortiz' });

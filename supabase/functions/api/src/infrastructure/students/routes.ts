@@ -9,6 +9,7 @@ import {
   UnenrolStudent,
 } from '../../application/classes/mod.ts';
 import {
+  type EnrolmentRequest,
   type Enrolments,
   LinkSiblings,
   ListPendingData,
@@ -44,7 +45,7 @@ export class ClassesEnrolments implements Enrolments {
 
   async enrol(
     student: StudentId,
-    groupIds: string[],
+    requests: EnrolmentRequest[],
     confirmOverCapacity: boolean,
     from?: LocalDate,
   ): Promise<void> {
@@ -53,8 +54,14 @@ export class ClassesEnrolments implements Enrolments {
       new SqlEnrolmentRepository(this.sql),
       this.clock,
     );
-    for (const groupId of groupIds) {
-      await enrol.execute(student.value, groupId, confirmOverCapacity, from);
+    for (const request of requests) {
+      await enrol.execute(
+        student.value,
+        request.groupId,
+        confirmOverCapacity,
+        from,
+        request.attendance,
+      );
     }
   }
 
@@ -160,9 +167,17 @@ export function registerStudentRoutes(api: ApiApp): void {
         clock,
         new BillingMembership(scope.tx),
       );
+      // `enrolments` (grupo + horario especial) o, más simple, `groupIds` (grupos completos).
+      const requested: EnrolmentRequest[] = [
+        ...body.stringList('groupIds').map((groupId) => ({ groupId, attendance: null })),
+        ...body.objectList('enrolments').map((e) => ({
+          groupId: e.requiredString('groupId'),
+          attendance: attendanceInput(e),
+        })),
+      ];
       const id = await register.execute(
         studentInput(body),
-        body.stringList('groupIds'),
+        requested,
         body.stringList('siblingIds'),
         body.bool('confirmOverCapacity'),
       );

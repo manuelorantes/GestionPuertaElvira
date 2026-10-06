@@ -47,6 +47,39 @@ export interface GroupPayload {
   capacity: number;
 }
 
+/** Un tramo del horario que hará un alumno. */
+export interface ScheduleBlock {
+  day: Weekday;
+  start: string;
+  end: string;
+  /** Aula elegida cuando a esa hora hay clase en varias. */
+  classroom: Classroom | null;
+}
+
+export interface ScheduleResolution {
+  enrolments: {
+    groupId: string;
+    groupName: string;
+    slotLabel: string;
+    attendance: { days: Weekday[]; start: string; end: string } | null;
+    attendanceLabel: string | null;
+  }[];
+  uncovered: { day: Weekday; start: string; end: string; label: string }[];
+  choices: {
+    day: Weekday;
+    start: string;
+    end: string;
+    label: string;
+    groups: { id: string; name: string; classroom: Classroom }[];
+  }[];
+  problems: string[];
+}
+
+/** Traduce las horas que hará un alumno a grupos, completos o con horario especial. */
+export function resolveSchedule(blocks: ScheduleBlock[]): Promise<ScheduleResolution> {
+  return apiSend('POST', '/api/admin/groups/resolve-schedule', { blocks });
+}
+
 export async function fetchGroups(): Promise<ClassGroup[]> {
   return (await apiGet<{ items: ClassGroup[] }>('/api/admin/groups')).items;
 }

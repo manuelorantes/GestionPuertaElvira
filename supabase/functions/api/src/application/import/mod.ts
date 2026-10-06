@@ -541,7 +541,7 @@ export class ApplyImport {
         federationLicence: null,
         imageConsent: false,
       },
-      decision.groupIds ?? [],
+      (decision.groupIds ?? []).map((groupId) => ({ groupId, attendance: null })),
       [],
       false,
       `${YearMonth.of(joined).toString()}-01`,

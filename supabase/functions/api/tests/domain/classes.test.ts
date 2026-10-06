@@ -16,6 +16,7 @@ import {
   type Level,
   levelFromName,
   occupancyByDay,
+  resolveSchedule,
   StudentReference,
   StudentScheduleOverlap,
   type Weekday,
@@ -318,4 +319,82 @@ Deno.test('GroupDetails should name the group by day, time, level and classroom 
   const named = GroupFactory.details({ name: 'Competición' });
   assertEquals(named.name.value, 'Competición');
   assertEquals(named.customName, true);
+});
+
+Deno.test('resolveSchedule should turn the hours a student attends into full or special enrolments', () => {
+  const g18 = GroupFactory.group({
+    days: [2],
+    start: '18:00',
+    end: '19:00',
+    name: 'Iniciación 18',
+  });
+  const g19 = GroupFactory.group({
+    days: [2],
+    start: '19:00',
+    end: '20:00',
+    name: 'Iniciación 19',
+  });
+  const other = GroupFactory.group({
+    days: [2],
+    start: '18:00',
+    end: '19:00',
+    name: 'Intermedio 18',
+    classroom: 'caballo',
+  });
+  const twoDays = GroupFactory.group({
+    days: [1, 3],
+    start: '17:00',
+    end: '18:30',
+    name: 'Iniciación A',
+    classroom: 'peon',
+  });
+  const groups = [g18, g19, other, twoDays];
+  const block = (day: Weekday, start: string, end: string, classroom: string | null = null) => ({
+    day,
+    start: HalfHour.fromString(start),
+    end: HalfHour.fromString(end),
+    classroom: classroom === null ? null : Classroom.fromString(classroom),
+  });
+  const summary = (r: ReturnType<typeof resolveSchedule>) =>
+    r.enrolments.map((
+      e,
+    ) => [e.group.details().name.value, e.attendance.labelIn(e.group.details())]);
+
+  // Media hora del grupo de las 18 y la hora entera del de las 19.
+  const crossing = resolveSchedule([block(2, '18:30', '20:00', 'alfil')], groups);
+  assertEquals(summary(crossing), [['Iniciación 18', 'Mar · 18:30–19:00'], [
+    'Iniciación 19',
+    null,
+  ]]);
+  assertEquals(crossing.uncovered, []);
+  assertEquals(crossing.choices, []);
+
+  // Sin aula, a las 18:30 hay dos grupos posibles: hay que elegir; de 19:00 a 19:30 solo uno.
+  const ambiguous = resolveSchedule([block(2, '18:30', '19:30')], groups);
+  assertEquals(summary(ambiguous), [['Iniciación 19', 'Mar · 19:00–19:30']]);
+  assertEquals(ambiguous.choices.length, 1);
+  assertEquals(ambiguous.choices[0]?.start.toString(), '18:30');
+  assertEquals(ambiguous.choices[0]?.end.toString(), '19:00');
+  assertEquals(ambiguous.choices[0]?.groups.map((g) => g.details().name.value), [
+    'Iniciación 18',
+    'Intermedio 18',
+  ]);
+
+  // Los dos días completos → todo el grupo; solo el lunes → horario especial de ese día.
+  const full = resolveSchedule([block(1, '17:00', '18:30'), block(3, '17:00', '18:30')], groups);
+  assertEquals(summary(full), [['Iniciación A', null]]);
+  const mondays = resolveSchedule([block(1, '17:00', '18:30')], groups);
+  assertEquals(summary(mondays), [['Iniciación A', 'Lun · 17:00–18:30']]);
+
+  // Sin clase a esa hora.
+  const nothing = resolveSchedule([block(1, '16:00', '17:00')], groups);
+  assertEquals(nothing.enrolments, []);
+  assertEquals(nothing.uncovered.map((u) => `${u.start.toString()}–${u.end.toString()}`), [
+    '16:00–17:00',
+  ]);
+
+  // El mismo grupo con horas distintas según el día no se puede representar.
+  const uneven = resolveSchedule([block(1, '17:00', '18:30'), block(3, '17:00', '18:00')], groups);
+  assertEquals(uneven.enrolments, []);
+  assertEquals(uneven.problems.length, 1);
 });

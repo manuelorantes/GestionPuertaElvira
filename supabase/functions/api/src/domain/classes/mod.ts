@@ -524,3 +524,139 @@ export class EnrolmentPolicy {
     if (busiest >= capacity && !overCapacityConfirmed) throw new GroupFull(busiest, capacity);
   }
 }
+
+/** Un tramo del horario que hará un alumno: un día, de una hora a otra, y si se sabe, en qué aula. */
+export interface ScheduleBlock {
+  day: Weekday;
+  start: HalfHour;
+  end: HalfHour;
+  classroom: Classroom | null;
+}
+
+export interface ResolvedEnrolment {
+  group: ClassGroup;
+  attendance: Attendance;
+}
+
+interface Slice {
+  day: Weekday;
+  start: HalfHour;
+  end: HalfHour;
+}
+
+/** Un tramo en el que hay varios grupos posibles (distintas aulas): hay que elegir. */
+export interface ScheduleChoice extends Slice {
+  groups: ClassGroup[];
+}
+
+export interface ScheduleResolution {
+  enrolments: ResolvedEnrolment[];
+  /** Tramos sin ninguna clase a esa hora. */
+  uncovered: Slice[];
+  choices: ScheduleChoice[];
+  /** Tramos que no se pueden representar (el mismo grupo con horas distintas según el día). */
+  problems: string[];
+}
+
+function sliceLabel(slice: Slice): string {
+  return `${weekdayShortLabel(slice.day)} · ${slice.start.toString()}–${slice.end.toString()}`;
+}
+
+/**
+ * Traduce las horas que va a venir un alumno a inscripciones: en cada tramo, el grupo que da clase
+ * a esa hora ese día; si solo cubre parte del grupo (o solo algunos de sus días), con horario
+ * especial. Cuando dos grupos coinciden en el tramo (distintas aulas) hay que elegir el aula.
+ */
+export function resolveSchedule(
+  blocks: readonly ScheduleBlock[],
+  groups: readonly ClassGroup[],
+): ScheduleResolution {
+  const uncovered: Slice[] = [];
+  const choices: ScheduleChoice[] = [];
+  const problems: string[] = [];
+  /** grupo → día → [inicio, fin] en minutos */
+  const windows = new Map<string, Map<Weekday, [number, number]>>();
+
+  for (const block of blocks) {
+    if (!block.start.isBefore(block.end)) continue;
+    const candidates = groups.filter((g) => {
+      const d = g.details();
+      return d.slot.days.includes(block.day) &&
+        (block.classroom === null || d.classroom.equals(block.classroom)) &&
+        d.slot.start.isBefore(block.end) && block.start.isBefore(d.slot.end);
+    });
+    const marks = new Set<number>([block.start.minutes, block.end.minutes]);
+    for (const g of candidates) {
+      for (const m of [g.details().slot.start.minutes, g.details().slot.end.minutes]) {
+        if (m > block.start.minutes && m < block.end.minutes) marks.add(m);
+      }
+    }
+    const sorted = [...marks].sort((a, b) => a - b);
+    let pendingChoice: ScheduleChoice | null = null;
+    let pendingGap: Slice | null = null;
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const from = sorted[i]!;
+      const to = sorted[i + 1]!;
+      const covering = candidates.filter((g) =>
+        g.details().slot.start.minutes <= from && g.details().slot.end.minutes >= to
+      );
+      const slice: Slice = {
+        day: block.day,
+        start: HalfHour.fromMinutes(from),
+        end: HalfHour.fromMinutes(to),
+      };
+      if (covering.length === 1) {
+        const group = covering[0]!;
+        const byDay = windows.get(group.id.value) ?? new Map<Weekday, [number, number]>();
+        const current = byDay.get(block.day);
+        byDay.set(
+          block.day,
+          current ? [Math.min(current[0], from), Math.max(current[1], to)] : [from, to],
+        );
+        windows.set(group.id.value, byDay);
+        pendingChoice = null;
+        pendingGap = null;
+      } else if (covering.length === 0) {
+        if (pendingGap) pendingGap.end = slice.end;
+        else uncovered.push(pendingGap = { ...slice });
+        pendingChoice = null;
+      } else {
+        const sameSet = pendingChoice &&
+          pendingChoice.groups.length === covering.length &&
+          pendingChoice.groups.every((g) => covering.some((c) => c.id.equals(g.id)));
+        if (sameSet && pendingChoice) pendingChoice.end = slice.end;
+        else choices.push(pendingChoice = { ...slice, groups: covering });
+        pendingGap = null;
+      }
+    }
+  }
+
+  const enrolments: ResolvedEnrolment[] = [];
+  for (const [groupId, byDay] of windows) {
+    const group = groups.find((g) => g.id.value === groupId)!;
+    const d = group.details();
+    const spans = [...byDay.values()];
+    const [start, end] = spans[0]!;
+    if (!spans.every(([s, e]) => s === start && e === end)) {
+      problems.push(
+        `En «${d.name.value}» el horario tiene que ser el mismo todos los días (${
+          [...byDay.entries()].map(([day, [s, e]]) =>
+            sliceLabel({ day, start: HalfHour.fromMinutes(s), end: HalfHour.fromMinutes(e) })
+          ).join('; ')
+        }).`,
+      );
+      continue;
+    }
+    const days = [...byDay.keys()].sort((a, b) => a - b);
+    enrolments.push({
+      group,
+      attendance: Attendance.within(
+        d,
+        days.length === d.slot.days.length ? null : days,
+        HalfHour.fromMinutes(start),
+        HalfHour.fromMinutes(end),
+      ),
+    });
+  }
+  return { enrolments, uncovered, choices, problems };
+}

@@ -1,8 +1,15 @@
-import { Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { useState } from 'react';
+
+import type { ScheduleBlock } from '@/features/classes/api';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { useGroups } from '@/features/classes/hooks';
-import { registerStudent, updateStudent, type StudentDetail } from '@/features/students/api';
+import {
+  type Registration,
+  registerStudent,
+  type StudentDetail,
+  updateStudent,
+} from '@/features/students/api';
 import { missingSentence } from '@/features/students/pending';
 import { useStudentMutation, useStudents } from '@/features/students/hooks';
 import {
@@ -12,6 +19,7 @@ import {
   type StudentFormValues,
 } from '@/features/students/useStudentForm';
 import { useOverCapacityConfirm } from '@/features/students/useOverCapacityConfirm';
+import { useScheduleResolution } from '@/features/students/useScheduleResolution';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
@@ -21,6 +29,8 @@ import { Select } from '@/shared/ui/Select';
 import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+
+import { ScheduleEditor } from './ScheduleEditor';
 
 interface StudentDialogProps {
   detail: StudentDetail | null;
@@ -40,23 +50,26 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) {
-  const groups = useGroups();
   const students = useStudents('active', '');
   const toast = useToast();
   const overCapacity = useOverCapacityConfirm();
+  // Los grupos salen del horario ya traducido por la API (ver más abajo).
+  // Las horas a las que vendrá; la API las traduce a grupos (completos o con horario especial).
+  const [schedule, setSchedule] = useState<ScheduleBlock[]>([]);
+  const resolution = useScheduleResolution(detail ? [] : schedule);
+  const enrolments: Registration['enrolments'] = (resolution.data?.enrolments ?? []).map((e) => ({
+    groupId: e.groupId,
+    attendance: e.attendance,
+  }));
   const register = useStudentMutation(
     ({ values, confirm }: { values: StudentFormValues; confirm: boolean }) =>
-      registerStudent(toRegistration(values), confirm),
+      registerStudent(toRegistration(values, enrolments), confirm),
   );
   const update = useStudentMutation((values: StudentFormValues) =>
     updateStudent(detail?.id ?? '', toPayload(values)),
   );
-  const groupOptions = (groups.data ?? []).map((g) => ({
-    value: g.id,
-    label: `${g.name} · ${g.slotLabel} · ${g.occupied}/${g.capacity}`,
-  }));
 
-  const form = useStudentForm(detail, groupOptions[0]?.value ?? '', async (values) => {
+  const form = useStudentForm(detail, async (values) => {
     if (detail) {
       await update.mutateAsync(values);
       toast('Cambios guardados');
@@ -71,6 +84,15 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
   });
   const { values, set, fieldErrors } = form;
   const title = form.isEdit ? 'Editar alumno' : 'Nuevo alumno';
+  // Con horario, hay que esperar a saber los grupos y que no quede nada sin clase, sin aula o sin resolver.
+  const scheduleReady =
+    schedule.length === 0 ||
+    (resolution.data !== undefined &&
+      !resolution.isFetching &&
+      resolution.data.uncovered.length === 0 &&
+      resolution.data.choices.length === 0 &&
+      resolution.data.problems.length === 0 &&
+      schedule.every((b) => b.start < b.end));
 
   return (
     <>
@@ -184,46 +206,12 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
             </Section>
             <Section title="Club">
               {!form.isEdit && (
-                <div className="flex flex-col gap-3">
-                  {values.groupIds.map((groupId, index) => (
-                    <Select
-                      key={index}
-                      label={index === 0 ? 'Grupo' : 'Otro grupo'}
-                      options={[{ value: '', label: 'Elige un grupo' }, ...groupOptions]}
-                      value={groupId}
-                      onChange={(value) =>
-                        set(
-                          'groupIds',
-                          values.groupIds.map((g, i) => (i === index ? value : g)),
-                        )
-                      }
-                      error={index === 0 ? fieldErrors.groupIds : undefined}
-                    />
-                  ))}
-                  {values.groupIds.length === 0 && (
-                    <Select
-                      label="Grupo"
-                      options={[{ value: '', label: 'Elige un grupo' }, ...groupOptions]}
-                      value=""
-                      onChange={(value) => set('groupIds', [value])}
-                      error={fieldErrors.groupIds}
-                    />
-                  )}
-                  <Button
-                    variant="ghost"
-                    className="self-start"
-                    onClick={() => set('groupIds', [...values.groupIds, ''])}
-                  >
-                    <Plus aria-hidden size={16} />
-                    Añadir otro grupo
-                  </Button>
-                  {values.groupIds.filter(Boolean).length === 0 && (
-                    <p className="text-[13px] text-ink-muted">
-                      Sin grupo, se dará de alta como socio sin clases: se le pedirá la cuota de
-                      socio y se podrá inscribir más adelante.
-                    </p>
-                  )}
-                </div>
+                <ScheduleEditor
+                  blocks={schedule}
+                  onChange={setSchedule}
+                  resolution={resolution.data}
+                  loading={resolution.isFetching}
+                />
               )}
               <Switch
                 label="Federado"
@@ -255,7 +243,12 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
             <Button variant="secondary" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" busy={form.isSubmitting} busyLabel="Guardando…">
+            <Button
+              type="submit"
+              busy={form.isSubmitting}
+              busyLabel="Guardando…"
+              disabled={!form.isEdit && !scheduleReady}
+            >
               {form.isEdit ? 'Guardar cambios' : 'Dar de alta'}
             </Button>
           </div>
