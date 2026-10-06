@@ -42,7 +42,6 @@ function quote(fx: BillingFixture, id: string, months: number): Promise<PaymentQ
     months,
     method: 'cash',
     date: '2026-10-02',
-    prorate: false,
     specialPercent: null,
     specialAmountCents: null,
     specialConcept: null,
@@ -63,7 +62,6 @@ function register(
       months,
       method: 'transfer',
       date: '2026-10-02',
-      prorate: false,
       specialPercent: null,
       specialAmountCents: null,
       specialConcept: null,
@@ -113,8 +111,7 @@ Deno.test('QuotePayment should use the agreed private rate, quote without saving
 
   const id = fx.student({ regularHours: 3, siblings: true });
   await new UpdateStudentAccount(fx).execute(id, 'three_months', false, null);
-  assertEquals(await quotes(fx).suggestion(id), 3);
-  assertEquals(await quotes(fx).remainingMonths(id), 9, 'de octubre a junio');
+  assertEquals(await quotes(fx).months(id), { suggested: 3, remaining: 9 }, 'de octubre a junio');
   assertEquals((await quote(fx, id, 3)).quote.total.cents, 13200);
   assertEquals(fx.payments.size, 0);
 });
@@ -176,38 +173,6 @@ Deno.test('QuotePayment should fill gaps, charge pending months at their stored 
     InvalidPaymentRequest,
     'No hay nada pendiente que cobrar con esos datos.',
   );
-});
-
-Deno.test('QuotePayment should only prorate the month of the payment and never go beyond june', async () => {
-  const fx = new BillingFixture();
-  const id = fx.student({ regularHours: 2 });
-  await generate(fx, '2026-09');
-  await assertRejects(
-    () =>
-      quotes(fx).execute({
-        studentId: id,
-        kind: 'monthly',
-        months: 1,
-        method: 'cash',
-        date: '2026-10-15',
-        prorate: true,
-        specialPercent: null,
-        specialAmountCents: null,
-        specialConcept: null,
-        redeemPoints: 0,
-      }),
-    InvalidPaymentRequest,
-    'El prorrateo solo se aplica al mes de la fecha del cobro',
-  );
-  const fresh = new BillingFixture();
-  const other = fresh.student();
-  await assertRejects(
-    () => register(fresh, other, 10),
-    InvalidPaymentRequest,
-    'Solo quedan 9 meses de temporada por cobrar.',
-  );
-  fresh.closedDates = ['2026-10-02'];
-  await assertRejects(() => register(fresh, other, 1), PeriodClosed);
 });
 
 Deno.test('RegisterPayment should register the membership fee without discounts', async () => {
@@ -358,7 +323,6 @@ Deno.test('RegisterPayment should spend the redeemed points and make a member of
     months: 1,
     method: 'cash',
     date: '2026-10-02',
-    prorate: false,
     specialPercent: null,
     specialAmountCents: null,
     specialConcept: null,

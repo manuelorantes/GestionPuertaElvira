@@ -18,7 +18,6 @@ import {
   PaymentId,
   PointsRedemption,
   PrivateLesson,
-  Proration,
   QuoteLine,
   SpecialDiscount,
   StudentAccount,
@@ -31,17 +30,8 @@ const quote = (
   profile: FeeProfile,
   months: number,
   special: SpecialDiscount | null = null,
-  proration: Proration | null = null,
   points: PointsRedemption | null = null,
-) =>
-  new FeeCalculator().quote(
-    profile,
-    BillingSettings.defaults(),
-    months,
-    special,
-    proration,
-    points,
-  );
+) => new FeeCalculator().quote(profile, BillingSettings.defaults(), months, special, points);
 
 Deno.test('FeeCalculator should charge the tier for the weekly hours of regular groups', () => {
   const tiers: [number, number][] = [[0, 0], [1, 3500], [1.5, 4000], [2, 4500], [2.5, 4500], [
@@ -92,7 +82,7 @@ Deno.test('FeeCalculator should add up discounts for siblings and prepayment', (
   }
 });
 
-Deno.test('FeeCalculator should add a special discount, prorate the first month and keep lines adding up', () => {
+Deno.test('FeeCalculator should add a special discount and keep lines adding up', () => {
   const special = quote(
     new FeeProfile(2, [], false),
     1,
@@ -101,11 +91,6 @@ Deno.test('FeeCalculator should add a special discount, prorate the first month 
   assertEquals(special.total.cents, 4275);
   assertEquals(special.lines[1]?.label, 'Canje de 5 puntos −5 %');
 
-  const prorated = quote(new FeeProfile(2, [], false), 1, null, new Proration(16, 31));
-  assertEquals(prorated.gross.cents, 2323, '45 € × 16/31 días');
-  assertEquals(prorated.lines[1]?.label, 'Prorrateo del 16 al 31 (16 de 31 días)');
-  assertEquals(prorated.lines[1]?.amount.cents, -2177);
-
   const q = quote(
     new FeeProfile(1.5, [new PrivateLesson('P', 1.5, Money.cents(3333))], true),
     6,
@@ -113,11 +98,6 @@ Deno.test('FeeCalculator should add a special discount, prorate the first month 
   );
   assert(q.lines.reduce((sum, l) => sum.plus(l.amount), Money.zero()).equals(q.total));
 
-  assertThrows(
-    () => quote(new FeeProfile(1, [], false), 3, null, new Proration(10, 31)),
-    InvalidPaymentRequest,
-    'El prorrateo solo se aplica al cobrar un único mes.',
-  );
   assertThrows(
     () => quote(new FeeProfile(1, [], false), 11),
     InvalidPaymentRequest,
@@ -270,7 +250,7 @@ Deno.test('Payment should number documents per season and issue one invoice with
 
 Deno.test('FeeCalculator should redeem points on a single month and take fixed special discounts', () => {
   // 2 h semanales = 45 €/mes; 3 meses con 10 % de pago adelantado = 121,50 €; 5 puntos = 5 % de UN mes = 2,25 €.
-  const withPoints = quote(new FeeProfile(2, [], false), 3, null, null, new PointsRedemption(5));
+  const withPoints = quote(new FeeProfile(2, [], false), 3, null, new PointsRedemption(5));
   assertEquals(withPoints.total.cents, 12150 - 225);
   assertEquals(withPoints.lines.at(-1)?.label, 'Canje de 5 puntos (5 % de un mes) −2,25 €');
   assertEquals(withPoints.lines.at(-1)?.amount.cents, -225);
@@ -279,7 +259,7 @@ Deno.test('FeeCalculator should redeem points on a single month and take fixed s
   );
 
   // Seis meses: los puntos siguen valiendo lo de un solo mes.
-  const six = quote(new FeeProfile(2, [], false), 6, null, null, new PointsRedemption(5));
+  const six = quote(new FeeProfile(2, [], false), 6, null, new PointsRedemption(5));
   assertEquals(six.lines.at(-1)?.amount.cents, -225);
 
   const fixed = quote(
