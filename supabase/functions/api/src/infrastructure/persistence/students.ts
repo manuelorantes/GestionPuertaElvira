@@ -23,6 +23,7 @@ import type {
   StudentRepository,
   StudentSummary,
 } from '../../application/students/mod.ts';
+import type { MemberNumbers } from '../../application/students/mod.ts';
 import { Row, type Sql } from './sql.ts';
 
 /** Texto normalizado para búsquedas: minúsculas y sin tildes («López» → «lopez»). */
@@ -125,8 +126,8 @@ export class SqlStudentRepository implements StudentRepository {
       withdrawn_on: student.withdrawnOn()?.toString() ?? null,
       sibling_ids: student.siblings().map((s) => s.value),
     };
-    await this.sql`INSERT INTO students_student ${this.sql(record)}
-      ON CONFLICT (id) DO UPDATE SET ${
+    // Primero UPDATE: un INSERT … ON CONFLICT evaluaría el DEFAULT del número de socio y gastaría uno.
+    const updated = await this.sql`UPDATE students_student SET ${
       this.sql(
         record,
         'full_name',
@@ -141,7 +142,29 @@ export class SqlStudentRepository implements StudentRepository {
         'withdrawn_on',
         'sibling_ids',
       )
-    }`;
+    } WHERE id = ${record.id}`;
+    if (updated.count === 0) await this.sql`INSERT INTO students_student ${this.sql(record)}`;
+  }
+}
+
+/** Números de socio: la secuencia de la base de datos los da en orden y nunca reutiliza uno. */
+export class SqlMemberNumbers implements MemberNumbers {
+  constructor(private readonly sql: Sql) {}
+
+  async of(studentIds: string[]): Promise<Map<string, number>> {
+    if (studentIds.length === 0) return new Map();
+    const rows = await this.sql`SELECT id, member_number FROM students_student
+      WHERE id::text IN ${this.sql(studentIds)}`;
+    return new Map(Row.all(rows).map((r) => [r.string('id'), r.int('member_number')]));
+  }
+
+  async assign(changes: Map<string, number>): Promise<void> {
+    if (changes.size === 0) return;
+    // La unicidad se comprueba al confirmar la transacción: los intercambios no chocan a mitad.
+    await this.sql`SET CONSTRAINTS students_student_member_number_key DEFERRED`;
+    for (const [id, number] of changes) {
+      await this.sql`UPDATE students_student SET member_number = ${number} WHERE id = ${id}`;
+    }
   }
 }
 
@@ -167,15 +190,23 @@ export class SqlStudentQuery implements StudentQuery {
         AND NOT EXISTS (SELECT 1 FROM classes_enrolment e WHERE e.student_id = s.id
           AND e.enrolled_on <= ${day} AND (e.ends_on IS NULL OR e.ends_on > ${day}))`,
     }[filter];
-    const bySearch = search && search.trim() !== ''
-      ? this.sql`AND s.search_name LIKE ${`%${searchText(search)}%`}`
-      : this.sql``;
+    const term = search?.trim() ?? '';
+    // Un número busca también por número de socio («12» o «#12»).
+    const asNumber = /^#?\d{1,9}$/.test(term) ? Number(term.replace('#', '')) : null;
+    const bySearch = term === ''
+      ? this.sql``
+      : asNumber !== null
+      ? this.sql`AND (s.member_number = ${asNumber} OR s.search_name LIKE ${`%${
+        searchText(term)
+      }%`})`
+      : this.sql`AND s.search_name LIKE ${`%${searchText(term)}%`}`;
     const rows = await this.sql`
-      SELECT s.id, s.full_name, s.birth_date, s.withdrawn_on, s.sibling_ids
+      SELECT s.id, s.member_number, s.full_name, s.birth_date, s.withdrawn_on, s.sibling_ids
         FROM students_student s WHERE 1 = 1 ${byFilter} ${bySearch} ORDER BY s.search_name`;
     const groupsByStudent = await this.activeGroupsByStudent(on);
     return Row.all(rows).map((row) => ({
       id: row.string('id'),
+      memberNumber: row.int('member_number'),
       fullName: row.string('full_name'),
       age: age(row, on),
       status: status(row.nullableString('withdrawn_on'), on),
@@ -205,6 +236,7 @@ export class SqlStudentQuery implements StudentQuery {
     );
     return {
       id,
+      memberNumber: row.int('member_number'),
       fullName: row.string('full_name'),
       birthDate: row.nullableString('birth_date'),
       age: age(row, on),

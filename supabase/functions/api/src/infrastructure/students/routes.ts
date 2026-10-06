@@ -15,6 +15,7 @@ import {
   ListPendingData,
   type Membership,
   RegisterStudent,
+  RenumberMembers,
   studentFilterFrom,
   type StudentInput,
   StudentNotFound,
@@ -33,7 +34,11 @@ import {
 } from '../persistence/classes.ts';
 import { SavepointTransactionRunner, type Sql } from '../persistence/sql.ts';
 import { SqlStudentAccountRepository } from '../persistence/billing.ts';
-import { SqlStudentQuery, SqlStudentRepository } from '../persistence/students.ts';
+import {
+  SqlMemberNumbers,
+  SqlStudentQuery,
+  SqlStudentRepository,
+} from '../persistence/students.ts';
 import { StudentAccount, StudentRef } from '../../domain/billing/mod.ts';
 
 /** Alumnado pide a Clases que inscriba o termine las inscripciones de un alumno. */
@@ -135,6 +140,21 @@ export function registerStudentRoutes(api: ApiApp): void {
         items: await query(scope).list(filter, search, today(api)),
         total: await query(scope).total(),
       });
+    },
+  );
+
+  // Antes de /:id para que «member-numbers» no se tome por un identificador.
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/students/member-numbers', access: 'admin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      await new RenumberMembers(new SqlMemberNumbers(scope.tx)).execute(
+        body.objectList('assignments').map((a) => ({
+          studentId: a.requiredString('studentId'),
+          memberNumber: a.requiredInt('memberNumber'),
+        })),
+      );
+      return c.body(null, 204);
     },
   );
 

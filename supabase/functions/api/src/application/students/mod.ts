@@ -9,6 +9,7 @@ import {
 import {
   FederationLicence,
   Guardian,
+  MemberRenumbering,
   type MissingDatum,
   NationalId,
   Student,
@@ -64,6 +65,8 @@ export interface StudentGroup {
 
 export interface StudentSummary {
   id: string;
+  /** Número de socio: único, en orden de alta y nunca reutilizado. */
+  memberNumber: number;
   fullName: string;
   /** null si no consta la fecha de nacimiento. */
   age: number | null;
@@ -74,6 +77,7 @@ export interface StudentSummary {
 
 export interface StudentDetail {
   id: string;
+  memberNumber: number;
   fullName: string;
   birthDate: string | null;
   age: number | null;
@@ -218,6 +222,32 @@ export class RegisterStudent {
       }
       return student.id.value;
     });
+  }
+}
+
+/** Números de socio (los asigna la persistencia al dar de alta, sin reutilizar nunca uno). */
+export interface MemberNumbers {
+  /** Número actual de cada alumno indicado que exista. */
+  of(studentIds: string[]): Promise<Map<string, number>>;
+  /** Aplica los cambios a la vez (los intercambios no chocan entre sí). */
+  assign(changes: Map<string, number>): Promise<void>;
+}
+
+/** Reparte de otra forma los números de socio que ya tienen unos alumnos (p. ej. para cuadrar con el listado del club). */
+export class RenumberMembers {
+  constructor(private readonly numbers: MemberNumbers) {}
+
+  async execute(assignments: { studentId: string; memberNumber: number }[]): Promise<void> {
+    const wanted = new Map<string, number>();
+    for (const a of assignments) {
+      if (wanted.has(a.studentId)) {
+        throw new InvalidValue('assignments', 'Hay un alumno repetido.');
+      }
+      wanted.set(a.studentId, a.memberNumber);
+    }
+    const current = await this.numbers.of([...wanted.keys()]);
+    const renumbering = MemberRenumbering.of(current, wanted);
+    await this.numbers.assign(renumbering.changes());
   }
 }
 

@@ -4,10 +4,25 @@ Registro de alumnos del club: datos personales, contacto con la familia, hermano
 y sus inscripciones en grupos.
 Solo administración puede verlos y gestionarlos.
 
+### Requirement: Número de socio
+Cada alumno MUST tener un número de socio único que se le asigna al darlo de alta, en orden creciente.
+Un número MUST NOT volver a darse a otro alumno, aunque el suyo se dé de baja o se borre: la baja
+conserva su número y los altas siguientes continúan la numeración.
+Administración MAY repartir de otra forma los números que ya tienen unos alumnos (para cuadrar con el
+listado del club), pero MUST NOT darles un número que no tenga ninguno de ellos.
+
+#### Scenario: Alta después de una baja
+- **WHEN** hay alumnos con los números 1 a 3, el 3 se da de baja y se da de alta otro
+- **THEN** el 3 conserva su número y el nuevo recibe el 4
+
+#### Scenario: Intercambio de números
+- **WHEN** administración pide que el alumno 1 tenga el 2 y el alumno 2 tenga el 1
+- **THEN** quedan intercambiados; pedir un número que no tiene ninguno de los indicados se rechaza
+
 ### Requirement: Lista de alumnos
-El sistema MUST mostrar los alumnos con su nombre, edad (o «edad sin indicar»), grupos y estado,
-con búsqueda por cualquier parte del nombre (sin distinguir mayúsculas ni tildes)
-y con los filtros Todos, Activos, Hermanos, De baja y Socios sin clases.
+El sistema MUST mostrar los alumnos con su número de socio, nombre, edad (o «edad sin indicar»), grupos y
+estado, con búsqueda por cualquier parte del nombre (sin distinguir mayúsculas ni tildes) o por número de
+socio, y con los filtros Todos, Activos, Hermanos, De baja y Socios sin clases.
 
 #### Scenario: Buscar sin tildes
 - **WHEN** administración busca «lopez»
