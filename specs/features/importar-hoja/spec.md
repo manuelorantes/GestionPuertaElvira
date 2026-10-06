@@ -6,9 +6,15 @@ revisando fila a fila antes de guardar nada. Solo administración.
 ### Requirement: Lectura de la hoja
 El sistema MUST aceptar el CSV exportado (coma o punto y coma) o las celdas pegadas (tabulador), con la fila de cabecera.
 Reconoce por cabecera: nombre (primera columna), Cuota Anual, Chándal y polo, Federativa, Septiembre…Junio, Fecha de nacimiento,
-Madre o padre, Teléfono y e-mail. Fotos, Tarjetero y banco se ignoran.
+Madre o padre, Teléfono y e-mail, y una o varias columnas de grupo (cabecera con «Grupo» o «Clase»; dentro de una celda,
+varios grupos separados por «;»). Fotos, Tarjetero y banco se ignoran.
 Importes con coma o punto; fechas d/m/aa o d/m/aaaa; teléfonos españoles de 9 cifras; emails válidos.
 Lo que no se entiende MUST avisarse y quedar vacío. Los meses de septiembre a diciembre son de la temporada en curso y los de enero a junio del año siguiente.
+
+#### Scenario: Columnas de grupo
+- **WHEN** una fila trae «Lunes 17:00» en una columna de grupo y «Jueves 18:30 Alfil» en otra
+- **THEN** la revisión propone esos dos grupos (por nombre completo, propio o por defecto, o por palabras que lo describan: día, hora, nivel, aula; «Lun» vale por «lunes»)
+- **AND** si un texto no corresponde a ningún grupo o a varios, la fila lo avisa y el grupo se elige a mano
 
 ### Requirement: Revisión antes de importar
 Cada fila MUST casarse con el alumno de nombre igual (sin tildes ni mayúsculas) y, si no lo hay, proponer el alta con los datos de la hoja

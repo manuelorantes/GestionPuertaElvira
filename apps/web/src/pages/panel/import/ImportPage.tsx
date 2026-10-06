@@ -45,7 +45,8 @@ function decisionFor(row: PreviewRow, action: Decision['action']): Decision {
   return {
     line: row.line,
     action,
-    groupIds: [],
+    // Los grupos que la hoja ya nombra vienen elegidos; el resto se elige a mano.
+    groupIds: row.groups.map((g) => g.groupId).filter((id): id is string => id !== null),
     fullName: row.fullName,
     birthDate: row.birthDate ?? '',
     guardianName: row.guardianName ?? '',

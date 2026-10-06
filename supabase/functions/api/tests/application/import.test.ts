@@ -1,7 +1,7 @@
 import { assertEquals, assertThrows } from '@std/assert';
 
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
-import { normaliseText, SpreadsheetParser } from '../../src/application/import/mod.ts';
+import { matchGroups, normaliseText, SpreadsheetParser } from '../../src/application/import/mod.ts';
 
 const SHEET = [
   ',Fotos,,Cuota Anual,Chandal y polo,Federativa,Septiembre,Octubre,Noviembre,Diciembre,Enero,Febrero,Marzo,Abril,Mayo,Junio,Fecha Nacimiento,Madre ó Padre,Telefono,e-mail',
@@ -59,4 +59,43 @@ Deno.test('SpreadsheetParser should accept pasted cells and semicolons and warn 
 Deno.test('SpreadsheetParser should fail clearly without a recognisable header', () => {
   assertThrows(() => parse('a,b,c\n1,2,3'), InvalidValue);
   assertEquals(normaliseText('  Héctor   PÉREZ '), 'hector perez');
+});
+
+Deno.test('SpreadsheetParser should read one or several group columns, with several groups per cell', () => {
+  const sheet = [
+    'Nombre,Fecha Nacimiento,Grupo 1,Grupo 2,Septiembre',
+    'Lucía Prueba,12/3/2015,Lunes 17:00,Miércoles 17:00,20',
+    'Javier Prueba,19/7/1984,Martes 17:00 Intermedio; Jueves 17:00 Intermedio,,36',
+    'Sin Grupo,1/1/2010,,,10',
+  ].join('\n');
+  const rows = parse(sheet);
+  assertEquals(rows[0]?.groups, ['Lunes 17:00', 'Miércoles 17:00']);
+  assertEquals(rows[1]?.groups, ['Martes 17:00 Intermedio', 'Jueves 17:00 Intermedio']);
+  assertEquals(rows[2]?.groups, []);
+  assertEquals(parse('Nombre,Septiembre\nAna,10')[0]?.groups, []);
+});
+
+Deno.test('matchGroups should find a group by its name, its default name or words that describe it', () => {
+  const groups = [
+    {
+      id: 'a',
+      name: 'Lunes 17:00 · Iniciación · Alfil',
+      defaultName: 'Lunes 17:00 · Iniciación · Alfil',
+    },
+    {
+      id: 'b',
+      name: 'Lunes 17:00 · Intermedio · Peón',
+      defaultName: 'Lunes 17:00 · Intermedio · Peón',
+    },
+    { id: 'c', name: 'Competición', defaultName: 'Viernes 17:30 · Avanzado · Alfil' },
+  ];
+  const ids = (text: string) => matchGroups(text, groups).map((g) => g.id);
+  assertEquals(ids('competicion'), ['c']);
+  assertEquals(ids('Viernes 17:30 · Avanzado · Alfil'), ['c']);
+  assertEquals(ids('Lunes 17:00'), ['a', 'b']);
+  assertEquals(ids('lun 17:00 peon'), ['b']);
+  assertEquals(ids('Lunes 17:00 Intermedio'), ['b']);
+  assertEquals(ids('Vie 17:30'), ['c']);
+  assertEquals(ids('Jueves 17:00'), []);
+  assertEquals(ids('   '), []);
 });

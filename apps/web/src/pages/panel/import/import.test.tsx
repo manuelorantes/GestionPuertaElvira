@@ -22,6 +22,7 @@ const PREVIEW = {
       warnings: [],
       match: { id: 's1', fullName: 'Héctor Pérez Ratkovsky' },
       suggestions: [],
+      groups: [],
     },
     {
       line: 3,
@@ -37,6 +38,7 @@ const PREVIEW = {
       warnings: ['«69066600» no es un teléfono válido.'],
       match: null,
       suggestions: [],
+      groups: [{ text: 'Lun 17:00', groupId: 'g1' }],
     },
     {
       line: 4,
@@ -52,6 +54,7 @@ const PREVIEW = {
       warnings: [],
       match: null,
       suggestions: [{ id: 's1', fullName: 'Héctor Pérez Ratkovsky' }],
+      groups: [],
     },
   ],
 };
@@ -170,7 +173,7 @@ describe('Importar hoja', () => {
     expect(
       within(julio).getByRole('button', { name: 'Aceptar fila Julio Requena Montenegro' }),
     ).toBeDisabled();
-    expect(within(julio).getByText('Elige un grupo para crear el alumno.')).toBeInTheDocument();
+    expect(within(julio).getByLabelText('Grupo')).toHaveValue('g1');
 
     expect(lookalike).toHaveTextContent('Posible duplicado: Héctor Pérez Ratkovsky');
   });

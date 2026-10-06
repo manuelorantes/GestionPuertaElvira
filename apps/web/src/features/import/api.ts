@@ -20,6 +20,8 @@ export interface PreviewRow {
   warnings: string[];
   match: Candidate | null;
   suggestions: Candidate[];
+  /** Lo escrito en las columnas de grupo y el grupo encontrado (null si no se encontró o es ambiguo). */
+  groups: { text: string; groupId: string | null }[];
 }
 
 type DecisionAction = 'link' | 'create' | 'skip';
