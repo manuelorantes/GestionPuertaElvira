@@ -7,7 +7,7 @@ import type { MissingDatum, Registration, StudentDetail, StudentPayload } from '
 import { ageOn } from './format';
 
 /** Espejo de la regla de la API: qué quedará pendiente con los datos del formulario. */
-export function missingDataFor(values: StudentFormValues): MissingDatum[] {
+function missingDataFor(values: StudentFormValues): MissingDatum[] {
   const age = ageOn(values.birthDate);
   const guardians = [
     { name: values.guardian1Name.trim(), phone: values.guardian1Phone.trim() },
