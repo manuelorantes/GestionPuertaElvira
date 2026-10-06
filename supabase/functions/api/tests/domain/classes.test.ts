@@ -3,6 +3,7 @@ import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
 import {
   AlreadyEnrolled,
+  Attendance,
   Capacity,
   Classroom,
   ClassroomSchedule,
@@ -14,6 +15,7 @@ import {
   HalfHour,
   type Level,
   levelFromName,
+  occupancyByDay,
   StudentReference,
   StudentScheduleOverlap,
   type Weekday,
@@ -97,14 +99,22 @@ Deno.test('Enrolment should be active from its start until the day before it end
 
 Deno.test('EnrolmentPolicy should accept free seats without clashes and refuse duplicates, overlaps and full groups', () => {
   const policy = new EnrolmentPolicy();
+  const full = Attendance.full();
+  const seats = (n: number, days: Weekday[] = [1, 2, 3, 4, 5]) =>
+    new Map<Weekday, number>(days.map((d) => [d, n]));
   const target = GroupFactory.group({ days: [5], start: '17:30', end: '19:00' });
   policy.assertCanEnrol(
     target,
-    [GroupFactory.group({ days: [1], start: '17:00', end: '18:00' })],
-    5,
+    [{ group: GroupFactory.group({ days: [1], start: '17:00', end: '18:00' }), attendance: full }],
+    seats(5),
+    full,
     false,
   );
-  assertThrows(() => policy.assertCanEnrol(target, [target], 5, false), AlreadyEnrolled);
+  assertThrows(
+    () =>
+      policy.assertCanEnrol(target, [{ group: target, attendance: full }], seats(5), full, false),
+    AlreadyEnrolled,
+  );
 
   const particular = GroupFactory.group({
     days: [1],
@@ -120,16 +130,117 @@ Deno.test('EnrolmentPolicy should accept free seats without clashes and refuse d
     name: 'Iniciación A',
   });
   const overlap = assertThrows(
-    () => policy.assertCanEnrol(particular, [current], 0, false),
+    () =>
+      policy.assertCanEnrol(
+        particular,
+        [{ group: current, attendance: full }],
+        seats(0),
+        full,
+        false,
+      ),
     StudentScheduleOverlap,
   );
   assertEquals(overlap.details().groupName, 'Iniciación A');
 
-  const full = GroupFactory.group({ capacity: 12 });
-  const error = assertThrows(() => policy.assertCanEnrol(full, [], 12, false), GroupFull);
+  const group = GroupFactory.group({ capacity: 12 });
+  const error = assertThrows(
+    () => policy.assertCanEnrol(group, [], seats(12), full, false),
+    GroupFull,
+  );
   assertEquals(error.details(), { occupied: 12, capacity: 12 });
   assertEquals(error.message, 'El grupo está completo (12/12).');
-  policy.assertCanEnrol(full, [], 12, true);
+  policy.assertCanEnrol(group, [], seats(12), full, true);
+});
+
+Deno.test('Attendance should trim a group schedule to some days or a shorter time and tell the real hours', () => {
+  const group = GroupFactory.details({ days: [1, 3], start: '17:00', end: '18:30' });
+  const mondays = Attendance.within(group, [1], null, null);
+  assertEquals(mondays.daysIn(group), [1]);
+  assertEquals(mondays.slotIn(group).label(), 'Lun · 17:00–18:30');
+  assertEquals(mondays.slotIn(group).weeklyHours(), 1.5);
+  assertEquals(mondays.labelIn(group), 'Lun · 17:00–18:30');
+
+  const shorter = Attendance.within(group, null, HalfHour.fromString('17:30'), null);
+  assertEquals(shorter.slotIn(group).label(), 'Lun y Mié · 17:30–18:30');
+  assertEquals(shorter.slotIn(group).weeklyHours(), 2);
+
+  // Lo que coincide con el grupo se guarda como «todo».
+  const same = Attendance.within(
+    group,
+    [1, 3],
+    HalfHour.fromString('17:00'),
+    HalfHour.fromString('18:30'),
+  );
+  assert(same.isFull());
+  assertEquals(same.labelIn(group), null);
+
+  assertThrows(() => Attendance.within(group, [2], null, null), InvalidValue);
+  assertThrows(() => Attendance.within(group, [], null, null), InvalidValue);
+  assertThrows(
+    () => Attendance.within(group, null, HalfHour.fromString('16:30'), null),
+    InvalidValue,
+  );
+  assertThrows(
+    () => Attendance.within(group, null, null, HalfHour.fromString('19:00')),
+    InvalidValue,
+  );
+  assertThrows(
+    () =>
+      Attendance.within(group, null, HalfHour.fromString('18:00'), HalfHour.fromString('18:00')),
+    InvalidValue,
+  );
+});
+
+Deno.test('occupancy should count seats per day, and the policy should check the busiest day the student attends', () => {
+  const group = GroupFactory.group({ days: [1, 3], start: '17:00', end: '18:30', capacity: 2 });
+  const details = group.details();
+  const enrol = (attendance: Attendance) =>
+    Enrolment.start(
+      EnrolmentId.generate(),
+      StudentReference.generate(),
+      group.id,
+      LocalDate.fromString('2026-09-15'),
+      attendance,
+    );
+  const enrolments = [
+    enrol(Attendance.full()),
+    enrol(Attendance.within(details, [1], null, null)),
+  ];
+  const seats = occupancyByDay(details, enrolments);
+  assertEquals([...seats.entries()], [[1, 2], [3, 1]]);
+
+  const policy = new EnrolmentPolicy();
+  // El lunes está lleno; el miércoles tiene hueco.
+  assertThrows(() => policy.assertCanEnrol(group, [], seats, Attendance.full(), false), GroupFull);
+  policy.assertCanEnrol(group, [], seats, Attendance.within(details, [3], null, null), false);
+
+  // Media hora del grupo anterior y la hora entera del siguiente no se solapan entre sí.
+  const first = GroupFactory.group({
+    days: [1],
+    start: '18:00',
+    end: '19:00',
+    name: 'Iniciación 18',
+  });
+  const second = GroupFactory.group({
+    days: [1],
+    start: '19:00',
+    end: '20:00',
+    name: 'Iniciación 19',
+    classroom: 'caballo',
+  });
+  const halfOfFirst = Attendance.within(first.details(), null, HalfHour.fromString('18:30'), null);
+  policy.assertCanEnrol(
+    second,
+    [{ group: first, attendance: halfOfFirst }],
+    occupancyByDay(second.details(), []),
+    Attendance.full(),
+    false,
+  );
+  assertEquals(
+    halfOfFirst.slotIn(first.details()).weeklyHours() +
+      Attendance.full().slotIn(second.details()).weeklyHours(),
+    1.5,
+  );
 });
 
 Deno.test('Group values should validate capacity, classroom, name and level', () => {

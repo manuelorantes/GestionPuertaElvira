@@ -50,6 +50,10 @@ export interface StudentGroup {
   slotLabel: string;
   teacherName: string;
   classroom: string;
+  /** Horario especial del alumno en el grupo, o null si va a todo el grupo. */
+  attendance: { days: string[]; start: string; end: string } | null;
+  /** «Lun · 18:30–19:00», o null si va a todo el grupo. */
+  attendanceLabel: string | null;
 }
 
 export interface StudentSummary {

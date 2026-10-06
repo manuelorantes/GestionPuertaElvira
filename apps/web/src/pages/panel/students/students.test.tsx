@@ -16,6 +16,7 @@ const GROUPS = [
     classroom: 'alfil',
     capacity: 12,
     occupied: 11,
+    occupancyByDay: {},
     customName: true,
     weeklyPlan: 'two_hours',
   },
@@ -31,6 +32,7 @@ const GROUPS = [
     classroom: 'caballo',
     capacity: 1,
     occupied: 1,
+    occupancyByDay: {},
     customName: true,
     weeklyPlan: 'one_hour',
   },
@@ -282,6 +284,28 @@ describe('Alumnos', () => {
     expect(screen.queryByRole('list', { name: 'Sin teléfono' })).not.toBeInTheDocument();
   });
 
+  it('should enrol a student in a group with a special schedule (some days, part of the time)', async () => {
+    const user = userEvent.setup();
+    const spy = api({ 'POST /api/admin/students/s1/enrolments': [204] });
+    renderApp('/panel/alumnos/s1');
+
+    const panel = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    await user.click(within(panel).getByRole('button', { name: 'Añadir grupo' }));
+    const dialog = screen.getByRole('dialog', { name: 'Añadir grupo' });
+    await user.selectOptions(within(dialog).getByLabelText('Grupo'), 'g2');
+    await user.click(within(dialog).getByRole('switch', { name: 'Horario especial' }));
+    await user.selectOptions(within(dialog).getByLabelText('Empieza'), '16:30');
+    await user.click(within(dialog).getByRole('button', { name: 'Añadir' }));
+
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/students/s1/enrolments')).toEqual({
+        groupId: 'g2',
+        confirmOverCapacity: false,
+        attendance: { days: ['tue'], start: '16:30', end: '17:00' },
+      }),
+    );
+  });
+
   it('should register a student and confirm when the group is full', async () => {
     const user = userEvent.setup();
     const spy = api({
@@ -426,6 +450,7 @@ describe('ficha de grupo', () => {
       expect(postBody(spy, '/api/admin/students/s4/enrolments')).toEqual({
         groupId: 'g1',
         confirmOverCapacity: false,
+        attendance: null,
       }),
     );
   });

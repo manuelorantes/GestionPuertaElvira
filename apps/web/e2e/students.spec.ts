@@ -107,3 +107,19 @@ test('should withdraw a student and show them as withdrawn', async ({ page }) =>
   await expect(page.getByRole('button', { name: /hugo martín castillo/i })).toBeVisible();
   await expect(page.getByText(/^1 de \d+ mostrados$/)).toBeVisible();
 });
+
+test('should enrol with a special schedule and show it on the card and the group', async ({
+  page,
+}) => {
+  await openStudents(page);
+
+  const card = await openCard(page, /pablo lópez herrera/i);
+  await card.getByRole('button', { name: 'Añadir grupo' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Añadir grupo' });
+  await selectStartingWith(dialog.getByLabel('Grupo'), 'Iniciación D');
+  await dialog.getByRole('switch', { name: 'Horario especial' }).click();
+  await dialog.getByRole('button', { name: 'Mié' }).click(); // solo los lunes
+  await dialog.getByRole('button', { name: 'Añadir' }).click();
+
+  await expect(card.getByText('Horario especial: Lun · 18:30–19:30')).toBeVisible();
+});

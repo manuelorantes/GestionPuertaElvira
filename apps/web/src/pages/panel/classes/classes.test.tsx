@@ -22,6 +22,7 @@ const GROUP = {
   classroom: 'alfil',
   capacity: 12,
   occupied: 13,
+  occupancyByDay: {},
   customName: true,
   weeklyPlan: 'two_hours',
 };

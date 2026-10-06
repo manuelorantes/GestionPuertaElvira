@@ -20,6 +20,7 @@ const GROUPS = [
     classroom: 'alfil',
     capacity: 12,
     occupied: 10,
+    occupancyByDay: {},
     customName: true,
     weeklyPlan: 'two_hours',
   },
@@ -83,6 +84,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             marginCents: 32200,
             incomePerHourCents: 5625,
             occupied: 10,
+            occupancyByDay: {},
             capacity: 12,
           },
           {
@@ -96,6 +98,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             marginCents: 9200,
             incomePerHourCents: 3333,
             occupied: 6,
+            occupancyByDay: {},
             capacity: 12,
           },
         ],

@@ -20,7 +20,10 @@ export interface ClassGroup {
   slotLabel: string;
   classroom: Classroom;
   capacity: number;
+  /** Plazas ocupadas el día más lleno. */
   occupied: number;
+  /** Plazas ocupadas cada día del grupo. */
+  occupancyByDay: Partial<Record<Weekday, number>>;
   weeklyPlan: WeeklyPlan;
 }
 
@@ -72,7 +75,7 @@ export function updateTeacher(
 }
 
 export interface ClassGroupDetail extends ClassGroup {
-  students: { id: string; fullName: string; age: number | null }[];
+  students: { id: string; fullName: string; age: number | null; attendanceLabel: string | null }[];
 }
 
 export function fetchGroup(id: string): Promise<ClassGroupDetail> {

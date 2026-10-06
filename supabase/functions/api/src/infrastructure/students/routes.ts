@@ -1,6 +1,8 @@
 import type { LocalDate } from '../../domain/common/mod.ts';
 import type { StudentId } from '../../domain/students/mod.ts';
 import {
+  type AttendanceInput,
+  ChangeAttendance,
   EndStudentEnrolments,
   EnrolStudent,
   MoveStudent,
@@ -77,6 +79,19 @@ export class BillingMembership implements Membership {
       await accounts.saveAccount(account);
     }
   }
+}
+
+/** Horario especial opcional: { days?: ['mon'], start?: '18:30', end?: '19:00' }. */
+function attendanceInput(body: JsonBody): AttendanceInput | null {
+  const raw = body.optionalObject('attendance');
+  if (raw === null) return null;
+  // Sin «days» (o vacío) se entiende «todos los días del grupo».
+  const days = raw.stringList('days');
+  return {
+    days: days.length === 0 ? null : days,
+    start: raw.optionalString('start'),
+    end: raw.optionalString('end'),
+  };
 }
 
 export function studentInput(body: JsonBody): StudentInput {
@@ -212,6 +227,26 @@ export function registerStudentRoutes(api: ApiApp): void {
         param(c, 'id'),
         body.requiredString('groupId'),
         body.bool('confirmOverCapacity'),
+        undefined,
+        attendanceInput(body),
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/students/:id/enrolments/:groupId', access: 'admin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      await new ChangeAttendance(
+        new SqlClassGroupRepository(scope.tx),
+        new SqlEnrolmentRepository(scope.tx),
+        clock,
+      ).execute(
+        param(c, 'id'),
+        param(c, 'groupId'),
+        attendanceInput(body),
+        body.bool('confirmOverCapacity'),
       );
       return c.body(null, 204);
     },
@@ -245,6 +280,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         param(c, 'groupId'),
         body.requiredString('toGroupId'),
         body.bool('confirmOverCapacity'),
+        attendanceInput(body),
       );
       return c.body(null, 204);
     },

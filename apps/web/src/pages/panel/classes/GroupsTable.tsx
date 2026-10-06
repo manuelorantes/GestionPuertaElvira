@@ -6,6 +6,8 @@ import { LEVELS, WEEKLY_PLAN_LABEL } from '@/features/classes/levels';
 import { Card } from '@/shared/ui/Card';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
 
+import { OccupancyByDay } from './OccupancyByDay';
+
 export function GroupsTable({
   groups,
   onEdit,
@@ -52,6 +54,7 @@ export function GroupsTable({
               <td className="px-4 py-3">{classroomLabel(group.classroom)}</td>
               <td className="px-4 py-3">
                 <OccupancyBar occupied={group.occupied} capacity={group.capacity} />
+                <OccupancyByDay group={group} />
               </td>
               <td className="px-4 py-3">
                 <div className="flex flex-wrap justify-end gap-2">
