@@ -216,6 +216,31 @@ Deno.test({
       422,
       'invalid_months',
     );
+    // Quien no es socio puede pagar la cuota de socio (y pasa a serlo); después ya no hay nada que cobrar.
+    const membership = await fx.client.json('POST', '/api/admin/billing/quote', {
+      studentId: fx.student,
+      kind: 'membership',
+      months: 1,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(membership.status, 200, JSON.stringify(membership.body));
+    assertEquals((membership.body as { totalCents: number }).totalCents, 5000);
+    assertEquals(
+      (await fx.client.json('POST', '/api/admin/billing/payments', {
+        studentId: fx.student,
+        kind: 'membership',
+        months: 1,
+        method: 'cash',
+        date: today,
+      })).status,
+      201,
+    );
+    const account = body<Record<string, unknown>>(
+      await fx.client.get(`/api/admin/billing/accounts/${fx.student}`),
+    );
+    assertEquals(account.member, true);
+    assertEquals(account.membershipPaid, true);
     assertError(
       await fx.client.json('POST', '/api/admin/billing/quote', {
         studentId: fx.student,

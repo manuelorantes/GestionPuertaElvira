@@ -398,6 +398,7 @@ function useCases(tx: TransactionSql, clock: Clock) {
       transactions,
       closed,
       locks,
+      accounts,
     ),
     issueInvoice: new IssueInvoice(payments, sequence, transactions, clock, locks),
     proposeSessions: new ProposeMonthSessions(
@@ -516,7 +517,9 @@ async function seedBilling(
       date: date ?? today.toString(),
       prorate: false,
       specialPercent: null,
+      specialAmountCents: null,
       specialConcept: null,
+      redeemPoints: 0,
     });
   let count = 0;
   // Los meses anteriores se cobraron en plazo, cada uno en su mes.

@@ -86,6 +86,21 @@ const SETTINGS = {
   vatPercent: 21,
 };
 
+const ACCOUNT = {
+  preferredPlan: 'monthly',
+  member: false,
+  privateRate: null,
+  points: 2,
+  suggestedMonths: 1,
+  remainingMonths: 9,
+  weeklyHours: 2,
+  monthlyFeeCents: 4050,
+  familyDiscount: true,
+  hasPrivateLessons: false,
+  membershipPaid: false,
+  membershipFeeCents: 5000,
+};
+
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /api/auth/me': [200, { user: ADMIN }],
@@ -110,17 +125,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
         total: 1,
       },
     ],
-    'GET /api/admin/billing/accounts/s1': [
-      200,
-      {
-        preferredPlan: 'monthly',
-        member: false,
-        privateRate: null,
-        points: 2,
-        suggestedMonths: 1,
-        remainingMonths: 9,
-      },
-    ],
+    'GET /api/admin/billing/accounts/s1': [200, ACCOUNT],
     'POST /api/admin/billing/quote': [200, QUOTE],
     'GET /api/admin/teachers': [
       200,
@@ -180,6 +185,32 @@ describe('Cobros y cuotas', () => {
       kind: 'monthly',
       months: 1,
       method: 'cash',
+      redeemPoints: 0,
+      specialDiscount: null,
+    });
+  });
+
+  it('lets administration redeem points and add a fixed special discount with a reason', async () => {
+    const fetch = api({
+      'GET /api/admin/billing/accounts/s1': [200, { ...ACCOUNT, points: 4 }],
+    });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const row = within(await screen.findByRole('table')).getByRole('row', { name: /Martina/ });
+    await userEvent.click(within(row).getByRole('button', { name: 'Cobrar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' });
+    await userEvent.selectOptions(await within(dialog).findByLabelText('Canjear puntos'), '3');
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Descuento especial' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cantidad fija' }));
+    await userEvent.type(within(dialog).getByLabelText('Descuento (€)'), '10');
+    await userEvent.type(within(dialog).getByLabelText('Motivo del descuento'), 'Beca del club');
+
+    await waitFor(() => {
+      const quotes = fetch.mock.calls.filter(([url]) => url === '/api/admin/billing/quote');
+      expect(JSON.parse(String(quotes.at(-1)?.[1]?.body))).toMatchObject({
+        redeemPoints: 3,
+        specialDiscount: { percent: null, amountCents: 1000, concept: 'Beca del club' },
+      });
     });
   });
 

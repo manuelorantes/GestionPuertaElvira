@@ -66,9 +66,18 @@ export function billing(api: ApiApp, scope: RequestScope) {
     generate,
     quotes,
     list: new ListMonthlyCharges(generate, query, clock),
-    register: new RegisterPayment(quotes, charges, payments, sequence, transactions, closed, locks),
+    register: new RegisterPayment(
+      quotes,
+      charges,
+      payments,
+      sequence,
+      transactions,
+      closed,
+      locks,
+      accounts,
+    ),
     issueInvoice: new IssueInvoice(payments, sequence, transactions, clock, locks),
-    getAccount: new GetStudentAccount(directory, accounts, quotes, clock),
+    getAccount: new GetStudentAccount(directory, accounts, quotes, clock, settings, charges),
     today: () => LocalDate.fromInstant(clock.now()),
   };
 }
@@ -82,8 +91,10 @@ function paymentRequest(body: JsonBody): PaymentRequest {
     method: body.requiredString('method'),
     date: body.requiredString('date'),
     prorate: body.bool('prorate'),
-    specialPercent: special?.requiredInt('percent') ?? null,
+    specialPercent: special?.optionalInt('percent') ?? null,
+    specialAmountCents: special?.optionalInt('amountCents') ?? null,
     specialConcept: special?.requiredString('concept') ?? null,
+    redeemPoints: body.optionalInt('redeemPoints') ?? 0,
   };
 }
 

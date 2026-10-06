@@ -39,7 +39,10 @@ export interface PaymentRequest {
   method: PaymentMethod;
   date: string;
   prorate: boolean;
-  specialDiscount: { percent: number; concept: string } | null;
+  /** Descuento especial: en porcentaje o en céntimos, con motivo. */
+  specialDiscount: { percent: number | null; amountCents: number | null; concept: string } | null;
+  /** Puntos a canjear (1 punto = 1 % de una cuota mensual; máximo 5; solo cuotas mensuales). */
+  redeemPoints: number;
 }
 
 interface Line {
@@ -97,6 +100,12 @@ export interface Account {
   points: number;
   suggestedMonths: number;
   remainingMonths: number;
+  weeklyHours: number;
+  monthlyFeeCents: number;
+  familyDiscount: boolean;
+  hasPrivateLessons: boolean;
+  membershipPaid: boolean;
+  membershipFeeCents: number;
 }
 
 export interface BillingSettings {

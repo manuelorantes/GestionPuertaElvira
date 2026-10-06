@@ -22,17 +22,29 @@ más sus clases particulares:
 - **THEN** paga 210 € al mes por ella
 
 ### Requirement: Descuentos
-Los descuentos MUST sumarse en porcentaje sobre el importe bruto del cobro:
+Los descuentos en porcentaje MUST sumarse sobre el importe bruto del cobro:
 
 - familiar (10 %), si tiene hermanos activos;
 - pago adelantado: 3 meses o más, 10 %; 6 meses o más, 15 %; 7 meses o más (resto de temporada), 20 %;
-- descuento especial puntual, con porcentaje y motivo (por ejemplo, el canje de puntos).
+- descuento especial en porcentaje, con motivo.
 
+Después se restan los descuentos en euros, sin bajar de 0 €:
+
+- canje de puntos: cada punto descuenta un 1 % de UNA cuota mensual (la del primer mes), aunque se paguen
+  varios meses; como mucho 5 puntos por cobro y nunca más de los que tiene el alumno; solo en cuotas mensuales.
+  Al registrar el cobro, los puntos canjeados se restan;
+- descuento especial en cantidad fija, con motivo.
+
+El descuento especial MUST poder aplicarse a cualquier cobro, incluida la cuota de socio, y siempre lleva motivo.
 El total MUST redondearse a céntimos, y las líneas del desglose MUST sumar exactamente el total.
 
 #### Scenario: Hermanos que pagan tres meses
 - **WHEN** un alumno con hermanos y tramo de 55 € paga 3 meses
 - **THEN** el bruto es 165 €, el descuento es del 20 % y el total es 132 €
+
+#### Scenario: Puntos en un cobro de seis meses
+- **WHEN** un alumno de tramo 45 € con 5 puntos paga 6 meses canjeando los 5
+- **THEN** al total con el 15 % de pago adelantado se le restan 2,25 € (5 % de una cuota), y el alumno se queda con 0 puntos
 
 ### Requirement: Horas semanales
 Las horas semanales de un alumno, de las que sale su tarifa, MUST ser la suma de lo que realmente hace en cada grupo:
@@ -45,7 +57,9 @@ el horario del grupo o, si tiene horario especial, solo los días y la franja a 
 ### Requirement: Cuotas del mes
 Cada mes de la temporada (septiembre a junio), cada alumno activo MUST tener una cuota pendiente de ese mes,
 con el importe de un mes y su descuento familiar, salvo que ya la tenga pagada por adelantado.
-Los socios MUST tener una cuota de socio por temporada (50 € por defecto, sin descuentos).
+Los socios MUST tener una cuota de socio por temporada (50 € por defecto, sin descuentos salvo el especial).
+Cualquier alumno que no haya pagado la cuota de socio de la temporada MUST poder pagarla desde «Registrar cobro»
+(concepto «Cuota de socio»); al pagarla pasa a ser socio.
 El importe de una cuota no cambia aunque después cambien las tarifas o los grupos.
 
 #### Scenario: Estados según la fecha
@@ -89,12 +103,15 @@ Para una cuota vencida, administración MUST poder abrir WhatsApp con el teléfo
 y un mensaje ya escrito (alumno, mes e importe). La cuota queda marcada como «Avisado».
 
 ### Requirement: Datos de cobro del alumno
-La ficha del alumno MUST mostrar y permitir cambiar:
+La ficha del alumno MUST mostrar:
 
-- su forma de pago preferida (solo propone el concepto al cobrar);
-- si es socio;
-- el precio por hora pactado de sus particulares;
-- sus puntos, que se suman y restan a mano y nunca bajan de 0.
+- sus horas semanales de clase y la cuota mensual que le corresponde hoy;
+- si se le aplica el descuento familiar;
+- si la cuota de socio de la temporada está pagada o pendiente (y su importe);
+- sus puntos, que se suman y restan a mano, nunca bajan de 0 y se canjean al cobrar;
+- si tiene particulares, el precio por hora pactado, que MUST poder cambiarse.
+
+Los meses a cobrar (1, 3, 6 o resto de temporada) se eligen en cada cobro; no hay forma de pago preferida.
 
 También MUST mostrar su historial de cobros, con acceso a cada recibo.
 
