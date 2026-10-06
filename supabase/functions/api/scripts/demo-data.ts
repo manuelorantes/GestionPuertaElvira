@@ -515,7 +515,6 @@ async function seedBilling(
       months,
       method,
       date: date ?? today.toString(),
-      prorate: false,
       specialPercent: null,
       specialAmountCents: null,
       specialConcept: null,

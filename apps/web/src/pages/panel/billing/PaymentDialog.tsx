@@ -83,6 +83,11 @@ export function PaymentDialog({
                 <ToggleButton
                   key={c.id}
                   disabled={form.unavailable(c.id)}
+                  title={
+                    form.unavailable(c.id)
+                      ? `Solo quedan ${form.remainingMonths} meses por cobrar`
+                      : undefined
+                  }
                   pressed={form.concept === c.id}
                   onClick={() => form.setConcept(c.id)}
                   className="h-9 rounded-full font-medium"
@@ -91,15 +96,21 @@ export function PaymentDialog({
                 </ToggleButton>
               ))}
             </div>
+            {form.remainingMonths !== null && CONCEPTS.some((c) => form.unavailable(c.id)) && (
+              <p className="text-[13px] text-ink-muted">
+                Quedan {form.remainingMonths} meses por cobrar: las opciones en gris piden más meses
+                de los que quedan.
+              </p>
+            )}
           </fieldset>
           <div className="flex flex-col gap-4">
             <fieldset className="flex flex-col gap-1.5">
               <legend className="mb-1.5 text-sm font-medium">Forma de pago</legend>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <ToggleButton
                   pressed={form.method === 'cash'}
                   onClick={() => form.setMethod('cash')}
-                  className="inline-flex h-11 flex-1 items-center justify-center gap-1.5"
+                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] sm:text-sm"
                 >
                   <Banknote aria-hidden size={16} />
                   Efectivo
@@ -107,7 +118,7 @@ export function PaymentDialog({
                 <ToggleButton
                   pressed={form.method === 'card'}
                   onClick={() => form.setMethod('card')}
-                  className="inline-flex h-11 flex-1 items-center justify-center gap-1.5"
+                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] sm:text-sm"
                 >
                   <CreditCard aria-hidden size={16} />
                   Datáfono
@@ -115,7 +126,7 @@ export function PaymentDialog({
                 <ToggleButton
                   pressed={form.method === 'transfer'}
                   onClick={() => form.setMethod('transfer')}
-                  className="inline-flex h-11 flex-1 items-center justify-center gap-1.5"
+                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] sm:text-sm"
                 >
                   <Landmark aria-hidden size={16} />
                   Transferencia
@@ -130,13 +141,6 @@ export function PaymentDialog({
               toYear={year + 1}
             />
           </div>
-          {form.concept === 'month' && (
-            <Switch
-              label="Prorratear desde la fecha (mes de alta)"
-              checked={form.prorate}
-              onChange={form.setProrate}
-            />
-          )}
           {form.concept !== 'membership' && form.account && (
             <div className="flex flex-col gap-1">
               <Switch

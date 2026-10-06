@@ -21,7 +21,7 @@ export function ToggleButton({
     <button
       type="button"
       aria-pressed={pressed}
-      className={`h-10 min-w-12 cursor-pointer rounded-sm border px-3 text-sm font-semibold ${
+      className={`h-10 min-w-12 cursor-pointer rounded-sm border px-3 text-sm font-semibold disabled:cursor-not-allowed disabled:border-dashed disabled:opacity-45 disabled:hover:bg-surface ${
         pressed
           ? PRESSED[tone]
           : 'border-line-strong bg-surface text-ink-soft hover:bg-surface-muted'

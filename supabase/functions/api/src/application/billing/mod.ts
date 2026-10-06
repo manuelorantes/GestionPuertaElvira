@@ -26,7 +26,6 @@ import {
   type PreferredPlan,
   preferredPlanFromName,
   PrivateLesson,
-  Proration,
   Quote,
   QuoteLine,
   SpecialDiscount,
@@ -306,7 +305,6 @@ export interface PaymentRequest {
   months: number;
   method: string;
   date: string;
-  prorate: boolean;
   /** Descuento especial: en porcentaje o en céntimos, con motivo. */
   specialPercent: number | null;
   specialAmountCents: number | null;
@@ -398,18 +396,8 @@ export class QuotePayment {
       new QuoteLine(`Cuota de ${p.label()}`, pending.get(p.toString()) ?? monthly)
     );
     const sameAsToday = items.every((l) => l.amount.equals(monthly));
-    if (
-      request.prorate &&
-      (periods.length !== 1 || !periods[0]?.equals(YearMonth.of(date)) || !sameAsToday)
-    ) {
-      throw request.months > 1
-        ? InvalidPaymentRequest.prorationRequiresOneMonth()
-        : InvalidPaymentRequest.prorationOnlyCurrentMonth();
-    }
-    const first = periods[0] as YearMonth;
-    const proration = request.prorate ? new Proration(date.day, first.days()) : null;
     const quote = sameAsToday
-      ? calculator.quote(profile, settings, request.months, special, proration, points)
+      ? calculator.quote(profile, settings, request.months, special, points)
       : calculator.quoteItems(items, settings, special, points);
     // Sin grupos, los meses nuevos valen 0 €: solo se puede cobrar lo pendiente.
     if (quote.gross.cents === 0 || items.some((l) => l.amount.cents === 0)) {
@@ -426,19 +414,12 @@ export class QuotePayment {
     };
   }
 
-  /** Meses que propone el formulario según la forma de pago preferida y lo que queda de temporada. */
-  async suggestion(studentId: string): Promise<number> {
+  /** Meses que aún se pueden cobrar y los que propone la forma de pago preferida, en una sola pasada. */
+  async months(studentId: string): Promise<{ remaining: number; suggested: number }> {
     const ref = StudentRef.fromString(studentId);
     const plan: PreferredPlan = (await this.accounts.account(ref))?.preferredPlan() ?? 'monthly';
-    return monthsWithin(plan, await this.available(ref, LocalDate.fromInstant(this.clock.now())));
-  }
-
-  /** Meses que aún se pueden cobrar: cuotas pendientes más los que quedan de temporada. */
-  remainingMonths(studentId: string): Promise<number> {
-    return this.available(
-      StudentRef.fromString(studentId),
-      LocalDate.fromInstant(this.clock.now()),
-    );
+    const remaining = await this.available(ref, LocalDate.fromInstant(this.clock.now()));
+    return { remaining, suggested: monthsWithin(plan, remaining) };
   }
 
   private async periods(ref: StudentRef, date: LocalDate, months: number): Promise<YearMonth[]> {
@@ -672,13 +653,14 @@ export class GetStudentAccount {
     const monthly = new FeeCalculator().quote(profile, settings, 1).total;
     const season = Season.containing(YearMonth.of(today));
     const membership = await this.charges.chargeFor(ref, 'membership', season.firstMonth());
+    const months = await this.quotes.months(studentId);
     return {
       preferredPlan: account?.preferredPlan() ?? 'monthly',
       member: account?.isMember() === true,
       privateRate: rate === null ? null : decimal(rate),
       points: account?.points() ?? 0,
-      suggestedMonths: await this.quotes.suggestion(studentId),
-      remainingMonths: await this.quotes.remainingMonths(studentId),
+      suggestedMonths: months.suggested,
+      remainingMonths: months.remaining,
       weeklyHours: student.regularWeeklyHours,
       monthlyFeeCents: monthly.cents,
       familyDiscount: student.hasSiblings && settings.tariff.familyPercent > 0,

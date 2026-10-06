@@ -90,7 +90,6 @@ function paymentRequest(body: JsonBody): PaymentRequest {
     months: body.optionalInt('months') ?? 1,
     method: body.requiredString('method'),
     date: body.requiredString('date'),
-    prorate: body.bool('prorate'),
     specialPercent: special?.optionalInt('percent') ?? null,
     specialAmountCents: special?.optionalInt('amountCents') ?? null,
     specialConcept: special?.requiredString('concept') ?? null,
@@ -211,7 +210,9 @@ export function registerBillingRoutes(api: ApiApp): void {
   api.defineRoute(admin('POST', '/api/admin/billing/accounts/:id/points'), async (c, scope) => {
     const b = billing(api, scope);
     const id = param(c, 'id');
-    await b.getAccount.execute(id);
+    if ((await b.directory.find(StudentRef.fromString(id), b.today())) === null) {
+      throw new BillingStudentNotFound();
+    }
     const points = await new AdjustPoints(b.accounts).execute(
       id,
       (await JsonBody.from(c.req.raw)).requiredInt('delta'),

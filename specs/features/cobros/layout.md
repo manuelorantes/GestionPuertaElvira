@@ -39,7 +39,6 @@ BillingPage (/panel/cobros)
 │   ├── Select «Alumno» (alumnos activos) + texto con sus grupos
 │   ├── Chips «Concepto»: Mes · 3 meses · 6 meses · 9 meses · Cuota de socio (propuesto según la preferencia de la ficha)
 │   ├── Forma de pago (Efectivo / Transferencia, ToggleButton con icono) | DateField «Fecha»
-│   ├── Switch «Prorratear desde la fecha» (solo con «Mes»)
 │   ├── Switch «Descuento especial» → % y «Motivo» (p. ej. «Canje de 5 puntos»)
 │   ├── Desglose (fondo arena): líneas de la cotización + «Total a cobrar» grande; «Cubre: septiembre – noviembre 2026»
 │   ├── Nota: «El cobro se hace fuera de la aplicación. Aquí solo queda anotado.»
@@ -67,7 +66,6 @@ StudentPanel (ficha de alumno) → nueva tarjeta «Cuotas y cobros»
 | Concepto | chips | sí | según la preferencia (o «Cuota de socio» si se abre desde esa cuota) |
 | Forma de pago | toggle | sí | Efectivo |
 | Fecha | DateField | sí | hoy |
-| Prorratear | switch | no | apagado; oculto si no es «Mes» |
 | Descuento especial % y motivo | número 1–100 y texto | si se activa | — |
 | Factura: nombre, NIF, dirección | texto | sí | nombre del tutor |
 | WhatsApp: mensaje | textarea | sí | plantilla del diseño |

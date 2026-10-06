@@ -190,6 +190,26 @@ describe('Cobros y cuotas', () => {
     });
   });
 
+  it('proposes the membership fee for a member without classes', async () => {
+    api({
+      'GET /api/admin/billing/accounts/s1': [
+        200,
+        { ...ACCOUNT, weeklyHours: 0, monthlyFeeCents: 0, membershipPaid: false },
+      ],
+    });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const row = within(await screen.findByRole('table')).getByRole('row', { name: /Martina/ });
+    await userEvent.click(within(row).getByRole('button', { name: 'Cobrar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Cuota de socio' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
+    );
+  });
+
   it('lets administration redeem points and add a fixed special discount with a reason', async () => {
     const fetch = api({
       'GET /api/admin/billing/accounts/s1': [200, { ...ACCOUNT, points: 6 }],

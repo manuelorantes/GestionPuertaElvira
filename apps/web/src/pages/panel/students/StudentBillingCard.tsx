@@ -97,11 +97,24 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
   );
   const queryClient = useQueryClient();
   const refresh = useRefreshClubData();
-  // Los puntos se ven al instante: la respuesta actualiza la ficha y el resto se recarga en segundo plano.
+  // Los puntos cambian al instante en pantalla (actualización optimista); la API se llama en segundo
+  // plano y, si fallara, se vuelve al valor anterior. Al recargar se obtiene el valor real.
+  const accountKey = ['account', studentId];
   const points = useMutation({
     mutationFn: (delta: number) => adjustPoints(studentId, delta),
+    onMutate: async (delta: number) => {
+      await queryClient.cancelQueries({ queryKey: accountKey });
+      const previous = queryClient.getQueryData<Account>(accountKey);
+      queryClient.setQueryData<Account>(accountKey, (old) =>
+        old ? { ...old, points: Math.max(0, old.points + delta) } : old,
+      );
+      return { previous };
+    },
+    onError: (_error, _delta, context) => {
+      if (context?.previous) queryClient.setQueryData(accountKey, context.previous);
+    },
     onSuccess: (total) => {
-      queryClient.setQueryData<Account>(['account', studentId], (old) =>
+      queryClient.setQueryData<Account>(accountKey, (old) =>
         old ? { ...old, points: total } : old,
       );
       refresh();
@@ -161,7 +174,7 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
           <button
             type="button"
             aria-label="Restar un punto"
-            disabled={account.points === 0 || points.isPending}
+            disabled={account.points === 0}
             onClick={() => points.mutate(-1)}
             className="flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -170,7 +183,6 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
           <button
             type="button"
             aria-label="Sumar un punto"
-            disabled={points.isPending}
             onClick={() => points.mutate(1)}
             className="flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted"
           >

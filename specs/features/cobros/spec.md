@@ -80,7 +80,6 @@ Un cobro MUST indicar el alumno, el concepto (1 mes, 3 meses, 6 meses, 9 meses o
 la forma de pago (efectivo, datáfono o transferencia) y la fecha, y MUST mostrar el desglose antes de guardarlo.
 La lista de cobros MUST mostrar los totales por forma de pago.
 Un cobro de N meses MUST pagar primero las cuotas pendientes más antiguas y después los meses siguientes, sin pasar de junio.
-El prorrateo MUST permitirse solo al cobrar un mes, y cobra los días que quedan desde la fecha hasta fin de mes.
 
 #### Scenario: Ponerse al día y adelantar
 - **WHEN** un alumno con septiembre y octubre pendientes paga 3 meses

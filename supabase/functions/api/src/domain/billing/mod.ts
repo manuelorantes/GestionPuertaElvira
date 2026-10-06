@@ -71,20 +71,6 @@ export class InvalidPaymentRequest extends Error implements HasErrorDetails {
     return new InvalidPaymentRequest('Se pueden cobrar entre 1 y 10 meses.', 'invalid_months');
   }
 
-  static prorationRequiresOneMonth(): InvalidPaymentRequest {
-    return new InvalidPaymentRequest(
-      'El prorrateo solo se aplica al cobrar un único mes.',
-      'proration_requires_one_month',
-    );
-  }
-
-  static prorationOnlyCurrentMonth(): InvalidPaymentRequest {
-    return new InvalidPaymentRequest(
-      'El prorrateo solo se aplica al mes de la fecha del cobro, sin cuotas anteriores pendientes.',
-      'proration_only_current_month',
-    );
-  }
-
   static beyondSeason(available: number): InvalidPaymentRequest {
     return new InvalidPaymentRequest(
       `Solo quedan ${available} meses de temporada por cobrar.`,
@@ -431,22 +417,6 @@ export class PointsRedemption {
   }
 }
 
-/** Cobro parcial del primer mes: desde el día de alta hasta fin de mes. */
-export class Proration {
-  constructor(
-    readonly fromDay: number,
-    readonly daysInMonth: number,
-  ) {
-    if (fromDay < 1 || fromDay > daysInMonth) {
-      throw new InvalidValue('prorate', 'El día de inicio del prorrateo no es válido.');
-    }
-  }
-
-  remainingDays(): number {
-    return this.daysInMonth - this.fromDay + 1;
-  }
-}
-
 function hoursLabel(hours: number): string {
   return `${String(Math.round(hours * 100) / 100).replace('.', ',')} h`;
 }
@@ -467,13 +437,11 @@ export class FeeCalculator {
     settings: BillingSettings,
     months: number,
     special: SpecialDiscount | null = null,
-    proration: Proration | null = null,
     points: PointsRedemption | null = null,
   ): Quote {
     if (!Number.isInteger(months) || months < 1 || months > FeeCalculator.MAX_MONTHS) {
       throw InvalidPaymentRequest.months();
     }
-    if (proration !== null && months !== 1) throw InvalidPaymentRequest.prorationRequiresOneMonth();
     const tariff = settings.tariff;
     const tier = tariff.forWeeklyHours(profile.regularWeeklyHours);
     const monthlyBase = profile.privateLessons.reduce((sum, l) => sum.plus(l.monthlyPrice()), tier);
@@ -496,17 +464,7 @@ export class FeeCalculator {
         ),
       );
     }
-    let gross = monthlyBase.times(months);
-    if (proration !== null) {
-      const prorated = monthlyBase.times(proration.remainingDays() / proration.daysInMonth);
-      lines.push(
-        new QuoteLine(
-          `Prorrateo del ${proration.fromDay} al ${proration.daysInMonth} (${proration.remainingDays()} de ${proration.daysInMonth} días)`,
-          prorated.minus(gross),
-        ),
-      );
-      gross = prorated;
-    }
+    const gross = monthlyBase.times(months);
     const discounts: [string, number][] = [];
     if (profile.hasSiblings && tariff.familyPercent > 0) {
       discounts.push(['Descuento familiar', tariff.familyPercent]);
