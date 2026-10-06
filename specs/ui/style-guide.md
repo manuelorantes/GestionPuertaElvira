@@ -84,7 +84,7 @@ Implementados en `apps/web/src/shared/ui/`. Úsalos antes de crear marcado propi
 | `Tabs` | `label`, `tabs`, `value`, `onChange` | Alto 44, subrayado 2px `brand` y texto `brand-strong` 600 en la activa; flechas izquierda y derecha |
 | `Card` | props de `<div>` | `surface`, borde `line`, `rounded-md`, `shadow-card` |
 | `Select` | `label`, `options`, `value`, `onChange`, `error` | Alto 44, mismo estilo que `TextField` |
-| `ToggleButton` | `pressed`, `tone`: `brand` (días) e `ink` (aulas) | Alto 40, `rounded-sm`; inactivo con borde `line-strong` |
+| `ToggleButton` | `pressed`, `tone`: `brand` (días), `ink` (aulas, chips de filtro) y `soft` (subfiltros) | Alto 40, `rounded-sm`; inactivo con borde `line-strong` |
 | `Switch` | `label`, `checked`, `onChange` | 44×24, `brand` activo y `line-strong` inactivo |
 | `Badge` | `tone`: `success`, `warning`, `danger`, `neutral` | `rounded-full`, 12px, peso 600 |
 | `OccupancyBar` | `occupied`, `capacity` | Barra de 6px sobre `surface-muted` (`brand`, o `brand-strong` si está lleno), «N/M» y badge «Sobre el cupo» |
@@ -129,6 +129,7 @@ Cada bloque es un botón coloreado por nivel; el ancho mínimo es de 980px, con 
 - Hover de enlace o botón primario: `brand` → `brand-strong`.
 - Elemento de navegación activo: fondo `brand-soft` y texto `brand-strong` (escritorio).
 - Chip de filtro activo: fondo `ink-strong`, texto `paper`.
+- Subfiltro (segundo nivel, p. ej. forma de pago dentro de «Ingresos»): debajo de los chips principales, en una franja `surface-muted` con borde superior `line-soft` y etiqueta en mayúsculas `ink-muted`; chips de 32 de alto, texto 13px, activo con `ToggleButton tone="soft"` (borde `brand`, fondo `brand-soft`, texto `brand-strong`).
 - Animaciones desactivadas con `prefers-reduced-motion`.
 - [pending analysis] Foco visible, deshabilitado y carga.
 
