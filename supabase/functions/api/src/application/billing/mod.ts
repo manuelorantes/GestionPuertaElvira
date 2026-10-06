@@ -22,6 +22,7 @@ import {
   Payment,
   PaymentId,
   paymentMethodFromName,
+  PointsRedemption,
   type PreferredPlan,
   preferredPlanFromName,
   PrivateLesson,
@@ -306,8 +307,25 @@ export interface PaymentRequest {
   method: string;
   date: string;
   prorate: boolean;
+  /** Descuento especial: en porcentaje o en céntimos, con motivo. */
   specialPercent: number | null;
+  specialAmountCents: number | null;
   specialConcept: string | null;
+  /** Puntos a canjear (0 = ninguno; como mucho 5 y solo en cuotas mensuales). */
+  redeemPoints: number;
+}
+
+function specialDiscountOf(request: PaymentRequest): SpecialDiscount | null {
+  if (request.specialPercent !== null) {
+    return new SpecialDiscount(request.specialPercent, request.specialConcept ?? '');
+  }
+  if (request.specialAmountCents !== null) {
+    return new SpecialDiscount(
+      Money.cents(request.specialAmountCents),
+      request.specialConcept ?? '',
+    );
+  }
+  return null;
 }
 
 /** Cotización de un cobro: desglose, meses que cubre y concepto del recibo. */
@@ -352,12 +370,19 @@ export class QuotePayment {
       throw new InvalidValue('kind', 'Tipo de cobro desconocido: usa monthly o membership.');
     }
     const settings = await this.settings.get();
-    if (request.kind === 'membership') return await this.membership(student, ref, date, settings);
+    const special = specialDiscountOf(request);
+    if (request.kind === 'membership') {
+      if (request.redeemPoints > 0) throw InvalidPaymentRequest.pointsOnlyMonthly();
+      return await this.membership(student, ref, date, settings, special);
+    }
     const periods = await this.periods(ref, date, request.months);
-    const special = request.specialPercent === null
-      ? null
-      : new SpecialDiscount(request.specialPercent, request.specialConcept ?? '');
-    const profile = feeProfileOf(student, await this.accounts.account(ref), settings);
+    const account = await this.accounts.account(ref);
+    const available = account?.points() ?? 0;
+    if (request.redeemPoints < 0 || request.redeemPoints > available) {
+      throw InvalidPaymentRequest.points(available);
+    }
+    const points = request.redeemPoints === 0 ? null : new PointsRedemption(request.redeemPoints);
+    const profile = feeProfileOf(student, account, settings);
     const calculator = new FeeCalculator();
     const monthly = calculator.quote(profile, settings, 1).total;
     // Las cuotas ya generadas se cobran por su importe guardado; los meses nuevos, con el de hoy.
@@ -380,8 +405,8 @@ export class QuotePayment {
     const first = periods[0] as YearMonth;
     const proration = request.prorate ? new Proration(date.day, first.days()) : null;
     const quote = sameAsToday
-      ? calculator.quote(profile, settings, request.months, special, proration)
-      : calculator.quoteItems(items, settings, special);
+      ? calculator.quote(profile, settings, request.months, special, proration, points)
+      : calculator.quoteItems(items, settings, special, points);
     // Sin grupos, los meses nuevos valen 0 €: solo se puede cobrar lo pendiente.
     if (quote.gross.cents === 0 || items.some((l) => l.amount.cents === 0)) {
       throw InvalidPaymentRequest.nothingToPay();
@@ -440,21 +465,20 @@ export class QuotePayment {
     return periods;
   }
 
+  /** Cualquier alumno puede pagar la cuota de socio de la temporada si aún no la ha pagado (y pasa a ser socio). */
   private async membership(
     student: BillingStudent,
     ref: StudentRef,
     date: LocalDate,
     settings: BillingSettings,
+    special: SpecialDiscount | null,
   ): Promise<PaymentQuote> {
     const season = Season.containing(YearMonth.of(date));
     const charge = await this.charges.chargeFor(ref, 'membership', season.firstMonth());
-    const isMember = (await this.accounts.account(ref))?.isMember() === true;
-    if (charge?.isPaid() || (charge === null && !isMember)) {
-      throw InvalidPaymentRequest.nothingToPay();
-    }
+    if (charge?.isPaid()) throw InvalidPaymentRequest.nothingToPay();
     const fee = charge?.amount ?? settings.tariff.membershipFee;
     const label = `Cuota de socio ${season.label()}`;
-    const quote = new Quote([new QuoteLine(label, fee)], fee, 0, fee, fee);
+    const quote = new FeeCalculator().quoteMembership(label, fee, special);
     return {
       student,
       kind: 'membership',
@@ -477,6 +501,7 @@ export class RegisterPayment {
     private readonly transactions: TransactionRunner,
     private readonly closed: ClosedPeriods,
     private readonly locks: Locks,
+    private readonly accounts: StudentAccountRepository,
   ) {}
 
   execute(request: PaymentRequest): Promise<string> {
@@ -508,6 +533,15 @@ export class RegisterPayment {
           Charge.create(ChargeId.generate(), ref, quote.kind, period, quote.monthlyCharge);
         charge.payWith(payment.id);
         await this.charges.saveCharge(charge);
+      }
+      // Los puntos canjeados se descuentan; pagar la cuota de socio convierte en socio.
+      if (request.redeemPoints > 0 || quote.kind === 'membership') {
+        const account = (await this.accounts.account(ref)) ?? StudentAccount.open(ref);
+        if (request.redeemPoints > 0) account.adjustPoints(-request.redeemPoints);
+        if (quote.kind === 'membership' && !account.isMember()) {
+          account.update(account.preferredPlan(), true, account.privateRate());
+        }
+        await this.accounts.saveAccount(account);
       }
       return payment.id.value;
     });
@@ -601,6 +635,15 @@ export interface AccountView {
   points: number;
   suggestedMonths: number;
   remainingMonths: number;
+  /** Horas semanales de clase (grupos normales), con horarios especiales ya aplicados. */
+  weeklyHours: number;
+  /** Cuota de un mes con lo que hace hoy (tramo + particulares, con descuento familiar si procede). */
+  monthlyFeeCents: number;
+  familyDiscount: boolean;
+  hasPrivateLessons: boolean;
+  /** Si la cuota de socio de la temporada en curso está pagada. */
+  membershipPaid: boolean;
+  membershipFeeCents: number;
 }
 
 export class GetStudentAccount {
@@ -609,15 +652,22 @@ export class GetStudentAccount {
     private readonly accounts: StudentAccountRepository,
     private readonly quotes: QuotePayment,
     private readonly clock: Clock,
+    private readonly settings: BillingSettingsRepository,
+    private readonly charges: ChargeRepository,
   ) {}
 
   async execute(studentId: string): Promise<AccountView> {
     const ref = StudentRef.fromString(studentId);
-    if ((await this.directory.find(ref, LocalDate.fromInstant(this.clock.now()))) === null) {
-      throw new BillingStudentNotFound();
-    }
+    const today = LocalDate.fromInstant(this.clock.now());
+    const student = await this.directory.find(ref, today);
+    if (student === null) throw new BillingStudentNotFound();
     const account = await this.accounts.account(ref);
     const rate = account?.privateRate() ?? null;
+    const settings = await this.settings.get();
+    const profile = feeProfileOf(student, account, settings);
+    const monthly = new FeeCalculator().quote(profile, settings, 1).total;
+    const season = Season.containing(YearMonth.of(today));
+    const membership = await this.charges.chargeFor(ref, 'membership', season.firstMonth());
     return {
       preferredPlan: account?.preferredPlan() ?? 'monthly',
       member: account?.isMember() === true,
@@ -625,6 +675,12 @@ export class GetStudentAccount {
       points: account?.points() ?? 0,
       suggestedMonths: await this.quotes.suggestion(studentId),
       remainingMonths: await this.quotes.remainingMonths(studentId),
+      weeklyHours: student.regularWeeklyHours,
+      monthlyFeeCents: monthly.cents,
+      familyDiscount: student.hasSiblings && settings.tariff.familyPercent > 0,
+      hasPrivateLessons: student.privateLessons.length > 0,
+      membershipPaid: membership?.isPaid() === true,
+      membershipFeeCents: (membership?.amount ?? settings.tariff.membershipFee).cents,
     };
   }
 }

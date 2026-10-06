@@ -129,29 +129,67 @@ export function PaymentDialog({
               onChange={form.setProrate}
             />
           )}
-          {form.concept !== 'membership' && (
-            <Switch
-              label="Descuento especial"
-              checked={form.special.enabled}
-              onChange={(enabled) => form.setSpecial({ ...form.special, enabled })}
+          {form.concept !== 'membership' && form.availablePoints > 0 && (
+            <Select
+              label="Canjear puntos"
+              value={String(form.redeemPoints)}
+              onChange={(v) => form.setRedeemPoints(Number(v))}
+              options={Array.from({ length: form.availablePoints + 1 }, (_, n) => ({
+                value: String(n),
+                label:
+                  n === 0
+                    ? 'Sin canje'
+                    : `${n} ${n === 1 ? 'punto' : 'puntos'} (−${n} % de un mes)`,
+              }))}
             />
           )}
-          {form.special.enabled && form.concept !== 'membership' && (
-            <div className="grid gap-4 sm:grid-cols-[120px_1fr]">
-              <TextField
-                label="Descuento (%)"
-                inputMode="numeric"
-                value={form.special.percent}
-                onChange={(e) =>
-                  form.setSpecial({ ...form.special, percent: e.target.value.replace(/\D/g, '') })
-                }
-              />
-              <TextField
-                label="Motivo"
-                placeholder="Canje de 5 puntos"
-                value={form.special.concept}
-                onChange={(e) => form.setSpecial({ ...form.special, concept: e.target.value })}
-              />
+          {form.concept !== 'membership' && form.availablePoints > 0 && (
+            <p className="-mt-3 text-[13px] text-ink-muted">
+              1 punto = 1 % de una cuota mensual, aunque se paguen varios meses. Máximo 5.
+            </p>
+          )}
+          <Switch
+            label="Descuento especial"
+            checked={form.special.enabled}
+            onChange={(enabled) => form.setSpecial({ ...form.special, enabled })}
+          />
+          {form.special.enabled && (
+            <div className="flex flex-col gap-3 rounded-sm bg-surface-muted p-3">
+              <div role="group" aria-label="Tipo de descuento" className="flex gap-2">
+                <ToggleButton
+                  pressed={form.special.mode === 'percent'}
+                  onClick={() => form.setSpecial({ ...form.special, mode: 'percent' })}
+                  className="h-9 rounded-full font-medium"
+                >
+                  Porcentaje
+                </ToggleButton>
+                <ToggleButton
+                  pressed={form.special.mode === 'amount'}
+                  onClick={() => form.setSpecial({ ...form.special, mode: 'amount' })}
+                  className="h-9 rounded-full font-medium"
+                >
+                  Cantidad fija
+                </ToggleButton>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-[140px_1fr]">
+                <TextField
+                  label={form.special.mode === 'percent' ? 'Descuento (%)' : 'Descuento (€)'}
+                  inputMode="decimal"
+                  value={form.special.value}
+                  onChange={(e) =>
+                    form.setSpecial({
+                      ...form.special,
+                      value: e.target.value.replace(/[^\d.,]/g, ''),
+                    })
+                  }
+                />
+                <TextField
+                  label="Motivo del descuento"
+                  placeholder="p. ej. beca del club"
+                  value={form.special.concept}
+                  onChange={(e) => form.setSpecial({ ...form.special, concept: e.target.value })}
+                />
+              </div>
             </div>
           )}
           {form.quoteError && <Alert>{form.quoteError}</Alert>}

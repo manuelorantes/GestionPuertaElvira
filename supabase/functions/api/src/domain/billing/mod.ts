@@ -99,6 +99,20 @@ export class InvalidPaymentRequest extends Error implements HasErrorDetails {
     );
   }
 
+  static points(available: number): InvalidPaymentRequest {
+    return new InvalidPaymentRequest(
+      `Se pueden canjear entre 1 y ${PointsRedemption.MAX_POINTS} puntos, y el alumno tiene ${available}.`,
+      'invalid_points',
+    );
+  }
+
+  static pointsOnlyMonthly(): InvalidPaymentRequest {
+    return new InvalidPaymentRequest(
+      'Los puntos solo se canjean en las cuotas mensuales, no en la de socio.',
+      'points_only_monthly',
+    );
+  }
+
   reason(): string {
     return this.why;
   }
@@ -364,21 +378,58 @@ export class FeeProfile {
   ) {}
 }
 
-/** Descuento puntual decidido al cobrar (p. ej. canje de puntos). */
+/** Descuento puntual decidido al cobrar, en porcentaje o en una cantidad fija, con su motivo. */
 export class SpecialDiscount {
+  readonly percent: number | null;
+  readonly amount: Money | null;
+
   constructor(
-    readonly percent: number,
+    value: number | Money,
     readonly concept: string,
   ) {
-    if (!Number.isInteger(percent) || percent < 1 || percent > 100) {
-      throw new InvalidValue(
-        'specialDiscount',
-        'El descuento especial debe estar entre 1 y 100 %.',
-      );
+    if (typeof value === 'number') {
+      if (!Number.isInteger(value) || value < 1 || value > 100) {
+        throw new InvalidValue(
+          'specialDiscount',
+          'El descuento especial debe estar entre 1 y 100 %.',
+        );
+      }
+      this.percent = value;
+      this.amount = null;
+    } else {
+      if (value.cents <= 0) {
+        throw new InvalidValue('specialDiscount', 'El descuento especial debe ser mayor que 0 €.');
+      }
+      this.percent = null;
+      this.amount = value;
     }
     if (concept.trim() === '') {
       throw new InvalidValue('specialDiscount', 'Indica el motivo del descuento especial.');
     }
+  }
+}
+
+/**
+ * Canje de puntos al cobrar: cada punto descuenta un 1 % de UNA cuota mensual (la del primer mes),
+ * aunque se paguen varios meses; como mucho 5 puntos.
+ */
+export class PointsRedemption {
+  static readonly MAX_POINTS = 5;
+
+  constructor(readonly points: number) {
+    if (!Number.isInteger(points) || points < 1 || points > PointsRedemption.MAX_POINTS) {
+      throw InvalidPaymentRequest.points(points);
+    }
+  }
+
+  discountOn(oneMonth: Money): Money {
+    return oneMonth.percent(this.points);
+  }
+
+  label(): string {
+    return `Canje de ${this.points} ${
+      this.points === 1 ? 'punto' : 'puntos'
+    } (${this.points} % de un mes)`;
   }
 }
 
@@ -419,6 +470,7 @@ export class FeeCalculator {
     months: number,
     special: SpecialDiscount | null = null,
     proration: Proration | null = null,
+    points: PointsRedemption | null = null,
   ): Quote {
     if (!Number.isInteger(months) || months < 1 || months > FeeCalculator.MAX_MONTHS) {
       throw InvalidPaymentRequest.months();
@@ -463,16 +515,38 @@ export class FeeCalculator {
     }
     const prepayment = tariff.prepaymentPercent(months);
     if (prepayment > 0) discounts.push([`Pago adelantado ${months} meses`, prepayment]);
-    if (special !== null) discounts.push([special.concept, special.percent]);
-    const percent = Math.min(100, discounts.reduce((sum, [, p]) => sum + p, 0));
-    const total = gross.percent(100 - percent);
-    return new Quote(
-      [...lines, ...discountLines(discounts, gross, gross.minus(total))],
-      gross,
-      percent,
-      total,
-      monthlyBase,
-    );
+    return this.applyDiscounts(lines, gross, discounts, special, points, monthlyBase, monthlyBase);
+  }
+
+  /**
+   * Resta los descuentos: primero los porcentajes (sumados sobre el bruto) y después las cantidades fijas
+   * (canje de puntos sobre una cuota mensual, descuento especial en euros), sin bajar de 0 €.
+   */
+  private applyDiscounts(
+    lines: readonly QuoteLine[],
+    gross: Money,
+    percentages: [string, number][],
+    special: SpecialDiscount | null,
+    points: PointsRedemption | null,
+    oneMonth: Money,
+    monthlyBase: Money,
+  ): Quote {
+    if (special?.percent !== null && special?.percent !== undefined) {
+      percentages.push([special.concept, special.percent]);
+    }
+    const percent = Math.min(100, percentages.reduce((sum, [, p]) => sum + p, 0));
+    let total = gross.percent(100 - percent);
+    const result = [...lines, ...discountLines(percentages, gross, gross.minus(total))];
+    const fixed: [string, Money][] = [];
+    if (points !== null) fixed.push([points.label(), points.discountOn(oneMonth)]);
+    if (special?.amount) fixed.push([special.concept, special.amount]);
+    for (const [label, amount] of fixed) {
+      const applied = amount.cents > total.cents ? total : amount;
+      if (applied.cents === 0) continue;
+      result.push(new QuoteLine(`${label} −${applied.format()}`, Money.cents(-applied.cents)));
+      total = total.minus(applied);
+    }
+    return new Quote(result, gross, percent, total, monthlyBase);
   }
 
   /**
@@ -483,6 +557,7 @@ export class FeeCalculator {
     items: readonly QuoteLine[],
     settings: BillingSettings,
     special: SpecialDiscount | null = null,
+    points: PointsRedemption | null = null,
   ): Quote {
     const months = items.length;
     const first = items[0];
@@ -491,16 +566,20 @@ export class FeeCalculator {
     const discounts: [string, number][] = [];
     const prepayment = settings.tariff.prepaymentPercent(months);
     if (prepayment > 0) discounts.push([`Pago adelantado ${months} meses`, prepayment]);
-    if (special !== null) discounts.push([special.concept, special.percent]);
-    const percent = Math.min(100, discounts.reduce((sum, [, p]) => sum + p, 0));
-    const total = gross.percent(100 - percent);
-    return new Quote(
-      [...items, ...discountLines(discounts, gross, gross.minus(total))],
+    return this.applyDiscounts(
+      items,
       gross,
-      percent,
-      total,
+      discounts,
+      special,
+      points,
+      first.amount,
       first.amount,
     );
+  }
+
+  /** La cuota de socio: sin descuentos salvo, si se decide, uno especial. */
+  quoteMembership(label: string, fee: Money, special: SpecialDiscount | null = null): Quote {
+    return this.applyDiscounts([new QuoteLine(label, fee)], fee, [], special, null, fee, fee);
   }
 }
 

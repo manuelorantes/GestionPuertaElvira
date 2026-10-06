@@ -16,6 +16,7 @@ import {
   monthsWithin,
   Payment,
   PaymentId,
+  PointsRedemption,
   PrivateLesson,
   Proration,
   QuoteLine,
@@ -31,7 +32,16 @@ const quote = (
   months: number,
   special: SpecialDiscount | null = null,
   proration: Proration | null = null,
-) => new FeeCalculator().quote(profile, BillingSettings.defaults(), months, special, proration);
+  points: PointsRedemption | null = null,
+) =>
+  new FeeCalculator().quote(
+    profile,
+    BillingSettings.defaults(),
+    months,
+    special,
+    proration,
+    points,
+  );
 
 Deno.test('FeeCalculator should charge the tier for the weekly hours of regular groups', () => {
   const tiers: [number, number][] = [[0, 0], [1, 3500], [1.5, 4000], [2, 4500], [2.5, 4500], [
@@ -253,4 +263,48 @@ Deno.test('Payment should number documents per season and issue one invoice with
   assertEquals(rounded.base.cents, 3719);
   assertEquals(rounded.vat.cents, 781);
   assertThrows(() => new InvoiceCustomer('', '12345678Z', 'Granada'), InvalidValue);
+});
+
+Deno.test('FeeCalculator should redeem points on a single month and take fixed special discounts', () => {
+  // 2 h semanales = 45 €/mes; 3 meses con 10 % de pago adelantado = 121,50 €; 5 puntos = 5 % de UN mes = 2,25 €.
+  const withPoints = quote(new FeeProfile(2, [], false), 3, null, null, new PointsRedemption(5));
+  assertEquals(withPoints.total.cents, 12150 - 225);
+  assertEquals(withPoints.lines.at(-1)?.label, 'Canje de 5 puntos (5 % de un mes) −2,25 €');
+  assertEquals(withPoints.lines.at(-1)?.amount.cents, -225);
+  assert(
+    withPoints.lines.reduce((sum, l) => sum.plus(l.amount), Money.zero()).equals(withPoints.total),
+  );
+
+  // Seis meses: los puntos siguen valiendo lo de un solo mes.
+  const six = quote(new FeeProfile(2, [], false), 6, null, null, new PointsRedemption(5));
+  assertEquals(six.lines.at(-1)?.amount.cents, -225);
+
+  const fixed = quote(
+    new FeeProfile(2, [], false),
+    1,
+    new SpecialDiscount(Money.cents(1000), 'Beca'),
+  );
+  assertEquals(fixed.total.cents, 3500);
+  assertEquals(fixed.lines.at(-1)?.label, 'Beca −10 €');
+
+  // Nunca por debajo de 0 €.
+  const huge = quote(
+    new FeeProfile(1, [], false),
+    1,
+    new SpecialDiscount(Money.cents(99900), 'Regalo'),
+  );
+  assertEquals(huge.total.cents, 0);
+  assertEquals(huge.lines.at(-1)?.amount.cents, -3500);
+
+  // La cuota de socio solo admite el descuento especial.
+  const membership = new FeeCalculator().quoteMembership(
+    'Cuota de socio 2026/27',
+    Money.cents(5000),
+    new SpecialDiscount(50, 'Media beca'),
+  );
+  assertEquals(membership.total.cents, 2500);
+
+  assertThrows(() => new PointsRedemption(6), InvalidPaymentRequest);
+  assertThrows(() => new PointsRedemption(0), InvalidPaymentRequest);
+  assertThrows(() => new SpecialDiscount(Money.zero(), 'Nada'), InvalidValue);
 });

@@ -2,12 +2,7 @@ import { Minus, Plus, Printer, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import {
-  adjustPoints,
-  updateAccount,
-  type Account,
-  type PreferredPlan,
-} from '@/features/billing/api';
+import { adjustPoints, updateAccount, type Account } from '@/features/billing/api';
 import { useAccount, useBillingMutation, usePayments } from '@/features/billing/hooks';
 import { formatCents } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
@@ -15,19 +10,14 @@ import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/Billin
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { Select } from '@/shared/ui/Select';
-import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
-const PLANS: { value: PreferredPlan; label: string }[] = [
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'three_months', label: 'Cada 3 meses' },
-  { value: 'six_months', label: 'Cada 6 meses' },
-  { value: 'rest_of_season', label: 'Resto de temporada' },
-];
+function hoursLabel(hours: number): string {
+  return `${String(Math.round(hours * 100) / 100).replace('.', ',')} h semanales`;
+}
 
-/** Tarjeta «Cuotas y cobros» de la ficha: preferencias de cobro, puntos e historial. */
+/** Tarjeta «Cuotas y cobros» de la ficha: lo que paga y por qué, puntos, cuota de socio e historial. */
 export function StudentBillingCard({
   studentId,
   title,
@@ -43,7 +33,7 @@ export function StudentBillingCard({
     <Card className="p-4">
       {title('Cuotas y cobros')}
       {account.data ? (
-        <AccountForm key={studentId} studentId={studentId} account={account.data} />
+        <AccountSummary key={studentId} studentId={studentId} account={account.data} />
       ) : (
         <p className="text-sm text-ink-muted">
           {account.isError ? 'No se han podido cargar los datos de cobro.' : 'Cargando…'}
@@ -85,50 +75,73 @@ export function StudentBillingCard({
   );
 }
 
-function AccountForm({ studentId, account }: { studentId: string; account: Account }) {
-  const [plan, setPlan] = useState(account.preferredPlan);
-  const [member, setMember] = useState(account.member);
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3 py-1.5 text-sm">
+      <span className="text-ink-muted">{label}</span>
+      <span className="text-right font-medium">{children}</span>
+    </div>
+  );
+}
+
+function AccountSummary({ studentId, account }: { studentId: string; account: Account }) {
   const [rate, setRate] = useState(account.privateRate ?? '');
   const save = useBillingMutation(() =>
-    updateAccount(studentId, { preferredPlan: plan, member, privateRate: rate.trim() || null }),
+    updateAccount(studentId, {
+      preferredPlan: account.preferredPlan,
+      member: account.member,
+      privateRate: rate.trim() || null,
+    }),
   );
   const points = useBillingMutation((delta: number) => adjustPoints(studentId, delta));
   const toast = useToast();
   const error = save.error ?? points.error;
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col">
       {error && <Alert>{apiErrorMessage(error)}</Alert>}
-      <Select
-        label="Forma de pago preferida"
-        value={plan}
-        onChange={(v) => setPlan(v as PreferredPlan)}
-        options={PLANS}
-      />
-      <Switch label="Socio del club" checked={member} onChange={setMember} />
-      <TextField
-        label="Precio por hora de particulares (€)"
-        help="Vacío: el del profesor"
-        inputMode="decimal"
-        value={rate}
-        onChange={(e) => setRate(e.target.value)}
-      />
-      <Button
-        variant="secondary"
-        busy={save.isPending}
-        busyLabel="Guardando…"
-        onClick={() =>
-          void save.mutateAsync(undefined).then(
-            () => toast('Datos de cobro guardados'),
-            () => undefined,
-          )
-        }
-      >
-        Guardar
-      </Button>
-      <div className="flex items-center justify-between gap-3 border-t border-line-soft pt-3 text-sm">
+      <Row label="Clases">
+        {account.weeklyHours > 0 ? hoursLabel(account.weeklyHours) : 'Sin clases'}
+      </Row>
+      <Row label="Cuota mensual">
+        {account.monthlyFeeCents > 0 ? formatCents(account.monthlyFeeCents) : '—'}
+      </Row>
+      <Row label="Descuento familiar">{account.familyDiscount ? 'Sí, por hermanos' : 'No'}</Row>
+      <Row label="Cuota de socio">
+        {account.membershipPaid
+          ? 'Pagada'
+          : `Pendiente · ${formatCents(account.membershipFeeCents)}`}
+      </Row>
+      {account.hasPrivateLessons && (
+        <div className="mt-2 flex items-end gap-2">
+          <TextField
+            label="Precio por hora de particulares (€)"
+            help="Vacío: el del profesor"
+            inputMode="decimal"
+            value={rate}
+            onChange={(e) => setRate(e.target.value)}
+          />
+          <Button
+            variant="secondary"
+            busy={save.isPending}
+            busyLabel="Guardando…"
+            onClick={() =>
+              void save.mutateAsync(undefined).then(
+                () => toast('Precio guardado'),
+                () => undefined,
+              )
+            }
+          >
+            Guardar
+          </Button>
+        </div>
+      )}
+      <div className="mt-2 flex items-center justify-between gap-3 border-t border-line-soft pt-3 text-sm">
         <span>
           Puntos: <strong>{account.points}</strong>
+          <span className="block text-[12px] text-ink-muted">
+            Se canjean al cobrar: 1 punto = 1 % de una cuota mensual (máximo 5).
+          </span>
         </span>
         <span className="flex gap-2">
           <button

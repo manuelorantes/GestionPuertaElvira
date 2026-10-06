@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertRejects } from '@std/assert';
+import { assert, assertEquals, assertFalse, assertRejects } from '@std/assert';
 
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
@@ -44,7 +44,9 @@ function quote(fx: BillingFixture, id: string, months: number): Promise<PaymentQ
     date: '2026-10-02',
     prorate: false,
     specialPercent: null,
+    specialAmountCents: null,
     specialConcept: null,
+    redeemPoints: 0,
   });
 }
 
@@ -54,7 +56,7 @@ function register(
   months: number,
   kind = 'monthly',
 ): Promise<string> {
-  return new RegisterPayment(quotes(fx), fx, fx, fx, fx.transactions, fx, fx.locks)
+  return new RegisterPayment(quotes(fx), fx, fx, fx, fx.transactions, fx, fx.locks, fx)
     .execute({
       studentId: id,
       kind,
@@ -63,7 +65,9 @@ function register(
       date: '2026-10-02',
       prorate: false,
       specialPercent: null,
+      specialAmountCents: null,
       specialConcept: null,
+      redeemPoints: 0,
     });
 }
 
@@ -188,7 +192,9 @@ Deno.test('QuotePayment should only prorate the month of the payment and never g
         date: '2026-10-15',
         prorate: true,
         specialPercent: null,
+        specialAmountCents: null,
         specialConcept: null,
+        redeemPoints: 0,
       }),
     InvalidPaymentRequest,
     'El prorrateo solo se aplica al mes de la fecha del cobro',
@@ -339,4 +345,51 @@ Deno.test('UpdateBillingSettings should replace prices, discounts, private rates
     () => new UpdateBillingSettings(fx).execute(input({ seasonPercent: 120 })),
     InvalidValue,
   );
+});
+
+Deno.test('RegisterPayment should spend the redeemed points and make a member of whoever pays the fee', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ siblings: false });
+  await new AdjustPoints(fx).execute(id, 4);
+  await generate(fx, '2026-10');
+  const request = {
+    studentId: id,
+    kind: 'monthly',
+    months: 1,
+    method: 'cash',
+    date: '2026-10-02',
+    prorate: false,
+    specialPercent: null,
+    specialAmountCents: null,
+    specialConcept: null,
+    redeemPoints: 3,
+  };
+  const paymentId = await new RegisterPayment(
+    quotes(fx),
+    fx,
+    fx,
+    fx,
+    fx.transactions,
+    fx,
+    fx.locks,
+    fx,
+  )
+    .execute(request);
+  const payment = await fx.payment(PaymentId.fromString(paymentId));
+  assertEquals(payment?.lines.at(-1)?.label, 'Canje de 3 puntos (3 % de un mes) −1,35 €');
+  assertEquals((await fx.account(StudentRef.fromString(id)))?.points(), 1);
+  await assertRejects(
+    () => quotes(fx).execute({ ...request, redeemPoints: 2 }),
+    InvalidPaymentRequest,
+    'el alumno tiene 1',
+  );
+  await assertRejects(
+    () => quotes(fx).execute({ ...request, kind: 'membership', redeemPoints: 1 }),
+    InvalidPaymentRequest,
+    'solo se canjean en las cuotas mensuales',
+  );
+
+  assertFalse((await fx.account(StudentRef.fromString(id)))?.isMember() ?? false);
+  await register(fx, id, 1, 'membership');
+  assert((await fx.account(StudentRef.fromString(id)))?.isMember());
 });
