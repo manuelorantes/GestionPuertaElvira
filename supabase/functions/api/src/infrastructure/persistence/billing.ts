@@ -462,7 +462,10 @@ export class SqlStudentDirectory implements StudentDirectory {
     to: string,
   ): Promise<Map<string, { name: string; level: string; teacherId: string; hours: number }[]>> {
     const rows = await this.sql`
-      SELECT e.student_id, g.name, g.level, g.teacher_id, g.start_minutes, g.end_minutes, jsonb_array_length(g.days::jsonb) AS sessions
+      SELECT e.student_id, g.name, g.level, g.teacher_id,
+             COALESCE(e.attendance_start_minutes, g.start_minutes) AS start_minutes,
+             COALESCE(e.attendance_end_minutes, g.end_minutes) AS end_minutes,
+             COALESCE(jsonb_array_length(e.attendance_days::jsonb), jsonb_array_length(g.days::jsonb)) AS sessions
         FROM classes_enrolment e JOIN classes_group g ON g.id = e.class_group_id
        WHERE e.student_id IN ${
       this.sql(studentIds)

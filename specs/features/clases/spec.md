@@ -60,12 +60,19 @@ con su nombre, horas, profesor y ocupación, coloreado por nivel y con una leyen
 - **THEN** ve el horario semanal de las tres aulas y puede abrir cualquier grupo para editarlo
 
 ### Requirement: Ocupación
-La ocupación de un grupo MUST ser el número de inscripciones activas en la fecha actual frente a sus plazas.
+La ocupación de un grupo MUST contarse por día: cada inscripción activa ocupa plaza los días a los que
+el alumno viene (todos los del grupo, salvo horario especial), aunque solo venga parte de la hora.
+La ocupación del grupo es la del día más lleno; cuando difiere entre días se muestra día a día («Lun 9 · Mié 8»),
+y el horario semanal muestra en cada columna la ocupación de ese día.
 Un grupo lleno se distingue visualmente, y uno con más alumnos que plazas se marca «Sobre el cupo».
 
 #### Scenario: Lista de grupos
 - **WHEN** administración consulta la lista de grupos
 - **THEN** ve por cada grupo su nivel, profesor, horario, modalidad, aula y ocupación
+
+#### Scenario: Ocupación distinta según el día
+- **WHEN** en un grupo de lunes y miércoles con 12 plazas hay 9 alumnos, uno de ellos solo los lunes
+- **THEN** la ocupación es 9/12 el lunes y 8/12 el miércoles, y el miércoles queda una plaza libre más
 
 ### Requirement: Acceso restringido
 Las operaciones de grupos MUST estar reservadas a cuentas de administración.

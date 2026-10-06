@@ -67,7 +67,7 @@ export function WeeklySchedule({
                       key={group.id}
                       type="button"
                       onClick={() => onSelect(group)}
-                      aria-label={`${group.name}, ${group.slotLabel}, ${group.teacher.fullName}, ${group.occupied} de ${group.capacity} plazas`}
+                      aria-label={`${group.name}, ${group.slotLabel}, ${group.teacher.fullName}, ${group.occupancyByDay[day.id] ?? group.occupied} de ${group.capacity} plazas`}
                       className={`m-0.5 flex cursor-pointer flex-col items-start gap-0.5 overflow-hidden rounded-sm border p-1.5 text-left hover:shadow-overlay ${LEVELS[group.level].className}`}
                       style={{
                         gridRow: `${rowStart} / ${rowEnd}`,
@@ -81,8 +81,8 @@ export function WeeklySchedule({
                         {group.start}–{group.end}
                       </span>
                       <span className="text-[11px] opacity-85">
-                        {teacherShortName(group.teacher.fullName)} · {group.occupied}/
-                        {group.capacity}
+                        {teacherShortName(group.teacher.fullName)} ·{' '}
+                        {group.occupancyByDay[day.id] ?? group.occupied}/{group.capacity}
                       </span>
                     </button>
                   );

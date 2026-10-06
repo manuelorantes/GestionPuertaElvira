@@ -73,6 +73,7 @@ function present(group: GroupSummary) {
     classroom: group.classroom,
     capacity: group.capacity,
     occupied: group.occupied,
+    occupancyByDay: group.occupancyByDay,
     weeklyPlan: group.weeklyPlan,
   };
 }

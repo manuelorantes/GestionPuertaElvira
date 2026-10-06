@@ -1,10 +1,12 @@
 import { type Clock, type HasErrorDetails, LocalDate } from '../../domain/common/mod.ts';
 import {
+  Attendance,
   Capacity,
   ClassGroup,
   ClassGroupId,
   Classroom,
   ClassroomSchedule,
+  type CurrentEnrolment,
   Enrolment,
   EnrolmentId,
   EnrolmentPolicy,
@@ -12,6 +14,7 @@ import {
   GroupName,
   HalfHour,
   levelFromName,
+  occupancyByDay,
   StudentReference,
   TeacherReference,
   weekdayFromName,
@@ -33,7 +36,8 @@ export interface EnrolmentRepository {
     group: ClassGroupId,
     on: LocalDate,
   ): Promise<Enrolment | null>;
-  activeCount(group: ClassGroupId, on: LocalDate): Promise<number>;
+  /** Inscripciones vigentes en el grupo ese día. */
+  activeInGroup(group: ClassGroupId, on: LocalDate): Promise<Enrolment[]>;
 }
 
 /** Si un profesor existe y está activo (lo responde el contexto de Profesorado). */
@@ -60,7 +64,10 @@ export interface GroupSummary {
   slotLabel: string;
   classroom: string;
   capacity: number;
+  /** Plazas ocupadas el día más lleno. */
   occupied: number;
+  /** Plazas ocupadas cada día (código del día → alumnos). */
+  occupancyByDay: Record<string, number>;
   weeklyPlan: string;
 }
 
@@ -68,6 +75,8 @@ export interface EnrolledStudent {
   id: string;
   fullName: string;
   age: number | null;
+  /** «Lun · 18:30–19:00» si tiene horario especial; null si va a todo el grupo. */
+  attendanceLabel: string | null;
 }
 
 export interface ClassQuery {
@@ -196,30 +205,114 @@ export class UpdateClassGroup {
   }
 }
 
-/** Inscribe a un alumno aplicando EnrolmentPolicy; compartido por EnrolStudent y MoveStudent. */
+/** Horario especial tal como llega del exterior; null o todo vacío es «todo el grupo». */
+export interface AttendanceInput {
+  days: string[] | null;
+  start: string | null;
+  end: string | null;
+}
+
+export function attendanceFrom(group: GroupDetails, input: AttendanceInput | null): Attendance {
+  if (input === null) return Attendance.full();
+  return Attendance.within(
+    group,
+    input.days === null ? null : input.days.map(weekdayFromName),
+    input.start === null ? null : HalfHour.fromString(input.start),
+    input.end === null ? null : HalfHour.fromString(input.end),
+  );
+}
+
+/** Inscribe a un alumno aplicando EnrolmentPolicy; compartido por EnrolStudent, MoveStudent y ChangeAttendance. */
 class Enrolling {
   constructor(
     private readonly groups: ClassGroupRepository,
     private readonly enrolments: EnrolmentRepository,
   ) {}
 
+  /** Comprueba las reglas y devuelve el horario validado; `ignoring` deja fuera un grupo del alumno. */
+  async check(
+    student: StudentReference,
+    target: ClassGroup,
+    on: LocalDate,
+    overCapacityConfirmed: boolean,
+    input: AttendanceInput | null,
+    ignoring?: ClassGroupId,
+  ): Promise<Attendance> {
+    const attendance = attendanceFrom(target.details(), input);
+    const current: CurrentEnrolment[] = [];
+    for (const enrolment of await this.enrolments.activeForStudent(student, on)) {
+      if (ignoring && enrolment.group.equals(ignoring)) continue;
+      const group = await this.groups.find(enrolment.group);
+      if (group !== null) current.push({ group, attendance: enrolment.attendance() });
+    }
+    const others = (await this.enrolments.activeInGroup(target.id, on)).filter((e) =>
+      !e.student.equals(student)
+    );
+    new EnrolmentPolicy().assertCanEnrol(
+      target,
+      current,
+      occupancyByDay(target.details(), others),
+      attendance,
+      overCapacityConfirmed,
+    );
+    return attendance;
+  }
+
   async enrol(
     student: StudentReference,
     groupId: ClassGroupId,
     on: LocalDate,
     overCapacityConfirmed: boolean,
+    input: AttendanceInput | null = null,
     ignoring?: ClassGroupId,
   ): Promise<void> {
     const target = await this.groups.find(groupId);
     if (target === null) throw new ClassGroupNotFound();
-    const studentGroups: ClassGroup[] = [];
-    for (const enrolment of await this.enrolments.activeForStudent(student, on)) {
-      const group = await this.groups.find(enrolment.group);
-      if (group !== null && !(ignoring && group.id.equals(ignoring))) studentGroups.push(group);
-    }
-    const occupied = await this.enrolments.activeCount(groupId, on);
-    new EnrolmentPolicy().assertCanEnrol(target, studentGroups, occupied, overCapacityConfirmed);
-    await this.enrolments.save(Enrolment.start(EnrolmentId.generate(), student, groupId, on));
+    const attendance = await this.check(
+      student,
+      target,
+      on,
+      overCapacityConfirmed,
+      input,
+      ignoring,
+    );
+    await this.enrolments.save(
+      Enrolment.start(EnrolmentId.generate(), student, groupId, on, attendance),
+    );
+  }
+}
+
+/** Cambia el horario especial de un alumno en un grupo en el que ya está (o lo quita). */
+export class ChangeAttendance {
+  constructor(
+    private readonly groups: ClassGroupRepository,
+    private readonly enrolments: EnrolmentRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(
+    studentId: string,
+    groupId: string,
+    input: AttendanceInput | null,
+    confirmOverCapacity: boolean,
+  ): Promise<void> {
+    const student = StudentReference.fromString(studentId);
+    const group = ClassGroupId.fromString(groupId);
+    const today = LocalDate.fromInstant(this.clock.now());
+    const enrolment = await this.enrolments.activeForStudentInGroup(student, group, today);
+    if (enrolment === null) throw new NotEnrolled();
+    const target = await this.groups.find(group);
+    if (target === null) throw new ClassGroupNotFound();
+    const attendance = await new Enrolling(this.groups, this.enrolments).check(
+      student,
+      target,
+      today,
+      confirmOverCapacity,
+      input,
+      group,
+    );
+    enrolment.changeAttendance(attendance);
+    await this.enrolments.save(enrolment);
   }
 }
 
@@ -230,18 +323,23 @@ export class EnrolStudent {
     private readonly clock: Clock,
   ) {}
 
-  /** @param from inicio de la inscripción; por defecto hoy */
+  /**
+   * @param from inicio de la inscripción; por defecto hoy
+   * @param attendance horario especial dentro del grupo; por defecto todo el grupo
+   */
   async execute(
     studentId: string,
     groupId: string,
     confirmOverCapacity: boolean,
     from?: LocalDate,
+    attendance: AttendanceInput | null = null,
   ): Promise<void> {
     await new Enrolling(this.groups, this.enrolments).enrol(
       StudentReference.fromString(studentId),
       ClassGroupId.fromString(groupId),
       from ?? LocalDate.fromInstant(this.clock.now()),
       confirmOverCapacity,
+      attendance,
     );
   }
 }
@@ -282,6 +380,7 @@ export class MoveStudent {
     fromGroupId: string,
     toGroupId: string,
     confirmOverCapacity: boolean,
+    attendance: AttendanceInput | null = null,
   ): Promise<void> {
     const student = StudentReference.fromString(studentId);
     const from = ClassGroupId.fromString(fromGroupId);
@@ -294,6 +393,7 @@ export class MoveStudent {
         ClassGroupId.fromString(toGroupId),
         today,
         confirmOverCapacity,
+        attendance,
         from,
       );
       current.endOn(today);

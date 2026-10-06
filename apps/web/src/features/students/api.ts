@@ -1,3 +1,4 @@
+import type { Weekday } from '@/features/classes/api';
 import { apiGet, apiSend } from '@/shared/api/client';
 
 /** `no_classes`: socios activos sin ningún grupo. */
@@ -36,8 +37,26 @@ export interface StudentDetail {
   joinedOn: string;
   withdrawnOn: string | null;
   status: 'active' | 'withdrawn';
-  groups: { id: string; name: string; slotLabel: string; teacherName: string; classroom: string }[];
+  groups: StudentGroup[];
   siblings: { id: string; fullName: string }[];
+}
+
+/** Horario especial dentro de un grupo: días a los que viene y franja. */
+export interface Attendance {
+  days: Weekday[];
+  start: string;
+  end: string;
+}
+
+export interface StudentGroup {
+  id: string;
+  name: string;
+  slotLabel: string;
+  teacherName: string;
+  classroom: string;
+  attendance: Attendance | null;
+  /** «Lun · 18:30–19:00», o null si va a todo el grupo. */
+  attendanceLabel: string | null;
 }
 
 export interface StudentPayload {
@@ -100,8 +119,30 @@ export function withdrawStudent(id: string, date: string): Promise<void> {
   return apiSend('POST', `/api/admin/students/${id}/withdrawal`, { date });
 }
 
-export function addGroup(id: string, groupId: string, confirmOverCapacity: boolean): Promise<void> {
-  return apiSend('POST', `/api/admin/students/${id}/enrolments`, { groupId, confirmOverCapacity });
+export function addGroup(
+  id: string,
+  groupId: string,
+  confirmOverCapacity: boolean,
+  attendance: Attendance | null = null,
+): Promise<void> {
+  return apiSend('POST', `/api/admin/students/${id}/enrolments`, {
+    groupId,
+    confirmOverCapacity,
+    attendance,
+  });
+}
+
+/** Cambia (o quita, con null) el horario especial del alumno en un grupo. */
+export function changeAttendance(
+  id: string,
+  groupId: string,
+  attendance: Attendance | null,
+  confirmOverCapacity: boolean,
+): Promise<void> {
+  return apiSend('PUT', `/api/admin/students/${id}/enrolments/${groupId}`, {
+    attendance,
+    confirmOverCapacity,
+  });
 }
 
 export function removeGroup(id: string, groupId: string): Promise<void> {

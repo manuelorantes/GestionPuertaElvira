@@ -1,4 +1,4 @@
-import { ArrowRightLeft, ChevronRight, Pencil, Plus, UserMinus, X } from 'lucide-react';
+import { ArrowRightLeft, ChevronRight, Clock, Pencil, Plus, UserMinus, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 
@@ -20,6 +20,7 @@ import { SidePanel } from '@/shared/ui/SidePanel';
 import { useToast } from '@/shared/ui/Toast';
 
 import { StudentBillingCard } from './StudentBillingCard';
+import { EnrolmentDialog } from './EnrolmentDialog';
 import { PickerDialog } from './PickerDialog';
 import { StudentDialog } from './StudentDialog';
 import { WithdrawDialog } from './WithdrawDialog';
@@ -28,6 +29,7 @@ type Action =
   | { kind: 'edit' }
   | { kind: 'withdraw' }
   | { kind: 'addGroup' }
+  | { kind: 'attendance'; groupId: string }
   | { kind: 'move'; groupId: string; groupName: string }
   | { kind: 'sibling' };
 
@@ -170,12 +172,26 @@ export function StudentPanel() {
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">{g.name}</p>
                   <p className="text-[13px] text-ink-muted">{g.slotLabel}</p>
+                  {g.attendanceLabel && (
+                    <p className="text-[13px] font-medium text-warning-fg">
+                      Horario especial: {g.attendanceLabel}
+                    </p>
+                  )}
                   <p className="text-[13px] text-ink-muted">
                     {classroomLabel(g.classroom)} · {g.teacherName}
                   </p>
                 </div>
                 {!isWithdrawn && (
                   <>
+                    <button
+                      type="button"
+                      aria-label={`Horario en ${g.name}`}
+                      title="Horario especial"
+                      onClick={() => setAction({ kind: 'attendance', groupId: g.id })}
+                      className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                    >
+                      <Clock aria-hidden size={16} />
+                    </button>
                     <button
                       type="button"
                       aria-label={`Mover de ${g.name}`}
@@ -283,14 +299,32 @@ export function StudentPanel() {
         />
       )}
       {action?.kind === 'addGroup' && (
-        <PickerDialog
+        <EnrolmentDialog
           title="Añadir grupo"
-          label="Grupo"
-          options={groupOptions(s.groups.map((g) => g.id))}
           confirmLabel="Añadir"
+          groups={(groups.data ?? []).filter((g) => !s.groups.some((mine) => mine.id === g.id))}
           onClose={() => setAction(null)}
-          onPick={(groupId) =>
-            enrolWithConfirm((confirm) => api.addGroup(s.id, groupId, confirm), 'Grupo añadido')
+          onConfirm={(groupId, attendance) =>
+            enrolWithConfirm(
+              (confirm) => api.addGroup(s.id, groupId, confirm, attendance),
+              'Grupo añadido',
+            )
+          }
+        />
+      )}
+      {action?.kind === 'attendance' && (
+        <EnrolmentDialog
+          title="Horario en el grupo"
+          confirmLabel="Guardar"
+          groups={groups.data ?? []}
+          fixedGroup={(groups.data ?? []).find((g) => g.id === action.groupId)}
+          current={s.groups.find((g) => g.id === action.groupId)?.attendance ?? null}
+          onClose={() => setAction(null)}
+          onConfirm={(groupId, attendance) =>
+            enrolWithConfirm(
+              (confirm) => api.changeAttendance(s.id, groupId, attendance, confirm),
+              'Horario guardado',
+            )
           }
         />
       )}
