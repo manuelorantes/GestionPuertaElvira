@@ -72,7 +72,8 @@ export interface StudentPayload {
 }
 
 export interface Registration extends StudentPayload {
-  groupIds: string[];
+  /** Grupos (completos o con horario especial) que salen del horario del alumno. */
+  enrolments: { groupId: string; attendance: Attendance | null }[];
   siblingIds: string[];
 }
 

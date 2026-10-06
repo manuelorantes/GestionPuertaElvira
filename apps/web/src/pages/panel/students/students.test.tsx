@@ -255,7 +255,7 @@ describe('Alumnos', () => {
         birthDate: null,
         guardians: [],
         ownPhone: null,
-        groupIds: [],
+        enrolments: [],
       }),
     );
   });
@@ -326,6 +326,23 @@ describe('Alumnos', () => {
         200,
         { ...DETAIL, id: 's9', fullName: 'Lucía Fernández Ortiz' },
       ],
+      'POST /api/admin/groups/resolve-schedule': [
+        200,
+        {
+          enrolments: [
+            {
+              groupId: 'g2',
+              groupName: 'Peques B',
+              slotLabel: 'Mar · 16:00–17:00',
+              attendance: null,
+              attendanceLabel: null,
+            },
+          ],
+          uncovered: [],
+          choices: [],
+          problems: [],
+        },
+      ],
     });
     renderApp('/panel/alumnos');
 
@@ -337,7 +354,13 @@ describe('Alumnos', () => {
     await user.selectOptions(within(dialog).getByLabelText('Año'), '2015');
     await user.type(within(dialog).getByLabelText('Tutor 1'), 'Carmen Ortiz');
     await user.type(within(dialog).getByLabelText('Teléfono tutor 1'), '612000111');
-    await user.selectOptions(within(dialog).getByLabelText('Grupo'), 'g2');
+    // El horario se traduce a grupos: martes 16:00–17:00 es «Peques B».
+    await user.click(within(dialog).getByRole('button', { name: 'Añadir horario' }));
+    const block = within(within(dialog).getByRole('group', { name: 'Horario 1' }));
+    await user.selectOptions(block.getByLabelText('Día'), 'tue');
+    await user.selectOptions(block.getByLabelText('Empieza'), '16:00');
+    await user.selectOptions(block.getByLabelText('Termina'), '17:00');
+    expect(await within(dialog).findByText('Peques B')).toBeVisible();
     await user.click(within(dialog).getByRole('button', { name: 'Dar de alta' }));
 
     const confirm = await screen.findByRole('dialog', { name: 'Grupo completo' });
@@ -352,7 +375,7 @@ describe('Alumnos', () => {
       fullName: 'Lucía Fernández Ortiz',
       birthDate: '2015-03-07',
       guardians: [{ name: 'Carmen Ortiz', phone: '612000111' }],
-      groupIds: ['g2'],
+      enrolments: [{ groupId: 'g2', attendance: null }],
       confirmOverCapacity: true,
     });
   });

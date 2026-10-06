@@ -24,10 +24,16 @@ export interface StudentRepository {
 }
 
 /** Inscripciones del alumno en grupos (las gestiona el contexto de Clases). */
+/** Inscripción pedida al dar de alta: el grupo y, si lo hay, el horario especial dentro de él. */
+export interface EnrolmentRequest {
+  groupId: string;
+  attendance: { days: string[] | null; start: string | null; end: string | null } | null;
+}
+
 export interface Enrolments {
   enrol(
     student: StudentId,
-    groupIds: string[],
+    requests: EnrolmentRequest[],
     confirmOverCapacity: boolean,
     from?: LocalDate,
   ): Promise<void>;
@@ -189,7 +195,7 @@ export class RegisterStudent {
    */
   async execute(
     input: StudentInput,
-    groupIds: string[],
+    enrolments: EnrolmentRequest[],
     siblingIds: string[],
     confirmOverCapacity: boolean,
     joinedOn?: string | null,
@@ -202,8 +208,8 @@ export class RegisterStudent {
     const student = Student.register(StudentId.generate(), studentDetails(input), today, joined);
     return await this.transactions.run(async () => {
       await this.students.save(student);
-      if (groupIds.length > 0) {
-        await this.enrolments.enrol(student.id, groupIds, confirmOverCapacity, joined);
+      if (enrolments.length > 0) {
+        await this.enrolments.enrol(student.id, enrolments, confirmOverCapacity, joined);
       } else if (this.membership !== null) {
         await this.membership.makeMember(student.id);
       }

@@ -468,7 +468,7 @@ export async function seedDemoData(
         federationLicence: licence,
         imageConsent,
       },
-      [id(groupIds, group)],
+      [{ groupId: id(groupIds, group), attendance: null }],
       [],
       false,
     );
