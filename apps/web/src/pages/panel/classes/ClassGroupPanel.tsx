@@ -121,7 +121,9 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
               <li key={s.id} className="flex items-center justify-between gap-2 py-2">
                 <span>
                   <span className="font-medium">{s.fullName}</span>{' '}
-                  <span className="text-[13px] text-ink-muted">· {s.age} años</span>
+                  <span className="text-[13px] text-ink-muted">
+                    · {s.age === null ? 'edad sin indicar' : `${s.age} años`}
+                  </span>
                 </span>
                 <Button variant="ghost" onClick={() => void navigate(`/panel/alumnos/${s.id}`)}>
                   Ver ficha

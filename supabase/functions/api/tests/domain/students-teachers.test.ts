@@ -10,7 +10,6 @@ import {
 import {
   FederationLicence,
   Guardian,
-  MissingContact,
   NationalId,
   Student,
   StudentId,
@@ -23,37 +22,48 @@ const today = LocalDate.fromString('2026-10-02');
 Deno.test('Student should register an active minor with a guardian', () => {
   const student = Student.register(StudentId.generate(), StudentFactory.details(), today);
   assert(student.isActiveOn(today));
-  assertEquals(student.details().birthDate.ageOn(today), 12);
+  assertEquals(student.details().ageOn(today), 12);
   assert(student.joinedOn.equals(today));
 });
 
-Deno.test('Student should apply the contact rules: minors need a guardian, adults a guardian or a phone', () => {
-  const minor = assertThrows(
-    () => Student.register(StudentId.generate(), StudentFactory.details({ guardians: [] }), today),
-    MissingContact,
+Deno.test('Student should accept any contact data and list what is missing instead of refusing', () => {
+  const minorWithoutGuardian = Student.register(
+    StudentId.generate(),
+    StudentFactory.details({ guardians: [], email: null }),
+    today,
   );
-  assertEquals(minor.details(), { field: 'guardians' });
+  assertEquals(minorWithoutGuardian.details().missingData(today), ['guardian', 'email']);
   const adult = Student.register(
     StudentId.generate(),
     StudentFactory.details({
       name: 'Javier Navarro Pérez',
       birthDate: '1984-05-01',
       guardians: [],
-      ownPhone: '677528810',
     }),
     today,
   );
-  assert(adult.isActiveOn(today));
-  assertThrows(
-    () =>
-      Student.register(
-        StudentId.generate(),
-        StudentFactory.details({ birthDate: '1984-05-01', guardians: [] }),
-        today,
-      ),
-    MissingContact,
-    'Sin tutor, el alumno necesita su propio teléfono de contacto.',
+  assertEquals(adult.details().missingData(today), ['phone']);
+  adult.updateDetails(
+    StudentFactory.details({ birthDate: '1984-05-01', guardians: [], ownPhone: '677528810' }),
+    today,
   );
+  assertEquals(adult.details().missingData(today), []);
+  const guardianWithoutPhone = new Guardian(FullName.fromString('Tutor Uno'), null);
+  const unknownAge = Student.register(
+    StudentId.generate(),
+    StudentFactory.details({ birthDate: null, guardians: [guardianWithoutPhone] }),
+    today,
+  );
+  assertEquals(unknownAge.details().ageOn(today), null);
+  assertEquals(unknownAge.details().isMinorOn(today), null);
+  assertEquals(unknownAge.details().missingData(today), ['birth_date', 'guardian_phone']);
+  assertEquals(
+    Student.register(StudentId.generate(), StudentFactory.details(), today).details().missingData(
+      today,
+    ),
+    [],
+  );
+
   const guardian = new Guardian(
     FullName.fromString('Tutor Uno'),
     PhoneNumber.fromString('612481930'),
@@ -75,11 +85,6 @@ Deno.test('Student should apply the contact rules: minors need a guardian, adult
         today,
       ),
     InvalidValue,
-  );
-  const student = Student.register(StudentId.generate(), StudentFactory.details(), today);
-  assertThrows(
-    () => student.updateDetails(StudentFactory.details({ guardians: [] }), today),
-    MissingContact,
   );
 });
 

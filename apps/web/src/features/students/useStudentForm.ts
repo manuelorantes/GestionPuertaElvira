@@ -3,8 +3,27 @@ import { useState, type FormEvent } from 'react';
 import { ApiError } from '@/shared/api/client';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 
-import type { Registration, StudentDetail, StudentPayload } from './api';
+import type { MissingDatum, Registration, StudentDetail, StudentPayload } from './api';
 import { ageOn } from './format';
+
+/** Espejo de la regla de la API: qué quedará pendiente con los datos del formulario. */
+export function missingDataFor(values: StudentFormValues): MissingDatum[] {
+  const age = ageOn(values.birthDate);
+  const guardians = [
+    { name: values.guardian1Name.trim(), phone: values.guardian1Phone.trim() },
+    { name: values.guardian2Name.trim(), phone: values.guardian2Phone.trim() },
+  ].filter((g) => g.name !== '');
+  const missing: MissingDatum[] = [];
+  if (!values.birthDate) missing.push('birth_date');
+  if (age === null || age < 18) {
+    if (guardians.length === 0) missing.push('guardian');
+    else if (guardians.every((g) => g.phone === '')) missing.push('guardian_phone');
+  } else if (values.ownPhone.trim() === '') {
+    missing.push('phone');
+  }
+  if (values.contactEmail.trim() === '') missing.push('email');
+  return missing;
+}
 
 export interface StudentFormValues {
   fullName: string;
@@ -61,13 +80,14 @@ function fromDetail(detail: StudentDetail | null, defaultGroupId: string): Stude
 const orNull = (value: string) => (value.trim() === '' ? null : value.trim());
 
 export function toPayload(values: StudentFormValues): StudentPayload {
+  // Un tutor sin teléfono vale (quedará en Datos pendientes); un teléfono sin nombre no es un tutor.
   const guardians = [
-    { name: values.guardian1Name.trim(), phone: values.guardian1Phone.trim() },
-    { name: values.guardian2Name.trim(), phone: values.guardian2Phone.trim() },
-  ].filter((guardian) => guardian.name !== '' || guardian.phone !== '');
+    { name: values.guardian1Name.trim(), phone: orNull(values.guardian1Phone) },
+    { name: values.guardian2Name.trim(), phone: orNull(values.guardian2Phone) },
+  ].filter((guardian) => guardian.name !== '');
   return {
     fullName: values.fullName.trim(),
-    birthDate: values.birthDate,
+    birthDate: orNull(values.birthDate),
     nationalId: orNull(values.nationalId),
     contactEmail: orNull(values.contactEmail),
     guardians,
@@ -93,8 +113,8 @@ export function useStudentForm(
 
   const age = ageOn(values.birthDate);
   const isMinor = age !== null && age < 18;
-  const hasGuardian = values.guardian1Name.trim() !== '' && values.guardian1Phone.trim() !== '';
-  const needsOwnPhone = age !== null && !isMinor && !hasGuardian;
+  // Solo el nombre es obligatorio: lo demás se reclama en Datos pendientes (mismas reglas que la API).
+  const pending = missingDataFor(values);
 
   const set = <K extends Field>(key: K, value: StudentFormValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }));
@@ -102,21 +122,10 @@ export function useStudentForm(
   function validate(): FieldErrors {
     return {
       ...(values.fullName.trim() === '' && { fullName: 'Escribe el nombre y apellidos.' }),
-      ...(values.birthDate === '' && { birthDate: 'Indica la fecha de nacimiento.' }),
-      ...(isMinor &&
-        !hasGuardian && {
-          guardian1Name: 'Un alumno menor necesita al menos un tutor con teléfono.',
-        }),
-      ...(needsOwnPhone &&
-        values.ownPhone.trim() === '' && {
-          ownPhone: 'Sin tutor, el alumno necesita su propio teléfono.',
-        }),
       ...(values.federated &&
         values.federationLicence.trim() === '' && {
           federationLicence: 'Indica el número de licencia.',
         }),
-      ...(!isEdit &&
-        values.groupIds.filter(Boolean).length === 0 && { groupIds: 'Elige al menos un grupo.' }),
     };
   }
 
@@ -144,7 +153,8 @@ export function useStudentForm(
     set,
     isEdit,
     isMinor,
-    needsOwnPhone,
+    /** Datos esperados que faltan con lo escrito hasta ahora. */
+    pending,
     fieldErrors,
     errorMessage,
     isSubmitting,

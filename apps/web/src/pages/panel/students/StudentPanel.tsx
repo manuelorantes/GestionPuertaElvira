@@ -6,6 +6,7 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { useGroups } from '@/features/classes/hooks';
 import * as api from '@/features/students/api';
+import { missingSentence } from '@/features/students/pending';
 import { formatDate, telHref } from '@/features/students/format';
 import { useStudent, useStudentMutation, useStudents } from '@/features/students/hooks';
 import { useOverCapacityConfirm } from '@/features/students/useOverCapacityConfirm';
@@ -118,8 +119,14 @@ export function StudentPanel() {
               {s.fullName}
             </h2>
             <p className="text-sm text-ink-muted">
-              {s.age} años{s.groups[0] ? ` · ${s.groups[0].name}` : ''}
+              {s.age === null ? 'Edad sin indicar' : `${s.age} años`}
+              {s.groups[0] ? ` · ${s.groups[0].name}` : ' · Socio sin clases'}
             </p>
+            {s.missingData.length > 0 && (
+              <p className="mt-1 text-[13px] font-medium text-warning-fg">
+                {missingSentence(s.missingData)}
+              </p>
+            )}
             <div className="mt-2">
               <Badge tone={isWithdrawn ? 'neutral' : s.withdrawnOn ? 'warning' : 'success'}>
                 {isWithdrawn
@@ -215,7 +222,7 @@ export function StudentPanel() {
           <CardTitle>Familia y contacto</CardTitle>
           {s.guardians.map((g) => (
             <Row key={g.name} label={g.name}>
-              <a href={telHref(g.phone)}>{g.phone}</a>
+              {g.phone ? <a href={telHref(g.phone)}>{g.phone}</a> : 'Sin teléfono'}
             </Row>
           ))}
           {s.ownPhone && (
