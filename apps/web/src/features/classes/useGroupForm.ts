@@ -26,7 +26,7 @@ function initialValues(group: ClassGroup | null, defaultTeacherId: string): Grou
     start: '17:00',
     end: '18:00',
     classroom: 'alfil',
-    capacity: 12,
+    capacity: 10,
   };
 }
 

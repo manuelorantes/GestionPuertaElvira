@@ -44,7 +44,7 @@ ClassesPage (/panel/clases)
 | Inicio | «Empieza» | select | sí | 16:00–20:30 cada 30 min |
 | Fin | «Termina» | select | sí | 16:30–21:00 cada 30 min |
 | Aula | «Aula» | tres botones (`aria-pressed`) | sí | Alfil, Caballo o Peón |
-| Plazas | «Plazas» | stepper con botones «Quitar plaza» y «Añadir plaza» | sí | 1–30 |
+| Plazas | «Plazas» | stepper con botones «Quitar plaza» y «Añadir plaza» | sí | 1–30; 10 por defecto |
 | Profesor nuevo | «Nombre y apellidos» | texto | sí | — |
 | Activo | «Activo» | interruptor (`role="switch"`) | — | — |
 
