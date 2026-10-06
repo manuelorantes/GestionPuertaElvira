@@ -2,12 +2,14 @@ import type { ButtonHTMLAttributes } from 'react';
 
 interface ToggleButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pressed: boolean;
-  tone?: 'brand' | 'ink';
+  /** `soft`: subfiltro, subordinado a una fila de filtros principal. */
+  tone?: 'brand' | 'ink' | 'soft';
 }
 
 const PRESSED = {
   brand: 'border-brand bg-brand text-surface-raised',
   ink: 'border-ink-strong bg-ink-strong text-paper',
+  soft: 'border-brand bg-brand-soft text-brand-strong',
 } as const;
 
 /** Botón conmutable del diseño (días de la semana, aulas). */
