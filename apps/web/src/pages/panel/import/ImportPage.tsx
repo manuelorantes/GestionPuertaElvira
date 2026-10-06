@@ -1,8 +1,9 @@
 import { ArrowLeft, Check, FileSpreadsheet, Plus, Upload } from 'lucide-react';
 import { useId, useState, type ChangeEvent } from 'react';
-import { Link } from 'react-router';
+import { Link, Navigate } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { useSession } from '@/features/auth/useSession';
 import { formatCents, monthName } from '@/features/billing/money';
 import { useGroups } from '@/features/classes/hooks';
 import {
@@ -269,7 +270,14 @@ function RowCard({
   );
 }
 
+/** Importar la hoja es cosa de superadministración; el resto vuelve al resumen. */
 export function ImportPage() {
+  const { data: user } = useSession();
+  if (user && user.role !== 'superadministrator') return <Navigate to="/panel" replace />;
+  return <ImportWorkspace />;
+}
+
+function ImportWorkspace() {
   const [text, setText] = useState('');
   const [rows, setRows] = useState<PreviewRow[] | null>(null);
   const [decisions, setDecisions] = useState<Record<number, Decision>>({});

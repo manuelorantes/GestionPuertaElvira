@@ -2,6 +2,7 @@ import { ClipboardList, FileSpreadsheet, Search, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Outlet, useNavigate, useSearchParams } from 'react-router';
 
+import { useSession } from '@/features/auth/useSession';
 import type { StudentFilter } from '@/features/students/api';
 import { usePendingData, useStudents } from '@/features/students/hooks';
 import { useDebouncedValue } from '@/shared/useDebouncedValue';
@@ -30,6 +31,7 @@ export function StudentsPage() {
   const [creating, setCreating] = useState(false);
   const students = useStudents(current.filter, debouncedSearch);
   const pendingCount = usePendingData().data?.items.length ?? 0;
+  const canImport = useSession().data?.role === 'superadministrator';
   const items = students.data?.items ?? [];
   const total = students.data?.total ?? 0;
   const activeCount =
@@ -116,13 +118,15 @@ export function StudentsPage() {
             <ClipboardList aria-hidden size={16} />
             Datos pendientes{pendingCount > 0 ? ` (${pendingCount})` : ''}
           </Link>
-          <Link
-            to="/panel/importar"
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
-          >
-            <FileSpreadsheet aria-hidden size={16} />
-            Importar hoja
-          </Link>
+          {canImport && (
+            <Link
+              to="/panel/importar"
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
+            >
+              <FileSpreadsheet aria-hidden size={16} />
+              Importar hoja
+            </Link>
+          )}
         </div>
         {renderList()}
       </Card>
