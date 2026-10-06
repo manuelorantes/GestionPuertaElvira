@@ -67,7 +67,12 @@ export function PaymentDialog({
             />
             {selected && (
               <span className="text-[13px] text-ink-muted">
-                {selected.groups.map((g) => g.name).join(' · ') || 'Sin grupo'}
+                {selected.groups.length === 0 && 'Sin grupo'}
+                {selected.groups.map((g) => (
+                  <span key={g.id} className="block">
+                    {g.name}
+                  </span>
+                ))}
               </span>
             )}
           </div>
