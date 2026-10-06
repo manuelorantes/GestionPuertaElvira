@@ -149,32 +149,26 @@ describe('Alumnos', () => {
     expect(within(card).getByText('Aula Alfil · Lucía Moreno Gil')).toBeVisible();
   });
 
-  it('should manage billing preferences, points and history from the student card', async () => {
+  it('should show what the student pays and why, the points and the history on the card', async () => {
     const user = userEvent.setup();
+    const account = {
+      preferredPlan: 'monthly',
+      member: false,
+      privateRate: null,
+      points: 2,
+      suggestedMonths: 1,
+      remainingMonths: 9,
+      weeklyHours: 2,
+      monthlyFeeCents: 4050,
+      familyDiscount: true,
+      hasPrivateLessons: false,
+      membershipPaid: false,
+      membershipFeeCents: 5000,
+    };
     const spy = api({
       'GET /api/admin/billing/accounts/s1': [
-        [
-          200,
-          {
-            preferredPlan: 'monthly',
-            member: false,
-            privateRate: null,
-            points: 2,
-            suggestedMonths: 1,
-            remainingMonths: 9,
-          },
-        ],
-        [
-          200,
-          {
-            preferredPlan: 'monthly',
-            member: false,
-            privateRate: null,
-            points: 3,
-            suggestedMonths: 1,
-            remainingMonths: 9,
-          },
-        ],
+        [200, account],
+        [200, { ...account, points: 3 }],
       ],
       'GET /api/admin/billing/payments?studentId=s1': [
         200,
@@ -196,31 +190,22 @@ describe('Alumnos', () => {
         },
       ],
       'POST /api/admin/billing/accounts/s1/points': [200, { points: 3 }],
-      'PUT /api/admin/billing/accounts/s1': [204],
     });
     renderApp('/panel/alumnos/s1');
 
     const history = await screen.findByRole('list', { name: 'Historial de cobros' });
     expect(within(history).getByText('Septiembre 2026')).toBeInTheDocument();
     expect(within(history).getByText('40,50 €')).toBeInTheDocument();
+    expect(screen.getByText('2 h semanales')).toBeInTheDocument();
+    expect(screen.getByText('Sí, por hermanos')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente · 50 €')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Forma de pago preferida')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Socio del club' })).not.toBeInTheDocument();
     expect(screen.getByText('Puntos:')).toHaveTextContent('Puntos: 2');
 
     await user.click(screen.getByRole('button', { name: 'Sumar un punto' }));
     expect(postBody(spy, '/api/admin/billing/accounts/s1/points')).toEqual({ delta: 1 });
-
     expect(await screen.findByText('Puntos:')).toHaveTextContent('Puntos: 3');
-    await user.selectOptions(screen.getByLabelText('Forma de pago preferida'), 'three_months');
-    await user.click(screen.getByRole('switch', { name: 'Socio del club' }));
-    await user.click(screen.getByRole('button', { name: 'Guardar' }));
-    expect(await screen.findByText('Datos de cobro guardados')).toBeInTheDocument();
-    const put = spy.mock.calls.find(
-      ([u, init]) => u === '/api/admin/billing/accounts/s1' && init?.method === 'PUT',
-    );
-    expect(JSON.parse(String(put?.[1]?.body))).toEqual({
-      preferredPlan: 'three_months',
-      member: true,
-      privateRate: null,
-    });
   });
 
   it('should keep «Alumnos» highlighted while a student card is open', async () => {

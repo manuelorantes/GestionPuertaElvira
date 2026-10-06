@@ -18,14 +18,16 @@ export const CONCEPTS: { id: Concept; label: string }[] = [
   { id: 'membership', label: 'Cuota de socio' },
 ];
 
-function conceptFor(account: api.Account | undefined): Concept {
-  if (account?.preferredPlan === 'three_months') return 'three';
-  if (account?.preferredPlan === 'six_months') return 'six';
-  if (account?.preferredPlan === 'rest_of_season') return 'rest';
-  return 'month';
+type SpecialMode = 'percent' | 'amount';
+
+export interface SpecialState {
+  enabled: boolean;
+  mode: SpecialMode;
+  value: string;
+  concept: string;
 }
 
-/** Estado del diálogo de cobro: propone el concepto según la ficha y pide la cotización al cambiar algo. */
+/** Estado del diálogo de cobro: pide la cotización al cambiar algo (meses, puntos, descuento especial). */
 export function usePaymentForm(initialStudentId?: string, initialKind?: api.ChargeKind) {
   const [studentId, setStudentId] = useState(initialStudentId ?? '');
   const [chosenConcept, setConcept] = useState<Concept | null>(
@@ -34,12 +36,28 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
   const [method, setMethod] = useState<api.PaymentMethod>('cash');
   const [date, setDate] = useState(todayIso());
   const [prorate, setProrate] = useState(false);
-  const [special, setSpecial] = useState({ enabled: false, percent: '', concept: '' });
+  const [special, setSpecial] = useState<SpecialState>({
+    enabled: false,
+    mode: 'percent',
+    value: '',
+    concept: '',
+  });
+  const [redeemPoints, setRedeemPoints] = useState(0);
   const account = useAccount(studentId);
-  const concept = chosenConcept ?? conceptFor(account.data);
+  const concept = chosenConcept ?? 'month';
   const remaining = account.data?.remainingMonths ?? null;
   const months = { month: 1, three: 3, six: 6, rest: remaining ?? 0, membership: 1 }[concept];
-  const percent = Number(special.percent);
+  const specialValue = Number(special.value.replace(',', '.'));
+  const specialDiscount =
+    special.enabled && specialValue > 0 && special.concept.trim()
+      ? {
+          percent: special.mode === 'percent' ? Math.round(specialValue) : null,
+          amountCents: special.mode === 'amount' ? Math.round(specialValue * 100) : null,
+          concept: special.concept.trim(),
+        }
+      : null;
+  const availablePoints = Math.min(5, account.data?.points ?? 0);
+  const points = concept === 'membership' ? 0 : Math.min(redeemPoints, availablePoints);
 
   const request: api.PaymentRequest = {
     studentId,
@@ -48,10 +66,8 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     method,
     date,
     prorate: prorate && concept === 'month',
-    specialDiscount:
-      special.enabled && percent > 0 && special.concept.trim()
-        ? { percent, concept: special.concept.trim() }
-        : null,
+    specialDiscount,
+    redeemPoints: points,
   };
   // Se espera a una pausa en la escritura comparando el texto de la petición (un objeto nuevo en cada render no se asentaría nunca).
   const requestKey = JSON.stringify(request);
@@ -95,6 +111,11 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     setProrate,
     special,
     setSpecial,
+    /** Puntos que se pueden canjear en este cobro (hasta 5 y los que tenga el alumno). */
+    availablePoints,
+    redeemPoints: points,
+    setRedeemPoints,
+    account: account.data,
     quote: quote.data,
     quoting: quote.isFetching || stale,
     quoteError: quote.isError ? apiErrorMessage(quote.error) : null,
