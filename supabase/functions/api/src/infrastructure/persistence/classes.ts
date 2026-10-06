@@ -183,7 +183,9 @@ export class SqlClassQuery implements ClassQuery {
     return Row.all(rows).map((row) => ({
       id: row.string('id'),
       fullName: row.string('full_name'),
-      age: LocalDate.fromString(row.string('birth_date')).ageOn(on),
+      age: row.nullableString('birth_date') === null
+        ? null
+        : LocalDate.fromString(row.string('birth_date')).ageOn(on),
     }));
   }
 }

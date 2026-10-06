@@ -9,6 +9,8 @@ import {
 import {
   type Enrolments,
   LinkSiblings,
+  ListPendingData,
+  type Membership,
   RegisterStudent,
   studentFilterFrom,
   type StudentInput,
@@ -27,7 +29,9 @@ import {
   SqlEnrolmentRepository,
 } from '../persistence/classes.ts';
 import { SavepointTransactionRunner, type Sql } from '../persistence/sql.ts';
+import { SqlStudentAccountRepository } from '../persistence/billing.ts';
 import { SqlStudentQuery, SqlStudentRepository } from '../persistence/students.ts';
+import { StudentAccount, StudentRef } from '../../domain/billing/mod.ts';
 
 /** Alumnado pide a Clases que inscriba o termine las inscripciones de un alumno. */
 export class ClassesEnrolments implements Enrolments {
@@ -60,15 +64,30 @@ export class ClassesEnrolments implements Enrolments {
   }
 }
 
+/** Alumnado pide a Cobros que marque como socio a quien entra sin clases. */
+export class BillingMembership implements Membership {
+  constructor(private readonly sql: Sql) {}
+
+  async makeMember(student: StudentId): Promise<void> {
+    const accounts = new SqlStudentAccountRepository(this.sql);
+    const ref = StudentRef.fromString(student.value);
+    const account = (await accounts.account(ref)) ?? StudentAccount.open(ref);
+    if (!account.isMember()) {
+      account.update(account.preferredPlan(), true, account.privateRate());
+      await accounts.saveAccount(account);
+    }
+  }
+}
+
 export function studentInput(body: JsonBody): StudentInput {
   return {
     fullName: body.requiredString('fullName'),
-    birthDate: body.requiredString('birthDate'),
+    birthDate: body.optionalString('birthDate'),
     nationalId: body.optionalString('nationalId'),
     contactEmail: body.optionalString('contactEmail'),
     guardians: body.objectList('guardians').map((g) => ({
       name: g.requiredString('name'),
-      phone: g.requiredString('phone'),
+      phone: g.optionalString('phone'),
     })),
     ownPhone: body.optionalString('ownPhone'),
     federationLicence: body.optionalString('federationLicence'),
@@ -78,10 +97,7 @@ export function studentInput(body: JsonBody): StudentInput {
 
 /** Rutas de alumnado: /api/admin/students */
 export function registerStudentRoutes(api: ApiApp): void {
-  registerDomainErrors({
-    StudentNotFound: [404, 'not_found'],
-    MissingContact: [422, 'missing_contact'],
-  });
+  registerDomainErrors({ StudentNotFound: [404, 'not_found'] });
   const { clock } = api.deps;
   const students = (scope: RequestScope) => new SqlStudentRepository(scope.tx);
   const query = (scope: RequestScope) => new SqlStudentQuery(scope.tx, new SqlClassQuery(scope.tx));
@@ -97,6 +113,15 @@ export function registerStudentRoutes(api: ApiApp): void {
         items: await query(scope).list(filter, search, today(api)),
         total: await query(scope).total(),
       });
+    },
+  );
+
+  // Antes de /:id para que «pending-data» no se tome por un identificador.
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/students/pending-data', access: 'admin' },
+    async (c, scope) => {
+      const items = await new ListPendingData(students(scope), clock).execute();
+      return c.json({ items });
     },
   );
 
@@ -118,6 +143,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         enrolments(scope),
         transactions(scope),
         clock,
+        new BillingMembership(scope.tx),
       );
       const id = await register.execute(
         studentInput(body),

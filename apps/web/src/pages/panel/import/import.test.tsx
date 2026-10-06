@@ -170,9 +170,10 @@ describe('Importar hoja', () => {
       'Julio Requena Montenegro',
     );
     expect(within(julio).getByText('«69066600» no es un teléfono válido.')).toBeInTheDocument();
+    // Solo el nombre es obligatorio: la fila se puede aceptar aunque falte el teléfono.
     expect(
       within(julio).getByRole('button', { name: 'Aceptar fila Julio Requena Montenegro' }),
-    ).toBeDisabled();
+    ).toBeEnabled();
     expect(within(julio).getByLabelText('Grupo')).toHaveValue('g1');
 
     expect(lookalike).toHaveTextContent('Posible duplicado: Héctor Pérez Ratkovsky');

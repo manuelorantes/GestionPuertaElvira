@@ -85,18 +85,11 @@ function done(result: ImportResult): string {
   return `Importada: ${parts.join(' · ')}`;
 }
 
-/** Un alumno nuevo no se puede crear sin grupo, ni un menor sin teléfono del tutor; vincular exige elegir alumno. */
+/** Vincular exige elegir alumno; crear solo exige el nombre (lo demás queda en Datos pendientes). */
 function problem(decision: Decision): string | null {
   if (decision.action === 'link')
     return decision.studentId ? null : 'Elige el alumno al que vincular.';
-  if (decision.action !== 'create') return null;
-  if ((decision.groupIds ?? []).filter(Boolean).length === 0) {
-    return 'Elige un grupo para crear el alumno.';
-  }
-  if (!decision.birthDate) return 'Falta la fecha de nacimiento.';
-  const age = new Date().getFullYear() - Number(decision.birthDate.slice(0, 4));
-  if (age < 18 && (!decision.guardianName || !decision.guardianPhone))
-    return 'Un menor necesita un tutor con teléfono.';
+  if (decision.action === 'create' && !decision.fullName?.trim()) return 'Falta el nombre.';
   return null;
 }
 

@@ -23,7 +23,7 @@ y acepta cada fila por separado (o todas las revisadas de una vez, en orden). Na
 
 #### Scenario: Alumno nuevo
 - **WHEN** una fila no coincide con ningún alumno
-- **THEN** se proponen nombre, fecha de nacimiento, tutor, teléfono y email, y no se puede importar hasta elegir al menos un grupo (y un teléfono de tutor si es menor); se pueden añadir más grupos
+- **THEN** se proponen nombre, fecha de nacimiento, tutor, teléfono, email y grupos; solo el nombre es obligatorio (lo que falte queda en «Datos pendientes» de Alumnos) y sin grupo el alumno entra como socio sin clases
 
 ### Requirement: Qué se registra
 Al importar, por cada fila aceptada:

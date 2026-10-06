@@ -1,9 +1,9 @@
-import { FileSpreadsheet, Search, UserPlus } from 'lucide-react';
+import { ClipboardList, FileSpreadsheet, Search, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Outlet, useNavigate, useSearchParams } from 'react-router';
 
 import type { StudentFilter } from '@/features/students/api';
-import { useStudents } from '@/features/students/hooks';
+import { usePendingData, useStudents } from '@/features/students/hooks';
 import { useDebouncedValue } from '@/shared/useDebouncedValue';
 import { Card } from '@/shared/ui/Card';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
@@ -18,6 +18,7 @@ const FILTERS: { param: string; filter: StudentFilter; label: string }[] = [
   { param: 'activos', filter: 'active', label: 'Activos' },
   { param: 'hermanos', filter: 'siblings', label: 'Hermanos' },
   { param: 'baja', filter: 'withdrawn', label: 'De baja' },
+  { param: 'socios', filter: 'no_classes', label: 'Socios sin clases' },
 ];
 
 export function StudentsPage() {
@@ -28,6 +29,7 @@ export function StudentsPage() {
   const debouncedSearch = useDebouncedValue(search, 250);
   const [creating, setCreating] = useState(false);
   const students = useStudents(current.filter, debouncedSearch);
+  const pendingCount = usePendingData().data?.items.length ?? 0;
   const items = students.data?.items ?? [];
   const total = students.data?.total ?? 0;
   const activeCount =
@@ -107,6 +109,13 @@ export function StudentsPage() {
           <p className="shrink-0 text-sm text-ink-muted">
             {items.length} de {total} mostrados
           </p>
+          <Link
+            to="/panel/alumnos/pendientes"
+            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
+          >
+            <ClipboardList aria-hidden size={16} />
+            Datos pendientes{pendingCount > 0 ? ` (${pendingCount})` : ''}
+          </Link>
           <Link
             to="/panel/importar"
             className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"

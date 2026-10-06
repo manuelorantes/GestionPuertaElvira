@@ -161,9 +161,9 @@ Deno.test('import should warn about a possible duplicate before creating', async
 Deno.test('import should fail only the bad row and save nothing of it', async () => {
   const fx = await fixture();
   assertError(
-    await importRow(fx, { line: 5, action: 'create', groupIds: [fx.group] }),
+    await importRow(fx, { line: 5, action: 'create', groupIds: [fx.group], email: 'sin-arroba' }),
     422,
-    'missing_contact',
+    'unprocessable',
   );
   assertError(
     await importRow(fx, { line: 9, action: 'link', studentId: fx.hector }),

@@ -34,7 +34,9 @@ test('should find students ignoring accents and case', async ({ page }) => {
   await expect(page.getByRole('button', { name: /pablo lópez herrera/i })).toBeVisible();
 });
 
-test('should refuse a minor without guardian and register one in two groups', async ({ page }) => {
+test('should register a minor in two groups, with the guardian added before saving', async ({
+  page,
+}) => {
   await openStudents(page);
   await page.getByRole('button', { name: 'Nuevo alumno' }).click();
   const dialog = page.getByRole('dialog', { name: 'Nuevo alumno' });
@@ -43,10 +45,7 @@ test('should refuse a minor without guardian and register one in two groups', as
   await dialog.getByLabel('Mes').selectOption({ label: 'marzo' });
   await dialog.getByLabel('Año').selectOption('2015');
   await selectStartingWith(dialog.getByLabel('Grupo'), 'Iniciación A');
-  await dialog.getByRole('button', { name: 'Dar de alta' }).click();
-  await expect(
-    dialog.getByText('Un alumno menor necesita al menos un tutor con teléfono.'),
-  ).toBeVisible();
+  await expect(dialog.getByText(/pendiente: tutor y email/i)).toBeVisible();
 
   await dialog.getByLabel('Tutor 1', { exact: true }).fill('Carmen Ortiz');
   await dialog.getByLabel('Teléfono tutor 1').fill('612000111');

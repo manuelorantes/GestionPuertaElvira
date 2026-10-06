@@ -1,7 +1,6 @@
 import {
   type EmailAddress,
   type FullName,
-  type HasErrorDetails,
   InvalidValue,
   type LocalDate,
   type PhoneNumber,
@@ -48,48 +47,27 @@ export class FederationLicence {
 }
 
 /** Tutor legal de contacto. */
+/** Tutor de un alumno; el teléfono puede faltar (y entonces aparece en Datos pendientes). */
 export class Guardian {
   constructor(
     readonly name: FullName,
-    readonly phone: PhoneNumber,
+    readonly phone: PhoneNumber | null,
   ) {}
 }
 
-export class MissingContact extends Error implements HasErrorDetails {
-  constructor(
-    message: string,
-    private readonly field: string,
-  ) {
-    super(message);
-    this.name = 'MissingContact';
-  }
+/**
+ * Datos que el club espera tener de cada alumno y que pueden faltar. Nada de esto impide el alta:
+ * la lista de Datos pendientes los reclama.
+ */
+export type MissingDatum = 'birth_date' | 'guardian' | 'guardian_phone' | 'phone' | 'email';
 
-  static minorWithoutGuardian(): MissingContact {
-    return new MissingContact(
-      'Un alumno menor de edad necesita al menos un tutor con teléfono.',
-      'guardians',
-    );
-  }
-
-  static adultWithoutPhone(): MissingContact {
-    return new MissingContact(
-      'Sin tutor, el alumno necesita su propio teléfono de contacto.',
-      'ownPhone',
-    );
-  }
-
-  details(): Record<string, string> {
-    return { field: this.field };
-  }
-}
-
-/** Datos personales editables de un alumno. */
+/** Datos personales editables de un alumno. Solo el nombre es obligatorio. */
 export class StudentDetails {
   private static readonly MAX_GUARDIANS = 2;
 
   constructor(
     readonly fullName: FullName,
-    readonly birthDate: LocalDate,
+    readonly birthDate: LocalDate | null,
     readonly nationalId: NationalId | null,
     readonly contactEmail: EmailAddress | null,
     readonly guardians: readonly Guardian[],
@@ -102,27 +80,46 @@ export class StudentDetails {
     }
   }
 
-  isMinorOn(day: LocalDate): boolean {
-    return this.birthDate.ageOn(day) < 18;
+  /** Edad en ese día, o null si no consta la fecha de nacimiento. */
+  ageOn(day: LocalDate): number | null {
+    return this.birthDate === null ? null : this.birthDate.ageOn(day);
+  }
+
+  /** true/false según la edad; null si no consta la fecha de nacimiento. */
+  isMinorOn(day: LocalDate): boolean | null {
+    const age = this.ageOn(day);
+    return age === null ? null : age < 18;
+  }
+
+  /**
+   * Qué falta: la fecha de nacimiento; un tutor (y su teléfono) si es menor o no se sabe la edad;
+   * el teléfono propio si es adulto; y el email.
+   */
+  missingData(day: LocalDate): MissingDatum[] {
+    const missing: MissingDatum[] = [];
+    if (this.birthDate === null) missing.push('birth_date');
+    if (this.isMinorOn(day) !== false) {
+      if (this.guardians.length === 0) missing.push('guardian');
+      else if (this.guardians.every((g) => g.phone === null)) missing.push('guardian_phone');
+    } else if (this.ownPhone === null) {
+      missing.push('phone');
+    }
+    if (this.contactEmail === null) missing.push('email');
+    return missing;
   }
 }
 
-/** Siempre debe haber a quién llamar: un menor necesita un tutor; un adulto sin tutor, su teléfono. */
+/** La fecha de nacimiento, si consta, tiene que ser creíble. */
 export class ContactPolicy {
   private static readonly MAX_AGE = 100;
 
   assertAcceptable(details: StudentDetails, today: LocalDate): void {
+    if (details.birthDate === null) return;
     if (today.isBefore(details.birthDate)) {
       throw new InvalidValue('birthDate', 'La fecha de nacimiento no puede ser futura.');
     }
     if (details.birthDate.ageOn(today) > ContactPolicy.MAX_AGE) {
       throw new InvalidValue('birthDate', 'Revisa la fecha de nacimiento.');
-    }
-    if (details.isMinorOn(today) && details.guardians.length === 0) {
-      throw MissingContact.minorWithoutGuardian();
-    }
-    if (!details.isMinorOn(today) && details.guardians.length === 0 && details.ownPhone === null) {
-      throw MissingContact.adultWithoutPhone();
     }
   }
 }

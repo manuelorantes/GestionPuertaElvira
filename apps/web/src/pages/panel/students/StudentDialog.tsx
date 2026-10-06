@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useGroups } from '@/features/classes/hooks';
 import { registerStudent, updateStudent, type StudentDetail } from '@/features/students/api';
+import { missingSentence } from '@/features/students/pending';
 import { useStudentMutation, useStudents } from '@/features/students/hooks';
 import {
   toPayload,
@@ -93,6 +94,10 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
           </div>
           <div className="flex flex-col gap-6 p-6">
             {form.errorMessage && <Alert>{form.errorMessage}</Alert>}
+            <p className="text-[13px] text-ink-muted">
+              Solo el nombre es obligatorio. Lo que falte quedará anotado en «Datos pendientes»
+              {form.pending.length > 0 ? ` (${missingSentence(form.pending).toLowerCase()})` : ''}.
+            </p>
             <Section title="Datos del alumno">
               <TextField
                 label="Nombre y apellidos"
@@ -155,15 +160,13 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                   onChange={(e) => set('guardian2Phone', e.target.value)}
                 />
               </div>
-              {(form.needsOwnPhone || values.ownPhone !== '') && (
-                <TextField
-                  label="Teléfono del alumno"
-                  type="tel"
-                  value={values.ownPhone}
-                  onChange={(e) => set('ownPhone', e.target.value)}
-                  error={fieldErrors.ownPhone}
-                />
-              )}
+              <TextField
+                label="Teléfono del alumno"
+                type="tel"
+                value={values.ownPhone}
+                onChange={(e) => set('ownPhone', e.target.value)}
+                error={fieldErrors.ownPhone}
+              />
               {!form.isEdit && (
                 <Select
                   label="Hermano en el club (opcional)"
@@ -214,6 +217,12 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                     <Plus aria-hidden size={16} />
                     Añadir otro grupo
                   </Button>
+                  {values.groupIds.filter(Boolean).length === 0 && (
+                    <p className="text-[13px] text-ink-muted">
+                      Sin grupo, se dará de alta como socio sin clases: se le pedirá la cuota de
+                      socio y se podrá inscribir más adelante.
+                    </p>
+                  )}
                 </div>
               )}
               <Switch

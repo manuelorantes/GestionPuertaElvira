@@ -5,9 +5,9 @@ y sus inscripciones en grupos.
 Solo administración puede verlos y gestionarlos.
 
 ### Requirement: Lista de alumnos
-El sistema MUST mostrar los alumnos con su nombre, edad, grupos y estado,
+El sistema MUST mostrar los alumnos con su nombre, edad (o «edad sin indicar»), grupos y estado,
 con búsqueda por cualquier parte del nombre (sin distinguir mayúsculas ni tildes)
-y con los filtros Todos, Activos, Hermanos y De baja.
+y con los filtros Todos, Activos, Hermanos, De baja y Socios sin clases.
 
 #### Scenario: Buscar sin tildes
 - **WHEN** administración busca «lopez»
@@ -17,13 +17,18 @@ y con los filtros Todos, Activos, Hermanos y De baja.
 - **WHEN** administración elige «De baja»
 - **THEN** solo aparecen los alumnos cuya baja ya ha llegado
 
+#### Scenario: Socios sin clases
+- **WHEN** administración elige «Socios sin clases»
+- **THEN** solo aparecen los alumnos activos que no están inscritos en ningún grupo
+
 ### Requirement: Ficha del alumno
 La ficha MUST mostrar:
 
-- fecha de nacimiento y edad;
+- fecha de nacimiento y edad, si constan;
 - DNI o NIE (opcional);
-- email de contacto (opcional);
-- tutores con su teléfono, y el teléfono propio si lo hay;
+- email de contacto;
+- tutores con su teléfono (o «sin teléfono»), y el teléfono propio si lo hay;
+- qué datos esperados faltan («Pendiente: …»);
 - si está federado, con su licencia;
 - autorización de imagen;
 - fechas de alta y de baja;
@@ -35,9 +40,11 @@ La ficha MUST mostrar:
 - **THEN** ve todos sus datos y puede llamar a sus tutores desde el teléfono
 
 ### Requirement: Alta de alumnos
-Un alumno MUST darse de alta con nombre y apellidos, fecha de nacimiento y al menos un grupo.
-El DNI o NIE, si se indica, MUST tener una letra de control válida.
-Se pueden indicar hermanos ya inscritos.
+Para dar de alta a un alumno solo MUST ser obligatorio el nombre y apellidos; todo lo demás es opcional.
+La fecha de nacimiento, si se indica, no puede ser futura ni de hace más de cien años,
+y el DNI o NIE, si se indica, MUST tener una letra de control válida.
+Se pueden indicar hermanos ya inscritos. Un alumno MAY darse de alta sin ningún grupo:
+es un socio sin clases, queda marcado como socio (se le pedirá la cuota de socio) y se podrá inscribir más adelante.
 
 #### Scenario: Alta en dos grupos
 - **WHEN** administración da de alta a un alumno en dos grupos que no coinciden en horario
@@ -47,17 +54,33 @@ Se pueden indicar hermanos ya inscritos.
 - **WHEN** el alta no puede completarse (por ejemplo, por un grupo completo sin confirmar)
 - **THEN** no queda ningún dato del alumno guardado
 
-### Requirement: Contacto obligatorio
-Un alumno menor de edad MUST tener al menos un tutor con teléfono,
-y un alumno adulto sin tutores MUST tener teléfono propio.
-Como máximo hay dos tutores.
+#### Scenario: Socio sin clases
+- **WHEN** administración da de alta a un alumno sin elegir ningún grupo
+- **THEN** el alumno queda activo, marcado como socio, aparece en «Socios sin clases» y no ocupa plaza en ningún grupo
+
+### Requirement: Datos pendientes
+Los datos que el club espera de cada alumno MUST poder faltar sin impedir el alta, y el sistema MUST
+listar, en «Datos pendientes», a los alumnos activos a los que les falta alguno, agrupados por dato:
+- la fecha de nacimiento;
+- un tutor, si es menor de edad o no consta la edad; y el teléfono del tutor si ningún tutor lo tiene;
+- el teléfono propio, si tiene 18 años o más (entonces el tutor no se espera);
+- el email de contacto.
+Como máximo hay dos tutores. La ficha de cada alumno MUST indicar también qué le falta.
 
 #### Scenario: Menor sin tutor
-- **WHEN** se intenta guardar un alumno menor de edad sin tutor
-- **THEN** el sistema no lo guarda e indica que necesita al menos un tutor con teléfono
+- **WHEN** se guarda un alumno de 12 años sin tutor y sin email
+- **THEN** el alumno queda guardado y aparece en «Datos pendientes» en «Sin tutor» y «Sin email»
+
+#### Scenario: Adulto sin teléfono
+- **WHEN** se guarda un alumno de 30 años sin teléfono propio
+- **THEN** aparece en «Datos pendientes» en «Sin teléfono», y no se le reclama tutor
+
+#### Scenario: Datos completos
+- **WHEN** administración completa los datos que faltaban
+- **THEN** el alumno desaparece de «Datos pendientes»
 
 ### Requirement: Edición
-Administración MUST poder modificar los datos personales de un alumno, aplicando las mismas reglas que en el alta.
+Administración MUST poder modificar los datos personales de un alumno, con las mismas reglas que en el alta.
 
 #### Scenario: Editar datos
 - **WHEN** administración corrige los datos de un alumno

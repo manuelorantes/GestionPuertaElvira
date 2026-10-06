@@ -30,11 +30,15 @@ export function StudentsList({
               <Avatar name={student.fullName} />
               <span>
                 <span className="block font-medium">{student.fullName}</span>
-                <span className="block text-[13px] text-ink-muted">{student.age} años</span>
+                <span className="block text-[13px] text-ink-muted">
+                  {student.age === null ? 'Edad sin indicar' : `${student.age} años`}
+                </span>
               </span>
             </span>
             <span className="text-sm">
-              {student.groups.length === 0 && <span className="text-ink-muted">Sin grupo</span>}
+              {student.groups.length === 0 && (
+                <span className="text-ink-muted">Socio sin clases</span>
+              )}
               {student.groups.map((group) => (
                 <span key={group.id} className="block">
                   {group.name}{' '}

@@ -521,12 +521,10 @@ export class ApplyImport {
     return await this.register.execute(
       {
         fullName: name,
-        birthDate: decision.birthDate ?? row.birthDate ?? '',
+        birthDate: decision.birthDate ?? row.birthDate,
         nationalId: null,
         contactEmail: decision.email ?? row.email,
-        guardians: guardianName && guardianPhone
-          ? [{ name: guardianName, phone: guardianPhone }]
-          : [],
+        guardians: guardianName ? [{ name: guardianName, phone: guardianPhone ?? null }] : [],
         ownPhone: null,
         federationLicence: null,
         imageConsent: false,

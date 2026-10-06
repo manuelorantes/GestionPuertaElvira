@@ -27,7 +27,7 @@ import { SqlClassGroupRepository } from '../persistence/classes.ts';
 import { SqlStudentMatcher } from '../persistence/import.ts';
 import { SavepointTransactionRunner, type Sql } from '../persistence/sql.ts';
 import { SqlStudentRepository } from '../persistence/students.ts';
-import { ClassesEnrolments } from '../students/routes.ts';
+import { BillingMembership, ClassesEnrolments } from '../students/routes.ts';
 
 /** Los grupos del contexto Clases tal como se pueden nombrar en la hoja. */
 class ImportGroupDirectory implements GroupDirectory {
@@ -101,6 +101,7 @@ export function registerImportRoutes(api: ApiApp): void {
           new ClassesEnrolments(tx, clock),
           transactions,
           clock,
+          new BillingMembership(tx),
         ),
         new ImportPayment(
           new SqlChargeRepository(tx),

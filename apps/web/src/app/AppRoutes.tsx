@@ -13,6 +13,7 @@ import { TeachersPayPage } from '@/pages/panel/payroll/TeachersPayPage';
 import { PanelLayout } from '@/pages/panel/PanelLayout';
 import { StudentPanel } from '@/pages/panel/students/StudentPanel';
 import { StudentsPage } from '@/pages/panel/students/StudentsPage';
+import { PendingDataPage } from '@/pages/panel/students/PendingDataPage';
 
 export function AppRoutes() {
   return (
@@ -28,6 +29,7 @@ export function AppRoutes() {
           <Route path="contabilidad" element={<AccountingPage />} />
           <Route path="historial" element={<AuditPage />} />
           <Route path="importar" element={<ImportPage />} />
+          <Route path="alumnos/pendientes" element={<PendingDataPage />} />
           <Route path="alumnos" element={<StudentsPage />}>
             <Route path=":id" element={<StudentPanel />} />
           </Route>
