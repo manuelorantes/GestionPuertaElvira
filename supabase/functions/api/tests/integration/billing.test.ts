@@ -263,3 +263,49 @@ Deno.test({
     assertError(await teacher.get('/api/admin/billing/charges'), 403, 'forbidden');
   },
 });
+
+Deno.test({
+  name: 'billing should change the payment method of a registered payment, also in accounting',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const registered = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'membership',
+      method: 'transfer',
+      date: today,
+    });
+    assertEquals(registered.status, 201, JSON.stringify(registered.body));
+    const payment = body<{ id: string }>(registered).id;
+
+    const changed = await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/method`, {
+      method: 'cash',
+    });
+    assertEquals(changed.status, 204, JSON.stringify(changed.body));
+    const receipt = body<Record<string, unknown>>(
+      await fx.client.get(`/api/admin/billing/payments/${payment}`),
+    );
+    assertEquals(receipt.methodLabel, 'Efectivo');
+    const ledger = body<{ items: { sourceId: string; method: string }[] }>(
+      await fx.client.get(`/api/admin/accounting/ledger?month=${today.slice(0, 7)}`),
+    );
+    assertEquals(ledger.items.find((i) => i.sourceId === payment)?.method, 'cash');
+
+    assertError(
+      await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/method`, {
+        method: 'bizum',
+      }),
+      422,
+      'unprocessable',
+    );
+    assertError(
+      await fx.client.json(
+        'PUT',
+        '/api/admin/billing/payments/01a11381-2833-782f-9c2b-ddc95b817821/method',
+        { method: 'cash' },
+      ),
+      404,
+      'not_found',
+    );
+  },
+});
