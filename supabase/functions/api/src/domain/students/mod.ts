@@ -202,3 +202,46 @@ export class Student {
     return [...this.siblingIds.values()];
   }
 }
+
+/**
+ * Cambio de números de socio. Los números los da la base de datos al dar de alta, en orden y sin
+ * reutilizar nunca uno; aquí solo se permite repartir de otra forma los que ya tienen esos alumnos
+ * (p. ej. para cuadrar con el listado del club), de modo que ningún número liberado vuelve a usarse.
+ */
+export class MemberRenumbering {
+  private constructor(private readonly assignments: Map<string, number>) {}
+
+  /** `current`: número actual de cada alumno; `wanted`: el que debe tener cada uno de los indicados. */
+  static of(current: Map<string, number>, wanted: Map<string, number>): MemberRenumbering {
+    const held = new Set<number>();
+    const given = new Set<number>();
+    for (const [student, number] of wanted) {
+      const now = current.get(student);
+      if (now === undefined) throw new InvalidValue('assignments', 'Hay un alumno que no existe.');
+      if (!Number.isInteger(number) || number < 1) {
+        throw new InvalidValue('assignments', 'Los números de socio son enteros positivos.');
+      }
+      if (given.has(number)) {
+        throw new InvalidValue('assignments', `El número ${number} está repetido.`);
+      }
+      held.add(now);
+      given.add(number);
+    }
+    for (const number of given) {
+      if (!held.has(number)) {
+        throw new InvalidValue(
+          'assignments',
+          `El número ${number} no es de ninguno de estos alumnos: solo se pueden intercambiar sus números.`,
+        );
+      }
+    }
+    return new MemberRenumbering(
+      new Map([...wanted].filter(([student, number]) => current.get(student) !== number)),
+    );
+  }
+
+  /** Alumnos cuyo número cambia, con el nuevo. */
+  changes(): Map<string, number> {
+    return new Map(this.assignments);
+  }
+}

@@ -379,3 +379,59 @@ Deno.test('registration takes the hours a student attends and turns them into gr
   );
   assertEquals(detail.groups.map((g) => g.attendanceLabel), ['Lun · 17:00–18:00']);
 });
+
+Deno.test('students get a unique, increasing member number that is never given again', async () => {
+  const fx = await fixture();
+  const first = await register(fx, { fullName: 'Ana Uno' });
+  const second = await register(fx, { fullName: 'Bruno Dos' });
+  const third = await register(fx, { fullName: 'Carla Tres' });
+  const numberOf = async (id: string) =>
+    body<{ memberNumber: number }>(await fx.client.get(`/api/admin/students/${id}`)).memberNumber;
+
+  assertEquals(
+    items((await fx.client.get('/api/admin/students')).body).map((s) => s.memberNumber),
+    [1, 2, 3],
+  );
+
+  // Editar no gasta números: el siguiente alta recibe el 4.
+  const edit = await fx.client.json('PUT', `/api/admin/students/${second}`, {
+    ...student(fx, { fullName: 'Bruno Dos Editado' }),
+  });
+  assertEquals(edit.status, 204);
+  assertEquals(await numberOf(second), 2);
+  assertEquals(await numberOf(await register(fx, { fullName: 'Diego Cuatro' })), 4);
+
+  // La baja conserva su número y nadie lo vuelve a coger.
+  const withdrawal = await fx.client.json('POST', `/api/admin/students/${third}/withdrawal`, {
+    date: '2099-09-01',
+  });
+  assertEquals(withdrawal.status, 204);
+  assertEquals(await numberOf(third), 3);
+  assertEquals(await numberOf(await register(fx, { fullName: 'Elena Cinco' })), 5);
+
+  // Se puede buscar por número.
+  const byNumber = items((await fx.client.get('/api/admin/students?q=2')).body);
+  assertEquals(byNumber.map((s) => s.fullName), ['Bruno Dos Editado']);
+
+  // Reordenar solo intercambia números que ya tienen esos alumnos.
+  const swap = await fx.client.json('PUT', '/api/admin/students/member-numbers', {
+    assignments: [{ studentId: first, memberNumber: 2 }, { studentId: second, memberNumber: 1 }],
+  });
+  assertEquals(swap.status, 204, JSON.stringify(swap.body));
+  assertEquals([await numberOf(first), await numberOf(second)], [2, 1]);
+
+  assertError(
+    await fx.client.json('PUT', '/api/admin/students/member-numbers', {
+      assignments: [{ studentId: first, memberNumber: 99 }],
+    }),
+    422,
+    'unprocessable',
+  );
+  assertError(
+    await fx.client.json('PUT', '/api/admin/students/member-numbers', {
+      assignments: [{ studentId: first, memberNumber: 3 }],
+    }),
+    422,
+    'unprocessable',
+  );
+});

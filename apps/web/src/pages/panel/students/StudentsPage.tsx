@@ -86,7 +86,7 @@ export function StudentsPage() {
               type="search"
               role="searchbox"
               aria-label="Buscar alumnos"
-              placeholder="Buscar por nombre"
+              placeholder="Buscar por nombre o nº de socio"
               value={search}
               onChange={(event) => {
                 setSearch(event.target.value);

@@ -10,6 +10,7 @@ import {
 import {
   FederationLicence,
   Guardian,
+  MemberRenumbering,
   NationalId,
   Student,
   StudentId,
@@ -131,4 +132,18 @@ Deno.test('Teacher should be active when registered, be paid fifteen euros an ho
   assertThrows(() => teacher.changeRate(Money.cents(-1)), InvalidValue);
   teacher.rename(FullName.fromString('Lucía Moreno Gil de la Torre'));
   assertEquals(teacher.fullName().value, 'Lucía Moreno Gil de la Torre');
+});
+
+Deno.test('MemberRenumbering should only swap numbers the students already have', () => {
+  const current = new Map([['a', 1], ['b', 2], ['c', 3]]);
+  assertEquals(
+    MemberRenumbering.of(current, new Map([['a', 2], ['b', 1]])).changes(),
+    new Map([['a', 2], ['b', 1]]),
+  );
+  assertEquals(MemberRenumbering.of(current, new Map([['c', 3]])).changes(), new Map());
+  assertThrows(() => MemberRenumbering.of(current, new Map([['a', 9]])), InvalidValue);
+  assertThrows(() => MemberRenumbering.of(current, new Map([['a', 3]])), InvalidValue);
+  assertThrows(() => MemberRenumbering.of(current, new Map([['a', 2], ['b', 2]])), InvalidValue);
+  assertThrows(() => MemberRenumbering.of(current, new Map([['x', 1]])), InvalidValue);
+  assertThrows(() => MemberRenumbering.of(current, new Map([['a', 0]])), InvalidValue);
 });

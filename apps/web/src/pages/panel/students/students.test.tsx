@@ -39,6 +39,7 @@ const GROUPS = [
 ];
 const MARTINA = {
   id: 's1',
+  memberNumber: 7,
   fullName: 'Martina López Herrera',
   age: 12,
   status: 'active',
@@ -47,6 +48,7 @@ const MARTINA = {
 };
 const HUGO = {
   id: 's2',
+  memberNumber: 12,
   fullName: 'Hugo Martín Castillo',
   age: 14,
   status: 'withdrawn',
@@ -55,6 +57,7 @@ const HUGO = {
 };
 const DETAIL = {
   id: 's1',
+  memberNumber: 7,
   fullName: 'Martina López Herrera',
   birthDate: '2014-03-12',
   age: 12,
@@ -109,6 +112,7 @@ describe('Alumnos', () => {
       'Iniciación A',
     );
     expect(screen.getByText('2 de 2 mostrados')).toBeVisible();
+    expect(screen.getByLabelText('Número de socio 7')).toHaveTextContent('7');
     expect(screen.getByRole('button', { name: /hugo martín castillo/i })).toHaveTextContent(
       'De baja',
     );
@@ -140,6 +144,7 @@ describe('Alumnos', () => {
 
     const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
     expect(within(card).getByText('12/03/2014')).toBeVisible();
+    expect(within(card).getByText('Socio nº 7')).toBeVisible();
     expect(within(card).getByText('Sí · AND-20417')).toBeVisible();
     expect(within(card).getByRole('link', { name: '612 48 19 30' })).toHaveAttribute(
       'href',
