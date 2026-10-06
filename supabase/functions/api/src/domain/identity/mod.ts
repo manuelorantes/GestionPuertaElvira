@@ -3,14 +3,23 @@ import { EmailAddress, FullName, InvalidValue, Uuid } from '../common/mod.ts';
 export class UserId extends Uuid {}
 export class SessionId extends Uuid {}
 
-export type Role = 'superadministrator' | 'administrator' | 'teacher';
-export const ROLES: readonly Role[] = ['superadministrator', 'administrator', 'teacher'];
+/**
+ * Roles. El asistente es la cuenta con la que la IA consulta y cambia datos a petición de la junta:
+ * tiene permisos de administración y todo lo que hace queda en el historial a su nombre.
+ */
+export type Role = 'superadministrator' | 'administrator' | 'teacher' | 'assistant';
+export const ROLES: readonly Role[] = [
+  'superadministrator',
+  'administrator',
+  'teacher',
+  'assistant',
+];
 
 export function roleFromName(name: string): Role {
   if (!(ROLES as readonly string[]).includes(name)) {
     throw new InvalidValue(
       'role',
-      'Rol desconocido: usa superadministrator, administrator o teacher.',
+      'Rol desconocido: usa superadministrator, administrator, teacher o assistant.',
     );
   }
   return name as Role;

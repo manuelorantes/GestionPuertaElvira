@@ -35,6 +35,7 @@ Después abre <http://localhost:8080>.
 | `junta@puertaelvira.test` | `desarrollo-junta` | Administración |
 | `profe@puertaelvira.test` | `desarrollo-profe` | Profesorado |
 | `nuevo@puertaelvira.test` | `desarrollo-nuevo` | Administración, con contraseña temporal |
+| `ia@puertaelvira.test` | `desarrollo-ia` | Asistente (la IA; ver [docs/asistente.md](docs/asistente.md)) |
 
 `make seed` las restablece y reinicia los bloqueos por intentos fallidos.
 También crea, si no hay ninguno, los 5 profesores, 18 grupos y 16 alumnos **ficticios** del diseño,

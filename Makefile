@@ -112,6 +112,12 @@ seed: ## Datos de desarrollo: usuarios de prueba (contraseñas conocidas) y demo
 	$(DENO) task console app:dev:seed-users
 	$(DENO) task console app:dev:seed-demo
 
+##@ Asistente (cuenta con la que la IA usa la aplicación; ver docs/asistente.md)
+
+.PHONY: asistente
+asistente: ## Petición a la API como asistente: ARGS="GET /api/admin/students" | ARGS="POST /api/... '{...}'"
+	@sh scripts/asistente.sh $(ARGS)
+
 ##@ Cuentas de usuario (ver supabase/functions/api/scripts/console.ts)
 
 .PHONY: console
@@ -119,7 +125,7 @@ console: ## Consola de la API: ARGS="app:billing:generate-charges --month=2026-1
 	$(DENO) task console $(ARGS)
 
 .PHONY: user-create
-user-create: ## Alta de cuenta: ARGS="email@club.es 'Nombre Apellidos' superadministrator|administrator|teacher"
+user-create: ## Alta de cuenta: ARGS="email@club.es 'Nombre Apellidos' superadministrator|administrator|teacher|assistant"
 	$(DENO) task console app:user:create $(ARGS)
 
 .PHONY: user-disable
@@ -131,7 +137,7 @@ user-enable: ## Reactiva una cuenta: ARGS="email@club.es"
 	$(DENO) task console app:user:enable $(ARGS)
 
 .PHONY: user-role
-user-role: ## Cambia el rol: ARGS="email@club.es administrator|teacher"
+user-role: ## Cambia el rol: ARGS="email@club.es administrator|teacher|assistant"
 	$(DENO) task console app:user:role $(ARGS)
 
 .PHONY: user-reset-password

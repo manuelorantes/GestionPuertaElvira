@@ -1,5 +1,5 @@
 // Consola de administración: cuentas de usuario y semillas de desarrollo.
-//   deno task console app:user:create email@club.es 'Nombre Apellidos' superadministrator|administrator|teacher
+//   deno task console app:user:create email@club.es 'Nombre Apellidos' superadministrator|administrator|teacher|assistant
 //   deno task console app:user:reset-password email@club.es
 //   deno task console app:user:disable|enable email@club.es
 //   deno task console app:user:role email@club.es teacher
@@ -49,6 +49,7 @@ export const DEVELOPMENT_USERS: Record<string, [string, Role, string, boolean]> 
   'junta@puertaelvira.test': ['Junta Pruebas', 'administrator', 'desarrollo-junta', false],
   'profe@puertaelvira.test': ['Profesora Pruebas', 'teacher', 'desarrollo-profe', false],
   'nuevo@puertaelvira.test': ['Cuenta Nueva Pruebas', 'administrator', 'desarrollo-nuevo', true],
+  'ia@puertaelvira.test': ['Asistente IA Pruebas', 'assistant', 'desarrollo-ia', false],
 };
 
 function showTemporary(temporary: string): void {

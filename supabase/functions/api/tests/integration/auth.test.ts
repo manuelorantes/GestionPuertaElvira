@@ -153,6 +153,7 @@ Deno.test('administration should be reserved to administrators; the history to s
   await createUser('profe@club.es', 'teacher');
   await createUser('junta@club.es');
   await createUser('super@club.es', 'superadministrator');
+  await createUser('ia@club.es', 'assistant');
   const client = new ApiClient();
 
   await client.logIn('profe@club.es');
@@ -160,6 +161,9 @@ Deno.test('administration should be reserved to administrators; the history to s
   assertError(await client.get('/api/admin/_ping'), 403, 'forbidden');
   await client.logIn('junta@club.es');
   assertEquals((await client.get('/api/admin/_ping')).status, 200);
+  assertError(await client.get('/api/admin/audit/_ping'), 403, 'forbidden');
+  await client.logIn('ia@club.es');
+  assertEquals((await client.get('/api/admin/_ping')).status, 200, 'el asistente administra');
   assertError(await client.get('/api/admin/audit/_ping'), 403, 'forbidden');
   await client.logIn('super@club.es');
   assertEquals((await client.get('/api/admin/audit/_ping')).status, 200);
