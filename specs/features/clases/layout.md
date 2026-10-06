@@ -12,6 +12,7 @@ ClassesPage (/panel/clases)
 ├── Tabs: «Horario semanal» | «Grupos» | «Profesores»
 ├── [Horario semanal] WeeklySchedule (tarjeta con scroll horizontal en pantallas estrechas)
 │   ├── Leyenda de niveles: Iniciación, Intermedio, Avanzado y competición, Particulares
+│   ├── Selector de aula: «Todas» (las tres aulas en columnas, vista resumida) | «Aula Alfil» | «Aula Caballo» | «Aula Peón» (solo esa aula, una columna por día, tarjetas con nombre, hora, profesor y ocupación)
 │   ├── Columna de horas: 16:00, 17:00, 18:00, 19:00, 20:00
 │   └── Por día (Lunes…Viernes): cabecera con el día y «Alfil | Caballo | Peón», rejilla de medias horas 16:00–21:00
 │       └── ScheduleBlock por grupo (el color ya dice el nivel): **Profesor** en negrita y «9/10 plazas»; en particulares, **nombre** en negrita y «Profesor · 1/1» (borde discontinuo). Sin hora: la da la rejilla

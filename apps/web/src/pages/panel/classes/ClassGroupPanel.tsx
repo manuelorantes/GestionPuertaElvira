@@ -18,7 +18,21 @@ import { OccupancyBar } from '@/shared/ui/OccupancyBar';
 import { OccupancyByDay } from './OccupancyByDay';
 import { Select } from '@/shared/ui/Select';
 import { SidePanel } from '@/shared/ui/SidePanel';
+import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+
+const fold = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+/** Cada palabra buscada debe aparecer en el nombre, sin distinguir mayúsculas ni tildes. */
+function matchesSearch(fullName: string, search: string): boolean {
+  const words = fold(search).split(/\s+/).filter(Boolean);
+  const name = fold(fullName);
+  return words.every((w) => name.includes(w));
+}
 
 interface ClassGroupPanelProps {
   groupId: string;
@@ -33,6 +47,7 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
   const toast = useToast();
   const overCapacity = useOverCapacityConfirm();
   const [studentId, setStudentId] = useState('');
+  const [search, setSearch] = useState('');
   const [error, setError] = useState<string | null>(null);
   const enrol = useStudentMutation(({ id, confirm }: { id: string; confirm: boolean }) =>
     addGroup(id, groupId, confirm),
@@ -50,10 +65,11 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
 
   const g = group.data;
   const enrolled = new Set(g.students.map((s) => s.id));
-  const options = (candidates.data?.items ?? [])
-    .filter((s) => !enrolled.has(s.id))
+  const available = (candidates.data?.items ?? []).filter((s) => !enrolled.has(s.id));
+  const options = available
+    .filter((s) => matchesSearch(s.fullName, search))
     .map((s) => ({ value: s.id, label: s.fullName }));
-  const name = options.find((o) => o.value === studentId)?.label ?? '';
+  const name = available.find((s) => s.id === studentId)?.fullName ?? '';
 
   async function submit() {
     if (!studentId) return;
@@ -139,22 +155,43 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
             ))}
           </ul>
         </Card>
-        <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
-          <Select
-            label="Inscribir alumno"
-            options={[{ value: '', label: 'Elige un alumno…' }, ...options]}
-            value={studentId}
-            onChange={setStudentId}
+        <Card className="flex flex-col gap-3 p-4">
+          <TextField
+            label="Buscar alumno"
+            type="search"
+            placeholder="Nombre o apellidos"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              if (studentId && !matchesSearch(name, e.target.value)) setStudentId('');
+            }}
           />
-          <Button
-            onClick={() => void submit()}
-            disabled={!studentId}
-            busy={enrol.isPending}
-            busyLabel="Inscribiendo…"
-            className="shrink-0"
-          >
-            Inscribir
-          </Button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <Select
+              label="Inscribir alumno"
+              options={[
+                {
+                  value: '',
+                  label:
+                    options.length === 0
+                      ? 'Ningún alumno coincide'
+                      : `Elige un alumno (${options.length})…`,
+                },
+                ...options,
+              ]}
+              value={studentId}
+              onChange={setStudentId}
+            />
+            <Button
+              onClick={() => void submit()}
+              disabled={!studentId}
+              busy={enrol.isPending}
+              busyLabel="Inscribiendo…"
+              className="shrink-0"
+            >
+              Inscribir
+            </Button>
+          </div>
         </Card>
       </div>
       {overCapacity.message && (
