@@ -16,6 +16,15 @@ y los totales de ingresos, gastos y resultado. Los movimientos MUST salir de:
 - las facturas de proveedores pagadas (gasto de su categoría, en la fecha de pago);
 - los apuntes manuales.
 
+Los movimientos MUST poder filtrarse por tipo: «Todo» (por defecto), «Ingresos» o «Pagos». Con «Ingresos»
+MUST poder elegirse además la forma de pago: «Todos» (por defecto), «Tarjeta», «Transferencia» o
+«Efectivo». Con un filtro activo se indica cuántos movimientos se ven y su suma. El filtro se conserva en la
+dirección de la página.
+
+#### Scenario: Ingresos en efectivo
+- **WHEN** administración elige «Ingresos» y luego «Efectivo»
+- **THEN** solo ve los ingresos cobrados en efectivo de ese mes, con su número y su suma
+
 #### Scenario: Sin teclear dos veces
 - **WHEN** administración registra un cobro de cuota o paga una liquidación
 - **THEN** aparece como movimiento del mes sin anotarlo en Contabilidad

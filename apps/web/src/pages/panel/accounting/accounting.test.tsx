@@ -135,6 +135,41 @@ describe('Contabilidad', () => {
     expect(within(byCategory).getByText('1366 €')).toBeInTheDocument();
   });
 
+  it('filters the movements by income or payments, and income by payment method', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
+    const kind = screen.getByRole('group', { name: 'Tipo de movimiento' });
+    expect(within(kind).getByRole('button', { name: 'Todo' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByRole('group', { name: 'Forma de pago' })).not.toBeInTheDocument();
+
+    await user.click(within(kind).getByRole('button', { name: 'Pagos' }));
+    expect(
+      within(table).queryByRole('row', { name: /Subvención municipal/ }),
+    ).not.toBeInTheDocument();
+    expect(within(table).getByRole('row', { name: /Alquiler octubre/ })).toBeInTheDocument();
+    expect(screen.getByText('1 movimiento · −950 €')).toBeInTheDocument();
+
+    await user.click(within(kind).getByRole('button', { name: 'Ingresos' }));
+    const method = screen.getByRole('group', { name: 'Forma de pago' });
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+    await user.click(within(method).getByRole('button', { name: 'Efectivo' }));
+    expect(within(table).getByRole('row', { name: /Martina López/ })).toBeInTheDocument();
+    expect(
+      within(table).queryByRole('row', { name: /Subvención municipal/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('1 movimiento · +45 €')).toBeInTheDocument();
+
+    await user.click(within(method).getByRole('button', { name: 'Tarjeta' }));
+    expect(await screen.findByText('No hay ingresos con tarjeta este mes.')).toBeInTheDocument();
+  });
+
   it('sends automatic movements to the section where they are managed', async () => {
     api();
     renderApp('/panel/contabilidad?mes=2026-10');

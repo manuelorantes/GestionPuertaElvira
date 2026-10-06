@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
+import { ledgerFilterFrom, withLedgerFilter } from '@/features/accounting/ledgerFilter';
 import { currentMonth } from '@/features/billing/money';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
@@ -41,7 +42,16 @@ export function AccountingPage() {
       return (
         <YearTab startYear={season} onChange={(year) => setParam('temporada', String(year))} />
       );
-    return <LedgerTab month={month} onMonthChange={(m) => setParam('mes', m)} />;
+    return (
+      <LedgerTab
+        month={month}
+        onMonthChange={(m) => setParam('mes', m)}
+        filter={ledgerFilterFrom(searchParams)}
+        onFilterChange={(filter) =>
+          setSearchParams(withLedgerFilter(searchParams, filter), { replace: true })
+        }
+      />
+    );
   }
 
   return (
