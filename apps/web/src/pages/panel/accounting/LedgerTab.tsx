@@ -4,6 +4,13 @@ import { Link } from 'react-router';
 
 import { deleteEntry, type LedgerItem } from '@/features/accounting/api';
 import { useAccountingMutation, useLedger } from '@/features/accounting/hooks';
+import {
+  applyLedgerFilter,
+  emptyFilterMessage,
+  KIND_OPTIONS,
+  type LedgerFilter,
+  METHOD_OPTIONS,
+} from '@/features/accounting/ledgerFilter';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { formatCents, monthLabel, shiftMonth } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
@@ -12,6 +19,7 @@ import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { MonthNav } from '@/shared/ui/MonthNav';
+import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
 
 import { EntryDialog } from './EntryDialog';
@@ -64,12 +72,138 @@ function signed(item: LedgerItem): string {
   return `${item.kind === 'income' ? '+' : '−'}${formatCents(item.amountCents)}`;
 }
 
+function LedgerFilters({
+  filter,
+  onChange,
+}: {
+  filter: LedgerFilter;
+  onChange: (filter: LedgerFilter) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-3">
+      <div role="group" aria-label="Tipo de movimiento" className="flex flex-wrap gap-1.5">
+        {KIND_OPTIONS.map((k) => (
+          <ToggleButton
+            key={k.id}
+            pressed={filter.kind === k.id}
+            onClick={() => onChange({ kind: k.id, method: 'all' })}
+            className="h-9 rounded-full font-medium"
+          >
+            {k.label}
+          </ToggleButton>
+        ))}
+      </div>
+      {filter.kind === 'income' && (
+        <div role="group" aria-label="Forma de pago" className="flex flex-wrap gap-1.5">
+          {METHOD_OPTIONS.map((m) => (
+            <ToggleButton
+              key={m.id}
+              tone="ink"
+              pressed={filter.method === m.id}
+              onClick={() => onChange({ kind: 'income', method: m.id })}
+              className="h-9 rounded-full font-medium"
+            >
+              {m.label}
+            </ToggleButton>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LedgerTable({
+  items,
+  label,
+  onRemove,
+}: {
+  items: LedgerItem[];
+  label: string;
+  onRemove: (item: LedgerItem) => void;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-left text-sm">
+        <caption className="sr-only">Movimientos de {label}</caption>
+        <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+          <tr>
+            <th scope="col" className="w-10">
+              <span className="sr-only">Tipo</span>
+            </th>
+            {['Fecha', 'Concepto', 'Categoría', 'Forma de pago'].map((h) => (
+              <th key={h} scope="col" className="px-3 py-3 font-semibold">
+                {h}
+              </th>
+            ))}
+            <th scope="col" className="px-3 py-3 text-right font-semibold">
+              Importe
+            </th>
+            <th scope="col">
+              <span className="sr-only">Acciones</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item) => (
+            <tr
+              key={`${item.source}-${item.sourceId}`}
+              className="border-b border-line-soft last:border-b-0"
+            >
+              <td
+                className={`pl-4 ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}
+              >
+                {item.kind === 'income' ? (
+                  <ArrowDownLeft aria-label="Ingreso" size={18} />
+                ) : (
+                  <ArrowUpRight aria-label="Gasto" size={18} />
+                )}
+              </td>
+              <td className="px-3 py-3 text-ink-muted">{formatDate(item.date)}</td>
+              <td className="px-3 py-3 font-medium">{item.concept}</td>
+              <td className="px-3 py-3">
+                <span className="rounded-full bg-line-soft px-2 py-0.5 text-xs whitespace-nowrap">
+                  {item.categoryLabel}
+                </span>
+              </td>
+              <td className="px-3 py-3 text-ink-soft">{item.methodLabel}</td>
+              <td
+                className={`px-3 py-3 text-right font-semibold whitespace-nowrap ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}
+              >
+                {signed(item)}
+              </td>
+              <td className="px-2 py-3">
+                {item.source === 'manual' ? (
+                  <button
+                    type="button"
+                    aria-label={`Quitar ${item.concept}`}
+                    title="Apunte manual: se puede quitar"
+                    onClick={() => onRemove(item)}
+                    className={ROW_ACTION}
+                  >
+                    <Trash2 aria-hidden size={16} />
+                  </button>
+                ) : (
+                  <OriginLink item={item} />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function LedgerTab({
   month,
   onMonthChange,
+  filter,
+  onFilterChange,
 }: {
   month: string;
   onMonthChange: (month: string) => void;
+  filter: LedgerFilter;
+  onFilterChange: (filter: LedgerFilter) => void;
 }) {
   const ledger = useLedger(month);
   const [adding, setAdding] = useState(false);
@@ -90,77 +224,23 @@ export function LedgerTab({
       );
     if (!data || data.items.length === 0)
       return <p className="px-5 py-12 text-center text-ink-muted">No hay movimientos este mes.</p>;
+    const shown = applyLedgerFilter(data.items, filter);
     return (
       <>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
-            <caption className="sr-only">Movimientos de {label}</caption>
-            <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-              <tr>
-                <th scope="col" className="w-10">
-                  <span className="sr-only">Tipo</span>
-                </th>
-                {['Fecha', 'Concepto', 'Categoría', 'Forma de pago'].map((h) => (
-                  <th key={h} scope="col" className="px-3 py-3 font-semibold">
-                    {h}
-                  </th>
-                ))}
-                <th scope="col" className="px-3 py-3 text-right font-semibold">
-                  Importe
-                </th>
-                <th scope="col">
-                  <span className="sr-only">Acciones</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item) => (
-                <tr
-                  key={`${item.source}-${item.sourceId}`}
-                  className="border-b border-line-soft last:border-b-0"
-                >
-                  <td
-                    className={`pl-4 ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}
-                  >
-                    {item.kind === 'income' ? (
-                      <ArrowDownLeft aria-label="Ingreso" size={18} />
-                    ) : (
-                      <ArrowUpRight aria-label="Gasto" size={18} />
-                    )}
-                  </td>
-                  <td className="px-3 py-3 text-ink-muted">{formatDate(item.date)}</td>
-                  <td className="px-3 py-3 font-medium">{item.concept}</td>
-                  <td className="px-3 py-3">
-                    <span className="rounded-full bg-line-soft px-2 py-0.5 text-xs whitespace-nowrap">
-                      {item.categoryLabel}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-ink-soft">{item.methodLabel}</td>
-                  <td
-                    className={`px-3 py-3 text-right font-semibold whitespace-nowrap ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}
-                  >
-                    {signed(item)}
-                  </td>
-                  <td className="px-2 py-3">
-                    {item.source === 'manual' ? (
-                      <button
-                        type="button"
-                        aria-label={`Quitar ${item.concept}`}
-                        title="Apunte manual: se puede quitar"
-                        onClick={() => setRemoving(item)}
-                        className={ROW_ACTION}
-                      >
-                        <Trash2 aria-hidden size={16} />
-                      </button>
-                    ) : (
-                      <OriginLink item={item} />
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <LedgerFilters filter={filter} onChange={onFilterChange} />
+        {shown.items.length === 0 ? (
+          <p className="px-5 py-12 text-center text-ink-muted">{emptyFilterMessage(filter)}</p>
+        ) : (
+          <LedgerTable items={shown.items} label={label} onRemove={setRemoving} />
+        )}
+        {shown.active && shown.items.length > 0 && (
+          <p className="border-t border-line px-5 pt-3 text-sm font-medium">
+            {shown.items.length} {shown.items.length === 1 ? 'movimiento' : 'movimientos'} ·{' '}
+            {shown.netCents < 0 ? '−' : '+'}
+            {formatCents(Math.abs(shown.netCents))}
+          </p>
+        )}
+
         <p className="border-t border-line px-5 pt-3 text-[13px] text-ink-muted">
           Solo los apuntes manuales se quitan aquí; cobros, liquidaciones y facturas se gestionan en
           su sección.
