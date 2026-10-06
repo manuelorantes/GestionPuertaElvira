@@ -72,7 +72,7 @@ export function updateTeacher(
 }
 
 export interface ClassGroupDetail extends ClassGroup {
-  students: { id: string; fullName: string; age: number }[];
+  students: { id: string; fullName: string; age: number | null }[];
 }
 
 export function fetchGroup(id: string): Promise<ClassGroupDetail> {

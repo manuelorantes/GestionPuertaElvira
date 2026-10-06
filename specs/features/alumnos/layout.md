@@ -11,7 +11,8 @@ StudentsPage (/panel/alumnos)
 ├── SectionHeader: «N alumnos activos» | «Alumnos» | acción «Nuevo alumno» (icono user-plus)
 ├── Toolbar (tarjeta superior)
 │   ├── SearchField: icono lupa, placeholder «Buscar por nombre»
-│   ├── Chips de filtro: Todos · Activos · Hermanos · De baja
+│   ├── Chips de filtro: Todos · Activos · Hermanos · De baja · Socios sin clases
+│   ├── Enlaces: «Datos pendientes (N)» (/panel/alumnos/pendientes) · «Importar hoja»
 │   └── Recuento: «N de M mostrados»
 ├── StudentsTable (escritorio) / StudentCards (móvil)
 │   ├── Cabecera (escritorio): Alumno | Grupos | Estado
@@ -24,7 +25,8 @@ StudentsPage (/panel/alumnos)
 │   └── Tarjeta «Familia y contacto»: tutores con teléfono (enlace tel:), teléfono propio, hermanos con «Abrir» y «Quitar»; «Añadir hermano»
 ├── StudentDialog («Nuevo alumno» / «Editar alumno»)
 │   ├── Sección «Datos del alumno»: Nombre y apellidos · Fecha de nacimiento (DateField) · DNI (opcional) · Email de contacto (opcional)
-│   ├── Sección «Familia y contacto»: Tutor 1 + Teléfono · Tutor 2 (opcional) + Teléfono · Teléfono propio (solo adultos)
+│   ├── Nota: «Solo el nombre es obligatorio…» con lo que quedará pendiente
+│   ├── Sección «Familia y contacto»: Tutor 1 + Teléfono · Tutor 2 (opcional) + Teléfono · Teléfono del alumno
 │   │   └── (solo alta) Hermano en el club (select opcional)
 │   ├── Sección «Club»: (solo alta) Grupo (select) + «Añadir otro grupo» · interruptor Federado + Nº de licencia · interruptor Autorización de imagen
 │   └── Pie: Cancelar | «Dar de alta» o «Guardar cambios»
@@ -47,7 +49,7 @@ ClassGroupPanel (Clases → pulsar un grupo; ficha lateral)
 | birthDate | «Fecha de nacimiento» | `DateField` (día / mes / año) | sí | — |
 | nationalId | «DNI o NIE (opcional)» | texto | no | placeholder «12345678Z» |
 | contactEmail | «Email de contacto (opcional)» | email | no | — |
-| guardians[0] | «Tutor 1» + «Teléfono tutor 1» | texto + tel | sí si es menor | — |
+| guardians[0] | «Tutor 1» + «Teléfono tutor 1» | texto + tel | no (pendiente si es menor) | — |
 | guardians[1] | «Tutor 2 (opcional)» + «Teléfono tutor 2» | texto + tel | no | — |
 | ownPhone | «Teléfono del alumno» | tel | sí si es adulto sin tutor | visible si la edad calculada es ≥ 18 |
 | siblingId | «Hermano en el club (opcional)» | select | no | solo en el alta |

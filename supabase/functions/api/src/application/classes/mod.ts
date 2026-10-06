@@ -67,7 +67,7 @@ export interface GroupSummary {
 export interface EnrolledStudent {
   id: string;
   fullName: string;
-  age: number;
+  age: number | null;
 }
 
 export interface ClassQuery {

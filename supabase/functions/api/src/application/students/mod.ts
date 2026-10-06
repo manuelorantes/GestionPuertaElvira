@@ -9,6 +9,7 @@ import {
 import {
   FederationLicence,
   Guardian,
+  type MissingDatum,
   NationalId,
   Student,
   StudentDetails,
@@ -18,7 +19,8 @@ import type { TransactionRunner } from '../common/mod.ts';
 
 export interface StudentRepository {
   find(id: StudentId): Promise<Student | null>;
-  save(student: Student): Promise<void>;
+  save(student: Student): Promise<void>; /** Alumnos con alta vigente ese día, por nombre. */
+  activeOn(day: LocalDate): Promise<Student[]>;
 }
 
 /** Inscripciones del alumno en grupos (las gestiona el contexto de Clases). */
@@ -32,10 +34,11 @@ export interface Enrolments {
   endAll(student: StudentId, on: LocalDate): Promise<void>;
 }
 
-export type StudentFilter = 'all' | 'active' | 'withdrawn' | 'siblings';
+/** `no_classes`: socios activos sin ningún grupo (pagan la cuota de socio, se podrán inscribir más adelante). */
+export type StudentFilter = 'all' | 'active' | 'withdrawn' | 'siblings' | 'no_classes';
 
 export function studentFilterFrom(value: string): StudentFilter {
-  if (!['all', 'active', 'withdrawn', 'siblings'].includes(value)) {
+  if (!['all', 'active', 'withdrawn', 'siblings', 'no_classes'].includes(value)) {
     throw new InvalidValue('filter', 'Filtro desconocido.');
   }
   return value as StudentFilter;
@@ -52,7 +55,8 @@ export interface StudentGroup {
 export interface StudentSummary {
   id: string;
   fullName: string;
-  age: number;
+  /** null si no consta la fecha de nacimiento. */
+  age: number | null;
   status: string;
   groups: { id: string; name: string; slotLabel: string }[];
   hasSiblings: boolean;
@@ -61,11 +65,13 @@ export interface StudentSummary {
 export interface StudentDetail {
   id: string;
   fullName: string;
-  birthDate: string;
-  age: number;
+  birthDate: string | null;
+  age: number | null;
   nationalId: string | null;
   contactEmail: string | null;
-  guardians: { name: string; phone: string }[];
+  guardians: { name: string; phone: string | null }[];
+  /** Datos esperados que faltan (ver Datos pendientes). */
+  missingData: MissingDatum[];
   ownPhone: string | null;
   federationLicence: string | null;
   imageConsent: boolean;
@@ -93,24 +99,27 @@ export class StudentNotFound extends Error {
 /** Datos personales de un alumno tal y como llegan del exterior; `studentDetails()` los valida. */
 export interface StudentInput {
   fullName: string;
-  birthDate: string;
+  /** Opcional: null si no se sabe. */
+  birthDate: string | null;
   nationalId: string | null;
   contactEmail: string | null;
-  guardians: { name: string; phone: string }[];
+  guardians: { name: string; phone: string | null }[];
   ownPhone: string | null;
   federationLicence: string | null;
   imageConsent: boolean;
 }
 
 export function studentDetails(input: StudentInput): StudentDetails {
-  let birthDate: LocalDate;
-  try {
-    birthDate = LocalDate.fromString(input.birthDate);
-  } catch (error) {
-    if (error instanceof InvalidValue) {
-      throw new InvalidValue('birthDate', 'La fecha de nacimiento no es válida.');
+  let birthDate: LocalDate | null = null;
+  if (input.birthDate !== null && input.birthDate.trim() !== '') {
+    try {
+      birthDate = LocalDate.fromString(input.birthDate);
+    } catch (error) {
+      if (error instanceof InvalidValue) {
+        throw new InvalidValue('birthDate', 'La fecha de nacimiento no es válida.');
+      }
+      throw error;
     }
-    throw error;
   }
   return new StudentDetails(
     FullName.fromString(input.fullName),
@@ -118,7 +127,10 @@ export function studentDetails(input: StudentInput): StudentDetails {
     input.nationalId === null ? null : NationalId.fromString(input.nationalId),
     input.contactEmail === null ? null : EmailAddress.fromString(input.contactEmail),
     input.guardians.map((g) =>
-      new Guardian(FullName.fromString(g.name), PhoneNumber.fromString(g.phone))
+      new Guardian(
+        FullName.fromString(g.name),
+        g.phone === null || g.phone.trim() === '' ? null : PhoneNumber.fromString(g.phone),
+      )
     ),
     input.ownPhone === null ? null : PhoneNumber.fromString(input.ownPhone),
     input.federationLicence === null ? null : FederationLicence.fromString(input.federationLicence),
@@ -152,16 +164,23 @@ export const Siblings = {
   },
 };
 
+/** Cobros da de alta como socio a quien entra en el club sin clases: se le pedirá la cuota de socio. */
+export interface Membership {
+  makeMember(student: StudentId): Promise<void>;
+}
+
 export class RegisterStudent {
   constructor(
     private readonly students: StudentRepository,
     private readonly enrolments: Enrolments,
     private readonly transactions: TransactionRunner,
     private readonly clock: Clock,
+    private readonly membership: Membership | null = null,
   ) {}
 
   /**
    * Alta del alumno, inscripción en sus grupos y vínculo con sus hermanos, todo o nada.
+   * Sin grupos, el alumno es un socio sin clases y queda marcado como socio.
    * @param joinedOn fecha de alta; por defecto hoy (una importación puede traer altas anteriores)
    */
   async execute(
@@ -171,7 +190,6 @@ export class RegisterStudent {
     confirmOverCapacity: boolean,
     joinedOn?: string | null,
   ): Promise<string> {
-    if (groupIds.length === 0) throw new InvalidValue('groupIds', 'Elige al menos un grupo.');
     const today = LocalDate.fromInstant(this.clock.now());
     const joined = joinedOn ? LocalDate.fromString(joinedOn) : today;
     if (today.isBefore(joined)) {
@@ -180,7 +198,11 @@ export class RegisterStudent {
     const student = Student.register(StudentId.generate(), studentDetails(input), today, joined);
     return await this.transactions.run(async () => {
       await this.students.save(student);
-      await this.enrolments.enrol(student.id, groupIds, confirmOverCapacity, joined);
+      if (groupIds.length > 0) {
+        await this.enrolments.enrol(student.id, groupIds, confirmOverCapacity, joined);
+      } else if (this.membership !== null) {
+        await this.membership.makeMember(student.id);
+      }
       for (const siblingId of siblingIds) {
         await Siblings.link(this.students, student.id.value, siblingId);
       }
@@ -241,5 +263,31 @@ export class UnlinkSiblings {
 
   execute(studentId: string, siblingId: string): Promise<void> {
     return this.transactions.run(() => Siblings.unlink(this.students, studentId, siblingId));
+  }
+}
+
+export interface PendingStudent {
+  id: string;
+  fullName: string;
+  missing: MissingDatum[];
+}
+
+/** Alumnos activos a los que les falta algún dato esperado, con qué falta. */
+export class ListPendingData {
+  constructor(
+    private readonly students: StudentRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(): Promise<PendingStudent[]> {
+    const today = LocalDate.fromInstant(this.clock.now());
+    const pending: PendingStudent[] = [];
+    for (const student of await this.students.activeOn(today)) {
+      const missing = student.details().missingData(today);
+      if (missing.length > 0) {
+        pending.push({ id: student.id.value, fullName: student.details().fullName.value, missing });
+      }
+    }
+    return pending;
   }
 }

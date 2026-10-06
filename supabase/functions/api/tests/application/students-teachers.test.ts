@@ -2,10 +2,11 @@ import { assert, assertEquals, assertFalse, assertRejects } from '@std/assert';
 
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
 import { GroupFull } from '../../src/domain/classes/mod.ts';
-import { MissingContact, StudentId } from '../../src/domain/students/mod.ts';
+import { StudentId } from '../../src/domain/students/mod.ts';
 import { TeacherId } from '../../src/domain/teachers/mod.ts';
 import {
   LinkSiblings,
+  ListPendingData,
   RegisterStudent,
   type StudentInput,
   StudentNotFound,
@@ -28,6 +29,7 @@ import {
   InMemoryStudentRepository,
   InMemoryTeacherRepository,
   SpyEnrolments,
+  SpyMembership,
 } from '../support/students.ts';
 
 function students() {
@@ -35,6 +37,7 @@ function students() {
   const enrolments = new SpyEnrolments();
   const transactions = new ImmediateTransactionRunner();
   const clock = new FrozenClock('2026-10-02T10:00:00+02:00');
+  const membership = new SpyMembership();
   const input = (overrides: Partial<StudentInput> = {}): StudentInput => ({
     fullName: 'Martina López Herrera',
     birthDate: '2014-03-12',
@@ -47,14 +50,14 @@ function students() {
     ...overrides,
   });
   const register = (groupIds: string[], siblingIds: string[] = [], joinedOn?: string) =>
-    new RegisterStudent(repo, enrolments, transactions, clock).execute(
+    new RegisterStudent(repo, enrolments, transactions, clock, membership).execute(
       input(),
       groupIds,
       siblingIds,
       false,
       joinedOn,
     );
-  return { repo, enrolments, transactions, clock, input, register };
+  return { repo, enrolments, transactions, clock, membership, input, register };
 }
 
 Deno.test('RegisterStudent should register a student and enrol them in their groups atomically', async () => {
@@ -63,18 +66,16 @@ Deno.test('RegisterStudent should register a student and enrol them in their gro
   const student = await repo.find(StudentId.fromString(id));
   assertEquals(student?.details().fullName.value, 'Martina López Herrera');
   assertEquals(student?.details().guardians[0]?.name.value, 'Rocío Herrera');
-  assertEquals(student?.details().guardians[0]?.phone.value, '612 48 19 30');
+  assertEquals(student?.details().guardians[0]?.phone?.value, '612 48 19 30');
   assertEquals(enrolments.enrolled, [{ student: id, groups: ['g1', 'g2'], confirmed: false }]);
   assertEquals(transactions.runs, 1);
 });
 
-Deno.test('RegisterStudent should accept an earlier joining date but never a future one, and require a group', async () => {
+Deno.test('RegisterStudent should accept an earlier joining date but never a future one', async () => {
   const { repo, register } = students();
   const id = await register(['g1'], [], '2026-09-01');
   assertEquals((await repo.find(StudentId.fromString(id)))?.joinedOn.toString(), '2026-09-01');
   await assertRejects(() => register(['g1'], [], '2027-01-01'), InvalidValue);
-  const missing = await assertRejects(() => register([]), InvalidValue);
-  assertEquals(missing.field, 'groupIds');
 });
 
 Deno.test('RegisterStudent should propagate enrolment problems and link siblings both ways', async () => {
@@ -92,7 +93,7 @@ Deno.test('RegisterStudent should propagate enrolment problems and link siblings
   ]);
 });
 
-Deno.test('UpdateStudent should apply the contact rules and fail clearly for unknown students', async () => {
+Deno.test('UpdateStudent should accept partial contact data and fail clearly for unknown students', async () => {
   const { repo, clock, input, register } = students();
   const id = await register(['g1']);
   await new UpdateStudent(repo, clock).execute(id, input({ fullName: 'Martina López' }));
@@ -100,9 +101,12 @@ Deno.test('UpdateStudent should apply the contact rules and fail clearly for unk
     (await repo.find(StudentId.fromString(id)))?.details().fullName.value,
     'Martina López',
   );
-  await assertRejects(
-    () => new UpdateStudent(repo, clock).execute(id, input({ guardians: [] })),
-    MissingContact,
+  await new UpdateStudent(repo, clock).execute(id, input({ guardians: [], birthDate: null }));
+  assertEquals(
+    (await repo.find(StudentId.fromString(id)))?.details().missingData(
+      LocalDate.fromString('2026-10-02'),
+    ),
+    ['birth_date', 'guardian'],
   );
   await assertRejects(
     () => new UpdateStudent(repo, clock).execute(StudentId.generate().value, input()),
@@ -154,4 +158,46 @@ Deno.test('Teacher use cases should register, rename, change the rate, deactivat
     () => new RenameTeacher(teachers).execute(TeacherId.generate().value, 'Nadie'),
     TeacherNotFound,
   );
+});
+
+Deno.test('RegisterStudent should admit a member without classes and mark them as member', async () => {
+  const { repo, enrolments, membership, input } = students();
+  const clock = new FrozenClock('2026-10-02T10:00:00+02:00');
+  const id = await new RegisterStudent(
+    repo,
+    enrolments,
+    new ImmediateTransactionRunner(),
+    clock,
+    membership,
+  )
+    .execute(input({ fullName: 'Socio Sin Clases' }), [], [], false);
+  assertEquals(enrolments.enrolled, []);
+  assertEquals(membership.members, [id]);
+});
+
+Deno.test('ListPendingData should list active students with what they are missing', async () => {
+  const { repo, register, clock, input } = students();
+  const complete = await register(['g1']);
+  const incomplete = await new RegisterStudent(
+    repo,
+    new SpyEnrolments(),
+    new ImmediateTransactionRunner(),
+    clock,
+  )
+    .execute(
+      input({ fullName: 'Pepe Sin Datos', birthDate: null, guardians: [], contactEmail: null }),
+      ['g1'],
+      [],
+      false,
+    );
+  const withdrawn = await register(['g1']);
+  await new WithdrawStudent(repo, new SpyEnrolments(), new ImmediateTransactionRunner(), clock)
+    .execute(withdrawn, '2026-10-02');
+  const pending = await new ListPendingData(repo, clock).execute();
+  assertEquals(pending, [{
+    id: incomplete,
+    fullName: 'Pepe Sin Datos',
+    missing: ['birth_date', 'guardian', 'email'],
+  }]);
+  assert(!pending.some((p) => p.id === complete));
 });

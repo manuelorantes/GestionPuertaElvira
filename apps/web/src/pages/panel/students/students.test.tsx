@@ -62,6 +62,7 @@ const DETAIL = {
   ownPhone: null,
   federationLicence: 'AND-20417',
   imageConsent: true,
+  missingData: [],
   joinedOn: '2026-09-15',
   withdrawnOn: null,
   status: 'active',
@@ -80,6 +81,7 @@ const DETAIL = {
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /api/auth/me': [200, { user: ADMIN }],
+    'GET /api/admin/students/pending-data': [200, { items: [] }],
     'GET /api/admin/groups': [200, { items: GROUPS }],
     'GET /api/admin/teachers': [200, { items: [] }],
     'GET /api/admin/students?filter=all': [200, { items: [MARTINA, HUGO], total: 2 }],
@@ -230,26 +232,54 @@ describe('Alumnos', () => {
     );
   });
 
-  it('should require a guardian for minors before sending a new student', async () => {
+  it('should register with only a name, announcing what stays pending and the member without classes', async () => {
     const user = userEvent.setup();
-    const spy = api();
+    const spy = api({ 'POST /api/admin/students': [201, { id: 's9' }] });
     renderApp('/panel/alumnos');
 
     await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
-    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Lucía Fernández Ortiz');
-    await user.selectOptions(within(dialog).getByLabelText('Día'), '7');
-    await user.selectOptions(within(dialog).getByLabelText('Mes'), 'marzo');
-    await user.selectOptions(within(dialog).getByLabelText('Año'), '2015');
+    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Socio Sin Clases');
+    expect(dialog).toHaveTextContent('pendiente: fecha de nacimiento, tutor y email');
+    expect(dialog).toHaveTextContent('se dará de alta como socio sin clases');
     await user.click(within(dialog).getByRole('button', { name: 'Dar de alta' }));
 
-    expect(
-      within(dialog).getByText('Un alumno menor necesita al menos un tutor con teléfono.'),
-    ).toBeVisible();
-    expect(spy).not.toHaveBeenCalledWith(
-      '/api/admin/students',
-      expect.objectContaining({ method: 'POST' }),
+    const sent = spy.mock.calls.find(
+      ([url, init]) => url === '/api/admin/students' && init?.method === 'POST',
     );
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual(
+      expect.objectContaining({
+        fullName: 'Socio Sin Clases',
+        birthDate: null,
+        guardians: [],
+        ownPhone: null,
+        groupIds: [],
+      }),
+    );
+  });
+
+  it('should list the students with pending data grouped by what is missing', async () => {
+    api({
+      'GET /api/admin/students/pending-data': [
+        200,
+        {
+          items: [
+            { id: 's1', fullName: 'Martina López Herrera', missing: ['email'] },
+            { id: 's2', fullName: 'Pepe Sin Datos', missing: ['birth_date', 'guardian', 'email'] },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos/pendientes');
+
+    expect(await screen.findByRole('heading', { name: 'Datos pendientes' })).toBeVisible();
+    expect(await screen.findByText('2 alumnos con datos por completar')).toBeVisible();
+    const noEmail = within(screen.getByRole('list', { name: 'Sin email' }));
+    expect(noEmail.getAllByRole('listitem')).toHaveLength(2);
+    const noGuardian = within(screen.getByRole('list', { name: 'Sin tutor' }));
+    expect(noGuardian.getByText('Pepe Sin Datos')).toBeVisible();
+    expect(noGuardian.getByText('Pendiente: fecha de nacimiento, tutor y email')).toBeVisible();
+    expect(screen.queryByRole('list', { name: 'Sin teléfono' })).not.toBeInTheDocument();
   });
 
   it('should register a student and confirm when the group is full', async () => {

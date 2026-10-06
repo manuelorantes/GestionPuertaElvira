@@ -1,11 +1,16 @@
 import { apiGet, apiSend } from '@/shared/api/client';
 
-export type StudentFilter = 'all' | 'active' | 'withdrawn' | 'siblings';
+/** `no_classes`: socios activos sin ningún grupo. */
+export type StudentFilter = 'all' | 'active' | 'withdrawn' | 'siblings' | 'no_classes';
+
+/** Datos esperados que pueden faltar en un alumno (ver Datos pendientes). */
+export type MissingDatum = 'birth_date' | 'guardian' | 'guardian_phone' | 'phone' | 'email';
 
 export interface StudentSummary {
   id: string;
   fullName: string;
-  age: number;
+  /** null si no consta la fecha de nacimiento. */
+  age: number | null;
   status: 'active' | 'withdrawn';
   groups: { id: string; name: string; slotLabel: string }[];
   hasSiblings: boolean;
@@ -13,20 +18,21 @@ export interface StudentSummary {
 
 interface Guardian {
   name: string;
-  phone: string;
+  phone: string | null;
 }
 
 export interface StudentDetail {
   id: string;
   fullName: string;
-  birthDate: string;
-  age: number;
+  birthDate: string | null;
+  age: number | null;
   nationalId: string | null;
   contactEmail: string | null;
   guardians: Guardian[];
   ownPhone: string | null;
   federationLicence: string | null;
   imageConsent: boolean;
+  missingData: MissingDatum[];
   joinedOn: string;
   withdrawnOn: string | null;
   status: 'active' | 'withdrawn';
@@ -36,7 +42,8 @@ export interface StudentDetail {
 
 export interface StudentPayload {
   fullName: string;
-  birthDate: string;
+  /** null si no se sabe. */
+  birthDate: string | null;
   nationalId: string | null;
   contactEmail: string | null;
   guardians: Guardian[];
@@ -56,6 +63,17 @@ export async function fetchStudents(
 ): Promise<{ items: StudentSummary[]; total: number }> {
   const query = `filter=${filter}${search.trim() ? `&q=${encodeURIComponent(search.trim())}` : ''}`;
   return apiGet(`/api/admin/students?${query}`);
+}
+
+export interface PendingStudent {
+  id: string;
+  fullName: string;
+  missing: MissingDatum[];
+}
+
+/** Alumnos activos a los que falta algún dato esperado. */
+export function fetchPendingData(): Promise<{ items: PendingStudent[] }> {
+  return apiGet('/api/admin/students/pending-data');
 }
 
 export function fetchStudent(id: string): Promise<StudentDetail> {

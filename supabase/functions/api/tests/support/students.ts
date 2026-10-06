@@ -7,23 +7,31 @@ import {
   type StudentId,
 } from '../../src/domain/students/mod.ts';
 import type { Teacher, TeacherId } from '../../src/domain/teachers/mod.ts';
-import type { Enrolments, StudentRepository } from '../../src/application/students/mod.ts';
+import type {
+  Enrolments,
+  Membership,
+  StudentRepository,
+} from '../../src/application/students/mod.ts';
 import type { TeacherRepository } from '../../src/application/teachers/mod.ts';
 
 export const StudentFactory = {
   details(options: {
     name?: string;
-    birthDate?: string;
+    /** null = sin fecha de nacimiento. */
+    birthDate?: string | null;
     guardians?: Guardian[];
     ownPhone?: string;
+    email?: string | null;
     licence?: string;
     imageConsent?: boolean;
   } = {}): StudentDetails {
     return new StudentDetails(
       FullName.fromString(options.name ?? 'Martina López Herrera'),
-      LocalDate.fromString(options.birthDate ?? '2014-03-12'),
+      options.birthDate === null ? null : LocalDate.fromString(options.birthDate ?? '2014-03-12'),
       null,
-      EmailAddress.fromString('familia@ejemplo.com'),
+      options.email === null
+        ? null
+        : EmailAddress.fromString(options.email ?? 'familia@ejemplo.com'),
       options.guardians ??
         [new Guardian(FullName.fromString('Rocío Herrera'), PhoneNumber.fromString('612481930'))],
       options.ownPhone ? PhoneNumber.fromString(options.ownPhone) : null,
@@ -42,6 +50,19 @@ export class InMemoryStudentRepository implements StudentRepository {
 
   save(student: Student): Promise<void> {
     this.students.set(student.id.value, student);
+    return Promise.resolve();
+  }
+
+  activeOn(day: LocalDate): Promise<Student[]> {
+    return Promise.resolve([...this.students.values()].filter((s) => s.isActiveOn(day)));
+  }
+}
+
+export class SpyMembership implements Membership {
+  members: string[] = [];
+
+  makeMember(student: StudentId): Promise<void> {
+    this.members.push(student.value);
     return Promise.resolve();
   }
 }

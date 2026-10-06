@@ -46,6 +46,8 @@ async function fixture(): Promise<Fixture> {
   };
 }
 
+const body = <T>(response: { body: unknown }) => response.body as T;
+
 function student(fx: Fixture, overrides: Record<string, unknown> = {}) {
   return {
     fullName: 'Martina López Herrera',
@@ -92,19 +94,46 @@ Deno.test('students should be registered, listed with search and shown in detail
   assertEquals((detail.groups as { teacherName: string }[])[0]?.teacherName, 'Lucía Moreno Gil');
 });
 
-Deno.test('students should refuse a minor without guardians pointing at the field', async () => {
+Deno.test('students need only a name; what is missing shows up in pending data and members without classes are listed', async () => {
   const fx = await fixture();
-  const response = await fx.client.json(
-    'POST',
-    '/api/admin/students',
-    student(fx, { guardians: [] }),
-  );
-  assertError(response, 422, 'missing_contact');
+  const created = await fx.client.json('POST', '/api/admin/students', {
+    fullName: 'Socio Sin Clases',
+    guardians: [{ name: 'Tutor Sin Teléfono' }],
+    groupIds: [],
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const id = (created.body as { id: string }).id;
+  const detail = body<Record<string, unknown>>(await fx.client.get(`/api/admin/students/${id}`));
+  assertEquals(detail.birthDate, null);
+  assertEquals(detail.age, null);
+  assertEquals(detail.guardians, [{ name: 'Tutor Sin Teléfono', phone: null }]);
+  assertEquals(detail.missingData, ['birth_date', 'guardian_phone', 'email']);
   assertEquals(
-    (response.body as { error: { details: { field: string } } }).error.details.field,
-    'guardians',
+    body<{ member: boolean }>(await fx.client.get(`/api/admin/billing/accounts/${id}`)).member,
+    true,
+    'sin clases, es socio',
   );
-  assertError(await fx.client.get('/api/admin/students?filter=raro'), 422, 'unprocessable');
+
+  const pending = body<{ items: Record<string, unknown>[] }>(
+    await fx.client.get('/api/admin/students/pending-data'),
+  ).items;
+  assertEquals(pending, [{
+    id,
+    fullName: 'Socio Sin Clases',
+    missing: ['birth_date', 'guardian_phone', 'email'],
+  }]);
+
+  const complete = await fx.client.json('POST', '/api/admin/students', student(fx));
+  assertEquals(complete.status, 201);
+  const noClasses = body<{ items: { id: string }[] }>(
+    await fx.client.get('/api/admin/students?filter=no_classes'),
+  ).items;
+  assertEquals(noClasses.map((s) => s.id), [id]);
+  assertEquals(
+    body<{ items: unknown[] }>(await fx.client.get('/api/admin/students/pending-data')).items
+      .length,
+    1,
+  );
 });
 
 Deno.test('students should need confirmation when the group is full, leaving no trace of the failed registration', async () => {

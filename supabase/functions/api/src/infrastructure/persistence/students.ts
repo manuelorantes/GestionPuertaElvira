@@ -23,9 +23,19 @@ export function searchText(text: string): string {
   return text.trim().toLowerCase().normalize('NFD').replace(/\p{M}+/gu, '');
 }
 
-function guardians(row: Row): { name: string; phone: string }[] {
+function guardians(row: Row): { name: string; phone: string | null }[] {
   const value = row.json('guardians');
-  return Array.isArray(value) ? (value as { name: string; phone: string }[]) : [];
+  return Array.isArray(value)
+    ? (value as { name: string; phone?: string | null }[]).map((g) => ({
+      name: g.name,
+      phone: g.phone ?? null,
+    }))
+    : [];
+}
+
+function age(row: Row, on: LocalDate): number | null {
+  const birth = row.nullableString('birth_date');
+  return birth === null ? null : LocalDate.fromString(birth).ageOn(on);
 }
 
 function toStudent(row: Row): Student {
@@ -34,15 +44,19 @@ function toStudent(row: Row): Student {
   const ownPhone = row.nullableString('own_phone');
   const licence = row.nullableString('federation_licence');
   const withdrawnOn = row.nullableString('withdrawn_on');
+  const birthDate = row.nullableString('birth_date');
   return Student.restore(
     StudentId.fromString(row.string('id')),
     new StudentDetails(
       FullName.fromString(row.string('full_name')),
-      LocalDate.fromString(row.string('birth_date')),
+      birthDate === null ? null : LocalDate.fromString(birthDate),
       nationalId === null ? null : NationalId.fromString(nationalId),
       contactEmail === null ? null : EmailAddress.fromString(contactEmail),
       guardians(row).map((g) =>
-        new Guardian(FullName.fromString(g.name), PhoneNumber.fromString(g.phone))
+        new Guardian(
+          FullName.fromString(g.name),
+          g.phone === null ? null : PhoneNumber.fromString(g.phone),
+        )
       ),
       ownPhone === null ? null : PhoneNumber.fromString(ownPhone),
       licence === null ? null : FederationLicence.fromString(licence),
@@ -62,17 +76,23 @@ export class SqlStudentRepository implements StudentRepository {
     return rows[0] ? toStudent(new Row(rows[0])) : null;
   }
 
+  async activeOn(day: LocalDate): Promise<Student[]> {
+    const rows = await this.sql`SELECT * FROM students_student
+      WHERE withdrawn_on IS NULL OR withdrawn_on > ${day.toString()} ORDER BY search_name`;
+    return Row.all(rows).map(toStudent);
+  }
+
   async save(student: Student): Promise<void> {
     const d = student.details();
     const record = {
       id: student.id.value,
       full_name: d.fullName.value,
       search_name: searchText(d.fullName.value),
-      birth_date: d.birthDate.toString(),
+      birth_date: d.birthDate?.toString() ?? null,
       national_id: d.nationalId?.value ?? null,
       contact_email: d.contactEmail?.value ?? null,
       // Columnas json: postgres.js serializa arrays y objetos (una cadena quedaría codificada dos veces).
-      guardians: d.guardians.map((g) => ({ name: g.name.value, phone: g.phone.value })),
+      guardians: d.guardians.map((g) => ({ name: g.name.value, phone: g.phone?.value ?? null })),
       own_phone: d.ownPhone?.value ?? null,
       federation_licence: d.federationLicence?.value ?? null,
       image_consent: d.imageConsent,
@@ -118,6 +138,9 @@ export class SqlStudentQuery implements StudentQuery {
       active: this.sql`AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${day})`,
       withdrawn: this.sql`AND s.withdrawn_on IS NOT NULL AND s.withdrawn_on <= ${day}`,
       siblings: this.sql`AND s.sibling_ids::jsonb <> '[]'::jsonb`,
+      no_classes: this.sql`AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${day})
+        AND NOT EXISTS (SELECT 1 FROM classes_enrolment e WHERE e.student_id = s.id
+          AND e.enrolled_on <= ${day} AND (e.ends_on IS NULL OR e.ends_on > ${day}))`,
     }[filter];
     const bySearch = search && search.trim() !== ''
       ? this.sql`AND s.search_name LIKE ${`%${searchText(search)}%`}`
@@ -129,7 +152,7 @@ export class SqlStudentQuery implements StudentQuery {
     return Row.all(rows).map((row) => ({
       id: row.string('id'),
       fullName: row.string('full_name'),
-      age: LocalDate.fromString(row.string('birth_date')).ageOn(on),
+      age: age(row, on),
       status: status(row.nullableString('withdrawn_on'), on),
       groups: (groupsByStudent.get(row.string('id')) ?? []).map((g) => ({
         id: g.id,
@@ -158,11 +181,12 @@ export class SqlStudentQuery implements StudentQuery {
     return {
       id,
       fullName: row.string('full_name'),
-      birthDate: row.string('birth_date'),
-      age: LocalDate.fromString(row.string('birth_date')).ageOn(on),
+      birthDate: row.nullableString('birth_date'),
+      age: age(row, on),
       nationalId: row.nullableString('national_id'),
       contactEmail: row.nullableString('contact_email'),
       guardians: guardians(row),
+      missingData: toStudent(row).details().missingData(on),
       ownPhone: row.nullableString('own_phone'),
       federationLicence: row.nullableString('federation_licence'),
       imageConsent: row.bool('image_consent'),
