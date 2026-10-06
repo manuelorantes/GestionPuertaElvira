@@ -3,6 +3,7 @@ import { paymentMethodFromName, paymentMethodLabel, StudentRef } from '../../dom
 import {
   AdjustPoints,
   BillingStudentNotFound,
+  ChangePaymentMethod,
   decimal,
   GenerateMonthlyCharges,
   GetStudentAccount,
@@ -174,6 +175,15 @@ export function registerBillingRoutes(api: ApiApp): void {
       invoice: detail.invoice,
       club: { name: club.name, taxId: club.taxId, address: club.address },
     });
+  });
+
+  api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/method'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await new ChangePaymentMethod(new SqlPaymentRepository(scope.tx)).execute(
+      param(c, 'id'),
+      body.requiredString('method'),
+    );
+    return c.body(null, 204);
   });
 
   api.defineRoute(admin('POST', '/api/admin/billing/payments/:id/invoice'), async (c, scope) => {

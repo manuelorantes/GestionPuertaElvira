@@ -89,6 +89,15 @@ Un cobro de N meses MUST pagar primero las cuotas pendientes más antiguas y des
 - **WHEN** se intentan cobrar más meses de los que quedan de temporada
 - **THEN** el cobro se rechaza indicando cuántos meses quedan
 
+### Requirement: Corregir la forma de pago
+Administración MUST poder corregir la forma de pago (efectivo, datáfono o transferencia) de un cobro ya
+registrado. El importe, el recibo y los meses cobrados no cambian; el recibo y Contabilidad muestran la nueva
+forma de pago y el cambio queda en el historial.
+
+#### Scenario: Anotado como transferencia y pagado en efectivo
+- **WHEN** administración cambia a «Efectivo» un cobro registrado como transferencia
+- **THEN** el recibo y el movimiento de Contabilidad pasan a «Efectivo» con el mismo importe
+
 ### Requirement: Recibos y facturas
 Cada cobro MUST tener un recibo con número correlativo por temporada (R-2026-0001), imprimible,
 con alumno, quien paga, concepto, desglose, total y forma de pago.
