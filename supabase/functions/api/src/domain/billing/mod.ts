@@ -358,6 +358,14 @@ export class Charge {
     return this.prepaid;
   }
 
+  /** Anota el descuento por pago adelantado sin cambiar el importe (meses ya pasados, que no se recalculan). */
+  noteDiscount(percent: number): void {
+    if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
+      throw new InvalidValue('percent', 'El descuento debe estar entre 0 y 100.');
+    }
+    this.prepaid = percent;
+  }
+
   /**
    * Deduce el descuento de una cuota que no lo tiene apuntado (p. ej. importada de la hoja) comparándola con la cuota
    * de un mes que tenía el alumno: si coincide con uno de los porcentajes de pago adelantado, lo fija sin cambiar el

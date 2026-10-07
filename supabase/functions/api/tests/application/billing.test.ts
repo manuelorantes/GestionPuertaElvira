@@ -23,6 +23,7 @@ import {
   RecalculateCharges,
   RegisterPayment,
   ResetCharge,
+  SetChargeDiscount,
   type SettingsInput,
   UpdateBillingSettings,
   UpdateStudentAccount,
@@ -496,5 +497,33 @@ Deno.test('RecalculateCharges should keep the prepayment discount of imported ch
   assertEquals(charges.map((c) => [c.period, c.amountCents, c.discountPercent, c.pendingCents]), [
     ['2026-10', 4950, 10, 0],
     ['2026-11', 4950, 10, 2700],
+  ]);
+});
+
+Deno.test('SetChargeDiscount should only note the discount of a past month and reprice the current and later ones', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 3 });
+  const importer = new ImportPayment(fx, fx, fx, fx);
+  await importer.execute(
+    id,
+    'monthly',
+    YearMonth.fromString('2026-09'),
+    Money.cents(3600),
+    LocalDate.fromString('2026-09-03'),
+  );
+  await importer.execute(
+    id,
+    'monthly',
+    YearMonth.fromString('2026-10'),
+    Money.cents(3600),
+    LocalDate.fromString('2026-10-01'),
+  );
+  const set = new SetChargeDiscount(fx, fx, fx, fx, fx.clock);
+  await set.execute(id, '2026-09', 10);
+  await set.execute(id, '2026-10', 10);
+  const charges = (await account(fx, id)).charges;
+  assertEquals(charges.map((c) => [c.period, c.amountCents, c.discountPercent]), [
+    ['2026-09', 3600, 10],
+    ['2026-10', 4950, 10],
   ]);
 });
