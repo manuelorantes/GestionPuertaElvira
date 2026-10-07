@@ -16,11 +16,12 @@ Cambios respecto al diseño, por decisiones de la spec:
 ```
 BillingPage (/panel/cobros)
 ├── SectionHeader: «Plazo: del 1 al 5 de <mes>» | «Cobros y cuotas» | acción «Registrar cobro» (icono wallet)
-├── Tabs: «Cuotas de <mes>» · «Cobros registrados» · «Tarifas y ajustes» (?pestana=cuotas|registro|tarifas)
+├── Tabs: «Cuotas» · «Cobros registrados» · «Tarifas y ajustes» (?pestana=cuotas|registro|tarifas)
 ├── ChargesTab
-│   ├── Barra de mes: botones «Mes anterior» / «Mes siguiente» (chevrons) y etiqueta «Octubre 2026»
+│   ├── Botones «Cuotas de socio · Sep · Oct · … · Jun» de la temporada (?mes=socio | ?mes=AAAA-MM; el mes en curso subrayado)
 │   ├── Tarjeta de progreso: «N de M cuotas cobradas · X € de Y €» + barra de progreso (brand) + «N vencidas»
-│   └── ChargesTable (escritorio: cabecera Alumno | Concepto | Importe | Estado | acciones; móvil: tarjetas)
+│   └── ChargesTable (escritorio: cabecera Alumno | Concepto | Importe | «Estado ▾» | acciones; móvil: tarjetas con «Estado ▾» arriba)
+│       ├── Menú «Estado»: Ordenar (Por alumno · Lo pendiente primero · Lo cobrado primero) · Mostrar (casillas de los estados presentes con su número) · «Ver todos»
 │       └── Fila: avatar con iniciales + nombre | «Cuota de octubre» o «Cuota de socio 2026/27» | importe |
 │           badge Cobrada/Pagada en parte (+ «Faltan X»)/En plazo/Vencida (+ «Avisado») | acciones:
 │           - pendiente: «Registrar cobro»

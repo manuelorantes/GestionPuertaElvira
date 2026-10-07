@@ -404,3 +404,32 @@ Deno.test({
     assertEquals([afterReset?.amountCents, afterReset?.manual], [5500, false]);
   },
 });
+
+Deno.test({
+  name:
+    'billing should list only the monthly charges of a month or the membership fees of its season',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}`, {
+      preferredPlan: 'monthly',
+      member: true,
+      privateRate: null,
+    });
+    const month = today.slice(0, 7);
+    const monthly = body<{ items: { kind: string }[] }>(
+      await fx.client.get(`/api/admin/billing/charges?month=${month}&kind=monthly`),
+    );
+    assert(monthly.items.length > 0 && monthly.items.every((i) => i.kind === 'monthly'));
+    const members = body<{ items: { kind: string; period: string }[] }>(
+      await fx.client.get(`/api/admin/billing/charges?month=${month}&kind=membership`),
+    );
+    const season = Season.containing(YearMonth.fromString(month)).firstMonth().toString();
+    assertEquals(members.items.map((i) => [i.kind, i.period]), [['membership', season]]);
+    assertError(
+      await fx.client.get(`/api/admin/billing/charges?month=${month}&kind=otra`),
+      422,
+      'unprocessable',
+    );
+  },
+});

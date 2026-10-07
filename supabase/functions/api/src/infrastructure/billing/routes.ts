@@ -1,4 +1,4 @@
-import { LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
+import { InvalidValue, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import { paymentMethodFromName, paymentMethodLabel, StudentRef } from '../../domain/billing/mod.ts';
 import {
   AdjustCharge,
@@ -118,7 +118,14 @@ export function registerBillingRoutes(api: ApiApp): void {
   });
 
   api.defineRoute(admin('GET', '/api/admin/billing/charges'), async (c, scope) => {
-    const result = await billing(api, scope).list.execute(c.req.query('month') ?? null);
+    const kind = c.req.query('kind') ?? 'all';
+    if (!['all', 'monthly', 'membership'].includes(kind)) {
+      throw new InvalidValue('kind', 'Tipo de cuota desconocido.');
+    }
+    const result = await billing(api, scope).list.execute(
+      c.req.query('month') ?? null,
+      kind as 'all' | 'monthly' | 'membership',
+    );
     const label = YearMonth.fromString(result.month).label();
     return c.json({
       month: result.month,

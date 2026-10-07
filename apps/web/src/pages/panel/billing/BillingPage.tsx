@@ -22,11 +22,13 @@ export type BillingDialog =
 
 export function BillingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  // ?mes=AAAA-MM (cuotas de ese mes) o ?mes=socio (cuotas de socio de la temporada).
+  const membership = searchParams.get('mes') === 'socio';
   const month = /^\d{4}-\d{2}$/.test(searchParams.get('mes') ?? '')
     ? (searchParams.get('mes') as string)
     : currentMonth();
   const tabs = [
-    { id: 'cuotas', label: `Cuotas de ${monthName(month)}` },
+    { id: 'cuotas', label: 'Cuotas' },
     { id: 'registro', label: 'Cobros registrados' },
     { id: 'tarifas', label: 'Tarifas y ajustes' },
   ];
@@ -52,7 +54,12 @@ export function BillingPage() {
       );
     if (tab === 'tarifas') return <SettingsTab />;
     return (
-      <ChargesTab month={month} onMonthChange={(m) => setParam('mes', m)} onAction={setDialog} />
+      <ChargesTab
+        month={month}
+        membership={membership}
+        onMonthChange={(m) => setParam('mes', m)}
+        onAction={setDialog}
+      />
     );
   }
 

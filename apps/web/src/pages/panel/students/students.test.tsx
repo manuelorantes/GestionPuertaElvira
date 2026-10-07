@@ -89,9 +89,9 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
     'GET /api/admin/students/pending-data': [200, { items: [] }],
     'GET /api/admin/groups': [200, { items: GROUPS }],
     'GET /api/admin/teachers': [200, { items: [] }],
-    'GET /api/admin/students?filter=all': [200, { items: [MARTINA, HUGO], total: 2 }],
+    'GET /api/admin/students?filter=active': [200, { items: [MARTINA, HUGO], total: 2 }],
     'GET /api/admin/students?filter=withdrawn': [200, { items: [HUGO], total: 2 }],
-    'GET /api/admin/students?filter=all&q=lopez': [200, { items: [MARTINA], total: 2 }],
+    'GET /api/admin/students?filter=active&q=lopez': [200, { items: [MARTINA], total: 2 }],
     'GET /api/admin/students/s1': [200, DETAIL],
     ...extra,
   });
@@ -155,7 +155,10 @@ describe('Alumnos', () => {
     await user.type(await screen.findByRole('searchbox', { name: 'Buscar alumnos' }), 'lopez');
 
     await waitFor(() =>
-      expect(spy).toHaveBeenCalledWith('/api/admin/students?filter=all&q=lopez', expect.anything()),
+      expect(spy).toHaveBeenCalledWith(
+        '/api/admin/students?filter=active&q=lopez',
+        expect.anything(),
+      ),
     );
     expect(await screen.findByText('1 de 2 mostrados')).toBeVisible();
   });
