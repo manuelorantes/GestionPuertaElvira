@@ -8,13 +8,16 @@ import { useDebouncedValue } from '@/shared/useDebouncedValue';
 import * as api from './api';
 import { useAccount, useBillingMutation } from './hooks';
 
-export type Concept = 'month' | 'three' | 'six' | 'nine' | 'membership';
+/** Todo el año (20 %) solo se ofrece si quedan 9 o 10 meses por cobrar. */
+const WHOLE_YEAR_MIN_MONTHS = 9;
+
+export type Concept = 'month' | 'three' | 'six' | 'year' | 'membership';
 
 export const CONCEPTS: { id: Concept; label: string }[] = [
   { id: 'month', label: 'Mes' },
   { id: 'three', label: '3 meses' },
   { id: 'six', label: '6 meses' },
-  { id: 'nine', label: '9 meses' },
+  { id: 'year', label: 'Todo el año' },
   { id: 'membership', label: 'Cuota de socio' },
 ];
 
@@ -53,7 +56,8 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
       : 'month';
   const concept = chosenConcept ?? defaultConcept;
   const remaining = account.data?.remainingMonths ?? null;
-  const months = { month: 1, three: 3, six: 6, nine: 9, membership: 1 }[concept];
+  // «Todo el año» cobra todo lo que queda de temporada (9 o 10 meses; la temporada es de septiembre a junio).
+  const months = { month: 1, three: 3, six: 6, year: remaining ?? 0, membership: 1 }[concept];
   const specialValue = Number(special.value.replace(',', '.'));
   const specialDiscount =
     special.enabled && specialValue > 0 && special.concept.trim()
@@ -107,7 +111,7 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     unavailable: (id: Concept) =>
       remaining !== null &&
       id !== 'membership' &&
-      ({ month: 1, three: 3, six: 6, nine: 9 } as const)[id] > remaining,
+      ({ month: 1, three: 3, six: 6, year: WHOLE_YEAR_MIN_MONTHS } as const)[id] > remaining,
     method,
     setMethod,
     date,

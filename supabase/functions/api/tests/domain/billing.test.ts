@@ -321,7 +321,7 @@ Deno.test('FeeCalculator should redeem points on a single month and take fixed s
   assertThrows(() => new PointsRedemption(6), InvalidPaymentRequest);
   assertThrows(() => new PointsRedemption(0), InvalidPaymentRequest);
 
-  // Pago adelantado: 20 % solo a partir de 9 meses; 7 u 8 meses siguen al 15 %.
+  // Pago adelantado: 20 % al pagar todo el año (9 o 10 meses); 7 u 8 meses siguen al 15 %.
   const tariff = BillingSettings.defaults().tariff;
   assertEquals([1, 3, 6, 7, 8, 9, 10].map((m) => tariff.prepaymentPercent(m)), [
     0,

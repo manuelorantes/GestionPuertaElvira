@@ -33,6 +33,7 @@ import {
   StudentRef,
   Tariff,
   TeacherRef,
+  WHOLE_YEAR_MIN_MONTHS,
 } from '../../domain/billing/mod.ts';
 import {
   type ClosedPeriods,
@@ -428,6 +429,10 @@ export class QuotePayment {
     }
     const candidates = await this.candidates(ref, date);
     if (months > candidates.length) throw InvalidPaymentRequest.beyondSeason(candidates.length);
+    // El 20 % de «todo el año» exige cobrar todo lo que queda (9 o 10 meses).
+    if (months >= WHOLE_YEAR_MIN_MONTHS && months < candidates.length) {
+      throw InvalidPaymentRequest.wholeYear(candidates.length);
+    }
     return candidates.slice(0, months).sort((a, b) => a.toString().localeCompare(b.toString()));
   }
 

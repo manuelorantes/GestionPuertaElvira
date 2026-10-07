@@ -102,7 +102,10 @@ export function toErrorResponse(error: unknown, logger: Logger): Response {
   }
   if (error instanceof Error && error.name === 'InvalidPaymentRequest') {
     const reason = (error as Error & { reason(): string }).reason();
-    const status = reason === 'beyond_season' || reason === 'nothing_to_pay' ? 409 : 422;
+    const status = reason === 'beyond_season' || reason === 'nothing_to_pay' ||
+        reason === 'whole_year_required'
+      ? 409
+      : 422;
     return errorEnvelope(status, reason, error.message);
   }
   logger.error('Unhandled API error', {
