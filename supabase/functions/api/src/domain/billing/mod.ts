@@ -72,6 +72,13 @@ export class InvalidPaymentRequest extends Error implements HasErrorDetails {
     return new InvalidPaymentRequest('Se pueden cobrar entre 1 y 10 meses.', 'invalid_months');
   }
 
+  static wholeYear(available: number): InvalidPaymentRequest {
+    return new InvalidPaymentRequest(
+      `El 20 % es por pagar todo el año: quedan ${available} meses y hay que cobrarlos todos.`,
+      'whole_year_required',
+    );
+  }
+
   static beyondSeason(available: number): InvalidPaymentRequest {
     return new InvalidPaymentRequest(
       `Solo quedan ${available} meses de temporada por cobrar.`,
@@ -321,6 +328,18 @@ export class Charge {
   }
 }
 
+/**
+ * Año completo: la temporada son 10 meses (septiembre a junio). El 20 % es por pagar todo lo que queda, y solo
+ * se ofrece si quedan 9 o 10 meses; con menos, el máximo es el de 6 meses.
+ */
+export const WHOLE_YEAR_MIN_MONTHS = 9;
+
+function prepaymentLabel(months: number): string {
+  return months >= WHOLE_YEAR_MIN_MONTHS
+    ? 'Pago de todo el año'
+    : `Pago adelantado ${months} meses`;
+}
+
 export class QuoteLine {
   constructor(
     readonly label: string,
@@ -471,7 +490,7 @@ export class FeeCalculator {
       discounts.push(['Descuento familiar', tariff.familyPercent]);
     }
     const prepayment = tariff.prepaymentPercent(months);
-    if (prepayment > 0) discounts.push([`Pago adelantado ${months} meses`, prepayment]);
+    if (prepayment > 0) discounts.push([prepaymentLabel(months), prepayment]);
     return this.applyDiscounts(lines, gross, discounts, special, points, monthlyBase, monthlyBase);
   }
 
@@ -522,7 +541,7 @@ export class FeeCalculator {
     const gross = items.reduce((sum, l) => sum.plus(l.amount), Money.zero());
     const discounts: [string, number][] = [];
     const prepayment = settings.tariff.prepaymentPercent(months);
-    if (prepayment > 0) discounts.push([`Pago adelantado ${months} meses`, prepayment]);
+    if (prepayment > 0) discounts.push([prepaymentLabel(months), prepayment]);
     return this.applyDiscounts(
       items,
       gross,

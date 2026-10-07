@@ -136,6 +136,37 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
 }
 
 describe('Cobros y cuotas', () => {
+  it('offers the whole year only with 9 or 10 months left, charging all of them', async () => {
+    const fetch = api({
+      'GET /api/admin/billing/accounts/s1': [200, { ...ACCOUNT, remainingMonths: 10 }],
+    });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const row = within(await screen.findByRole('table')).getByRole('row', { name: /Martina/ });
+    await userEvent.click(within(row).getByRole('button', { name: 'Cobrar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' });
+    const year = await within(dialog).findByRole('button', { name: 'Todo el año' });
+    await waitFor(() => expect(year).toBeEnabled());
+    await userEvent.click(year);
+    await waitFor(() => {
+      const quotes = fetch.mock.calls.filter(([url]) => url === '/api/admin/billing/quote');
+      expect(JSON.parse(String(quotes.at(-1)?.[1]?.body))).toMatchObject({ months: 10 });
+    });
+  });
+
+  it('disables the whole year when fewer than 9 months are left', async () => {
+    api({ 'GET /api/admin/billing/accounts/s1': [200, { ...ACCOUNT, remainingMonths: 8 }] });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const row = within(await screen.findByRole('table')).getByRole('row', { name: /Martina/ });
+    await userEvent.click(within(row).getByRole('button', { name: 'Cobrar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Todo el año' })).toBeDisabled(),
+    );
+    expect(within(dialog).getByRole('button', { name: '6 meses' })).toBeEnabled();
+  });
+
   it('opens a receipt straight from its link', async () => {
     api({ 'GET /api/admin/billing/payments/p9': [200, RECEIPT] });
     renderApp('/panel/cobros?pestana=registro&recibo=p9');

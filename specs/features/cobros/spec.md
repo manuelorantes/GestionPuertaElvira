@@ -25,8 +25,10 @@ más sus clases particulares:
 Los descuentos en porcentaje MUST sumarse sobre el importe bruto del cobro:
 
 - familiar (10 %), si tiene hermanos activos;
-- pago adelantado: 3 meses o más, 10 %; 6 meses o más, 15 %; 9 meses (la temporada), 20 %. Solo se puede
-  cobrar un bloque de 3, 6 o 9 meses si quedan al menos esos meses por cobrar;
+- pago adelantado: 3 meses o más, 10 %; 6 meses o más, 15 %; todo el año, 20 %. El año son 10 meses
+  (septiembre a junio): «Todo el año» cobra todos los meses que quedan y solo se ofrece si quedan 9 o 10;
+  quien tenga 8 o menos (p. ej. entra en noviembre) no puede acogerse. Cobrar 9 meses cuando quedan 10 no
+  da el 20 %. Un bloque de 3 o 6 meses solo se puede cobrar si quedan al menos esos meses;
 - descuento especial en porcentaje, con motivo.
 
 Después se restan los descuentos en euros, sin bajar de 0 €:
@@ -47,9 +49,13 @@ El total MUST redondearse a céntimos, y las líneas del desglose MUST sumar exa
 - **WHEN** un alumno de tramo 45 € con 5 puntos paga 6 meses canjeando los 5
 - **THEN** al total con el 15 % de pago adelantado se le restan 2,25 € (5 % de una cuota), y el alumno se queda con 0 puntos
 
-#### Scenario: Menos de nueve meses
+#### Scenario: Entra en noviembre
 - **WHEN** a un alumno le quedan 8 meses por cobrar
-- **THEN** no puede acogerse al cobro de 9 meses ni a su 20 %; 6 meses sigue disponible con el 15 %
+- **THEN** no puede acogerse a «Todo el año» ni a su 20 %; 6 meses sigue disponible con el 15 %
+
+#### Scenario: Todo el año desde septiembre
+- **WHEN** a un alumno le quedan 10 meses y elige «Todo el año»
+- **THEN** se cobran los 10 meses con un 20 % («Pago de todo el año −20 %»)
 
 ### Requirement: Horas semanales
 Las horas semanales de un alumno, de las que sale su tarifa, MUST ser la suma de lo que realmente hace en cada grupo:
@@ -76,7 +82,7 @@ El importe de una cuota no cambia aunque después cambien las tarifas o los grup
 - **THEN** no hay cuotas
 
 ### Requirement: Registrar un cobro
-Un cobro MUST indicar el alumno, el concepto (1 mes, 3 meses, 6 meses, 9 meses o cuota de socio),
+Un cobro MUST indicar el alumno, el concepto (1 mes, 3 meses, 6 meses, todo el año o cuota de socio),
 la forma de pago (efectivo, datáfono o transferencia) y la fecha, y MUST mostrar el desglose antes de guardarlo.
 La lista de cobros MUST mostrar los totales por forma de pago.
 Un cobro de N meses MUST pagar primero las cuotas pendientes más antiguas y después los meses siguientes, sin pasar de junio.
