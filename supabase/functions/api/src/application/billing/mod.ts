@@ -421,6 +421,8 @@ export interface PaymentQuote {
   credit: Money;
   /** Descuento por pago adelantado (3, 6 meses o todo el año) que queda fijado en cada mes que cubre. */
   prepaymentPercent: number;
+  /** Descuento familiar que ya lleva cada cuota mensual (el adelantado se suma a él sobre la base). */
+  familyPercent: number;
 }
 
 function concept(periods: readonly YearMonth[]): string {
@@ -499,6 +501,9 @@ export class QuotePayment {
       monthlyCharge: monthly,
       credit: items.reduce((sum, l) => sum.plus(l.amount), Money.zero()),
       prepaymentPercent: settings.tariff.prepaymentPercent(periods.length),
+      // Con la cuota de hoy los descuentos se suman sobre la base (como en el presupuesto); con importes pendientes
+      // distintos, el adelantado se aplica sobre cada importe.
+      familyPercent: sameAsToday && student.hasSiblings ? settings.tariff.familyPercent : 0,
     };
   }
 
@@ -572,6 +577,7 @@ export class QuotePayment {
       monthlyCharge: charge?.amount ?? settings.tariff.membershipFee,
       credit: pendingFee,
       prepaymentPercent: 0,
+      familyPercent: 0,
     };
   }
 }
@@ -611,7 +617,7 @@ export class RegisterPayment {
         const charge = (await this.charges.chargeFor(ref, quote.kind, period)) ??
           Charge.create(ChargeId.generate(), ref, quote.kind, period, quote.monthlyCharge);
         const already = charge.amount.minus(pendingBefore.get(period.toString()) ?? charge.amount);
-        charge.applyPrepayment(quote.prepaymentPercent);
+        charge.applyPrepayment(quote.prepaymentPercent, quote.familyPercent);
         const left = charge.amount.minus(already);
         if (!left.isNegative()) credit = credit.plus(left);
         covered.push(charge);
@@ -787,6 +793,8 @@ export interface AccountView {
   /** Cuota de un mes con lo que hace hoy (tramo + particulares, con descuento familiar si procede). */
   monthlyFeeCents: number;
   familyDiscount: boolean;
+  /** Porcentaje del descuento familiar que llevan sus cuotas mensuales (0 si no tiene). */
+  familyPercent: number;
   hasPrivateLessons: boolean;
   /** Si la cuota de socio de la temporada en curso está pagada. */
   membershipPaid: boolean;
@@ -846,6 +854,7 @@ export class GetStudentAccount {
       weeklyHours: student.regularWeeklyHours,
       monthlyFeeCents: monthly.cents,
       familyDiscount: student.hasSiblings && settings.tariff.familyPercent > 0,
+      familyPercent: student.hasSiblings ? settings.tariff.familyPercent : 0,
       hasPrivateLessons: student.privateLessons.length > 0,
       membershipPaid: membership !== null &&
         !membershipLeft.some((p) => p.charge.id.equals(membership.id)),
@@ -962,14 +971,26 @@ async function currentMonthlyFee(
   ref: StudentRef,
   today: LocalDate,
 ): Promise<Money | null> {
+  return (await currentFee(directory, accounts, settings, ref, today))?.fee ?? null;
+}
+
+/** Cuota de un mes de hoy y el descuento familiar que ya lleva (0 si no tiene). */
+async function currentFee(
+  directory: StudentDirectory,
+  accounts: StudentAccountRepository,
+  settings: BillingSettingsRepository,
+  ref: StudentRef,
+  today: LocalDate,
+): Promise<{ fee: Money; family: number } | null> {
   const student = await directory.find(ref, today);
   if (student === null) return null;
   const config = await settings.get();
-  return new FeeCalculator().quote(
+  const fee = new FeeCalculator().quote(
     feeProfileOf(student, await accounts.account(ref), config),
     config,
     1,
   ).total;
+  return { fee, family: student.hasSiblings ? config.tariff.familyPercent : 0 };
 }
 
 /**
@@ -1010,8 +1031,9 @@ export class RecalculateCharges {
     const from = today.day <= RecalculateCharges.LAST_DAY_FOR_CURRENT_MONTH
       ? thisMonth
       : thisMonth.next();
-    const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
-    if (fee === null) return;
+    const current = await currentFee(this.directory, this.accounts, this.settings, ref, today);
+    if (current === null) return;
+    const { fee, family } = current;
     const season = Season.containing(from);
     const tariff = (await this.settings.get()).tariff;
     const percents = [tariff.threeMonthsPercent, tariff.sixMonthsPercent, tariff.seasonPercent];
@@ -1020,8 +1042,8 @@ export class RecalculateCharges {
         continue;
       }
       const before = charge.amount;
-      if (previousFee !== null) charge.inferDiscount(previousFee, percents);
-      charge.reprice(fee);
+      if (previousFee !== null) charge.inferDiscount(previousFee, percents, family);
+      charge.reprice(fee, family);
       if (!charge.amount.equals(before) || charge.discountPercent() > 0) {
         await this.charges.saveCharge(charge);
       }
@@ -1102,9 +1124,9 @@ export class SetChargeDiscount {
     if (charge.period.isBefore(YearMonth.of(today))) {
       charge.noteDiscount(percent);
     } else {
-      const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
-      if (fee === null) throw new BillingStudentNotFound();
-      charge.setDiscount(percent, fee);
+      const current = await currentFee(this.directory, this.accounts, this.settings, ref, today);
+      if (current === null) throw new BillingStudentNotFound();
+      charge.setDiscount(percent, current.fee, current.family);
     }
     await this.charges.saveCharge(charge);
   }

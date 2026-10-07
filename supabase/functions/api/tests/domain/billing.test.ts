@@ -403,3 +403,39 @@ Deno.test('FeeCalculator should redeem points on a single month and take fixed s
   ]);
   assertThrows(() => new SpecialDiscount(Money.zero(), 'Nada'), InvalidValue);
 });
+
+Deno.test('Charge should add the prepayment discount to the family one over the base fee', () => {
+  // Base de 40 €, 10 % familiar: cuota de 36 €. Con un 20 % por todo el año, 40 € − 30 % = 28 € (no 36 € − 20 %).
+  const fee = Money.cents(3600);
+  const paid = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-10'),
+    fee,
+  );
+  paid.applyPrepayment(20, 10);
+  assertEquals([paid.amount.cents, paid.discountPercent()], [2800, 20]);
+  paid.reprice(fee, 10);
+  assertEquals(paid.amount.cents, 2800);
+
+  const set = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-11'),
+    fee,
+  );
+  set.setDiscount(20, fee, 10);
+  assertEquals(set.amount.cents, 2800);
+
+  const imported = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-12'),
+    Money.cents(2800),
+  );
+  imported.inferDiscount(fee, [10, 15, 20], 10);
+  assertEquals([imported.amount.cents, imported.discountPercent()], [2800, 20]);
+});

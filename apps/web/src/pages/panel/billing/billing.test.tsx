@@ -96,6 +96,7 @@ const ACCOUNT = {
   weeklyHours: 2,
   monthlyFeeCents: 4050,
   familyDiscount: true,
+  familyPercent: 0,
   hasPrivateLessons: false,
   membershipPaid: false,
   membershipFeeCents: 5000,
