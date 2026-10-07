@@ -1,8 +1,9 @@
-import { Plus, X } from 'lucide-react';
+import { Clock, Plus, X } from 'lucide-react';
 
 import type { ScheduleBlock, ScheduleResolution } from '@/features/classes/api';
 import { classroomLabel } from '@/features/classes/classrooms';
-import { WEEKDAYS } from '@/features/classes/schedule';
+import { attendanceText, WEEKDAYS } from '@/features/classes/schedule';
+import type { Attendance } from '@/features/students/api';
 import { Button } from '@/shared/ui/Button';
 import { Select } from '@/shared/ui/Select';
 
@@ -21,13 +22,24 @@ interface ScheduleEditorProps {
   onChange: (blocks: ScheduleBlock[]) => void;
   resolution: ScheduleResolution | undefined;
   loading: boolean;
+  /** Horario especial elegido a mano por grupo (undefined: el que sale de las horas; null: el grupo entero). */
+  overrides?: Record<string, Attendance | null>;
+  /** Abre el ajuste del horario especial de un grupo. */
+  onEditAttendance?: (groupId: string) => void;
 }
 
 /**
  * Las horas a las que va a venir el alumno. La API las traduce a grupos (completos o con horario
  * especial); si a una hora hay clase en varias aulas, se elige el aula del tramo.
  */
-export function ScheduleEditor({ blocks, onChange, resolution, loading }: ScheduleEditorProps) {
+export function ScheduleEditor({
+  blocks,
+  onChange,
+  resolution,
+  loading,
+  overrides = {},
+  onEditAttendance,
+}: ScheduleEditorProps) {
   const update = (index: number, patch: Partial<ScheduleBlock>) =>
     onChange(blocks.map((b, i) => (i === index ? { ...b, ...patch } : b)));
   const choiceFor = (block: ScheduleBlock) =>
@@ -117,18 +129,36 @@ export function ScheduleEditor({ blocks, onChange, resolution, loading }: Schedu
       {blocks.length > 0 && (
         <div aria-live="polite" className="flex flex-col gap-1 text-[13px]">
           {loading && <p className="text-ink-muted">Buscando los grupos…</p>}
-          {resolution?.enrolments.map((e) => (
-            <p key={e.groupId}>
-              <span className="font-medium">{e.groupName}</span>
-              <span className="text-ink-muted"> · {e.slotLabel}</span>
-              {e.attendanceLabel && (
-                <span className="font-medium text-warning-fg">
-                  {' '}
-                  · horario especial: {e.attendanceLabel}
-                </span>
-              )}
-            </p>
-          ))}
+          {resolution?.enrolments.map((e) => {
+            const chosen = e.groupId in overrides ? overrides[e.groupId] : undefined;
+            const special =
+              chosen === undefined ? e.attendanceLabel : chosen ? attendanceText(chosen) : null;
+            return (
+              <div key={e.groupId} className="flex items-center gap-2">
+                <p className="flex-1">
+                  <span className="font-medium">{e.groupName}</span>
+                  <span className="text-ink-muted"> · {e.slotLabel}</span>
+                  {special && (
+                    <span className="font-medium text-warning-fg">
+                      {' '}
+                      · horario especial: {special}
+                    </span>
+                  )}
+                </p>
+                {onEditAttendance && (
+                  <button
+                    type="button"
+                    onClick={() => onEditAttendance(e.groupId)}
+                    aria-label={`Horario especial en ${e.groupName}`}
+                    title="Horario especial"
+                    className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted"
+                  >
+                    <Clock aria-hidden size={14} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
           {resolution?.uncovered.map((u) => (
             <p key={u.label} className="font-medium text-danger-fg">
               Sin clase a esa hora: {u.label}
