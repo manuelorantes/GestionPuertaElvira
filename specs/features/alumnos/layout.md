@@ -11,7 +11,7 @@ StudentsPage (/panel/alumnos)
 ├── SectionHeader: «N alumnos activos» | «Alumnos» | acción «Nuevo alumno» (icono user-plus)
 ├── Toolbar (tarjeta superior)
 │   ├── SearchField: icono lupa, placeholder «Buscar por nombre»
-│   ├── Chips de filtro: Todos · Activos · Familia directa · De baja · Socios sin clases
+│   ├── Chips de filtro: Activos (por defecto) · Socios sin clases · De baja
 │   ├── Enlaces: «Datos pendientes (N)» (/panel/alumnos/pendientes) · «Importar hoja»
 │   └── Recuento: «N de M mostrados»
 ├── StudentsTable (escritorio) / StudentCards (móvil)

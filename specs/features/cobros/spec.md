@@ -76,6 +76,10 @@ el estado de cada cuota MUST salir de repartir lo que cubren todos los cobros de
 antigua a la más reciente. Lo que cubre un cobro es su importe en cuotas antes de descuentos. Lo que sobra es saldo a
 favor y cubre las cuotas siguientes.
 
+La pestaña «Cuotas» MUST ofrecer un botón por cada mes de la temporada (septiembre a junio) y, antes, «Cuotas de socio»,
+que reúne las cuotas de socio de la temporada (las de los meses solo muestran cuotas mensuales). La cabecera «Estado» MUST
+permitir ordenar (por alumno, lo pendiente primero o lo cobrado primero) y filtrar por los estados presentes.
+
 #### Scenario: Estados según la fecha
 - **WHEN** administración consulta las cuotas del mes
 - **THEN** cada cuota aparece como «Cobrada», «Pagada en parte» (con lo que falta), «En plazo» (del día 1 al 5 de su mes), «Vencida» (desde el día 6 o de meses anteriores) o «Próxima» (meses futuros)
