@@ -181,7 +181,7 @@ export class Student {
 
   addSibling(sibling: StudentId): void {
     if (sibling.equals(this.id)) {
-      throw new InvalidValue('siblingId', 'Un alumno no puede ser hermano de sí mismo.');
+      throw new InvalidValue('siblingId', 'Un alumno no puede ser familia directa de sí mismo.');
     }
     this.siblingIds.set(sibling.value, sibling);
   }
