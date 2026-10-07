@@ -14,17 +14,20 @@ import {
   TimesheetEntryId,
 } from '../../domain/payroll/mod.ts';
 import type {
+  ClassLoad,
+  ClassLoadQuery,
   DutyRepository,
   HolidayCalendar,
+  MonthlyFees,
   PayrollQuery,
   ProposalLog,
   ScheduleDirectory,
   SessionView,
   SettlementRepository,
   SubstitutionRepository,
-  TeacherActivity,
   TeacherRate,
   TeacherRates,
+  TeacherSeats,
   TimesheetRepository,
 } from '../../application/payroll/mod.ts';
 import { Row, type Sql } from './sql.ts';
@@ -180,7 +183,7 @@ export class SqlScheduleDirectory implements ScheduleDirectory {
   }
 }
 
-export class SqlPayrollQuery implements PayrollQuery {
+export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
   constructor(
     private readonly sql: Sql,
     private readonly today: () => LocalDate,
@@ -209,62 +212,66 @@ export class SqlPayrollQuery implements PayrollQuery {
     }));
   }
 
-  async activity(month: YearMonth): Promise<Map<string, TeacherActivity>> {
-    const today = this.today().toString();
+  async classLoad(month: YearMonth): Promise<ClassLoad> {
     const from = month.firstDay().toString();
     const to = month.lastDay().toString();
-    // Grupos y ocupación actual por profesor.
-    const groups = await this.sql`
-      SELECT g.teacher_id, g.name, g.capacity,
-             (SELECT COUNT(*) FROM classes_enrolment e WHERE e.class_group_id = g.id AND e.enrolled_on <= ${today} AND (e.ends_on IS NULL OR e.ends_on > ${today})) AS occupied
+    // Día de referencia para la ocupación: hoy si cae en el mes; si no, el último día (pasado) o el primero (futuro).
+    const today = this.today().toString();
+    const on = today < from ? from : today > to ? to : today;
+    // Plazas de cada clase contando cada día: alumnos que van ese día (horario especial incluido) frente al cupo.
+    const seats = await this.sql`
+      SELECT g.teacher_id, g.name,
+             g.capacity * jsonb_array_length(g.days::jsonb) AS capacity,
+             (SELECT COUNT(*) FROM classes_enrolment e, jsonb_array_elements_text(g.days::jsonb) AS d(day)
+               WHERE e.class_group_id = g.id AND e.enrolled_on <= ${on} AND (e.ends_on IS NULL OR e.ends_on > ${on})
+                 AND (e.attendance_days IS NULL OR e.attendance_days::jsonb ? d.day)) AS occupied
         FROM classes_group g ORDER BY g.name`;
-    const activity = new Map<
-      string,
-      { groups: string[]; occupied: number; capacity: number; income: number }
-    >();
-    for (const row of Row.all(groups)) {
+    const teachers = new Map<string, TeacherSeats>();
+    for (const row of Row.all(seats)) {
       const teacher = row.string('teacher_id');
-      const current = activity.get(teacher) ?? { groups: [], occupied: 0, capacity: 0, income: 0 };
+      const current = teachers.get(teacher) ?? { groups: [], occupied: 0, capacity: 0 };
       current.groups.push(row.string('name'));
       current.occupied += row.int('occupied');
       current.capacity += row.int('capacity');
-      activity.set(teacher, current);
+      teachers.set(teacher, current);
     }
-    // Horas semanales de cada alumno por profesor durante el mes, para repartir su cuota.
+    // Minutos semanales de cada alumno con cada profesor durante el mes (con su horario especial, si lo tiene).
     const hours = await this.sql`
-      SELECT e.student_id, g.teacher_id, SUM((g.end_minutes - g.start_minutes) * jsonb_array_length(g.days::jsonb)) AS minutes
+      SELECT e.student_id, g.teacher_id,
+             SUM((COALESCE(e.attendance_end_minutes, g.end_minutes) - COALESCE(e.attendance_start_minutes, g.start_minutes))
+                 * COALESCE(jsonb_array_length(e.attendance_days::jsonb), jsonb_array_length(g.days::jsonb))) AS minutes
         FROM classes_enrolment e JOIN classes_group g ON g.id = e.class_group_id
        WHERE e.enrolled_on <= ${to} AND (e.ends_on IS NULL OR e.ends_on > ${from})
        GROUP BY e.student_id, g.teacher_id`;
-    const byStudent = new Map<string, Map<string, number>>();
+    const students = new Map<string, Map<string, number>>();
     for (const row of Row.all(hours)) {
-      const shares = byStudent.get(row.string('student_id')) ?? new Map<string, number>();
+      const shares = students.get(row.string('student_id')) ?? new Map<string, number>();
       shares.set(row.string('teacher_id'), row.int('minutes'));
-      byStudent.set(row.string('student_id'), shares);
+      students.set(row.string('student_id'), shares);
     }
-    // Lo realmente cobrado por ese mes: el total de cada cobro repartido entre los meses que cubre (con sus descuentos).
-    const charges = await this.sql`
-      SELECT p.student_id, ROUND(p.total_cents::numeric / GREATEST(jsonb_array_length(p.periods::jsonb), 1)) AS amount_cents
-        FROM billing_payment p
-       WHERE p.kind = 'monthly' AND p.periods::jsonb ? ${month.toString()}`;
-    for (const row of Row.all(charges)) {
-      const shares = byStudent.get(row.string('student_id')) ?? new Map<string, number>();
-      const total = [...shares.values()].reduce((sum, m) => sum + m, 0);
-      for (const [teacher, minutes] of shares) {
-        const current = activity.get(teacher);
-        if (total > 0 && current) current.income += (row.int('amount_cents') * minutes) / total;
-      }
+    return { teachers, students };
+  }
+}
+
+/**
+ * Cuotas mensuales del mes por alumno (ya con descuentos) y, para quien aún no la tenga en un mes futuro, la prevista.
+ */
+export class SqlMonthlyFees implements MonthlyFees {
+  constructor(
+    private readonly sql: Sql,
+    private readonly expected: (
+      month: string,
+    ) => Promise<{ student: { id: string }; amount: Money }[]>,
+  ) {}
+
+  async monthlyFees(month: YearMonth): Promise<Map<string, number>> {
+    const rows = await this.sql`
+      SELECT student_id, amount_cents FROM billing_charge WHERE kind = 'monthly' AND period = ${month.toString()}`;
+    const fees = new Map(Row.all(rows).map((r) => [r.string('student_id'), r.int('amount_cents')]));
+    for (const { student, amount } of await this.expected(month.toString())) {
+      if (!fees.has(student.id)) fees.set(student.id, amount.cents);
     }
-    return new Map(
-      [...activity].map((
-        [teacher, a],
-      ) => [teacher, {
-        groups: a.groups,
-        occupied: a.occupied,
-        capacity: a.capacity,
-        incomeCents: Math.round(a.income),
-      }]),
-    );
+    return fees;
   }
 }
 

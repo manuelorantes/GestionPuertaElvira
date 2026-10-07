@@ -258,7 +258,12 @@ export class Settlement {
 export class SettlementCalculator {
   settle(entries: readonly TimesheetEntry[], rate: Money): Settlement {
     const byLabel = new Map<string, number>();
-    for (const [entry, minutes] of effectiveMinutes(entries)) {
+    const spans = effectiveMinutes(entries, (e) => ({
+      day: e.date.toString(),
+      start: e.start,
+      minutes: e.minutes().minutes,
+    }));
+    for (const [entry, minutes] of spans) {
       byLabel.set(entry.label, (byLabel.get(entry.label) ?? 0) + minutes);
     }
     const minutes = [...byLabel.values()].reduce((sum, m) => sum + m, 0);
@@ -287,34 +292,75 @@ export class MonthlySettlement {
   ) {}
 }
 
+/** Tramo de una sesión para contar solapes: día, minuto de inicio (null si no se sabe) y duración. */
+interface Span {
+  day: string;
+  start: number | null;
+  minutes: number;
+}
+
 /** Minutos que aporta cada sesión sin contar dos veces lo que se solapa el mismo día. */
-function effectiveMinutes(entries: readonly TimesheetEntry[]): [TimesheetEntry, number][] {
-  const result: [TimesheetEntry, number][] = [];
-  const timed = new Map<string, TimesheetEntry[]>();
-  for (const entry of entries) {
-    if (entry.start === null) {
-      result.push([entry, entry.minutes().minutes]);
+function effectiveMinutes<T>(items: readonly T[], span: (item: T) => Span): [T, number][] {
+  const result: [T, number][] = [];
+  const timed = new Map<string, { item: T; span: Span }[]>();
+  for (const item of items) {
+    const s = span(item);
+    if (s.start === null) {
+      result.push([item, s.minutes]);
       continue;
     }
-    const key = entry.date.toString();
-    timed.set(key, [...(timed.get(key) ?? []), entry]);
+    timed.set(s.day, [...(timed.get(s.day) ?? []), { item, span: s }]);
   }
   for (const day of timed.values()) {
     const ordered = [...day].sort((a, b) =>
-      b.minutes().minutes - a.minutes().minutes || (a.start ?? 0) - (b.start ?? 0)
+      b.span.minutes - a.span.minutes || (a.span.start ?? 0) - (b.span.start ?? 0)
     );
     // Tramos ya contados, fusionados (sin solapes entre sí).
     let taken: [number, number][] = [];
-    for (const entry of ordered) {
-      const from = entry.start ?? 0;
-      const to = from + entry.minutes().minutes;
+    for (const { item, span: s } of ordered) {
+      const from = s.start ?? 0;
+      const to = from + s.minutes;
       let free = to - from;
       for (const [a, b] of taken) free -= Math.max(0, Math.min(to, b) - Math.max(from, a));
-      result.push([entry, Math.max(0, free)]);
+      result.push([item, Math.max(0, free)]);
       taken = merge([...taken, [from, to]]);
     }
   }
   return result;
+}
+
+/**
+ * Horas esperadas de cada profesor en un mes según el horario: todas sus clases y turnos de los días del mes salvo
+ * festivos, sin sustituciones y sin contar dos veces lo que se solapa. Claves: id de profesor.
+ */
+export class ExpectedHours {
+  ofMonth(
+    month: YearMonth,
+    groups: readonly ScheduledGroup[],
+    duties: readonly ClubDuty[],
+    holidays: ReadonlySet<string>,
+  ): Map<string, number> {
+    const planner = new DailyPlanner();
+    const sessions: PlannedSession[] = [];
+    for (let day = month.firstDay(); !month.lastDay().isBefore(day); day = day.plusDays(1)) {
+      if (holidays.has(day.toString())) continue;
+      sessions.push(...planner.plan(day, groups, duties, [], null));
+    }
+    const byTeacher = new Map<string, PlannedSession[]>();
+    for (const s of sessions) {
+      byTeacher.set(s.teacher.value, [...(byTeacher.get(s.teacher.value) ?? []), s]);
+    }
+    const minutes = new Map<string, number>();
+    for (const [teacher, own] of byTeacher) {
+      const total = effectiveMinutes(own, (s) => ({
+        day: s.date.toString(),
+        start: s.start,
+        minutes: s.minutes.minutes,
+      })).reduce((sum, [, m]) => sum + m, 0);
+      minutes.set(teacher, total);
+    }
+    return minutes;
+  }
 }
 
 function merge(intervals: [number, number][]): [number, number][] {

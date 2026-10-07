@@ -107,7 +107,7 @@ Deno.test({
     ).items[0];
     assertEquals(row?.teacherName, 'Lucía Moreno Gil');
     assertEquals(row?.groups, ['Iniciación A']);
-    assertEquals(row?.capacity, 12);
+    assertEquals(row?.capacity, 60, '12 plazas × 5 días de clase');
     assertError(
       await client.json(
         'DELETE',
