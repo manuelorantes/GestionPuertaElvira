@@ -80,6 +80,10 @@ La pestaña «Cuotas» MUST ofrecer un botón por cada mes de la temporada (sept
 que reúne las cuotas de socio de la temporada (las de los meses solo muestran cuotas mensuales). La cabecera «Estado» MUST
 permitir ordenar (por alumno, lo pendiente primero o lo cobrado primero) y filtrar por los estados presentes.
 
+En los meses futuros, además de las cuotas ya cobradas por adelantado, MUST mostrarse como «Prevista» la cuota
+esperada de cada alumno activo ese mes que aún no la tenga (con la tarifa de hoy). Las previstas no se guardan: pasan a
+ser cuotas al cobrarlas o al llegar el mes.
+
 #### Scenario: Estados según la fecha
 - **WHEN** administración consulta las cuotas del mes
 - **THEN** cada cuota aparece como «Cobrada», «Pagada en parte» (con lo que falta), «En plazo» (del día 1 al 5 de su mes), «Vencida» (desde el día 6 o de meses anteriores) o «Próxima» (meses futuros)

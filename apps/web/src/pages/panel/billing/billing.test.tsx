@@ -234,6 +234,34 @@ describe('Cobros y cuotas', () => {
     ).toBe(true);
   });
 
+  it('shows expected charges of a future month', async () => {
+    api({
+      'GET /api/admin/billing/charges?month=2026-11&kind=monthly': [
+        200,
+        {
+          ...OCTOBER,
+          month: '2026-11',
+          items: [
+            {
+              ...OCTOBER.items[0],
+              id: 'prevista-s1-2026-11',
+              period: '2026-11',
+              status: 'expected',
+              paymentId: null,
+              receiptNumber: null,
+              coveredCents: 0,
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/cobros?mes=2026-11');
+
+    const row = await screen.findByRole('row', { name: /Prevista/ });
+    expect(row).toHaveTextContent('Prevista');
+    expect(screen.getByText(/1 previstas/)).toBeInTheDocument();
+  });
+
   it('filters and sorts the charges by status from the status header', async () => {
     api();
     renderApp('/panel/cobros?mes=2026-10');
