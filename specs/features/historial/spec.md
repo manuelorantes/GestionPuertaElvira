@@ -17,6 +17,16 @@ Las consultas (ver pantallas) no se registran.
 - **WHEN** superadministración abre el historial
 - **THEN** ve las acciones de la más reciente a la más antigua con fecha y hora (de Madrid), persona, acción y lo que afectó, puede filtrar por persona y ver el detalle campo a campo (sin contraseñas)
 
+### Requirement: Ir al elemento cambiado
+En el detalle de una acción, cada cambio MUST ofrecer un botón para ir al sitio de la aplicación donde se ve lo
+que tocó: el recibo del cobro, la ficha del alumno (también para sus datos de cobro e inscripciones), el grupo,
+los profesores, las cuotas o los movimientos del mes, las facturas, el registro de horas, la liquidación o las
+tarifas. Si el propio elemento se borró, o es una cuenta de usuario, no hay botón.
+
+#### Scenario: Del historial al cobro
+- **WHEN** superadministración abre una acción que cambió un cobro y pulsa «Ir al cobro»
+- **THEN** se abre Cobros con el recibo de ese cobro
+
 ### Requirement: Deshacer una acción
 Administración MUST poder deshacer una acción concreta tras confirmarlo, siempre que ninguna acción posterior haya tocado los mismos registros.
 

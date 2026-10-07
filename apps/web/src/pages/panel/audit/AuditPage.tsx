@@ -1,9 +1,18 @@
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, History, LogIn, RotateCcw, Undo2 } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  History,
+  LogIn,
+  RotateCcw,
+  Undo2,
+} from 'lucide-react';
 import { Fragment, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router';
+import { Link, Navigate, useSearchParams } from 'react-router';
 
 import { fieldLabel, fieldValue } from '@/features/audit/fields';
+import { targetLink } from '@/features/audit/targets';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useSession } from '@/features/auth/useSession';
 import {
@@ -55,9 +64,20 @@ function ActionDetail({ id }: { id: string }) {
           key={`${change.table}-${index}`}
           className="rounded-sm border border-line-soft bg-surface p-3"
         >
-          <p className="mb-1.5 text-[13px] font-semibold">
-            {OPERATION[change.operation]} · {change.tableLabel}
-          </p>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-[13px] font-semibold">
+              {OPERATION[change.operation]} · {change.tableLabel}
+            </p>
+            {change.target && (
+              <Link
+                to={targetLink(change.target).to}
+                className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-line-strong bg-surface px-3 text-[13px] font-semibold text-ink no-underline hover:bg-surface-muted"
+              >
+                {targetLink(change.target).label}
+                <ArrowRight aria-hidden size={14} />
+              </Link>
+            )}
+          </div>
           <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-3 gap-y-1 text-[13px]">
             {change.fields.map((f) => (
               <Fragment key={f.field}>
