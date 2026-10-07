@@ -142,8 +142,9 @@ export function ChargeDialog({
             Aplicar
           </Button>
           <p className="w-full text-[13px] text-ink-muted">
-            Recalcula la cuota con la tarifa de hoy y ese descuento. Se mantiene si después cambian
-            sus grupos.
+            En este mes y los siguientes recalcula la cuota con la tarifa de hoy y ese descuento (y
+            se mantiene si cambian sus grupos). En un mes ya pasado solo lo anota, sin cambiar el
+            importe.
           </p>
         </div>
         <div className="flex flex-wrap justify-between gap-3 border-t border-line pt-4">
