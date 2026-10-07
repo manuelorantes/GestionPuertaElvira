@@ -247,6 +247,7 @@ describe('Profesorado', () => {
       within(calendar).getByRole('button', { name: 'Nueva sustitución el 07/10/2026' }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Una sola clase' }));
     await userEvent.selectOptions(within(dialog).getByLabelText('Clase'), 'g1');
     await userEvent.selectOptions(within(dialog).getByLabelText('La da'), 't2');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Planificar' }));
@@ -258,6 +259,41 @@ describe('Profesorado', () => {
         groupId: 'g1',
         date: '2026-10-07',
         teacherId: 't2',
+        reason: null,
+      });
+    });
+  });
+
+  it('substitutes a teacher in all their classes of those days by default', async () => {
+    const fetch = api({
+      'GET /api/admin/payroll/substitutions?month=2026-10': [200, { month: '2026-10', items: [] }],
+      'GET /api/admin/payroll/holidays?season=2026': [200, { items: [] }],
+      'POST /api/admin/payroll/teacher-substitutions': [201, { created: 2 }],
+    });
+    renderApp('/panel/profesores?mes=2026-10&pestana=sustituciones');
+
+    const calendar = await screen.findByRole('table', { name: 'Sustituciones de octubre 2026' });
+    await userEvent.click(
+      within(calendar).getByRole('button', { name: 'Nueva sustitución el 07/10/2026' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
+    expect(within(dialog).getByRole('button', { name: 'Un profesor' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await userEvent.selectOptions(within(dialog).getByLabelText('Falta'), 't1');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Le sustituye'), 't2');
+    expect(await within(dialog).findByText(/Se sustituye 1 clase/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Planificar' }));
+    await waitFor(() => {
+      const call = fetch.mock.calls.find(
+        ([u, init]) => u === '/api/admin/payroll/teacher-substitutions' && init?.method === 'POST',
+      );
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+        teacherId: 't1',
+        substituteId: 't2',
+        from: '2026-10-07',
+        to: '2026-10-07',
         reason: null,
       });
     });

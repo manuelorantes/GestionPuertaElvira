@@ -18,6 +18,7 @@ import {
   RecordSession,
   RefillDay,
   SaveDuty,
+  SubstituteTeacher,
   SubstitutionNeedsReason,
   UpdateSession,
 } from '../../src/application/payroll/mod.ts';
@@ -268,4 +269,60 @@ Deno.test('RefillDay should add the missing automatic sessions of a past day wit
   await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
   assertEquals(await refill().execute('2026-10-12'), 0, 'festivo');
   await assertRejects(() => refill().execute('2026-11-02'), InvalidValue);
+});
+
+Deno.test('SubstituteTeacher should give all the classes of a teacher on those days to another, skipping holidays', async () => {
+  const { fx, lucia, carlos, duties, substitutions } = setUp();
+  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
+  const substitute = new SubstituteTeacher(fx, duties, substitutions, fx, fx, fx, fx);
+  // Lucía (lunes y miércoles) falta del 7 al 14 de octubre: miércoles 7, lunes 12 (festivo) y miércoles 14.
+  const created = await substitute.execute({
+    teacherId: lucia,
+    substituteId: carlos,
+    from: '2026-10-07',
+    to: '2026-10-14',
+    reason: 'Baja médica',
+  });
+  assertEquals(created, 2);
+  assertEquals(
+    [...fx.substitutions.values()].map((s) => s.date.toString()).sort(),
+    ['2026-10-07', '2026-10-14'],
+  );
+  await assertRejects(
+    () =>
+      substitute.execute({
+        teacherId: lucia,
+        substituteId: lucia,
+        from: '2026-10-19',
+        to: '2026-10-19',
+        reason: null,
+      }),
+    InvalidValue,
+  );
+  await assertRejects(
+    () =>
+      substitute.execute({
+        teacherId: lucia,
+        substituteId: carlos,
+        from: '2026-10-19',
+        to: '2027-01-19',
+        reason: null,
+      }),
+    InvalidValue,
+  );
+
+  // Si quien sustituye tiene clase a esa hora, se pide el motivo y no se guarda nada.
+  const ana = fx.teacherWithGroup('Ana Belén Torres', 1500, 'Martes B', [2], 60, 17 * 60);
+  await assertRejects(
+    () =>
+      substitute.execute({
+        teacherId: ana,
+        substituteId: carlos,
+        from: '2026-10-20',
+        to: '2026-10-20',
+        reason: null,
+      }),
+    SubstitutionNeedsReason,
+  );
+  assertEquals(fx.substitutions.size, 2);
 });

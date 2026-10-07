@@ -210,4 +210,28 @@ Deno.test('payroll should manage holidays, club duties and substitutions over HT
     (await client.json('DELETE', `/api/admin/payroll/substitutions/${id}`, {})).status,
     204,
   );
+
+  // Sustituir a una profesora con un solo grupo (lunes) por Ángel del 16 al 30 de noviembre: lunes 16, 23 y 30.
+  const absent = await newTeacher(client, 'Lucía Moreno Gil');
+  await newGroup(client, absent, {
+    days: ['mon'],
+    start: '19:00',
+    end: '20:00',
+    classroom: 'caballo',
+  });
+  const whole = await client.json('POST', '/api/admin/payroll/teacher-substitutions', {
+    teacherId: absent,
+    substituteId: other,
+    from: '2026-11-16',
+    to: '2026-11-30',
+    reason: 'Baja',
+  });
+  assertEquals([whole.status, whole.body], [201, { created: 3 }]);
+  const after = (await client.get('/api/admin/payroll/substitutions?month=2026-11')).body as {
+    items: { date: string; teacherName: string }[];
+  };
+  assertEquals(
+    after.items.filter((s) => s.teacherName === 'Lucía Moreno Gil').map((s) => s.date),
+    ['2026-11-16', '2026-11-23', '2026-11-30'],
+  );
 });

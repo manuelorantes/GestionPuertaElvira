@@ -578,6 +578,74 @@ export class PlanSubstitution {
   }
 }
 
+export interface TeacherSubstitutionInput {
+  teacherId: string;
+  substituteId: string;
+  from: string;
+  to: string;
+  reason: string | null;
+}
+
+/** Máximo de días de una sustitución de profesor de una vez. */
+const MAX_SUBSTITUTION_DAYS = 62;
+
+/**
+ * Sustituye a un profesor por otro en todas sus clases de unos días (lo habitual): crea la sustitución de cada clase
+ * suya en esos días, salvo festivos. Si quien sustituye ya tiene clase o turno a la hora de alguna, hace falta un
+ * motivo y no se guarda nada. Devuelve cuántas clases sustituye.
+ */
+export class SubstituteTeacher {
+  constructor(
+    private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
+    private readonly substitutions: SubstitutionRepository,
+    private readonly holidays: HolidayCalendar,
+    private readonly timesheets: TimesheetRepository,
+    private readonly settlements: SettlementRepository,
+    private readonly teachers: TeacherRates,
+  ) {}
+
+  async execute(input: TeacherSubstitutionInput): Promise<number> {
+    const absent = TeacherRef.fromString(input.teacherId);
+    const substitute = TeacherRef.fromString(input.substituteId);
+    if (absent.equals(substitute)) {
+      throw new InvalidValue('substituteId', 'Elige un profesor distinto del que falta.');
+    }
+    await ensureTeacherExists(this.teachers, absent);
+    await ensureTeacherExists(this.teachers, substitute);
+    const from = LocalDate.fromString(input.from);
+    const to = LocalDate.fromString(input.to);
+    if (to.isBefore(from)) {
+      throw new InvalidValue('to', 'El último día no puede ser anterior al primero.');
+    }
+    if (from.plusDays(MAX_SUBSTITUTION_DAYS).isBefore(to)) {
+      throw new InvalidValue('to', `Como mucho ${MAX_SUBSTITUTION_DAYS} días de una vez.`);
+    }
+    const reason = input.reason?.trim() || null;
+    const groups = await this.schedule.groups();
+    const duties = await this.duties.all();
+    const own = groups.filter((g) => g.teacher.equals(absent));
+    const planned: { group: ScheduledGroup; date: LocalDate }[] = [];
+    for (let date = from; !to.isBefore(date); date = date.plusDays(1)) {
+      if (await this.holidays.isHoliday(date)) continue;
+      for (const group of own.filter((g) => g.weekdays.includes(date.isoWeekday()))) {
+        const busy = busyWith(group, substitute, date, groups, duties);
+        if (busy !== null && reason === null) throw new SubstitutionNeedsReason(busy);
+        planned.push({ group, date });
+      }
+    }
+    for (const { group, date } of planned) {
+      const existing = await this.substitutions.find(group.id, date);
+      await this.substitutions.save(
+        existing?.id ?? crypto.randomUUID(),
+        new Substitution(group.id, date, substitute, reason),
+      );
+      await reassignSession(this.timesheets, this.settlements, group, date, substitute);
+    }
+    return planned.length;
+  }
+}
+
 /** Anula una sustitución; si la sesión de ese día ya estaba apuntada, vuelve al titular. */
 export class CancelSubstitution {
   constructor(
