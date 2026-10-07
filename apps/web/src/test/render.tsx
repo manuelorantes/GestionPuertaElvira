@@ -62,6 +62,7 @@ export const ADMIN = {
   email: 'junta@club.es',
   role: 'administrator',
   mustChangePassword: false,
+  impersonatedBy: null,
 } as const;
 
 export const SUPERADMIN = {

@@ -1,9 +1,10 @@
-import { KeyRound, Power, UserPlus } from 'lucide-react';
+import { KeyRound, LogIn, Power, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { ROLE_LABEL, type Role } from '@/features/auth/api';
+import { useStartImpersonation } from '@/features/auth/useImpersonation';
 import { useSession } from '@/features/auth/useSession';
 import { changeRole, type ClubUser, resetPassword, setEnabled } from '@/features/users/api';
 import { useUserMutation, useUsers } from '@/features/users/hooks';
@@ -32,7 +33,41 @@ const ROLES = Object.keys(ROLE_LABEL) as Role[];
 const ROW_ACTION =
   'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-2.5 text-[13px] font-semibold whitespace-nowrap hover:bg-surface-muted';
 
-type Pending = { type: 'reset'; user: ClubUser } | { type: 'toggle'; user: ClubUser } | null;
+type Pending =
+  | { type: 'reset'; user: ClubUser }
+  | { type: 'toggle'; user: ClubUser }
+  | { type: 'impersonate'; user: ClubUser }
+  | null;
+
+/** Se puede entrar como cualquier cuenta activa que no sea la propia ni de superadministración. */
+const canImpersonate = (user: ClubUser, selfId: string | undefined) =>
+  user.id !== selfId && user.status === 'active' && user.role !== 'superadministrator';
+
+const DIALOG = {
+  reset: { title: 'Restablecer contraseña', confirm: 'Restablecer' },
+  disable: { title: 'Desactivar cuenta', confirm: 'Desactivar' },
+  enable: { title: 'Reactivar cuenta', confirm: 'Reactivar' },
+  impersonate: { title: 'Entrar como esta cuenta', confirm: 'Entrar' },
+} as const;
+
+function dialogKind(pending: NonNullable<Pending>): keyof typeof DIALOG {
+  if (pending.type === 'toggle') return pending.user.status === 'active' ? 'disable' : 'enable';
+  return pending.type;
+}
+
+function dialogMessage(pending: NonNullable<Pending>): string {
+  const name = pending.user.fullName;
+  switch (dialogKind(pending)) {
+    case 'reset':
+      return `${name} recibirá una contraseña temporal que tendrá que cambiar al entrar. Se cerrarán sus sesiones abiertas.`;
+    case 'disable':
+      return `${name} no podrá entrar y se cerrarán sus sesiones. Se puede reactivar cuando quieras.`;
+    case 'enable':
+      return `${name} podrá volver a entrar con su contraseña.`;
+    case 'impersonate':
+      return `Verás y usarás la aplicación como ${name}. Tu sesión se cerrará hasta que pulses «Volver a mi cuenta». Lo que hagas quedará en el historial a su nombre y al tuyo.`;
+  }
+}
 
 /** Cuentas de usuario (solo superadministración): última conexión, rol, contraseña y desactivación. */
 export function UsersPage() {
@@ -45,6 +80,7 @@ export function UsersPage() {
   const [temporary, setTemporary] = useState<{ user: string; password: string } | null>(null);
   const reset = useUserMutation(resetPassword);
   const toggle = useUserMutation((u: ClubUser) => setEnabled(u.id, u.status === 'disabled'));
+  const impersonation = useStartImpersonation();
   const role = useUserMutation(({ id, value }: { id: string; value: Role }) =>
     changeRole(id, value),
   );
@@ -65,6 +101,8 @@ export function UsersPage() {
         },
         () => undefined,
       );
+    } else if (pending?.type === 'impersonate') {
+      impersonation.mutate(pending.user.id);
     } else if (pending?.type === 'toggle') {
       const user = pending.user;
       void toggle.mutateAsync(user).then(
@@ -186,6 +224,17 @@ export function UsersPage() {
                       </td>
                       <td className="px-5 py-3">
                         <span className="flex justify-end gap-2">
+                          {canImpersonate(user, session?.id) && (
+                            <button
+                              type="button"
+                              className={ROW_ACTION}
+                              onClick={() => setPending({ type: 'impersonate', user })}
+                              aria-label={`Entrar como ${user.fullName}`}
+                            >
+                              <LogIn aria-hidden size={15} />
+                              Entrar como
+                            </button>
+                          )}
                           <button
                             type="button"
                             className={ROW_ACTION}
@@ -227,38 +276,23 @@ export function UsersPage() {
       )}
       {pending && (
         <ConfirmDialog
-          title={
-            pending.type === 'reset'
-              ? 'Restablecer contraseña'
-              : pending.user.status === 'active'
-                ? 'Desactivar cuenta'
-                : 'Reactivar cuenta'
-          }
-          message={
-            pending.type === 'reset'
-              ? `${pending.user.fullName} recibirá una contraseña temporal que tendrá que cambiar al entrar. Se cerrarán sus sesiones abiertas.`
-              : pending.user.status === 'active'
-                ? `${pending.user.fullName} no podrá entrar y se cerrarán sus sesiones. Se puede reactivar cuando quieras.`
-                : `${pending.user.fullName} podrá volver a entrar con su contraseña.`
-          }
-          confirmLabel={
-            pending.type === 'reset'
-              ? 'Restablecer'
-              : pending.user.status === 'active'
-                ? 'Desactivar'
-                : 'Reactivar'
-          }
-          busy={reset.isPending || toggle.isPending}
+          title={DIALOG[dialogKind(pending)].title}
+          message={dialogMessage(pending)}
+          confirmLabel={DIALOG[dialogKind(pending)].confirm}
+          busy={reset.isPending || toggle.isPending || impersonation.isPending}
           error={
             reset.isError
               ? apiErrorMessage(reset.error)
               : toggle.isError
                 ? apiErrorMessage(toggle.error)
-                : null
+                : impersonation.isError
+                  ? apiErrorMessage(impersonation.error)
+                  : null
           }
           onCancel={() => {
             reset.reset();
             toggle.reset();
+            impersonation.reset();
             setPending(null);
           }}
           onConfirm={confirm}

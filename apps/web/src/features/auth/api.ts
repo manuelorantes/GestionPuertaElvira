@@ -8,6 +8,8 @@ export interface SessionUser {
   email: string;
   role: Role;
   mustChangePassword: boolean;
+  /** Superadministración que está usando esta cuenta (suplantación), o null. */
+  impersonatedBy: { id: string; fullName: string } | null;
 }
 
 interface UserEnvelope {
@@ -30,6 +32,16 @@ export async function login(email: string, password: string): Promise<SessionUse
 
 export function logout(): Promise<void> {
   return apiSend('POST', '/api/auth/logout');
+}
+
+/** Entra como otra cuenta (solo superadministración). */
+export async function impersonate(userId: string): Promise<SessionUser> {
+  return (await apiSend<UserEnvelope>('POST', `/api/admin/users/${userId}/impersonate`)).user;
+}
+
+/** Vuelve a la cuenta de superadministración. */
+export async function stopImpersonation(): Promise<SessionUser> {
+  return (await apiSend<UserEnvelope>('POST', '/api/auth/impersonation/stop')).user;
 }
 
 export function changePassword(currentPassword: string, newPassword: string): Promise<void> {

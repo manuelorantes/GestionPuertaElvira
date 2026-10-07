@@ -50,6 +50,8 @@ export class AuditLabels {
     'POST /api/admin/teachers': 'Crear profesor',
     'PUT /api/admin/teachers/:id': 'Editar profesor',
     'POST /api/admin/users': 'Crear cuenta de usuario',
+    'POST /api/admin/users/:id/impersonate': 'Suplantar cuenta',
+    'POST /api/auth/impersonation/stop': 'Volver a la cuenta propia',
     'POST /api/admin/users/:id/password-reset': 'Restablecer contraseña',
     'POST /api/admin/users/:id/disable': 'Desactivar cuenta',
     'POST /api/admin/users/:id/enable': 'Reactivar cuenta',
@@ -80,6 +82,8 @@ export class AuditLabels {
     'login.success': 'Inicio de sesión',
     'login.failure': 'Intento de acceso fallido',
     'logout.success': 'Cierre de sesión',
+    'impersonation_start.success': 'Empieza a suplantar una cuenta',
+    'impersonation_stop.success': 'Deja de suplantar una cuenta',
     'password_change.success': 'Cambio de contraseña',
     'password_change.failure': 'Cambio de contraseña fallido',
     'password_reset.success': 'Restablecer contraseña',
@@ -107,6 +111,15 @@ export class AuditLabels {
  * de la transacción, y el trigger de captura las usa para agrupar y firmar los cambios
  * (ver historial-de-cambios-con-triggers.md).
  */
+/** Firma del historial: la cuenta y, si alguien la suplanta, quién («Junta (suplantada por Ana)»). */
+function signature(user: AuthenticatedUser | null): string {
+  if (user === null) return '';
+  const name = user.impersonatedBy === null
+    ? user.fullName
+    : `${user.fullName} (suplantada por ${user.impersonatedBy.fullName})`;
+  return [...name].slice(0, 120).join('');
+}
+
 export async function startAuditAction(
   tx: Sql,
   user: AuthenticatedUser | null,
@@ -114,7 +127,7 @@ export async function startAuditAction(
 ): Promise<void> {
   await tx`SELECT set_config('audit.action_id', ${generateUuidV7()}, true), set_config('audit.kind', 'change', true),
     set_config('audit.user_id', ${user?.id ?? ''}, true), set_config('audit.user_name', ${
-    user?.fullName ?? ''
+    signature(user)
   }, true),
     set_config('audit.label', ${label}, true)`;
 }

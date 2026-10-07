@@ -27,6 +27,7 @@ Deno.test('login should start a session cookie and return the user when credenti
       email: 'junta@club.es',
       role: 'administrator',
       mustChangePassword: false,
+      impersonatedBy: null,
     },
   });
   const cookie = response.headers.getSetCookie()[0] ?? '';
