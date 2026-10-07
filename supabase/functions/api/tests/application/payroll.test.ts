@@ -125,7 +125,7 @@ Deno.test('substitutions give the class to another teacher and need a reason whe
   assertEquals([monday.teacher().value, monday.label], [carlos, 'Iniciación A (sustitución)']);
 
   // Anularla devuelve la sesión ya apuntada al titular.
-  await new CancelSubstitution(fx, substitutions, fx, fx).execute(id);
+  await new CancelSubstitution(fx, duties, substitutions, fx, fx).execute(id);
   assertEquals(monday.teacher().value, lucia);
 
   // Carlos da Adultos I los martes a las 17:00: sustituir otra clase del martes a la misma hora pide motivo.
@@ -365,5 +365,53 @@ Deno.test('Profitability should compare the expected hours of the month with the
       ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20],
       ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10],
     ],
+  );
+});
+
+Deno.test('Substitutions should cover club duty shifts too, alone or with all the classes of the teacher', async () => {
+  const { fx, lucia, carlos, duties, substitutions } = setUp();
+  // Carlos es encargado los viernes de 17:00 a 20:00; Lucía no tiene clase los viernes.
+  const duty = await new SaveDuty(duties, fx).execute(null, {
+    teacherId: carlos,
+    weekday: 5,
+    start: '17:00',
+    end: '20:00',
+    label: null,
+  });
+  const plan = new PlanSubstitution(fx, duties, substitutions, fx, fx, fx);
+  await plan.execute({
+    groupId: null,
+    dutyId: duty,
+    date: '2026-10-09',
+    teacherId: lucia,
+    reason: null,
+  });
+  assertEquals([...fx.substitutions.values()].map((s) => [s.source, s.date.toString()]), [
+    [`duty:${duty}`, '2026-10-09'],
+  ]);
+  await assertRejects(
+    () =>
+      plan.execute({
+        groupId: null,
+        dutyId: duty,
+        date: '2026-10-08',
+        teacherId: lucia,
+        reason: null,
+      }),
+    InvalidValue,
+  );
+
+  // Sustituir a Carlos una semana: su clase del martes 13 y su turno del viernes 16.
+  const created = await new SubstituteTeacher(fx, duties, substitutions, fx, fx, fx, fx).execute({
+    teacherId: carlos,
+    substituteId: lucia,
+    from: '2026-10-12',
+    to: '2026-10-16',
+    reason: null,
+  });
+  assertEquals(created, 2);
+  assertEquals(
+    [...fx.substitutions.values()].map((s) => s.date.toString()).sort(),
+    ['2026-10-09', '2026-10-13', '2026-10-16'],
   );
 });

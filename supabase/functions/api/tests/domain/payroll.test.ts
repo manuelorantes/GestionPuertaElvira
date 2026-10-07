@@ -175,3 +175,17 @@ Deno.test('ExpectedHours should count every class and duty of the month except h
     0,
   );
 });
+
+Deno.test('DailyPlanner should give a substituted club duty to the substitute', () => {
+  const angel = TeacherRef.generate();
+  const ana = TeacherRef.generate();
+  const duty = new ClubDuty(DutyRef.generate(), angel, 5, 17 * 60, 20 * 60, 'Encargado del club');
+  const friday = LocalDate.fromString('2026-10-09');
+  const substitution = new Substitution(duty.id, friday, ana, 'Ángel en un torneo');
+  assertEquals(substitution.source, `duty:${duty.id.value}`);
+  const [session] = new DailyPlanner().plan(friday, [], [duty], [substitution], null);
+  assertEquals(
+    [session?.teacher.value, session?.label, session?.source],
+    [ana.value, 'Encargado del club (sustitución)', `duty:${duty.id.value}`],
+  );
+});

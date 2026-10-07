@@ -5,7 +5,7 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import type { Teacher, Weekday } from '@/features/classes/api';
 import { useGroups } from '@/features/classes/hooks';
 import { planSubstitution, substituteTeacher } from '@/features/payroll/api';
-import { useHolidays, usePayrollMutation } from '@/features/payroll/hooks';
+import { useDuties, useHolidays, usePayrollMutation } from '@/features/payroll/hooks';
 import { todayIso } from '@/features/students/format';
 import { ApiError } from '@/shared/api/client';
 import { Alert } from '@/shared/ui/Alert';
@@ -20,9 +20,18 @@ import { ToggleButton } from '@/shared/ui/ToggleButton';
 /** Día de la semana de JavaScript (0 = domingo) → día de clase; sábado y domingo no tienen clase. */
 const WEEKDAY_IDS: (Weekday | null)[] = [null, 'mon', 'tue', 'wed', 'thu', 'fri', null];
 
-function weekdayOf(date: string): Weekday | null {
+function jsDay(date: string): number {
   const [y = 2000, m = 1, d = 1] = date.split('-').map(Number);
-  return WEEKDAY_IDS[new Date(y, m - 1, d).getDay()] ?? null;
+  return new Date(y, m - 1, d).getDay();
+}
+
+function weekdayOf(date: string): Weekday | null {
+  return WEEKDAY_IDS[jsDay(date)] ?? null;
+}
+
+/** 1 = lunes … 7 = domingo (como los turnos). */
+function isoWeekdayOf(date: string): number {
+  return jsDay(date) || 7;
 }
 
 /** Días «AAAA-MM-DD» de `from` a `to`, ambos incluidos (vacío si están al revés). */
@@ -37,11 +46,17 @@ function daysBetween(from: string, to: string): string[] {
   return days;
 }
 
-type Mode = 'teacher' | 'class';
+type Mode = 'day' | 'period' | 'class';
+
+const MODES: { id: Mode; label: string }[] = [
+  { id: 'day', label: 'Un día' },
+  { id: 'period', label: 'Periodo largo' },
+  { id: 'class', label: 'Una sola clase' },
+];
 
 /**
- * Planifica sustituciones. Lo habitual es sustituir a un profesor por otro en todas sus clases de unos días; para
- * casos especiales, una sola clase. Si quien sustituye ya tiene otra clase o un turno a esa hora, la API pide un
+ * Planifica sustituciones. Lo habitual es sustituir a un profesor por otro en todas sus clases y turnos de un día; para
+ * una baja, un periodo largo (desde y hasta); para casos especiales, una sola clase o turno. Si quien sustituye ya tiene otra clase o un turno a esa hora, la API pide un
  * motivo (dará las dos a la vez y no suma horas dobles).
  */
 export function SubstitutionDialog({
@@ -53,7 +68,7 @@ export function SubstitutionDialog({
   teachers: Teacher[];
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState<Mode>('teacher');
+  const [mode, setMode] = useState<Mode>('day');
   const initialDate = date || todayIso();
 
   return (
@@ -66,17 +81,22 @@ export function SubstitutionDialog({
           Nueva sustitución
         </h2>
         <div role="group" aria-label="Qué se sustituye" className="flex flex-wrap gap-2">
-          <ToggleButton pressed={mode === 'teacher'} onClick={() => setMode('teacher')}>
-            Un profesor
-          </ToggleButton>
-          <ToggleButton pressed={mode === 'class'} onClick={() => setMode('class')}>
-            Una sola clase
-          </ToggleButton>
+          {MODES.map((m) => (
+            <ToggleButton key={m.id} pressed={mode === m.id} onClick={() => setMode(m.id)}>
+              {m.label}
+            </ToggleButton>
+          ))}
         </div>
-        {mode === 'teacher' ? (
-          <TeacherSubstitutionForm date={initialDate} teachers={teachers} onClose={onClose} />
-        ) : (
+        {mode === 'class' ? (
           <ClassSubstitutionForm date={initialDate} teachers={teachers} onClose={onClose} />
+        ) : (
+          <TeacherSubstitutionForm
+            key={mode}
+            period={mode === 'period'}
+            date={initialDate}
+            teachers={teachers}
+            onClose={onClose}
+          />
         )}
       </div>
     </Dialog>
@@ -89,29 +109,41 @@ interface FormProps {
   onClose: () => void;
 }
 
-/** Todas las clases de un profesor en unos días pasan a otro (salvo festivos). */
-function TeacherSubstitutionForm({ date, teachers, onClose }: FormProps) {
+/** Todas las clases y turnos de un profesor en un día (o un periodo) pasan a otro, salvo festivos. */
+function TeacherSubstitutionForm({
+  period,
+  date,
+  teachers,
+  onClose,
+}: FormProps & { period: boolean }) {
   const [absentId, setAbsentId] = useState('');
   const [from, setFrom] = useState(date);
   const [to, setTo] = useState(date);
   const [substituteId, setSubstituteId] = useState('');
   const [reason, setReason] = useState('');
   const groups = useGroups();
+  const duties = useDuties();
   const holidays = useHolidays(fiscalYearOf(from.slice(0, 7)));
   const substitute = usePayrollMutation(substituteTeacher);
   const toast = useToast();
   const year = new Date().getFullYear();
   const active = teachers.filter((t) => t.active);
   const own = (groups.data ?? []).filter((g) => g.teacher.id === absentId);
+  const ownDuties = (duties.data ?? []).filter((d) => d.teacherId === absentId);
   const holidayDates = new Set((holidays.data ?? []).map((h) => h.date));
-  const classes = daysBetween(from, to)
+  const until = period ? to : from;
+  const classes = daysBetween(from, until)
     .filter((d) => !holidayDates.has(d))
     .reduce((count, d) => {
       const weekday = weekdayOf(d);
-      return count + own.filter((g) => weekday !== null && g.days.includes(weekday)).length;
+      return (
+        count +
+        own.filter((g) => weekday !== null && g.days.includes(weekday)).length +
+        ownDuties.filter((duty) => duty.weekday === isoWeekdayOf(d)).length
+      );
     }, 0);
   const needsReason = isReasonRequired(substitute.error);
-  const ready = absentId !== '' && substituteId !== '' && to >= from && classes > 0;
+  const ready = absentId !== '' && substituteId !== '' && until >= from && classes > 0;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -121,7 +153,7 @@ function TeacherSubstitutionForm({ date, teachers, onClose }: FormProps) {
         teacherId: absentId,
         substituteId,
         from,
-        to,
+        to: until,
         reason: reason.trim() || null,
       })
       .then(
@@ -148,25 +180,35 @@ function TeacherSubstitutionForm({ date, teachers, onClose }: FormProps) {
           if (value === substituteId) setSubstituteId('');
         }}
       />
-      <div className="flex flex-col gap-4">
+      {period ? (
+        <div className="flex flex-col gap-4">
+          <DateField
+            label="Desde"
+            value={from}
+            onChange={(value) => {
+              setFrom(value);
+              if (to < value) setTo(value);
+            }}
+            fromYear={year - 1}
+            toYear={year + 1}
+          />
+          <DateField
+            label="Hasta"
+            value={to}
+            onChange={setTo}
+            fromYear={year - 1}
+            toYear={year + 1}
+          />
+        </div>
+      ) : (
         <DateField
-          label="Desde"
+          label="Día"
           value={from}
-          onChange={(value) => {
-            setFrom(value);
-            if (to < value) setTo(value);
-          }}
+          onChange={setFrom}
           fromYear={year - 1}
           toYear={year + 1}
         />
-        <DateField
-          label="Hasta"
-          value={to}
-          onChange={setTo}
-          fromYear={year - 1}
-          toYear={year + 1}
-        />
-      </div>
+      )}
       <Select
         label="Le sustituye"
         options={[
@@ -182,12 +224,14 @@ function TeacherSubstitutionForm({ date, teachers, onClose }: FormProps) {
       <ReasonField needsReason={needsReason} value={reason} onChange={setReason} />
       <p className="text-[13px] text-ink-muted">
         {absentId === ''
-          ? 'Sus clases de esos días se apuntarán solas a quien sustituye. Los festivos no cuentan.'
+          ? 'Sus clases y turnos se apuntarán solos a quien sustituye. Los festivos no cuentan.'
           : classes === 0
-            ? 'No tiene clases esos días.'
+            ? period
+              ? 'No tiene clases ni turnos esos días.'
+              : 'No tiene clases ni turnos ese día.'
             : classes === 1
-              ? 'Se sustituye 1 clase (los festivos no cuentan).'
-              : `Se sustituyen ${classes} clases (los festivos no cuentan).`}
+              ? 'Se sustituye 1 clase o turno (los festivos no cuentan).'
+              : `Se sustituyen ${classes} clases y turnos (los festivos no cuentan).`}
       </p>
       <Actions
         onClose={onClose}
@@ -198,28 +242,53 @@ function TeacherSubstitutionForm({ date, teachers, onClose }: FormProps) {
   );
 }
 
-/** Una clase concreta de un día la da otro profesor (casos especiales). */
+/** Una clase o un turno concreto de un día lo da otro profesor (casos especiales). */
 function ClassSubstitutionForm({ date: initialDate, teachers, onClose }: FormProps) {
   const [date, setDate] = useState(initialDate);
-  const [groupId, setGroupId] = useState('');
+  // «group:<id>» o «duty:<id>».
+  const [target, setTarget] = useState('');
   const [teacherId, setTeacherId] = useState('');
   const [reason, setReason] = useState('');
   const groups = useGroups();
+  const duties = useDuties();
   const plan = usePayrollMutation(planSubstitution);
   const toast = useToast();
   const year = new Date().getFullYear();
   const weekday = weekdayOf(date);
-  const options = (groups.data ?? [])
-    .filter((g) => weekday !== null && g.days.includes(weekday))
-    .sort((a, b) => a.start.localeCompare(b.start));
-  const group = options.find((g) => g.id === groupId);
-  const candidates = teachers.filter((t) => t.active && t.id !== group?.teacher.id);
+  const options = [
+    ...(groups.data ?? [])
+      .filter((g) => weekday !== null && g.days.includes(weekday))
+      .map((g) => ({
+        value: `group:${g.id}`,
+        start: g.start,
+        label: `${g.start}–${g.end} · ${g.name} · ${g.teacher.fullName}`,
+        ownerId: g.teacher.id,
+      })),
+    ...(duties.data ?? [])
+      .filter((d) => d.weekday === isoWeekdayOf(date))
+      .map((d) => ({
+        value: `duty:${d.id}`,
+        start: d.start,
+        label: `${d.start}–${d.end} · ${d.label} · ${d.teacherName}`,
+        ownerId: d.teacherId,
+      })),
+  ].sort((a, b) => a.start.localeCompare(b.start));
+  const chosen = options.find((o) => o.value === target);
+  const candidates = teachers.filter((t) => t.active && t.id !== chosen?.ownerId);
   const needsReason = isReasonRequired(plan.error);
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!groupId || !teacherId) return;
-    void plan.mutateAsync({ groupId, date, teacherId, reason: reason.trim() || null }).then(
+    if (!chosen || !teacherId) return;
+    const [kind, id = ''] = chosen.value.split(':');
+    const input = {
+      groupId: kind === 'group' ? id : null,
+      dutyId: kind === 'duty' ? id : null,
+      date,
+      teacherId,
+      reason: reason.trim() || null,
+    };
+    void plan.mutateAsync(input).then(
       () => {
         toast('Sustitución planificada');
         onClose();
@@ -236,26 +305,23 @@ function ClassSubstitutionForm({ date: initialDate, teachers, onClose }: FormPro
         value={date}
         onChange={(value) => {
           setDate(value);
-          setGroupId('');
+          setTarget('');
         }}
         fromYear={year - 1}
         toYear={year + 1}
       />
       <Select
-        label="Clase"
+        label="Clase o turno"
         options={[
           {
             value: '',
-            label: options.length === 0 ? 'Ese día no hay clases' : 'Elige la clase',
+            label: options.length === 0 ? 'Ese día no hay clases' : 'Elige la clase o el turno',
           },
-          ...options.map((g) => ({
-            value: g.id,
-            label: `${g.start}–${g.end} · ${g.name} · ${g.teacher.fullName}`,
-          })),
+          ...options.map((o) => ({ value: o.value, label: o.label })),
         ]}
-        value={groupId}
+        value={target}
         onChange={(value) => {
-          setGroupId(value);
+          setTarget(value);
           setTeacherId('');
         }}
       />
@@ -267,7 +333,7 @@ function ClassSubstitutionForm({ date: initialDate, teachers, onClose }: FormPro
         ]}
         value={teacherId}
         onChange={setTeacherId}
-        disabled={!group}
+        disabled={!chosen}
       />
       <ReasonField needsReason={needsReason} value={reason} onChange={setReason} />
       <p className="text-[13px] text-ink-muted">
@@ -276,7 +342,7 @@ function ClassSubstitutionForm({ date: initialDate, teachers, onClose }: FormPro
       </p>
       <Actions
         onClose={onClose}
-        disabled={!groupId || !teacherId || (needsReason && reason.trim() === '')}
+        disabled={!chosen || !teacherId || (needsReason && reason.trim() === '')}
         busy={plan.isPending}
       />
     </form>

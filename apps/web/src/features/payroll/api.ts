@@ -105,7 +105,10 @@ export function removeHoliday(date: string): Promise<void> {
 export interface Substitution {
   id: string;
   date: string;
-  groupId: string;
+  /** La clase sustituida, o null si es un turno (encargado del club). */
+  groupId: string | null;
+  dutyId: string | null;
+  /** Nombre de la clase o del turno. */
   groupName: string;
   start: string;
   end: string;
@@ -121,7 +124,8 @@ export async function fetchSubstitutions(month: string): Promise<Substitution[]>
 }
 
 export async function planSubstitution(input: {
-  groupId: string;
+  groupId: string | null;
+  dutyId: string | null;
   date: string;
   teacherId: string;
   reason: string | null;

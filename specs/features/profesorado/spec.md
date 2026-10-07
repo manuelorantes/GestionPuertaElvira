@@ -49,9 +49,11 @@ genera horas. Administración MUST poder añadir festivos (con nombre) y quitarl
 de ese día salvo las de liquidaciones pagadas.
 
 ### Requirement: Sustituciones
-Lo habitual es sustituir a un profesor por otro: administración MUST poder elegir quién falta, los días (de uno a 62
-seguidos) y quién le sustituye, y se planifica la sustitución de cada clase suya en esos días salvo festivos. Para casos
-especiales MUST poder planificarse una sola clase (día, clase de ese día y quién la da). Cada sustitución lleva un motivo
+Lo habitual es sustituir a un profesor por otro un día: administración MUST poder elegir quién falta, el día y quién le
+sustituye, y se planifica la sustitución de cada clase y turno suyo ese día. Para una baja MUST poder hacerse lo mismo en
+un periodo largo (desde y hasta, como mucho 62 días), salvo festivos. Para casos especiales MUST poder planificarse una
+sola clase o turno (día, clase o turno de ese día y quién lo da). Los turnos de encargado del club se sustituyen igual
+que las clases. Cada sustitución lleva un motivo
 opcional, se puede anular y se ve en un calendario del mes junto con los festivos. Ese día la sesión se apunta a quien sustituye; si ya estaba apuntada,
 pasa a quien sustituye (o vuelve al titular al anularla). Si quien sustituye ya tiene otra clase o un turno a esa hora,
 es un caso especial: MUST indicarse el motivo y no suma horas dobles.

@@ -2,9 +2,9 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
+import { currentMonth, shiftMonth } from '@/features/billing/money';
+import { SeasonMonths } from '@/features/billing/SeasonMonths';
 import { useTeachers } from '@/features/classes/hooks';
-import { MonthNav } from '@/shared/ui/MonthNav';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
 
@@ -82,10 +82,11 @@ export function TeachersPayPage() {
         }}
       />
       <div className={`mb-6 ${WITHOUT_MONTH.includes(tab) ? 'hidden' : ''}`}>
-        <MonthNav
-          label={monthLabel(month)}
-          onPrevious={() => setParams({ mes: shiftMonth(month, -1) })}
-          onNext={() => setParams({ mes: shiftMonth(month, 1) })}
+        <SeasonMonths
+          month={month}
+          selected={month}
+          label="Mes"
+          onChange={(m) => setParams({ mes: m })}
         />
       </div>
       <Tabs

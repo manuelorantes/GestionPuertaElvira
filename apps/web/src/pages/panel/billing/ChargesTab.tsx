@@ -3,8 +3,9 @@ import { useState } from 'react';
 
 import type { Charge, ChargeStatus } from '@/features/billing/api';
 import { useMonthlyCharges } from '@/features/billing/hooks';
+import { SeasonMonths } from '@/features/billing/SeasonMonths';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
-import { currentMonth, formatCents, monthLabel, monthName } from '@/features/billing/money';
+import { formatCents, monthLabel, monthName } from '@/features/billing/money';
 import { Alert } from '@/shared/ui/Alert';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
@@ -34,13 +35,6 @@ const URGENCY: ChargeStatus[] = ['overdue', 'partial', 'due', 'upcoming', 'expec
 type StatusSort = 'none' | 'urgent' | 'paid';
 
 /** Meses con clase de la temporada que contiene `month`: de septiembre a junio. */
-function seasonMonths(month: string): string[] {
-  const start = fiscalYearOf(month);
-  return [9, 10, 11, 12, 1, 2, 3, 4, 5, 6].map(
-    (m) => `${m >= 9 ? start : start + 1}-${String(m).padStart(2, '0')}`,
-  );
-}
-
 interface ChargesTabProps {
   month: string;
   /** Muestra las cuotas de socio de la temporada en vez de las del mes. */
@@ -249,29 +243,22 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
 
   return (
     <div className="flex flex-col gap-6">
-      <div role="group" aria-label="Cuotas a ver" className="flex flex-wrap gap-1.5">
-        <ToggleButton
-          tone="ink"
-          pressed={membership}
-          onClick={() => onMonthChange('socio')}
-          className="h-9 rounded-full font-medium"
-        >
-          Cuotas de socio
-        </ToggleButton>
-        {seasonMonths(month).map((m) => (
+      <SeasonMonths
+        month={month}
+        selected={membership ? null : month}
+        label="Cuotas a ver"
+        onChange={onMonthChange}
+        before={
           <ToggleButton
-            key={m}
             tone="ink"
-            pressed={!membership && m === month}
-            onClick={() => onMonthChange(m)}
-            aria-label={monthLabel(m)}
-            title={m === currentMonth() ? `${monthLabel(m)} (en curso)` : monthLabel(m)}
-            className={`h-9 min-w-0 rounded-full px-3 font-medium capitalize ${m === currentMonth() ? 'underline decoration-2 underline-offset-4' : ''}`}
+            pressed={membership}
+            onClick={() => onMonthChange('socio')}
+            className="h-9 rounded-full font-medium"
           >
-            {monthName(m).slice(0, 3)}
+            Cuotas de socio
           </ToggleButton>
-        ))}
-      </div>
+        }
+      />
       {data && items.length > 0 && (
         <Card className="flex flex-col gap-2 px-6 py-5">
           <div className="flex flex-wrap justify-between gap-2 text-sm">
