@@ -1,6 +1,7 @@
 import { apiGet, apiSend } from '@/shared/api/client';
 
-export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming';
+/** `expected`: cuota prevista de un mes futuro (aún no existe; lo que se espera cobrar). */
+export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming' | 'expected';
 export type ChargeKind = 'monthly' | 'membership';
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 

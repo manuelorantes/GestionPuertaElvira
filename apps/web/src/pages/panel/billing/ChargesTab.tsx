@@ -22,13 +22,14 @@ const STATUS: Record<
   due: { label: 'En plazo', tone: 'warning' },
   overdue: { label: 'Vencida', tone: 'danger' },
   upcoming: { label: 'Próxima', tone: 'neutral' },
+  expected: { label: 'Prevista', tone: 'neutral' },
 };
 
 const ACTION =
   'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm px-3 text-[13px] font-semibold';
 
 /** Orden de urgencia del estado: lo que hay que reclamar primero, lo cobrado al final. */
-const URGENCY: ChargeStatus[] = ['overdue', 'partial', 'due', 'upcoming', 'paid'];
+const URGENCY: ChargeStatus[] = ['overdue', 'partial', 'due', 'upcoming', 'expected', 'paid'];
 
 type StatusSort = 'none' | 'urgent' | 'paid';
 
@@ -278,6 +279,12 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
               {paid} de {items.length} cuotas cobradas · {formatCents(data.totals.collectedCents)}{' '}
               de {formatCents(data.totals.expectedCents)}
             </span>
+            {all.some((c) => c.status === 'expected') && (
+              <span className="text-ink-muted">
+                {all.filter((c) => c.status === 'expected').length} previstas: lo que se espera
+                cobrar con la tarifa de hoy
+              </span>
+            )}
             {data.totals.overdueCount > 0 && (
               <span className="font-medium text-danger-fg">
                 {data.totals.overdueCount} {data.totals.overdueCount === 1 ? 'vencida' : 'vencidas'}
