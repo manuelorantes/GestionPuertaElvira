@@ -60,5 +60,5 @@ test('should keep the published tariffs in the settings', async ({ page }) => {
   await page.getByRole('tab', { name: 'Tarifas y ajustes' }).click();
 
   await expect(page.getByLabel('3 h o más a la semana')).toHaveValue('55.00');
-  await expect(page.getByLabel('Familiar (hermanos en el club)')).toHaveValue('10');
+  await expect(page.getByLabel('Familiar (familia directa en el club)')).toHaveValue('10');
 });
