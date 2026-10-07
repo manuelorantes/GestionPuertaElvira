@@ -103,6 +103,26 @@ function postBody(spy: ReturnType<typeof api>, url: string) {
 }
 
 describe('Alumnos', () => {
+  it('sorts the list by member number or alphabetically from the headers', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/alumnos');
+
+    const names = async () =>
+      (await screen.findAllByRole('button', { name: /mart/i }))
+        .map((b) => b.textContent ?? '')
+        .filter((t) => /Martina|Hugo/.test(t))
+        .map((t) => (t.includes('Martina') ? 'Martina' : 'Hugo'));
+    expect(await names()).toEqual(['Hugo', 'Martina']);
+
+    await user.click(screen.getByRole('button', { name: 'Ordenar por número' }));
+    expect(await names()).toEqual(['Martina', 'Hugo']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por número' }));
+    expect(await names()).toEqual(['Hugo', 'Martina']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por nombre' }));
+    expect(await names()).toEqual(['Hugo', 'Martina']);
+  });
+
   it('should list students with their groups and status, and filter them', async () => {
     const user = userEvent.setup();
     api();

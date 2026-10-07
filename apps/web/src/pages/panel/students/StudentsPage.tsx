@@ -5,6 +5,7 @@ import { Link, Outlet, useNavigate, useSearchParams } from 'react-router';
 import { useSession } from '@/features/auth/useSession';
 import type { StudentFilter } from '@/features/students/api';
 import { usePendingData, useStudents } from '@/features/students/hooks';
+import { sortFrom, sortParam, sortStudents, toggleSort } from '@/features/students/sorting';
 import { useDebouncedValue } from '@/shared/useDebouncedValue';
 import { Card } from '@/shared/ui/Card';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
@@ -39,6 +40,7 @@ export function StudentsPage() {
       ? items.filter((s) => s.status === 'active').length
       : null;
   const query = searchParams.toString();
+  const sort = sortFrom(searchParams.get('orden'));
 
   function updateParams(changes: Record<string, string>) {
     const next = new URLSearchParams(searchParams);
@@ -61,7 +63,9 @@ export function StudentsPage() {
     }
     return (
       <StudentsList
-        students={items}
+        students={sortStudents(items, sort)}
+        sort={sort}
+        onSort={(key) => updateParams({ orden: sortParam(toggleSort(sort, key)) })}
         onOpen={(id) => void navigate(`/panel/alumnos/${id}${query ? `?${query}` : ''}`)}
       />
     );
