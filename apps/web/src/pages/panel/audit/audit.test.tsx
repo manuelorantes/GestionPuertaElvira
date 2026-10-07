@@ -46,6 +46,7 @@ const DETAIL = {
         { field: 'receipt_number', before: null, after: 'R-2026-0027' },
         { field: 'total_cents', before: null, after: 4500 },
       ],
+      target: { kind: 'payment', id: 'p1' },
     },
     {
       table: 'billing_charge',
@@ -53,6 +54,7 @@ const DETAIL = {
       key: { id: 'c1' },
       operation: 'U',
       fields: [{ field: 'paid_by', before: null, after: 'p1' }],
+      target: { kind: 'charges', month: '2026-10' },
     },
   ],
 };
@@ -87,6 +89,14 @@ describe('Historial', () => {
     expect(screen.getByText('45 €')).toBeInTheDocument();
     expect(screen.getByText('Alta · Cobro')).toBeInTheDocument();
     expect(screen.getByText('Cambio · Cuota')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ir al cobro' })).toHaveAttribute(
+      'href',
+      '/panel/cobros?pestana=registro&recibo=p1',
+    );
+    expect(screen.getByRole('link', { name: 'Ir a las cuotas de octubre 2026' })).toHaveAttribute(
+      'href',
+      '/panel/cobros?mes=2026-10',
+    );
   });
 
   it('undoes an action after confirming', async () => {

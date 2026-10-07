@@ -37,6 +37,13 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
 }
 
 describe('Clases', () => {
+  it('opens a group straight from its link', async () => {
+    api({ 'GET /api/admin/groups/g1': [200, { ...GROUP, students: [] }] });
+    renderApp('/panel/clases?grupo=g1');
+
+    expect(await screen.findByRole('dialog', { name: 'Iniciación A' })).toBeInTheDocument();
+  });
+
   it('should show each group in the weekly schedule with its teacher and occupancy', async () => {
     api();
     renderApp('/panel/clases');

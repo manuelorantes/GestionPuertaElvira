@@ -5,6 +5,7 @@ import type {
   AuditFilter,
   AuditLog,
   AuditReverter,
+  AuditTarget,
 } from '../../application/audit/mod.ts';
 import { AuditLabels } from '../audit/mod.ts';
 import { Row, type Sql } from './sql.ts';
@@ -103,6 +104,12 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
         key: (row.json('row_key') ?? {}) as Record<string, unknown>,
         operation,
         fields,
+        target: auditTarget(
+          row.string('table_name'),
+          operation,
+          row.json('before') as Record<string, unknown> | null,
+          row.json('after') as Record<string, unknown> | null,
+        ),
       };
     });
   }
@@ -154,5 +161,63 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
 
   async revert(changeId: number): Promise<void> {
     await this.sql`SELECT audit_revert_change(${changeId})`;
+  }
+}
+
+/**
+ * Dónde se ve en la aplicación la fila que tocó un cambio. Si se borró el propio elemento no hay dónde ir;
+ * si se borró algo que cuelga de otro (una inscripción, una sesión), se va a ese otro.
+ */
+export function auditTarget(
+  table: string,
+  operation: string,
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
+): AuditTarget | null {
+  const row = after ?? before ?? {};
+  const text = (field: string) => (typeof row[field] === 'string' ? (row[field] as string) : null);
+  const deleted = operation === 'D';
+  const own = (kind: 'payment' | 'student' | 'group' | 'teacher'): AuditTarget | null => {
+    const id = text('id');
+    return deleted || id === null ? null : { kind, id };
+  };
+  const month = (field: string) => text(field)?.slice(0, 7) ?? null;
+  switch (table) {
+    case 'billing_payment':
+      return own('payment');
+    case 'students_student':
+      return own('student');
+    case 'classes_group':
+      return own('group');
+    case 'teachers_teacher':
+      return own('teacher');
+    case 'billing_account':
+    case 'classes_enrolment': {
+      const id = text('student_id');
+      return id === null ? null : { kind: 'student', id };
+    }
+    case 'billing_charge': {
+      const m = month('period');
+      return m === null ? null : { kind: 'charges', month: m };
+    }
+    case 'accounting_entry': {
+      const m = month('entry_date');
+      return m === null || deleted ? null : { kind: 'ledger', month: m };
+    }
+    case 'accounting_invoice':
+      return deleted ? null : { kind: 'invoices' };
+    case 'payroll_session': {
+      const m = month('session_date');
+      const teacherId = text('teacher_id');
+      return m === null || teacherId === null ? null : { kind: 'hours', month: m, teacherId };
+    }
+    case 'payroll_settlement': {
+      const m = month('month');
+      return m === null ? null : { kind: 'settlement', month: m };
+    }
+    case 'billing_settings':
+      return { kind: 'billing-settings' };
+    default:
+      return null;
   }
 }

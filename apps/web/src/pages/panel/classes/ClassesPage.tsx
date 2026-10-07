@@ -28,7 +28,8 @@ export function ClassesPage() {
     ? (searchParams.get('pestana') as string)
     : 'horario';
   const [dialog, setDialog] = useState<DialogState>(null);
-  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  // ?grupo=<id> abre ese grupo (p. ej. desde el historial).
+  const [openGroupId, setOpenGroupId] = useState<string | null>(() => searchParams.get('grupo'));
   const groups = useGroups();
   const teachers = useTeachers();
   const toast = useToast();
