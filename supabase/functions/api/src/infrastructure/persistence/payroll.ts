@@ -1,21 +1,27 @@
 import { LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
 import {
+  ClubDuty,
+  DutyRef,
   GroupRef,
   MonthlySettlement,
   ScheduledGroup,
   SessionMinutes,
   Settlement,
   SettlementLine,
+  Substitution,
   TeacherRef,
   TimesheetEntry,
   TimesheetEntryId,
 } from '../../domain/payroll/mod.ts';
 import type {
+  DutyRepository,
+  HolidayCalendar,
   PayrollQuery,
   ProposalLog,
   ScheduleDirectory,
   SessionView,
   SettlementRepository,
+  SubstitutionRepository,
   TeacherActivity,
   TeacherRate,
   TeacherRates,
@@ -33,6 +39,8 @@ function toEntry(row: Row): TimesheetEntry {
     row.string('label'),
     SessionMinutes.fromMinutes(row.int('minutes')),
     row.bool('from_schedule'),
+    row.nullableInt('start_minutes'),
+    row.nullableString('source'),
   );
 }
 
@@ -53,6 +61,8 @@ export class SqlTimesheetRepository implements TimesheetRepository {
       label: entry.label,
       minutes: entry.minutes().minutes,
       from_schedule: entry.fromSchedule,
+      start_minutes: entry.start,
+      source: entry.source,
     };
     await this.sql`INSERT INTO payroll_session ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET teacher_id = EXCLUDED.teacher_id, minutes = EXCLUDED.minutes`;
@@ -122,14 +132,15 @@ export class SqlSettlementRepository implements SettlementRepository, ProposalLo
               ${s.paidOn.toString()})`;
   }
 
-  async wasProposed(month: YearMonth): Promise<boolean> {
-    return (await this.sql`SELECT 1 FROM payroll_proposed_month WHERE month = ${month.toString()}`)
+  async wasProposed(date: LocalDate): Promise<boolean> {
+    return (await this
+      .sql`SELECT 1 FROM payroll_proposed_day WHERE proposed_date = ${date.toString()}`)
       .length > 0;
   }
 
-  async markProposed(month: YearMonth): Promise<void> {
+  async markProposed(date: LocalDate): Promise<void> {
     await this
-      .sql`INSERT INTO payroll_proposed_month (month) VALUES (${month.toString()}) ON CONFLICT DO NOTHING`;
+      .sql`INSERT INTO payroll_proposed_day (proposed_date) VALUES (${date.toString()}) ON CONFLICT DO NOTHING`;
   }
 }
 
@@ -163,6 +174,7 @@ export class SqlScheduleDirectory implements ScheduleDirectory {
         TeacherRef.fromString(row.string('teacher_id')),
         row.intList('days'),
         row.int('end_minutes') - row.int('start_minutes'),
+        row.int('start_minutes'),
       )
     );
   }
@@ -253,5 +265,200 @@ export class SqlPayrollQuery implements PayrollQuery {
         incomeCents: Math.round(a.income),
       }]),
     );
+  }
+}
+
+/** Festivos (tabla `payroll_holiday`). */
+export class SqlHolidayCalendar implements HolidayCalendar {
+  constructor(private readonly sql: Sql) {}
+
+  async isHoliday(date: LocalDate): Promise<boolean> {
+    return (await this.sql`SELECT 1 FROM payroll_holiday WHERE holiday_date = ${date.toString()}`)
+      .length > 0;
+  }
+
+  async add(date: LocalDate, name: string): Promise<void> {
+    await this
+      .sql`INSERT INTO payroll_holiday (holiday_date, name) VALUES (${date.toString()}, ${name})
+      ON CONFLICT (holiday_date) DO UPDATE SET name = EXCLUDED.name`;
+  }
+
+  async remove(date: LocalDate): Promise<void> {
+    await this.sql`DELETE FROM payroll_holiday WHERE holiday_date = ${date.toString()}`;
+  }
+
+  async between(from: LocalDate, to: LocalDate): Promise<{ date: string; name: string }[]> {
+    const rows = await this.sql`SELECT holiday_date::text AS date, name FROM payroll_holiday
+      WHERE holiday_date BETWEEN ${from.toString()} AND ${to.toString()} ORDER BY holiday_date`;
+    return Row.all(rows).map((r) => ({ date: r.string('date'), name: r.string('name') }));
+  }
+}
+
+function toDuty(row: Row): ClubDuty {
+  return new ClubDuty(
+    DutyRef.fromString(row.string('id')),
+    TeacherRef.fromString(row.string('teacher_id')),
+    row.int('weekday'),
+    row.int('start_minutes'),
+    row.int('end_minutes'),
+    row.string('label'),
+  );
+}
+
+/** Turnos fijos (tabla `payroll_duty`). */
+export class SqlDutyRepository implements DutyRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async all(): Promise<ClubDuty[]> {
+    return Row.all(await this.sql`SELECT * FROM payroll_duty ORDER BY weekday, start_minutes`).map(
+      toDuty,
+    );
+  }
+
+  async duty(id: DutyRef): Promise<ClubDuty | null> {
+    const rows = await this.sql`SELECT * FROM payroll_duty WHERE id = ${id.value}`;
+    return rows[0] ? toDuty(new Row(rows[0])) : null;
+  }
+
+  async save(duty: ClubDuty): Promise<void> {
+    const record = {
+      id: duty.id.value,
+      teacher_id: duty.teacher.value,
+      weekday: duty.weekday,
+      start_minutes: duty.start,
+      end_minutes: duty.end,
+      label: duty.label,
+    };
+    await this.sql`INSERT INTO payroll_duty ${this.sql(record)} ON CONFLICT (id) DO UPDATE SET ${
+      this.sql(record, 'teacher_id', 'weekday', 'start_minutes', 'end_minutes', 'label')
+    }`;
+  }
+
+  async delete(id: DutyRef): Promise<void> {
+    await this.sql`DELETE FROM payroll_duty WHERE id = ${id.value}`;
+  }
+}
+
+function toSubstitution(row: Row): Substitution {
+  return new Substitution(
+    GroupRef.fromString(row.string('group_id')),
+    LocalDate.fromString(row.string('substitution_date')),
+    TeacherRef.fromString(row.string('teacher_id')),
+    row.nullableString('reason'),
+  );
+}
+
+/** Sustituciones planificadas (tabla `payroll_substitution`). */
+export class SqlSubstitutionRepository implements SubstitutionRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async onDate(date: LocalDate): Promise<Substitution[]> {
+    return Row.all(
+      await this
+        .sql`SELECT * FROM payroll_substitution WHERE substitution_date = ${date.toString()}`,
+    ).map(toSubstitution);
+  }
+
+  async find(group: GroupRef, date: LocalDate) {
+    const rows = await this.sql`SELECT * FROM payroll_substitution
+      WHERE group_id = ${group.value} AND substitution_date = ${date.toString()}`;
+    if (!rows[0]) return null;
+    const row = new Row(rows[0]);
+    return { id: row.string('id'), substitution: toSubstitution(row) };
+  }
+
+  async byId(id: string): Promise<Substitution | null> {
+    const rows = await this.sql`SELECT * FROM payroll_substitution WHERE id::text = ${id}`;
+    return rows[0] ? toSubstitution(new Row(rows[0])) : null;
+  }
+
+  async save(id: string, s: Substitution): Promise<void> {
+    const record = {
+      id,
+      group_id: s.group.value,
+      substitution_date: s.date.toString(),
+      teacher_id: s.teacher.value,
+      reason: s.reason,
+    };
+    await this.sql`INSERT INTO payroll_substitution ${this.sql(record)}
+      ON CONFLICT (id) DO UPDATE SET teacher_id = EXCLUDED.teacher_id, reason = EXCLUDED.reason`;
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.sql`DELETE FROM payroll_substitution WHERE id::text = ${id}`;
+  }
+}
+
+/** Sustitución tal y como se ve en el calendario. */
+export interface SubstitutionView {
+  id: string;
+  date: string;
+  groupId: string;
+  groupName: string;
+  start: string;
+  end: string;
+  teacherId: string;
+  teacherName: string;
+  substituteId: string;
+  substituteName: string;
+  reason: string | null;
+}
+
+/** Turno fijo tal y como se ve en la lista. */
+export interface DutyView {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  weekday: number;
+  start: string;
+  end: string;
+  label: string;
+}
+
+const hhmm = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+/** Lecturas para el calendario de sustituciones y la lista de turnos. */
+export class SqlPlanningQuery {
+  constructor(private readonly sql: Sql) {}
+
+  async substitutions(from: LocalDate, to: LocalDate): Promise<SubstitutionView[]> {
+    const rows = await this.sql`
+      SELECT s.id, s.substitution_date::text AS date, s.group_id, s.reason, g.name AS group_name,
+             g.start_minutes, g.end_minutes, g.teacher_id AS owner_id, o.full_name AS owner_name,
+             s.teacher_id, t.full_name AS substitute_name
+        FROM payroll_substitution s
+        JOIN classes_group g ON g.id = s.group_id
+        JOIN teachers_teacher o ON o.id = g.teacher_id
+        JOIN teachers_teacher t ON t.id = s.teacher_id
+       WHERE s.substitution_date BETWEEN ${from.toString()} AND ${to.toString()}
+       ORDER BY s.substitution_date, g.start_minutes`;
+    return Row.all(rows).map((r) => ({
+      id: r.string('id'),
+      date: r.string('date'),
+      groupId: r.string('group_id'),
+      groupName: r.string('group_name'),
+      start: hhmm(r.int('start_minutes')),
+      end: hhmm(r.int('end_minutes')),
+      teacherId: r.string('owner_id'),
+      teacherName: r.string('owner_name'),
+      substituteId: r.string('teacher_id'),
+      substituteName: r.string('substitute_name'),
+      reason: r.nullableString('reason'),
+    }));
+  }
+
+  async duties(): Promise<DutyView[]> {
+    const rows = await this.sql`SELECT d.*, t.full_name FROM payroll_duty d
+      JOIN teachers_teacher t ON t.id = d.teacher_id ORDER BY d.weekday, d.start_minutes`;
+    return Row.all(rows).map((r) => ({
+      id: r.string('id'),
+      teacherId: r.string('teacher_id'),
+      teacherName: r.string('full_name'),
+      weekday: r.int('weekday'),
+      start: hhmm(r.int('start_minutes')),
+      end: hhmm(r.int('end_minutes')),
+      label: r.string('label'),
+    }));
   }
 }

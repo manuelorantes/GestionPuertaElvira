@@ -2,11 +2,14 @@ import { assert, assertEquals, assertThrows } from '@std/assert';
 
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
+  ClubDuty,
+  DailyPlanner,
+  DutyRef,
   GroupRef,
   ScheduledGroup,
   SessionMinutes,
-  SessionPlanner,
   SettlementCalculator,
+  Substitution,
   TeacherRef,
   TimesheetEntry,
   TimesheetEntryId,
@@ -19,20 +22,47 @@ Deno.test('SessionMinutes should accept half hours between half an hour and twel
   assertThrows(() => SessionMinutes.fromMinutes(750), InvalidValue);
 });
 
-Deno.test('SessionPlanner should propose a session for every class day of the month, and none in summer', () => {
-  const teacher = TeacherRef.generate();
-  const groups = [
-    new ScheduledGroup(GroupRef.generate(), 'Iniciación A', teacher, [1, 3], 60),
-    new ScheduledGroup(GroupRef.generate(), 'Competición', teacher, [5], 90),
-  ];
-  const sessions = new SessionPlanner().plan(YearMonth.fromString('2026-10'), groups);
-  // Octubre 2026: lunes 5, 12, 19, 26 · miércoles 7, 14, 21, 28 · viernes 2, 9, 16, 23, 30
-  assertEquals(sessions.length, 13);
-  assertEquals(sessions[0]?.date.toString(), '2026-10-02');
-  assertEquals(sessions[0]?.group.name, 'Competición');
-  assertEquals(sessions[0]?.minutes.minutes, 90);
-  assertEquals(sessions.reduce((sum, s) => sum + s.minutes.minutes, 0), 8 * 60 + 5 * 90);
-  assertEquals(new SessionPlanner().plan(YearMonth.fromString('2027-07'), groups), []);
+Deno.test('DailyPlanner should plan the classes and club duties of a day once they are over, with substitutions', () => {
+  const ana = TeacherRef.generate();
+  const angel = TeacherRef.generate();
+  const beginners = new ScheduledGroup(
+    GroupRef.generate(),
+    'Iniciación A',
+    ana,
+    [1, 3],
+    60,
+    17 * 60,
+  );
+  const competition = new ScheduledGroup(
+    GroupRef.generate(),
+    'Competición',
+    angel,
+    [5],
+    90,
+    18 * 60,
+  );
+  const duty = new ClubDuty(DutyRef.generate(), angel, 5, 17 * 60, 20 * 60, 'Encargado del club');
+  const planner = new DailyPlanner();
+  const friday = LocalDate.fromString('2026-10-09');
+
+  // Viernes a las 19:00: ni la competición (18:00–19:30) ni el turno (17:00–20:00) han acabado.
+  assertEquals(planner.plan(friday, [beginners, competition], [duty], [], 19 * 60), []);
+  const day = planner.plan(friday, [beginners, competition], [duty], [], null);
+  assertEquals(day.map((p) => [p.label, p.start, p.minutes.minutes, p.source]), [
+    ['Encargado del club', 17 * 60, 180, `duty:${duty.id.value}`],
+    ['Competición', 18 * 60, 90, `group:${competition.id.value}`],
+  ]);
+  assert(day.every((p) => p.teacher.equals(angel)));
+
+  // El lunes de la sustitución, la clase la apunta quien sustituye.
+  const monday = LocalDate.fromString('2026-10-05');
+  const substitution = new Substitution(beginners.id, monday, angel, 'Ana, en un torneo');
+  const replaced = planner.plan(monday, [beginners], [], [substitution], null);
+  assertEquals(replaced.map((p) => [p.label, p.teacher.equals(angel)]), [[
+    'Iniciación A (sustitución)',
+    true,
+  ]]);
+  assertEquals(planner.plan(LocalDate.fromString('2027-07-05'), [beginners], [], [], null), []);
 });
 
 const entry = (
@@ -41,6 +71,7 @@ const entry = (
   group: GroupRef | null,
   label: string,
   hours: number,
+  start: number | null = null,
 ) =>
   TimesheetEntry.record(
     TimesheetEntryId.generate(),
@@ -50,6 +81,7 @@ const entry = (
     label,
     SessionMinutes.fromHours(hours),
     false,
+    start,
   );
 
 Deno.test('TimesheetEntry should reassign and resize a session and require a label', () => {
@@ -81,4 +113,37 @@ Deno.test('SettlementCalculator should settle hours by rate with a breakdown per
     120,
     3300,
   ], ['Torneo escolar', 150, 4125]]);
+});
+
+Deno.test('SettlementCalculator should not count twice the hours that overlap on the same day', () => {
+  // Encargado de 17:00 a 20:00 y clase de 18:00 a 19:30: 3 horas, no 4,5.
+  const angel = TeacherRef.generate();
+  const settlement = new SettlementCalculator().settle(
+    [
+      entry(angel, '2026-10-09', null, 'Encargado del club', 3, 17 * 60),
+      entry(angel, '2026-10-09', GroupRef.generate(), 'Competición', 1.5, 18 * 60),
+      entry(angel, '2026-10-16', GroupRef.generate(), 'Competición', 1.5, 18 * 60),
+    ],
+    Money.cents(1500),
+  );
+  assertEquals(settlement.minutes, 180 + 90);
+  assertEquals(settlement.lines.map((l) => [l.label, l.minutes]), [
+    ['Encargado del club', 180],
+    ['Competición', 90],
+  ]);
+  assertEquals(settlement.amount.cents, 6750);
+});
+
+Deno.test('SettlementCalculator should count once a stretch covered by several overlapping sessions', () => {
+  // 17:00–19:00 y 18:00–20:00 se solapan; una tercera de 18:00–19:00 no añade nada: 3 horas en total.
+  const teacher = TeacherRef.generate();
+  const settlement = new SettlementCalculator().settle(
+    [
+      entry(teacher, '2026-10-09', null, 'A', 2, 17 * 60),
+      entry(teacher, '2026-10-09', null, 'B', 2, 18 * 60),
+      entry(teacher, '2026-10-09', null, 'C', 1, 18 * 60),
+    ],
+    Money.cents(1000),
+  );
+  assertEquals(settlement.minutes, 180);
 });

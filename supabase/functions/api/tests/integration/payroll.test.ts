@@ -133,3 +133,81 @@ Deno.test({
     );
   },
 });
+
+Deno.test('payroll should manage holidays, club duties and substitutions over HTTP', async () => {
+  const { client, teacher } = await fixture();
+  const other = await newTeacher(client, 'Ángel Castillo Rodriguez');
+
+  const holiday = await client.json('POST', '/api/admin/payroll/holidays', {
+    date: '2026-12-08',
+    name: 'Inmaculada Concepción',
+  });
+  assertEquals(holiday.status, 200, JSON.stringify(holiday.body));
+  const holidays = (await client.get('/api/admin/payroll/holidays?season=2026')).body as {
+    items: { date: string; name: string }[];
+  };
+  assertEquals(holidays.items, [{ date: '2026-12-08', name: 'Inmaculada Concepción' }]);
+  assertEquals(
+    (await client.json('DELETE', '/api/admin/payroll/holidays/2026-12-08', {})).status,
+    204,
+  );
+
+  const duty = await client.json('POST', '/api/admin/payroll/duties', {
+    teacherId: other,
+    weekday: 5,
+    start: '17:00',
+    end: '20:00',
+  });
+  assertEquals(duty.status, 201, JSON.stringify(duty.body));
+  const duties = (await client.get('/api/admin/payroll/duties')).body as {
+    items: { teacherName: string; weekday: number; start: string; end: string; label: string }[];
+  };
+  assertEquals(duties.items.map((d) => [d.teacherName, d.weekday, d.start, d.end, d.label]), [
+    ['Ángel Castillo Rodriguez', 5, '17:00', '20:00', 'Encargado del club'],
+  ]);
+  assertError(
+    await client.json('POST', '/api/admin/payroll/duties', {
+      teacherId: other,
+      weekday: 5,
+      start: '20:00',
+      end: '17:00',
+    }),
+    422,
+    'unprocessable',
+  );
+
+  // Grupo de los lunes de 17:00 a 18:00 del profesor titular; un lunes lo da Ángel.
+  const group = await newGroup(client, teacher, {
+    days: ['mon'],
+    start: '17:00',
+    end: '18:00',
+    classroom: 'caballo',
+  });
+  const planned = await client.json('POST', '/api/admin/payroll/substitutions', {
+    groupId: group,
+    date: '2026-11-09',
+    teacherId: other,
+    reason: 'Torneo',
+  });
+  assertEquals(planned.status, 201, JSON.stringify(planned.body));
+  const listed = (await client.get('/api/admin/payroll/substitutions?month=2026-11')).body as {
+    items: { id: string; date: string; substituteName: string; start: string; reason: string }[];
+  };
+  assertEquals(listed.items.map((s) => [s.date, s.substituteName, s.start, s.reason]), [
+    ['2026-11-09', 'Ángel Castillo Rodriguez', '17:00', 'Torneo'],
+  ]);
+  assertError(
+    await client.json('POST', '/api/admin/payroll/substitutions', {
+      groupId: group,
+      date: '2026-11-10',
+      teacherId: other,
+    }),
+    422,
+    'unprocessable',
+  );
+  const id = listed.items[0]?.id ?? '';
+  assertEquals(
+    (await client.json('DELETE', `/api/admin/payroll/substitutions/${id}`, {})).status,
+    204,
+  );
+});

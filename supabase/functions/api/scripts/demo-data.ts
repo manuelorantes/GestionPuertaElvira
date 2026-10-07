@@ -9,7 +9,7 @@ import {
   UpdateStudentAccount,
 } from '../src/application/billing/mod.ts';
 import { CreateClassGroup } from '../src/application/classes/mod.ts';
-import { PaySettlement, ProposeMonthSessions } from '../src/application/payroll/mod.ts';
+import { PaySettlement, ProposeSessions } from '../src/application/payroll/mod.ts';
 import { LinkSiblings, RegisterStudent } from '../src/application/students/mod.ts';
 import { ChangeTeacherRate, RegisterTeacher } from '../src/application/teachers/mod.ts';
 import { TeachersTeacherDirectory } from '../src/infrastructure/classes/routes.ts';
@@ -25,8 +25,11 @@ import {
 } from '../src/infrastructure/persistence/billing.ts';
 import { SqlClassGroupRepository } from '../src/infrastructure/persistence/classes.ts';
 import {
+  SqlDutyRepository,
+  SqlHolidayCalendar,
   SqlScheduleDirectory,
   SqlSettlementRepository,
+  SqlSubstitutionRepository,
   SqlTeacherRates,
   SqlTimesheetRepository,
 } from '../src/infrastructure/persistence/payroll.ts';
@@ -322,6 +325,10 @@ const RESET_TABLES = [
   'payroll_session',
   'payroll_settlement',
   'payroll_proposed_month',
+  'payroll_proposed_day',
+  'payroll_substitution',
+  'payroll_duty',
+  'payroll_holiday',
   'billing_charge',
   'billing_payment',
   'billing_account',
@@ -401,8 +408,11 @@ function useCases(tx: TransactionSql, clock: Clock) {
       accounts,
     ),
     issueInvoice: new IssueInvoice(payments, sequence, transactions, clock, locks),
-    proposeSessions: new ProposeMonthSessions(
+    proposeSessions: new ProposeSessions(
       new SqlScheduleDirectory(tx),
+      new SqlDutyRepository(tx),
+      new SqlSubstitutionRepository(tx),
+      new SqlHolidayCalendar(tx),
       timesheets,
       settlements,
       settlements,
@@ -564,8 +574,9 @@ async function seedPayroll(
   const current = YearMonth.of(LocalDate.fromInstant(clock.now()));
   const season = Season.teachingSeason(current);
   if (season === null) return;
+  // Las horas se apuntan solas día a día (desde el mes anterior hasta hoy).
+  await app.proposeSessions.execute();
   for (let month = season.firstMonth(); !current.isBefore(month); month = month.next()) {
-    await app.proposeSessions.execute(month.toString());
     if (!month.isBefore(current)) continue;
     for (const [key, teacherId] of Object.entries(teacherIds)) {
       if (key !== UNPAID_TEACHER || month.next().isBefore(current)) {
