@@ -1,4 +1,4 @@
-import { type Clock, LocalDate, YearMonth } from '../../domain/common/mod.ts';
+import { type Clock, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import type { LedgerLine, MonthLedger } from '../accounting/mod.ts';
 import type { BillingQuery, ChargeView, ListMonthlyCharges } from '../billing/mod.ts';
 import type { ClassQuery, GroupSummary } from '../classes/mod.ts';
@@ -30,9 +30,20 @@ export interface ClubSummaryView {
 }
 
 /**
+ * Cuotas mensuales para el gráfico de la temporada: no por cuándo se cobran, sino por el mes al que corresponden.
+ */
+export interface FeeIncome {
+  /** Lo cobrado en cuotas mensuales, por mes de cobro (céntimos por «AAAA-MM»). */
+  collectedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
+  /** Cada cobro de cuotas mensuales repartido a partes iguales entre los meses que paga. */
+  earnedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
+}
+
+/**
  * Resumen del club con cifras reales: lo compone a partir de Cobros, Contabilidad, Alumnado y Clases.
  */
 export class ClubSummary {
+  /** La temporada en el gráfico: de septiembre a agosto. */
   private static readonly CHART_MONTHS = 12;
   private static readonly LIST_SIZE = 6;
 
@@ -43,14 +54,20 @@ export class ClubSummary {
     private readonly students: StudentQuery,
     private readonly classes: ClassQuery,
     private readonly clock: Clock,
+    private readonly fees: FeeIncome,
   ) {}
 
   async execute(): Promise<ClubSummaryView> {
     const today = LocalDate.fromInstant(this.clock.now());
     const month = YearMonth.of(today);
     const charges = await this.charges.execute(month.toString());
-    let first = month;
-    for (let i = 1; i < ClubSummary.CHART_MONTHS; i++) first = first.previous();
+    const first = Season.containing(month).firstMonth();
+    let last = first;
+    for (let i = 1; i < ClubSummary.CHART_MONTHS; i++) last = last.next();
+    // Las cuotas mensuales cuentan en el mes al que corresponden; lo demás (socio, subvenciones, promociones…),
+    // en el mes en que se cobra.
+    const collected = await this.fees.collectedByMonth(first, last);
+    const earned = await this.fees.earnedByMonth(first, last);
     const chart: ClubSummaryView['chart'] = [];
     let current: { expenseCents: number; lines: LedgerLine[] } | null = null;
     let previousLines: LedgerLine[] = [];
@@ -58,7 +75,8 @@ export class ClubSummary {
       const view = await this.ledger.execute(m.toString());
       chart.push({
         month: m.toString(),
-        incomeCents: view.incomeCents,
+        incomeCents: view.incomeCents - (collected.get(m.toString()) ?? 0) +
+          (earned.get(m.toString()) ?? 0),
         expenseCents: view.expenseCents,
       });
       if (m.equals(month)) current = view;

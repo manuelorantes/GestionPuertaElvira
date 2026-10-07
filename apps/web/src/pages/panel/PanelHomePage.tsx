@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { useSession } from '@/features/auth/useSession';
+import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { formatCents, monthLabel, monthName } from '@/features/billing/money';
 import { fetchDashboard, type Dashboard } from '@/features/dashboard/api';
 import { formatDate } from '@/features/students/format';
@@ -77,7 +78,7 @@ function Summary({ data }: { data: Dashboard }) {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <Card className="p-6">
           <div className="mb-5 flex flex-wrap items-baseline justify-between gap-4">
-            <Title>Mes a mes · últimos 12 meses</Title>
+            <Title>{`Mes a mes · temporada ${seasonLabel(data.chart[0]?.month ?? data.month)}`}</Title>
             <div className="flex gap-4 text-[13px] text-ink-soft">
               <span className="flex items-center gap-1.5">
                 <span aria-hidden className="size-3 rounded-[3px] bg-brand" />
@@ -218,6 +219,11 @@ function Summary({ data }: { data: Dashboard }) {
       <BillingDialogs dialog={dialog} onChange={setDialog} />
     </>
   );
+}
+
+/** «2026/27» para el mes de inicio del gráfico. */
+function seasonLabel(month: string): string {
+  return fiscalYearLabel(fiscalYearOf(month));
 }
 
 export function PanelHomePage() {

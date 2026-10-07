@@ -3,6 +3,7 @@ import { ClubSummary } from '../../application/dashboard/mod.ts';
 import { billing } from '../billing/routes.ts';
 import type { ApiApp } from '../http/app.ts';
 import { SqlLedgerQuery } from '../persistence/accounting.ts';
+import { SqlFeeIncome } from '../persistence/billing.ts';
 import { SqlClassQuery } from '../persistence/classes.ts';
 import { SqlStudentQuery } from '../persistence/students.ts';
 
@@ -19,6 +20,7 @@ export function registerDashboardRoutes(api: ApiApp): void {
         new SqlStudentQuery(scope.tx, new SqlClassQuery(scope.tx)),
         new SqlClassQuery(scope.tx),
         api.deps.clock,
+        new SqlFeeIncome(scope.tx),
       );
       return c.json(await summary.execute());
     },

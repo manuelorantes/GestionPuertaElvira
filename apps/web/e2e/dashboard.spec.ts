@@ -12,7 +12,7 @@ test('should summarise the club with real figures', async ({ page }) => {
 
   await expect(page.getByText(/^Cobrado en /)).toBeVisible();
   await expect(
-    page.getByRole('img', { name: /Ingresos y gastos de los últimos 12 meses/ }),
+    page.getByRole('img', { name: /Ingresos y gastos de la temporada, de septiembre a agosto/ }),
   ).toBeVisible();
   await expect(page.getByText('Ocupación de clases')).toBeVisible();
   if (month !== 9) {

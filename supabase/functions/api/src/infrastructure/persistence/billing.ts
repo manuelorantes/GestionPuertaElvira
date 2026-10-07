@@ -31,6 +31,7 @@ import type {
   StudentAccountRepository,
   StudentDirectory,
 } from '../../application/billing/mod.ts';
+import type { FeeIncome } from '../../application/dashboard/mod.ts';
 import type { ClosedPeriods } from '../../application/common/mod.ts';
 import { Row, type Sql } from './sql.ts';
 
@@ -520,5 +521,34 @@ export class SqlStudentDirectory implements StudentDirectory {
       groups.set(row.string('student_id'), list);
     }
     return groups;
+  }
+}
+
+/** Cuotas mensuales por mes de cobro y por mes al que corresponden (para el gráfico de la temporada). */
+export class SqlFeeIncome implements FeeIncome {
+  constructor(private readonly sql: Sql) {}
+
+  async collectedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
+    const rows = await this.sql`
+      SELECT to_char(paid_on, 'YYYY-MM') AS month, SUM(total_cents) AS cents FROM billing_payment
+       WHERE kind = 'monthly' AND to_char(paid_on, 'YYYY-MM') BETWEEN ${first.toString()} AND ${last.toString()}
+       GROUP BY 1`;
+    return new Map(Row.all(rows).map((r) => [r.string('month'), r.int('cents')]));
+  }
+
+  async earnedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
+    // Reparto exacto: cada mes recibe el cociente y los primeros, un céntimo más hasta agotar el resto.
+    const rows = await this.sql`
+      SELECT period AS month, SUM(share) AS cents FROM (
+        SELECT e.period,
+               p.total_cents / k.n + CASE WHEN e.position - 1 < p.total_cents % k.n THEN 1 ELSE 0 END AS share
+          FROM billing_payment p
+          CROSS JOIN LATERAL (SELECT GREATEST(jsonb_array_length(p.periods::jsonb), 1) AS n) k
+          CROSS JOIN LATERAL jsonb_array_elements_text(p.periods::jsonb) WITH ORDINALITY AS e(period, position)
+         WHERE p.kind = 'monthly'
+      ) shares
+       WHERE period BETWEEN ${first.toString()} AND ${last.toString()}
+       GROUP BY period`;
+    return new Map(Row.all(rows).map((r) => [r.string('month'), r.int('cents')]));
   }
 }
