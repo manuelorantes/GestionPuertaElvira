@@ -148,7 +148,16 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
       return (
         <>
           <div className="flex justify-end border-b border-line-soft px-5 py-3">{menu}</div>
-          <p className="px-5 py-12 text-center text-ink-muted">Ninguna cuota con ese estado.</p>
+          <p className="px-5 py-12 text-center text-ink-muted">
+            Ninguna cuota con ese estado.{' '}
+            <button
+              type="button"
+              onClick={() => setStatusFilter([])}
+              className="cursor-pointer font-semibold text-brand"
+            >
+              Ver todas
+            </button>
+          </p>
         </>
       );
     }

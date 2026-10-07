@@ -221,7 +221,11 @@ describe('Cobros y cuotas', () => {
     await userEvent.click(within(months).getByRole('button', { name: 'Septiembre 2026' }));
     expect(await screen.findByText('No hay cuotas este mes.')).toBeInTheDocument();
 
-    await userEvent.click(within(months).getByRole('button', { name: 'Cuotas de socio' }));
+    await userEvent.click(
+      within(screen.getByRole('group', { name: 'Cuotas a ver' })).getByRole('button', {
+        name: 'Cuotas de socio',
+      }),
+    );
     expect(await screen.findByText('No hay cuotas de socio esta temporada.')).toBeInTheDocument();
     expect(
       fetch.mock.calls.some(
