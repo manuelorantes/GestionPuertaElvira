@@ -16,6 +16,7 @@ StudentsPage (/panel/alumnos)
 │   └── Recuento: «N de M mostrados»
 ├── StudentsTable (escritorio) / StudentCards (móvil)
 │   ├── Cabecera (escritorio): Alumno | Grupos | Estado
+│   ├── Cabecera: «Nº» y «Alumno» son botones para ordenar por número de socio o alfabéticamente (?orden=numero|-numero|nombre|-nombre; pulsar otra vez invierte; por defecto, por nombre)
 │   └── Fila (botón): nº de socio | avatar con iniciales + nombre + «12 años» | grupos (nombre y horario) | badge Activo/De baja (+ «Hermanos»)
 ├── Estado vacío: «No hay alumnos que coincidan con la búsqueda.»
 ├── StudentPanel (ficha: panel lateral derecho en escritorio; ruta /panel/alumnos/:id en pantalla completa en móvil)

@@ -23,6 +23,7 @@ listado del club), pero MUST NOT darles un número que no tenga ninguno de ellos
 El sistema MUST mostrar los alumnos con su número de socio, nombre, edad (o «edad sin indicar»), grupos y
 estado, con búsqueda por cualquier parte del nombre (sin distinguir mayúsculas ni tildes) o por número de
 socio, y con los filtros Todos, Activos, Familia directa, De baja y Socios sin clases.
+La lista MUST poder ordenarse por número de socio o alfabéticamente (por defecto), en ambos sentidos.
 
 #### Scenario: Buscar sin tildes
 - **WHEN** administración busca «lopez»
