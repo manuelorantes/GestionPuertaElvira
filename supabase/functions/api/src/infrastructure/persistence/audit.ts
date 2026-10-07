@@ -59,6 +59,13 @@ function view(row: Row): AuditActionView {
 /**
  * Lectura y reversión del historial (tablas audit_action y audit_change, rellenadas por el trigger audit_capture).
  */
+/**
+ * El historial muestra solo lo que cambió datos guardados: los eventos de sesión (inicios, cierres, intentos
+ * fallidos, suplantaciones) siguen registrándose por seguridad y para la última conexión, pero no se listan.
+ */
+const PERSISTED =
+  `a.kind <> 'security' AND EXISTS (SELECT 1 FROM audit_change c WHERE c.action_id = a.id)`;
+
 export class SqlAuditLog implements AuditLog, AuditReverter {
   constructor(private readonly sql: Sql) {}
 
@@ -66,7 +73,8 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
     const limit = Math.max(1, Math.min(200, filter.limit ?? 50));
     const rows = await this.sql.unsafe(
       `SELECT ${ACTION_COLUMNS} FROM audit_action a
-        WHERE ($1::uuid IS NULL OR a.user_id = $1::uuid) AND ($2::bigint IS NULL OR a.seq < $2::bigint)
+        WHERE ${PERSISTED} AND ($1::uuid IS NULL OR a.user_id = $1::uuid)
+          AND ($2::bigint IS NULL OR a.seq < $2::bigint)
         ORDER BY a.seq DESC LIMIT $3`,
       [filter.userId ?? null, filter.beforeSeq ?? null, limit],
     );
@@ -115,8 +123,10 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
   }
 
   async people(): Promise<{ id: string; name: string }[]> {
-    const rows = await this.sql`SELECT DISTINCT ON (user_id) user_id, user_name FROM audit_action
-      WHERE user_id IS NOT NULL ORDER BY user_id, seq DESC`;
+    const rows = await this.sql.unsafe(
+      `SELECT DISTINCT ON (a.user_id) a.user_id, a.user_name FROM audit_action a
+        WHERE a.user_id IS NOT NULL AND ${PERSISTED} ORDER BY a.user_id, a.seq DESC`,
+    );
     return Row.all(rows).map((r) => ({ id: r.string('user_id'), name: r.string('user_name') }));
   }
 
