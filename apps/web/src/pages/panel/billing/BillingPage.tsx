@@ -55,6 +55,7 @@ export function BillingPage() {
     if (tab === 'tarifas') return <SettingsTab />;
     return (
       <ChargesTab
+        key={membership ? 'socio' : month}
         month={month}
         membership={membership}
         onMonthChange={(m) => setParam('mes', m)}

@@ -16,6 +16,7 @@ import {
   PlanSubstitution,
   ProposeSessions,
   RecordSession,
+  RefillDay,
   SaveDuty,
   SubstitutionNeedsReason,
   UpdateSession,
@@ -256,4 +257,15 @@ Deno.test('PayAllSettlements should pay every pending settlement of the month', 
   );
   assertEquals(fx.paidSettlements.size, 2);
   await assertRejects(() => pay().execute(carlos, '2026-10', '2026-11-03'), SettlementAlreadyPaid);
+});
+
+Deno.test('RefillDay should add the missing automatic sessions of a past day without duplicating them', async () => {
+  const { fx, duties, substitutions } = setUp();
+  fx.markMonthProposed(YearMonth.fromString('2026-10'));
+  const refill = () => new RefillDay(fx, duties, substitutions, fx, fx, fx, fx, fx.clock);
+  assertEquals(await refill().execute('2026-10-05'), 1, 'el lunes, Iniciación A');
+  assertEquals(await refill().execute('2026-10-05'), 0, 'sin duplicados');
+  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
+  assertEquals(await refill().execute('2026-10-12'), 0, 'festivo');
+  await assertRejects(() => refill().execute('2026-11-02'), InvalidValue);
 });
