@@ -1,50 +1,151 @@
-import { assertEquals, assertFalse, assertRejects } from '@std/assert';
+import { assertEquals, assertRejects } from '@std/assert';
 
-import { InvalidValue, Money, YearMonth } from '../../src/domain/common/mod.ts';
+import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
   SettlementAlreadyPaid,
   TeacherRef,
   type TimesheetEntry,
 } from '../../src/domain/payroll/mod.ts';
 import {
+  AddHoliday,
+  CancelSubstitution,
   DeleteSession,
   ListSettlements,
-  MarkHoliday,
   PayAllSettlements,
   PaySettlement,
-  ProposeMonthSessions,
+  PlanSubstitution,
+  ProposeSessions,
   RecordSession,
+  SaveDuty,
+  SubstitutionNeedsReason,
   UpdateSession,
 } from '../../src/application/payroll/mod.ts';
 import { PeriodClosed } from '../../src/application/common/mod.ts';
-import { PayrollFixture } from '../support/payroll.ts';
+import { DutyFixture, PayrollFixture, SubstitutionFixture } from '../support/payroll.ts';
 
 function setUp() {
   const fx = new PayrollFixture();
   const lucia = fx.teacherWithGroup('Lucía Moreno Gil', 1600, 'Iniciación A', [1, 3], 60);
   const carlos = fx.teacherWithGroup('Carlos Ruiz Márquez', 1800, 'Adultos I', [2], 90);
-  const propose = (month: string) =>
-    new ProposeMonthSessions(fx, fx, fx, fx, fx.clock, fx.transactions, fx.locks).execute(month);
+  const duties = new DutyFixture(fx);
+  const substitutions = new SubstitutionFixture(fx);
+  const proposer = () =>
+    new ProposeSessions(
+      fx,
+      duties,
+      substitutions,
+      fx,
+      fx,
+      fx,
+      fx,
+      fx.clock,
+      fx.transactions,
+      fx.locks,
+    );
+  // Septiembre ya estaba apuntado: solo se apunta octubre (hasta hoy, 31 de octubre por la noche).
+  fx.markMonthProposed(YearMonth.fromString('2026-09'));
+  const propose = (_month?: string) => proposer().execute();
   const pay = () => new PaySettlement(fx, fx, fx, fx, fx.transactions, fx.locks);
   const list = () => new ListSettlements(fx, fx, fx);
-  return { fx, lucia, carlos, propose, pay, list };
+  return { fx, lucia, carlos, propose, pay, list, duties, substitutions };
 }
 
-Deno.test('ProposeMonthSessions should propose the month once, respect deletions and skip old and future months', async () => {
+Deno.test('ProposeSessions should record each class once it is over, skip holidays and respect deletions', async () => {
   const { fx, propose } = setUp();
-  await propose('2026-10');
-  assertEquals(fx.entries.size, 8 + 4);
+  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
+  await propose();
+  // Octubre: 8 lunes y miércoles de Lucía menos el festivo del 12, y 4 martes de Carlos.
+  assertEquals(fx.entries.size, 7 + 4);
   const first = [...fx.entries.keys()][0] as string;
   await new DeleteSession(fx, fx).execute(first);
-  await propose('2026-10');
-  assertEquals(fx.entries.size, 11);
+  await propose();
+  assertEquals(fx.entries.size, 10, 'lo borrado no vuelve');
 
-  const old = setUp();
-  await old.propose('2026-08');
-  await old.propose('2025-10');
-  await old.propose('2026-11');
-  assertEquals(old.fx.entries.size, 0);
-  assertFalse(await old.fx.wasProposed(YearMonth.fromString('2026-11')));
+  // A media tarde solo están las clases que ya han acabado.
+  const live = new PayrollFixture('2026-10-20T17:30:00+02:00');
+  const ana = live.teacherWithGroup('Ana', 1500, 'Martes temprano', [2], 30, 16 * 60);
+  live.teacherWithGroup('Bea', 1500, 'Martes tarde', [2], 60, 17 * 60);
+  live.markMonthProposed(YearMonth.fromString('2026-09'));
+  for (let day = 1; day < 20; day++) live.proposed.add(`2026-10-${String(day).padStart(2, '0')}`);
+  const liveProposer = new ProposeSessions(
+    live,
+    new DutyFixture(live),
+    new SubstitutionFixture(live),
+    live,
+    live,
+    live,
+    live,
+    live.clock,
+    live.transactions,
+    live.locks,
+  );
+  await liveProposer.execute();
+  assertEquals([...live.entries.values()].map((e) => [e.label, e.teacher().value]), [[
+    'Martes temprano',
+    ana,
+  ]]);
+  await liveProposer.execute();
+  assertEquals(live.entries.size, 1, 'sin duplicados en el mismo día');
+});
+
+Deno.test('club duties count as hours without adding the classes given meanwhile', async () => {
+  const { fx, carlos, duties, propose, list } = setUp();
+  // Carlos: martes de 17:00 a 18:30 con Adultos I; encargado del club los martes de 17:00 a 20:00.
+  await new SaveDuty(duties, fx).execute(null, {
+    teacherId: carlos,
+    weekday: 2,
+    start: '17:00',
+    end: '20:00',
+    label: null,
+  });
+  await propose();
+  const settlement = (await list().execute('2026-10')).find((s) => s.teacherId === carlos);
+  assertEquals(settlement?.minutes, 4 * 180, '4 martes × 3 h, sin sumar la clase de 1,5 h');
+  assertEquals(settlement?.lines.map((l) => [l.label, l.minutes]), [
+    ['Encargado del club', 720],
+    ['Adultos I', 0],
+  ]);
+});
+
+Deno.test('substitutions give the class to another teacher and need a reason when they overlap', async () => {
+  const { fx, lucia, carlos, duties, substitutions, propose } = setUp();
+  const beginners = fx.scheduledGroups.find((g) => g.name === 'Iniciación A')!;
+  const planner = new PlanSubstitution(fx, duties, substitutions, fx, fx, fx);
+  const id = await planner.execute({
+    groupId: beginners.id.value,
+    date: '2026-10-05',
+    teacherId: carlos,
+    reason: null,
+  });
+  await propose();
+  const monday = [...fx.entries.values()].find((e) => e.date.toString() === '2026-10-05')!;
+  assertEquals([monday.teacher().value, monday.label], [carlos, 'Iniciación A (sustitución)']);
+
+  // Anularla devuelve la sesión ya apuntada al titular.
+  await new CancelSubstitution(fx, substitutions, fx, fx).execute(id);
+  assertEquals(monday.teacher().value, lucia);
+
+  // Carlos da Adultos I los martes a las 17:00: sustituir otra clase del martes a la misma hora pide motivo.
+  const tuesdayGroup = fx.teacherWithGroup('Ana Belén Torres', 1500, 'Martes B', [2], 60, 17 * 60);
+  const other = fx.scheduledGroups.find((g) => g.teacher.value === tuesdayGroup)!;
+  await assertRejects(
+    () =>
+      planner.execute({
+        groupId: other.id.value,
+        date: '2026-10-06',
+        teacherId: carlos,
+        reason: null,
+      }),
+    SubstitutionNeedsReason,
+    'Adultos I',
+  );
+  await planner.execute({
+    groupId: other.id.value,
+    date: '2026-10-06',
+    teacherId: carlos,
+    reason: 'Ana Belén enferma: junta los dos grupos',
+  });
+  assertEquals(fx.substitutions.size, 1);
 });
 
 Deno.test('RecordSession should record group sessions and other activities for known teachers only', async () => {
@@ -91,7 +192,7 @@ Deno.test('RecordSession should record group sessions and other activities for k
   );
 });
 
-Deno.test('UpdateSession and MarkHoliday should substitute a teacher and remove a day', async () => {
+Deno.test('UpdateSession and AddHoliday should substitute a teacher and remove a day', async () => {
   const { fx, carlos, propose } = setUp();
   await propose('2026-10');
   const monday = [...fx.entries.values()].find((e) =>
@@ -100,7 +201,7 @@ Deno.test('UpdateSession and MarkHoliday should substitute a teacher and remove 
   await new UpdateSession(fx, fx, fx).execute(monday.id.value, carlos, 1.5);
   assertEquals(monday.teacher().value, carlos);
   assertEquals(monday.minutes().minutes, 90);
-  assertEquals(await new MarkHoliday(fx, fx).execute('2026-10-12'), 1);
+  assertEquals(await new AddHoliday(fx, fx, fx).execute('2026-10-12', 'Fiesta Nacional'), 1);
   assertEquals(fx.entries.size, 11);
 });
 

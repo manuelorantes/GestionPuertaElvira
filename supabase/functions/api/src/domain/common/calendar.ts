@@ -202,3 +202,14 @@ export class Season {
     return `${this.startYear}/${String((this.startYear + 1) % 100).padStart(2, '0')}`;
   }
 }
+
+/** Minutos transcurridos desde las 00:00 en Madrid en un instante (17:30 → 1050). */
+export function minutesOfDayInMadrid(instant: Date): number {
+  const [hours = '0', minutes = '0'] = new Intl.DateTimeFormat('en-GB', {
+    timeZone: TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(instant).split(':');
+  return Number(hours) * 60 + Number(minutes);
+}
