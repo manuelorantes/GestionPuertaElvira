@@ -99,6 +99,8 @@ const ACCOUNT = {
   hasPrivateLessons: false,
   membershipPaid: false,
   membershipFeeCents: 5000,
+  charges: [],
+  balanceCents: 0,
 };
 
 function api(extra: Parameters<typeof mockApi>[0] = {}) {

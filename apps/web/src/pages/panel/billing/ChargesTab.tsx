@@ -16,6 +16,7 @@ const STATUS: Record<
   { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }
 > = {
   paid: { label: 'Cobrada', tone: 'success' },
+  partial: { label: 'Pagada en parte', tone: 'warning' },
   due: { label: 'En plazo', tone: 'warning' },
   overdue: { label: 'Vencida', tone: 'danger' },
   upcoming: { label: 'Próxima', tone: 'neutral' },
@@ -118,6 +119,7 @@ export function ChargesTab({ month, onMonthChange, onAction }: ChargesTabProps) 
               <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
                 {concept(charge)}
                 <Badge tone={STATUS[charge.status].tone}>{STATUS[charge.status].label}</Badge>
+                {charge.status === 'partial' && <Missing charge={charge} />}
                 {charge.remindedOn && charge.status !== 'paid' && (
                   <span className="text-[13px] text-brand-strong">Avisado</span>
                 )}
@@ -155,6 +157,7 @@ export function ChargesTab({ month, onMonthChange, onAction }: ChargesTabProps) 
                   <td className="px-5 py-2.5">
                     <span className="flex flex-wrap items-center gap-2">
                       <Badge tone={STATUS[charge.status].tone}>{STATUS[charge.status].label}</Badge>
+                      {charge.status === 'partial' && <Missing charge={charge} />}
                       {charge.remindedOn && charge.status !== 'paid' && (
                         <span className="inline-flex items-center gap-1 text-[13px] text-brand-strong">
                           <Check aria-hidden size={14} />
@@ -202,5 +205,14 @@ export function ChargesTab({ month, onMonthChange, onAction }: ChargesTabProps) 
       )}
       <Card>{renderBody()}</Card>
     </div>
+  );
+}
+
+/** «Faltan 10 €» bajo una cuota pagada en parte. */
+function Missing({ charge }: { charge: Charge }) {
+  return (
+    <span className="text-[12px] text-ink-muted">
+      Faltan {formatCents(charge.amountCents - charge.coveredCents)}
+    </span>
   );
 }

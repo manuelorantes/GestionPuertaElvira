@@ -7,6 +7,7 @@ import {
   YearMonth,
 } from '../../domain/common/mod.ts';
 import {
+  allocateCredit,
   BillingSettings,
   Charge,
   ChargeId,
@@ -83,8 +84,10 @@ export interface StudentAccountRepository {
 export interface ChargeRepository {
   charge(id: ChargeId): Promise<Charge | null>;
   chargeFor(student: StudentRef, kind: ChargeKind, period: YearMonth): Promise<Charge | null>;
-  /** Cuotas sin pagar, de la más antigua a la más reciente. */
-  unpaidFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]>;
+  /** Todas las cuotas de un tipo del alumno, de la más antigua a la más reciente. */
+  allFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]>;
+  /** Lo que cubren todos los cobros de ese tipo del alumno (en importes de cuota, antes de descuentos). */
+  creditFor(student: StudentRef, kind: ChargeKind): Promise<Money>;
   saveCharge(charge: Charge): Promise<void>;
 }
 
@@ -112,6 +115,11 @@ export interface ChargeView {
   paymentId: string | null;
   receiptNumber: string | null;
   remindedOn: string | null;
+  /** Lo que tiene cubierto por los cobros del alumno (reparto de la más antigua a la más reciente). */
+  coveredCents: number;
+  /** Fijada a mano y su motivo. */
+  manual: boolean;
+  note: string | null;
 }
 
 export interface PaymentSummary {
@@ -193,6 +201,19 @@ export const decimal = (money: Money): string => (money.cents / 100).toFixed(2);
  * Crea las cuotas del mes que falten (idempotente): la mensual de cada alumno activo y la de socio de la temporada.
  * Nunca para meses futuros.
  */
+/** Cuotas de un tipo del alumno a las que aún les falta algo, de la más antigua a la más reciente. */
+export async function pendingCharges(
+  charges: ChargeRepository,
+  student: StudentRef,
+  kind: ChargeKind,
+): Promise<{ charge: Charge; pending: Money }[]> {
+  const all = await charges.allFor(student, kind);
+  const allocation = allocateCredit(all, await charges.creditFor(student, kind));
+  return all
+    .map((charge) => ({ charge, pending: allocation.pending(charge) }))
+    .filter((p) => p.pending.cents > 0);
+}
+
 export class GenerateMonthlyCharges {
   constructor(
     private readonly directory: StudentDirectory,
@@ -280,7 +301,10 @@ export class ListMonthlyCharges {
       month: period.toString(),
       items,
       expectedCents: sum(items),
-      collectedCents: sum(items.filter((c) => c.status === 'paid')),
+      collectedCents: items.reduce(
+        (total, c) => total + Math.min(c.coveredCents, c.amountCents),
+        0,
+      ),
       overdueCount: items.filter((c) => c.status === 'overdue').length,
     };
   }
@@ -336,6 +360,8 @@ export interface PaymentQuote {
   periods: YearMonth[];
   concept: string;
   monthlyCharge: Money;
+  /** Lo que cubre en cuotas (antes de descuentos): se reparte entre las cuotas del alumno. */
+  credit: Money;
 }
 
 function concept(periods: readonly YearMonth[]): string {
@@ -388,10 +414,10 @@ export class QuotePayment {
     const profile = feeProfileOf(student, account, settings);
     const calculator = new FeeCalculator();
     const monthly = calculator.quote(profile, settings, 1).total;
-    // Las cuotas ya generadas se cobran por su importe guardado; los meses nuevos, con el de hoy.
+    // Las cuotas ya generadas se cobran por lo que les falta; los meses nuevos, con el importe de hoy.
     const pending = new Map<string, Money>();
-    for (const charge of await this.charges.unpaidFor(ref, 'monthly')) {
-      pending.set(charge.period.toString(), charge.amount);
+    for (const { charge, pending: left } of await pendingCharges(this.charges, ref, 'monthly')) {
+      pending.set(charge.period.toString(), left);
     }
     const items = periods.map((p) =>
       new QuoteLine(`Cuota de ${p.label()}`, pending.get(p.toString()) ?? monthly)
@@ -412,6 +438,7 @@ export class QuotePayment {
       periods,
       concept: concept(periods),
       monthlyCharge: monthly,
+      credit: items.reduce((sum, l) => sum.plus(l.amount), Money.zero()),
     };
   }
 
@@ -445,7 +472,9 @@ export class QuotePayment {
    * los meses de la temporada, desde el del cobro, que aún no tienen cuota (rellenando huecos).
    */
   private async candidates(ref: StudentRef, date: LocalDate): Promise<YearMonth[]> {
-    const periods = (await this.charges.unpaidFor(ref, 'monthly')).map((c) => c.period);
+    const periods = (await pendingCharges(this.charges, ref, 'monthly')).map((p) =>
+      p.charge.period
+    );
     let start = YearMonth.of(date);
     if (Season.teachingSeason(start) === null) start = Season.containing(start).firstMonth();
     const season = Season.containing(start);
@@ -465,10 +494,14 @@ export class QuotePayment {
   ): Promise<PaymentQuote> {
     const season = Season.containing(YearMonth.of(date));
     const charge = await this.charges.chargeFor(ref, 'membership', season.firstMonth());
-    if (charge?.isPaid()) throw InvalidPaymentRequest.nothingToPay();
-    const fee = charge?.amount ?? settings.tariff.membershipFee;
+    const pendingFee = charge === null
+      ? settings.tariff.membershipFee
+      : (await pendingCharges(this.charges, ref, 'membership')).find((p) =>
+        p.charge.id.equals(charge.id)
+      )?.pending ?? Money.zero();
+    if (pendingFee.cents <= 0) throw InvalidPaymentRequest.nothingToPay();
     const label = `Cuota de socio ${season.label()}`;
-    const quote = new FeeCalculator().quoteMembership(label, fee, special);
+    const quote = new FeeCalculator().quoteMembership(label, pendingFee, special);
     return {
       student,
       kind: 'membership',
@@ -476,7 +509,8 @@ export class QuotePayment {
       quote,
       periods: [season.firstMonth()],
       concept: label,
-      monthlyCharge: fee,
+      monthlyCharge: charge?.amount ?? settings.tariff.membershipFee,
+      credit: pendingFee,
     };
   }
 }
@@ -516,12 +550,13 @@ export class RegisterPayment {
         lines: quote.quote.lines,
         total: quote.quote.total,
         periods: quote.periods,
+        credit: quote.credit,
       });
       await this.payments.savePayment(payment);
       for (const period of quote.periods) {
         const charge = (await this.charges.chargeFor(ref, quote.kind, period)) ??
           Charge.create(ChargeId.generate(), ref, quote.kind, period, quote.monthlyCharge);
-        charge.payWith(payment.id);
+        charge.coveredBy(payment.id);
         await this.charges.saveCharge(charge);
       }
       // Los puntos canjeados se descuentan; pagar la cuota de socio convierte en socio.
@@ -560,7 +595,12 @@ export class ImportPayment {
   ): Promise<string | null> {
     const student = StudentRef.fromString(studentId);
     let charge = await this.charges.chargeFor(student, kind, period);
-    if (charge?.isPaid()) return null;
+    if (charge !== null) {
+      const left = (await pendingCharges(this.charges, student, kind)).find((p) =>
+        p.charge.id.equals((charge as Charge).id)
+      );
+      if (left === undefined) return null;
+    }
     await PeriodClosed.guard(this.closed, paidOn);
     const season = Season.containing(period);
     const label = kind === 'membership' ? `Cuota de socio ${season.label()}` : concept([period]);
@@ -581,7 +621,7 @@ export class ImportPayment {
     });
     await this.payments.savePayment(payment);
     charge ??= Charge.create(ChargeId.generate(), student, kind, period, amount);
-    charge.payWith(payment.id);
+    charge.coveredBy(payment.id);
     await this.charges.saveCharge(charge);
     return payment.id.value;
   }
@@ -673,6 +713,21 @@ export interface AccountView {
   /** Si la cuota de socio de la temporada en curso está pagada. */
   membershipPaid: boolean;
   membershipFeeCents: number;
+  /** Cuotas mensuales de la temporada en curso con lo cubierto y lo que falta. */
+  charges: AccountCharge[];
+  /** Lo que sobra de los cobros tras cubrir todas las cuotas mensuales. */
+  balanceCents: number;
+}
+
+export interface AccountCharge {
+  id: string;
+  period: string;
+  amountCents: number;
+  coveredCents: number;
+  pendingCents: number;
+  status: string;
+  manual: boolean;
+  note: string | null;
 }
 
 export class GetStudentAccount {
@@ -697,6 +752,9 @@ export class GetStudentAccount {
     const monthly = new FeeCalculator().quote(profile, settings, 1).total;
     const season = Season.containing(YearMonth.of(today));
     const membership = await this.charges.chargeFor(ref, 'membership', season.firstMonth());
+    const membershipLeft = await pendingCharges(this.charges, ref, 'membership');
+    const monthlyCharges = await this.charges.allFor(ref, 'monthly');
+    const allocation = allocateCredit(monthlyCharges, await this.charges.creditFor(ref, 'monthly'));
     const months = await this.quotes.months(studentId);
     return {
       preferredPlan: account?.preferredPlan() ?? 'monthly',
@@ -709,8 +767,22 @@ export class GetStudentAccount {
       monthlyFeeCents: monthly.cents,
       familyDiscount: student.hasSiblings && settings.tariff.familyPercent > 0,
       hasPrivateLessons: student.privateLessons.length > 0,
-      membershipPaid: membership?.isPaid() === true,
+      membershipPaid: membership !== null &&
+        !membershipLeft.some((p) => p.charge.id.equals(membership.id)),
       membershipFeeCents: (membership?.amount ?? settings.tariff.membershipFee).cents,
+      charges: monthlyCharges
+        .filter((c) => season.includes(c.period))
+        .map((c) => ({
+          id: c.id.value,
+          period: c.period.toString(),
+          amountCents: c.amount.cents,
+          coveredCents: allocation.covered(c).cents,
+          pendingCents: allocation.pending(c).cents,
+          status: c.statusOn(today, allocation.covered(c)),
+          manual: c.isManual(),
+          note: c.note(),
+        })),
+      balanceCents: allocation.balance.cents,
     };
   }
 }
@@ -798,5 +870,112 @@ export class UpdateBillingSettings {
         ),
       ),
     );
+  }
+}
+
+/** Cuota de un mes con lo que hace hoy el alumno (tramo + particulares, con descuento familiar si procede). */
+async function currentMonthlyFee(
+  directory: StudentDirectory,
+  accounts: StudentAccountRepository,
+  settings: BillingSettingsRepository,
+  ref: StudentRef,
+  today: LocalDate,
+): Promise<Money | null> {
+  const student = await directory.find(ref, today);
+  if (student === null) return null;
+  const config = await settings.get();
+  return new FeeCalculator().quote(
+    feeProfileOf(student, await accounts.account(ref), config),
+    config,
+    1,
+  ).total;
+}
+
+/**
+ * Recalcula las cuotas mensuales de un alumno cuando cambia lo que las determina (grupos, horario especial, familia,
+ * precio de particulares): desde el mes siguiente o, del día 1 al 10, desde el actual, hasta junio. Las fijadas a mano
+ * no cambian; las ya cobradas sí, y la diferencia queda pendiente o a favor.
+ */
+export class RecalculateCharges {
+  static readonly LAST_DAY_FOR_CURRENT_MONTH = 10;
+
+  constructor(
+    private readonly directory: StudentDirectory,
+    private readonly accounts: StudentAccountRepository,
+    private readonly settings: BillingSettingsRepository,
+    private readonly charges: ChargeRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string): Promise<void> {
+    const ref = StudentRef.fromString(studentId);
+    const today = LocalDate.fromInstant(this.clock.now());
+    const thisMonth = YearMonth.of(today);
+    const from = today.day <= RecalculateCharges.LAST_DAY_FOR_CURRENT_MONTH
+      ? thisMonth
+      : thisMonth.next();
+    const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
+    if (fee === null) return;
+    const season = Season.containing(from);
+    for (const charge of await this.charges.allFor(ref, 'monthly')) {
+      if (charge.period.isBefore(from) || !season.includes(charge.period)) continue;
+      if (charge.isManual() || charge.amount.equals(fee)) continue;
+      charge.reprice(fee);
+      await this.charges.saveCharge(charge);
+    }
+  }
+}
+
+/**
+ * Fija a mano el importe de una cuota mensual con un motivo: solo ese mes o ese y los siguientes de la temporada
+ * (creando las cuotas que falten). Los cobros no cambian; el reparto se rehace solo.
+ */
+export class AdjustCharge {
+  constructor(private readonly charges: ChargeRepository) {}
+
+  async execute(
+    studentId: string,
+    month: string,
+    amountCents: number,
+    reason: string,
+    scope: 'one' | 'rest',
+  ): Promise<void> {
+    if (scope !== 'one' && scope !== 'rest') {
+      throw new InvalidValue('scope', 'Elige si afecta solo a ese mes o también a los siguientes.');
+    }
+    const ref = StudentRef.fromString(studentId);
+    const first = YearMonth.fromString(month);
+    const season = Season.teachingSeason(first);
+    if (season === null) throw new InvalidValue('month', 'Julio y agosto no tienen cuotas.');
+    const amount = Money.cents(amountCents);
+    const last = scope === 'one' ? first : season.lastMonth();
+    for (let period = first; !last.isBefore(period); period = period.next()) {
+      const charge = (await this.charges.chargeFor(ref, 'monthly', period)) ??
+        Charge.create(ChargeId.generate(), ref, 'monthly', period, amount);
+      charge.adjust(amount, reason);
+      await this.charges.saveCharge(charge);
+    }
+  }
+}
+
+/** Devuelve una cuota fijada a mano al importe calculado con lo que hace hoy el alumno. */
+export class ResetCharge {
+  constructor(
+    private readonly directory: StudentDirectory,
+    private readonly accounts: StudentAccountRepository,
+    private readonly settings: BillingSettingsRepository,
+    private readonly charges: ChargeRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string, month: string): Promise<void> {
+    const ref = StudentRef.fromString(studentId);
+    const charge = await this.charges.chargeFor(ref, 'monthly', YearMonth.fromString(month));
+    if (charge === null) throw new ChargeNotFound();
+    const today = LocalDate.fromInstant(this.clock.now());
+    const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
+    if (fee === null) throw new BillingStudentNotFound();
+    charge.resetTo(fee);
+    await this.charges.saveCharge(charge);
   }
 }

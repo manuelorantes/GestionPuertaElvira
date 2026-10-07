@@ -153,16 +153,32 @@ export class SqlStudentAccountRepository implements StudentAccountRepository {
 function toCharge(row: Row): Charge {
   const paidBy = row.nullableString('paid_by');
   const remindedOn = row.nullableString('reminded_on');
-  return Charge.restore(
-    ChargeId.fromString(row.string('id')),
-    StudentRef.fromString(row.string('student_id')),
-    row.string('kind') as ChargeKind,
-    YearMonth.fromString(row.string('period')),
-    Money.cents(row.int('amount_cents')),
-    paidBy === null ? null : PaymentId.fromString(paidBy),
-    remindedOn === null ? null : LocalDate.fromString(remindedOn),
-  );
+  return Charge.restore({
+    id: ChargeId.fromString(row.string('id')),
+    student: StudentRef.fromString(row.string('student_id')),
+    kind: row.string('kind') as ChargeKind,
+    period: YearMonth.fromString(row.string('period')),
+    amount: Money.cents(row.int('amount_cents')),
+    paidBy: paidBy === null ? null : PaymentId.fromString(paidBy),
+    remindedOn: remindedOn === null ? null : LocalDate.fromString(remindedOn),
+    manual: row.bool('manual'),
+    note: row.nullableString('note'),
+  });
 }
+
+/**
+ * Cuotas con lo que tienen cubierto: lo que cubren los cobros del alumno (por tipo) se reparte entre sus cuotas de la
+ * más antigua a la más reciente (ver cuotas-separadas-de-los-cobros.md). Se usa como CTE `allocated`.
+ */
+const ALLOCATED = `allocated AS (
+  SELECT c.*, LEAST(c.amount_cents, GREATEST(0,
+           COALESCE(cr.credit, 0) - COALESCE(SUM(c.amount_cents) OVER (
+             PARTITION BY c.student_id, c.kind ORDER BY c.period
+             ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)))::integer AS covered_cents
+    FROM billing_charge c
+    LEFT JOIN (SELECT student_id, kind, SUM(credit_cents) AS credit FROM billing_payment
+                GROUP BY student_id, kind) cr ON cr.student_id = c.student_id AND cr.kind = c.kind
+)`;
 
 export class SqlChargeRepository implements ChargeRepository {
   constructor(private readonly sql: Sql) {}
@@ -182,10 +198,16 @@ export class SqlChargeRepository implements ChargeRepository {
     return rows[0] ? toCharge(new Row(rows[0])) : null;
   }
 
-  async unpaidFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]> {
+  async allFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]> {
     const rows = await this.sql`SELECT * FROM billing_charge
-      WHERE student_id = ${student.value} AND kind = ${kind} AND paid_by IS NULL ORDER BY period`;
+      WHERE student_id = ${student.value} AND kind = ${kind} ORDER BY period`;
     return Row.all(rows).map(toCharge);
+  }
+
+  async creditFor(student: StudentRef, kind: ChargeKind): Promise<Money> {
+    const rows = await this.sql`SELECT COALESCE(SUM(credit_cents), 0) AS credit FROM billing_payment
+      WHERE student_id = ${student.value} AND kind = ${kind}`;
+    return Money.cents(rows[0] ? new Row(rows[0]).int('credit') : 0);
   }
 
   async saveCharge(charge: Charge): Promise<void> {
@@ -197,9 +219,12 @@ export class SqlChargeRepository implements ChargeRepository {
       amount_cents: charge.amount.cents,
       paid_by: charge.paidBy()?.value ?? null,
       reminded_on: charge.remindedOn()?.toString() ?? null,
+      manual: charge.isManual(),
+      note: charge.note(),
     };
     await this.sql`INSERT INTO billing_charge ${this.sql(record)}
-      ON CONFLICT (id) DO UPDATE SET paid_by = EXCLUDED.paid_by, reminded_on = EXCLUDED.reminded_on`;
+      ON CONFLICT (id) DO UPDATE SET amount_cents = EXCLUDED.amount_cents, paid_by = EXCLUDED.paid_by,
+        reminded_on = EXCLUDED.reminded_on, manual = EXCLUDED.manual, note = EXCLUDED.note`;
   }
 }
 
@@ -246,6 +271,7 @@ function toPayment(row: Row): Payment {
     total: Money.cents(row.int('total_cents')),
     periods: row.stringList('periods').map((p) => YearMonth.fromString(p)),
     invoice: invoice === null || invoice === undefined ? null : toInvoice(invoice),
+    credit: Money.cents(row.int('credit_cents')),
   });
 }
 
@@ -271,13 +297,14 @@ export class SqlPaymentRepository implements PaymentRepository {
         payment.lines.map((l) => ({ label: l.label, amountCents: l.amount.cents })),
       ),
       total_cents: payment.total.cents,
+      credit_cents: payment.credit.cents,
       periods: this.sql.json(payment.periods.map((p) => p.toString())),
       invoice_number: invoice?.number.toString() ?? null,
       invoice: invoice === null ? null : this.sql.json(invoiceData(invoice)),
     };
     await this.sql`INSERT INTO billing_payment ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET method = EXCLUDED.method, paid_on = EXCLUDED.paid_on,
-        lines = EXCLUDED.lines, total_cents = EXCLUDED.total_cents,
+        lines = EXCLUDED.lines, total_cents = EXCLUDED.total_cents, credit_cents = EXCLUDED.credit_cents,
         invoice_number = EXCLUDED.invoice_number, invoice = EXCLUDED.invoice`;
   }
 }
@@ -312,8 +339,11 @@ function toChargeView(row: Row, today: LocalDate): ChargeView {
     kind: charge.kind,
     period: charge.period.toString(),
     amountCents: charge.amount.cents,
-    status: charge.statusOn(today),
+    status: charge.statusOn(today, Money.cents(row.int('covered_cents'))),
     paymentId: charge.paidBy()?.value ?? null,
+    coveredCents: row.int('covered_cents'),
+    manual: charge.isManual(),
+    note: charge.note(),
     receiptNumber: row.nullableString('receipt_number'),
     remindedOn: row.nullableString('reminded_on'),
   };
@@ -340,12 +370,13 @@ export class SqlBillingQuery implements BillingQuery {
   async charges(month: YearMonth, today: LocalDate): Promise<ChargeView[]> {
     const seasonStart = Season.containing(month).firstMonth().toString();
     const rows = await this.sql.unsafe(
-      `SELECT c.*, s.full_name, ${GUARDIAN} AS guardian_name, ${PHONE} AS guardian_phone, p.receipt_number
-         FROM billing_charge c
+      `WITH ${ALLOCATED}
+       SELECT c.*, s.full_name, ${GUARDIAN} AS guardian_name, ${PHONE} AS guardian_phone, p.receipt_number
+         FROM allocated c
          JOIN students_student s ON s.id = c.student_id
          LEFT JOIN billing_payment p ON p.id = c.paid_by
         WHERE (c.kind = 'monthly' AND c.period = $1)
-           OR (c.kind = 'membership' AND c.period = $2 AND (c.paid_by IS NULL OR $1 = $2))
+           OR (c.kind = 'membership' AND c.period = $2 AND (c.covered_cents < c.amount_cents OR $1 = $2))
         ORDER BY s.search_name, c.kind DESC`,
       [month.toString(), seasonStart],
     );
@@ -354,9 +385,10 @@ export class SqlBillingQuery implements BillingQuery {
 
   async overdue(today: LocalDate): Promise<ChargeView[]> {
     const rows = await this.sql.unsafe(
-      `SELECT c.*, s.full_name, ${GUARDIAN} AS guardian_name, ${PHONE} AS guardian_phone, NULL AS receipt_number
-         FROM billing_charge c JOIN students_student s ON s.id = c.student_id
-        WHERE c.kind = 'monthly' AND c.paid_by IS NULL AND (c.period < $1 OR (c.period = $1 AND $2 > 5))
+      `WITH ${ALLOCATED}
+       SELECT c.*, s.full_name, ${GUARDIAN} AS guardian_name, ${PHONE} AS guardian_phone, NULL AS receipt_number
+         FROM allocated c JOIN students_student s ON s.id = c.student_id
+        WHERE c.kind = 'monthly' AND c.covered_cents < c.amount_cents AND (c.period < $1 OR (c.period = $1 AND $2 > 5))
         ORDER BY c.period, s.search_name`,
       [YearMonth.of(today).toString(), today.day],
     );

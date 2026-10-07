@@ -230,11 +230,11 @@ export class SqlPayrollQuery implements PayrollQuery {
       shares.set(row.string('teacher_id'), row.int('minutes'));
       byStudent.set(row.string('student_id'), shares);
     }
-    // Lo realmente cobrado por ese mes: el total del cobro repartido entre los meses que cubre (con sus descuentos).
+    // Lo realmente cobrado por ese mes: el total de cada cobro repartido entre los meses que cubre (con sus descuentos).
     const charges = await this.sql`
-      SELECT c.student_id, ROUND(p.total_cents::numeric / GREATEST(jsonb_array_length(p.periods::jsonb), 1)) AS amount_cents
-        FROM billing_charge c JOIN billing_payment p ON p.id = c.paid_by
-       WHERE c.kind = 'monthly' AND c.period = ${month.toString()}`;
+      SELECT p.student_id, ROUND(p.total_cents::numeric / GREATEST(jsonb_array_length(p.periods::jsonb), 1)) AS amount_cents
+        FROM billing_payment p
+       WHERE p.kind = 'monthly' AND p.periods::jsonb ? ${month.toString()}`;
     for (const row of Row.all(charges)) {
       const shares = byStudent.get(row.string('student_id')) ?? new Map<string, number>();
       const total = [...shares.values()].reduce((sum, m) => sum + m, 0);
