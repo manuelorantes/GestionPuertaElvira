@@ -116,6 +116,19 @@ Deno.test('QuotePayment should use the agreed private rate, quote without saving
   assertEquals(fx.payments.size, 0);
 });
 
+Deno.test('QuotePayment should give the 20 % only when paying the whole year that is left (9 or 10 months)', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-09');
+  // Quedan septiembre (pendiente) y octubre a junio: 10 meses.
+  assertEquals((await quotes(fx).months(id)).remaining, 10);
+  const whole = await quote(fx, id, 10);
+  assertEquals(whole.quote.discountPercent, 20);
+  assertEquals(whole.quote.lines.at(-1)?.label, 'Pago de todo el año −20 %');
+  await assertRejects(() => quote(fx, id, 9), InvalidPaymentRequest, 'todo el año');
+  assertEquals((await quote(fx, id, 8)).quote.discountPercent, 15);
+});
+
 Deno.test('RegisterPayment should pay the oldest pending charges first and create future ones', async () => {
   const fx = new BillingFixture();
   const id = fx.student({ regularHours: 2 });

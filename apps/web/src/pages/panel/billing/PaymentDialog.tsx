@@ -85,8 +85,12 @@ export function PaymentDialog({
                   disabled={form.unavailable(c.id)}
                   title={
                     form.unavailable(c.id)
-                      ? `Solo quedan ${form.remainingMonths} meses por cobrar`
-                      : undefined
+                      ? c.id === 'year'
+                        ? `Todo el año es para quien tiene 9 o 10 meses por pagar; quedan ${form.remainingMonths}`
+                        : `Solo quedan ${form.remainingMonths} meses por cobrar`
+                      : c.id === 'year' && form.remainingMonths !== null
+                        ? `Cobra los ${form.remainingMonths} meses que quedan, con un 20 %`
+                        : undefined
                   }
                   pressed={form.concept === c.id}
                   onClick={() => form.setConcept(c.id)}
