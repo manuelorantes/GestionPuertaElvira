@@ -132,6 +132,8 @@ Una inscripción MAY llevar un horario especial dentro del grupo: solo algunos d
 su franja (en medias horas, dentro del horario del grupo). Por defecto el alumno va a todo el grupo.
 El alumno ocupa plaza solo los días a los que viene; sus horas semanales (para la cuota) son las que
 realmente hace; la ficha del alumno y la del grupo muestran «Horario especial: Lun · 18:30–19:00».
+En el alta, el horario especial sale de las horas indicadas y además MUST poder ajustarse a mano en cada grupo
+(mismo diálogo que en la ficha), antes de guardar.
 El horario especial MUST poder cambiarse o quitarse después, con las mismas comprobaciones que una inscripción.
 
 #### Scenario: Media hora de un grupo y la hora del siguiente

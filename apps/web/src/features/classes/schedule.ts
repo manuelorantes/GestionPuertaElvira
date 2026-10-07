@@ -50,3 +50,15 @@ export function weeklyHours(days: number, start: string, end: string): number {
 export function formatHours(hours: number): string {
   return `${String(hours).replace('.', ',')} h semanales`;
 }
+
+/** «Lun y Mié · 17:00–18:00»: días y franja de un horario especial. */
+export function attendanceText(attendance: {
+  days: Weekday[];
+  start: string;
+  end: string;
+}): string {
+  const days = WEEKDAYS.filter((d) => attendance.days.includes(d.id)).map((d) => d.short);
+  const list =
+    days.length > 1 ? `${days.slice(0, -1).join(', ')} y ${days.at(-1)}` : (days[0] ?? '');
+  return `${list} · ${attendance.start}–${attendance.end}`;
+}
