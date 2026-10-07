@@ -357,8 +357,8 @@ Deno.test('Profitability should compare the expected hours of the month with the
     new ListSettlements(fx, fx, fx),
     load,
     fees,
-  )
-    .execute('2026-10');
+    fx.clock,
+  ).execute('2026-10');
   assertEquals(
     rows.map((r) => [r.teacherName, r.minutes, r.costCents, r.incomeCents, r.occupied, r.capacity]),
     [
@@ -414,4 +414,38 @@ Deno.test('Substitutions should cover club duty shifts too, alone or with all th
     [...fx.substitutions.values()].map((s) => s.date.toString()).sort(),
     ['2026-10-09', '2026-10-13', '2026-10-16'],
   );
+});
+
+Deno.test('Profitability should use the hours actually recorded in a month already over', async () => {
+  const { fx, lucia, carlos, duties } = setUp();
+  // Hoy es 31 de octubre: septiembre ya pasó. Lucía tiene apuntadas 3 h (un torneo); Carlos, ninguna.
+  await new RecordSession(fx, fx, fx, fx).execute({
+    teacherId: lucia,
+    date: '2026-09-15',
+    groupId: null,
+    activity: 'Torneo escolar',
+    hours: 3,
+  });
+  const load = {
+    classLoad: () =>
+      Promise.resolve({
+        teachers: new Map([[carlos, { groups: ['Adultos I'], occupied: 4, capacity: 10 }]]),
+        students: new Map([['ana', new Map([[carlos, 90]])]]),
+      }),
+  };
+  const fees = { monthlyFees: () => Promise.resolve(new Map([['ana', 4500]])) };
+  const rows = await new Profitability(
+    fx,
+    duties,
+    fx,
+    fx,
+    new ListSettlements(fx, fx, fx),
+    load,
+    fees,
+    fx.clock,
+  ).execute('2026-09');
+  assertEquals(rows.map((r) => [r.teacherName, r.minutes, r.costCents, r.incomeCents]), [
+    ['Carlos Ruiz Márquez', 0, 0, 4500],
+    ['Lucía Moreno Gil', 180, 4800, 0],
+  ]);
 });

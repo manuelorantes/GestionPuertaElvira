@@ -90,8 +90,9 @@ Se paga a mes vencido: por defecto se muestra el mes anterior. Se puede imprimir
 ### Requirement: Rentabilidad
 Para cada mes, el sistema MUST mostrar por profesor: horas, tarifa, coste, ingresos atribuidos, margen, € por hora y ocupación de sus grupos,
 con los totales del mes y ordenable por margen, € por hora u ocupación.
-- Horas y coste: las horas esperadas del mes según el horario (todas sus clases y turnos salvo festivos, aunque aún no
-  se hayan dado; sin tener en cuenta sustituciones ni contar dos veces lo que se solapa) por su tarifa.
+- Horas y coste: en el mes en curso y los futuros, las horas esperadas según el horario (todas sus clases y turnos salvo
+  festivos, aunque aún no se hayan dado; sin tener en cuenta sustituciones ni contar dos veces lo que se solapa) por su
+  tarifa. En un mes ya pasado, las horas realmente imputadas y el coste de su liquidación.
 - Ingresos atribuidos: las cuotas mensuales de ese mes de sus alumnos, ya con descuentos (familia, pago adelantado…),
   cobradas o por cobrar y, en meses futuros, las previstas; sin cuotas de socio. Si un alumno va con varios profesores,
   su cuota se reparte según las horas semanales con cada uno.
@@ -101,6 +102,8 @@ con los totales del mes y ordenable por margen, € por hora u ocupación.
 - **WHEN** un alumno que paga 70 € va 2 horas semanales con una profesora y 1,5 con otro
 - **THEN** a ella se le atribuyen 40 € y a él 30 €
 El de mayor margen positivo se destaca como «Más rentable».
+Al pie MUST mostrarse los totales del mes: horas, tarifa media (ponderada por las horas de cada profesor), coste en
+profesores, ingresos, margen, ganancia o pérdida por hora y ocupación media de todas las clases.
 
 ### Requirement: Acceso restringido
 La gestión del profesorado MUST estar reservada a cuentas de administración.
