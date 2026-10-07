@@ -1,24 +1,26 @@
 import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { markHoliday } from '@/features/payroll/api';
+import { addHoliday } from '@/features/payroll/api';
 import { usePayrollMutation } from '@/features/payroll/hooks';
 import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { DateField } from '@/shared/ui/DateField';
 import { Dialog } from '@/shared/ui/Dialog';
+import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
 export function HolidayDialog({ onClose }: { onClose: () => void }) {
   const [date, setDate] = useState(todayIso());
-  const mark = usePayrollMutation(markHoliday);
+  const [name, setName] = useState('');
+  const mark = usePayrollMutation(addHoliday);
   const toast = useToast();
   const year = new Date().getFullYear();
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await mark.mutateAsync(date).then(
+    await mark.mutateAsync({ date, name: name.trim() || 'Festivo' }).then(
       (removed) => {
         toast(
           `Festivo marcado: ${removed} ${removed === 1 ? 'sesión quitada' : 'sesiones quitadas'}`,
@@ -46,8 +48,15 @@ export function HolidayDialog({ onClose }: { onClose: () => void }) {
           fromYear={year - 1}
           toYear={year + 1}
         />
+        <TextField
+          label="Nombre"
+          placeholder="Por ejemplo: Día de la Cruz"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
         <p className="text-sm text-ink-muted">
-          Se quitarán todas las sesiones de ese día (salvo las de liquidaciones pagadas).
+          Ese día no se apuntarán horas solas. Se quitarán todas las sesiones de ese día (salvo las
+          de liquidaciones pagadas).
         </p>
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>

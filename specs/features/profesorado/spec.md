@@ -4,8 +4,8 @@ Profesores del club, su tarifa por hora, las sesiones que imparten, su liquidaci
 Solo administración puede gestionarlo.
 
 ### Requirement: Alta y edición de profesores
-Administración MUST poder dar de alta profesores con su nombre y apellidos, y cambiarles el nombre.
-Un profesor nuevo nace activo.
+Administración MUST poder dar de alta profesores con su nombre y apellidos, y cambiarles el nombre, la tarifa y si
+están activos, tanto desde Clases → Profesores como desde Profesores → Equipo. Un profesor nuevo nace activo.
 
 #### Scenario: Alta
 - **WHEN** administración añade un profesor con su nombre
@@ -33,24 +33,46 @@ La lista MUST mostrar cada profesor ordenado por nombre, con su tarifa por hora,
 ### Requirement: Tarifa por hora
 Cada profesor MUST tener una tarifa por hora (lo que el club le paga), de 15 €/h al darlo de alta, editable y nunca negativa.
 
-### Requirement: Sesiones propuestas desde el horario
-La primera vez que se consulta un mes de la temporada (nunca uno futuro), el sistema MUST proponer una sesión
-por cada día de clase de cada grupo, con su profesor y la duración del grupo. Solo se propone una vez por mes.
+### Requirement: Horas apuntadas solas
+Las horas MUST apuntarse solas día a día: al acabar cada clase se crea su sesión, con la duración y la hora de inicio
+del grupo, para quien la da ese día (el titular o quien le sustituye); al acabar cada turno fijo (encargado del club),
+la suya. Solo se rellenan los días desde el mes anterior hasta hoy; un día ya apuntado no se rellena otra vez (lo que
+administración borre no vuelve) y no se tocan las liquidaciones pagadas.
 
-#### Scenario: Festivo
-- **WHEN** administración marca un día como festivo
-- **THEN** se quitan todas las sesiones de ese día (salvo las de liquidaciones pagadas) y no vuelven a aparecer
+#### Scenario: A media tarde
+- **WHEN** se consulta el registro de horas a las 17:30 de un martes
+- **THEN** están las clases de ese martes que ya han acabado y no las que siguen en curso
 
-#### Scenario: Sustitución
-- **WHEN** administración cambia el profesor de una sesión
-- **THEN** las horas cuentan para el sustituto en su liquidación
+### Requirement: Festivos
+El club MUST tener su calendario de festivos (nacionales, de Andalucía y locales de Granada capital). Un festivo no
+genera horas. Administración MUST poder añadir festivos (con nombre) y quitarlos; al añadir uno se quitan las sesiones
+de ese día salvo las de liquidaciones pagadas.
+
+### Requirement: Sustituciones
+Administración MUST poder planificar una sustitución (día, clase de ese día, quién la da y motivo) y anularla, y verlas
+en un calendario del mes junto con los festivos. Ese día la sesión se apunta a quien sustituye; si ya estaba apuntada,
+pasa a quien sustituye (o vuelve al titular al anularla). Si quien sustituye ya tiene otra clase o un turno a esa hora,
+es un caso especial: MUST indicarse el motivo y no suma horas dobles.
+
+#### Scenario: Dos clases a la vez
+- **WHEN** se intenta que un profesor sustituya una clase a la misma hora que la suya sin indicar motivo
+- **THEN** se pide el motivo; con motivo, se planifica y sus horas de esa franja cuentan una sola vez
+
+### Requirement: Encargado del club
+Administración MUST poder definir turnos fijos semanales (por defecto «Encargado del club»: día, franja y profesor),
+cambiarlos y quitarlos. Cada semana cuentan como horas de quien los tiene. Las horas que se solapan el mismo día
+(una clase durante el turno) MUST contar una sola vez.
+
+#### Scenario: Encargado con clase
+- **WHEN** un profesor es encargado de 17:00 a 20:00 y tiene clase de 18:00 a 19:30
+- **THEN** ese día se le pagan 3 horas
 
 ### Requirement: Registro de horas
 Administración MUST poder añadir sesiones de un grupo u otras actividades (con descripción), cambiar su profesor y sus horas
-(de 0,5 a 12, en medias horas) y quitarlas, viendo el coste de cada una.
+(de 0,5 a 12, en medias horas) y quitarlas (por ejemplo, un cambio de última hora o una falta), viendo el coste de cada una.
 
 ### Requirement: Liquidación mensual
-La liquidación de cada profesor y mes MUST ser horas × tarifa, redondeada a céntimos, con el detalle por grupo o actividad.
+La liquidación de cada profesor y mes MUST ser horas × tarifa (sin contar dos veces las que se solapan el mismo día), redondeada a céntimos, con el detalle por grupo o actividad.
 Se paga a mes vencido: por defecto se muestra el mes anterior. Se puede imprimir y marcar como pagada, una a una o todas.
 
 #### Scenario: Pagar una liquidación

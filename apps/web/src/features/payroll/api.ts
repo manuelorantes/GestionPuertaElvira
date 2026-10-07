@@ -83,8 +83,86 @@ export function deleteSession(id: string): Promise<void> {
   return apiSend('DELETE', `${BASE}/sessions/${id}`);
 }
 
-export async function markHoliday(date: string): Promise<number> {
-  return (await apiSend<{ removed: number }>('POST', `${BASE}/holidays`, { date })).removed;
+export interface Holiday {
+  date: string;
+  name: string;
+}
+
+/** Festivos de una temporada (año en que empieza). */
+export async function fetchHolidays(season: number): Promise<Holiday[]> {
+  return (await apiGet<{ items: Holiday[] }>(`${BASE}/holidays?season=${season}`)).items;
+}
+
+/** Añade un festivo; devuelve cuántas sesiones de ese día quitó. */
+export async function addHoliday(input: { date: string; name: string }): Promise<number> {
+  return (await apiSend<{ removed: number }>('POST', `${BASE}/holidays`, input)).removed;
+}
+
+export function removeHoliday(date: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/holidays/${date}`, {});
+}
+
+export interface Substitution {
+  id: string;
+  date: string;
+  groupId: string;
+  groupName: string;
+  start: string;
+  end: string;
+  teacherId: string;
+  teacherName: string;
+  substituteId: string;
+  substituteName: string;
+  reason: string | null;
+}
+
+export async function fetchSubstitutions(month: string): Promise<Substitution[]> {
+  return (await apiGet<{ items: Substitution[] }>(`${BASE}/substitutions?month=${month}`)).items;
+}
+
+export async function planSubstitution(input: {
+  groupId: string;
+  date: string;
+  teacherId: string;
+  reason: string | null;
+}): Promise<string> {
+  return (await apiSend<{ id: string }>('POST', `${BASE}/substitutions`, input)).id;
+}
+
+export function cancelSubstitution(id: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/substitutions/${id}`, {});
+}
+
+export interface Duty {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  /** 1 = lunes … 7 = domingo. */
+  weekday: number;
+  start: string;
+  end: string;
+  label: string;
+}
+
+export interface DutyPayload {
+  teacherId: string;
+  weekday: number;
+  start: string;
+  end: string;
+  label: string | null;
+}
+
+export async function fetchDuties(): Promise<Duty[]> {
+  return (await apiGet<{ items: Duty[] }>(`${BASE}/duties`)).items;
+}
+
+export async function saveDuty(input: { id: string | null; duty: DutyPayload }): Promise<void> {
+  if (input.id === null) await apiSend('POST', `${BASE}/duties`, input.duty);
+  else await apiSend('PUT', `${BASE}/duties/${input.id}`, input.duty);
+}
+
+export function deleteDuty(id: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/duties/${id}`, {});
 }
 
 export function paySettlement(teacherId: string, month: string): Promise<void> {

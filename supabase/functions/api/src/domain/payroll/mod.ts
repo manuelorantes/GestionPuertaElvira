@@ -39,7 +39,9 @@ export class SessionMinutes {
   }
 }
 
-/** Grupo del horario: profesor, días ISO (1 = lunes) y duración de cada sesión. */
+export class DutyRef extends Uuid {}
+
+/** Grupo del horario: profesor, días ISO (1 = lunes), duración y hora de inicio (minutos desde las 00:00). */
 export class ScheduledGroup {
   constructor(
     readonly id: GroupRef,
@@ -47,33 +49,110 @@ export class ScheduledGroup {
     readonly teacher: TeacherRef,
     readonly weekdays: readonly number[],
     readonly minutes: number,
+    readonly start: number,
   ) {}
 }
 
+/** Turno fijo semanal (p. ej. «Encargado del club» los viernes de 17:00 a 20:00) que cuenta como horas. */
+export class ClubDuty {
+  constructor(
+    readonly id: DutyRef,
+    readonly teacher: TeacherRef,
+    readonly weekday: number,
+    readonly start: number,
+    readonly end: number,
+    readonly label: string,
+  ) {
+    if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
+      throw new InvalidValue('weekday', 'Día de la semana no válido.');
+    }
+    if (end <= start || start < 0 || end > 24 * 60 || start % 30 !== 0 || end % 30 !== 0) {
+      throw new InvalidValue(
+        'end',
+        'La franja va en medias horas y debe acabar después de empezar.',
+      );
+    }
+    if (label.trim() === '') throw new InvalidValue('label', 'Indica la actividad.');
+  }
+
+  minutes(): number {
+    return this.end - this.start;
+  }
+}
+
+/** Sustitución planificada: ese día la clase del grupo la da otro profesor. */
+export class Substitution {
+  constructor(
+    readonly group: GroupRef,
+    readonly date: LocalDate,
+    readonly teacher: TeacherRef,
+    readonly reason: string | null,
+  ) {}
+}
+
+/** Sesión que se apunta sola al acabar una clase o un turno. */
 export class PlannedSession {
   constructor(
-    readonly group: ScheduledGroup,
+    readonly teacher: TeacherRef,
+    readonly group: GroupRef | null,
     readonly date: LocalDate,
+    readonly label: string,
+    readonly start: number,
     readonly minutes: SessionMinutes,
+    /** «group:<id>» o «duty:<id>»: una sola sesión automática por origen y día. */
+    readonly source: string,
   ) {}
 }
 
-/** Propone las sesiones de un mes a partir del horario: una por cada día de clase de cada grupo. */
-export class SessionPlanner {
-  /** Ordenadas por fecha. */
-  plan(month: YearMonth, groups: readonly ScheduledGroup[]): PlannedSession[] {
-    if (Season.teachingSeason(month) === null) return [];
+/**
+ * Sesiones de un día a partir del horario: cada clase (o quien la sustituya) y cada turno fijo, solo cuando ya han
+ * acabado (`nowMinutes`, o null si el día ya terminó). Los festivos los descarta quien la llama.
+ */
+export class DailyPlanner {
+  /** Ordenadas por hora de inicio. */
+  plan(
+    date: LocalDate,
+    groups: readonly ScheduledGroup[],
+    duties: readonly ClubDuty[],
+    substitutions: readonly Substitution[],
+    nowMinutes: number | null,
+  ): PlannedSession[] {
+    if (Season.teachingSeason(YearMonth.of(date)) === null) return [];
+    const weekday = date.isoWeekday();
+    const over = (end: number) => nowMinutes === null || end <= nowMinutes;
     const sessions: PlannedSession[] = [];
-    for (let day = 1; day <= month.days(); day++) {
-      const date = LocalDate.fromString(`${month.toString()}-${String(day).padStart(2, '0')}`);
-      const weekday = date.isoWeekday();
-      for (const group of groups) {
-        if (group.weekdays.includes(weekday)) {
-          sessions.push(new PlannedSession(group, date, SessionMinutes.fromMinutes(group.minutes)));
-        }
-      }
+    for (const group of groups) {
+      if (!group.weekdays.includes(weekday) || !over(group.start + group.minutes)) continue;
+      const substitution = substitutions.find((s) =>
+        s.group.equals(group.id) && s.date.equals(date)
+      );
+      sessions.push(
+        new PlannedSession(
+          substitution?.teacher ?? group.teacher,
+          group.id,
+          date,
+          substitution ? `${group.name} (sustitución)` : group.name,
+          group.start,
+          SessionMinutes.fromMinutes(group.minutes),
+          `group:${group.id.value}`,
+        ),
+      );
     }
-    return sessions;
+    for (const duty of duties) {
+      if (duty.weekday !== weekday || !over(duty.end)) continue;
+      sessions.push(
+        new PlannedSession(
+          duty.teacher,
+          null,
+          date,
+          duty.label,
+          duty.start,
+          SessionMinutes.fromMinutes(duty.minutes()),
+          `duty:${duty.id.value}`,
+        ),
+      );
+    }
+    return sessions.sort((a, b) => a.start - b.start);
   }
 }
 
@@ -87,6 +166,10 @@ export class TimesheetEntry {
     readonly label: string,
     private duration: SessionMinutes,
     readonly fromSchedule: boolean,
+    /** Hora de inicio en minutos desde las 00:00 (para no contar dos veces horas que se solapan), o null. */
+    readonly start: number | null,
+    /** Origen de una sesión automática («group:<id>», «duty:<id>»), o null si se apuntó a mano. */
+    readonly source: string | null,
   ) {}
 
   static record(
@@ -97,9 +180,35 @@ export class TimesheetEntry {
     label: string,
     minutes: SessionMinutes,
     fromSchedule: boolean,
+    start: number | null = null,
+    source: string | null = null,
   ): TimesheetEntry {
     if (label.trim() === '') throw new InvalidValue('label', 'Indica la clase o la actividad.');
-    return new TimesheetEntry(id, teacher, date, group, label.trim(), minutes, fromSchedule);
+    return new TimesheetEntry(
+      id,
+      teacher,
+      date,
+      group,
+      label.trim(),
+      minutes,
+      fromSchedule,
+      start,
+      source,
+    );
+  }
+
+  static planned(id: TimesheetEntryId, session: PlannedSession): TimesheetEntry {
+    return TimesheetEntry.record(
+      id,
+      session.teacher,
+      session.date,
+      session.group,
+      session.label,
+      session.minutes,
+      true,
+      session.start,
+      session.source,
+    );
   }
 
   reassign(teacher: TeacherRef): void {
@@ -141,12 +250,16 @@ export class Settlement {
   ) {}
 }
 
-/** Liquidación = horas × tarifa, redondeada a céntimos, con el detalle por grupo o actividad. */
+/**
+ * Liquidación = horas × tarifa, redondeada a céntimos, con el detalle por grupo o actividad. Las horas que se
+ * solapan el mismo día (encargado del club mientras da una clase, dos clases a la vez por una sustitución) cuentan
+ * una sola vez: cada sesión aporta solo los minutos que no cubre otra anterior (las más largas primero).
+ */
 export class SettlementCalculator {
   settle(entries: readonly TimesheetEntry[], rate: Money): Settlement {
     const byLabel = new Map<string, number>();
-    for (const entry of entries) {
-      byLabel.set(entry.label, (byLabel.get(entry.label) ?? 0) + entry.minutes().minutes);
+    for (const [entry, minutes] of effectiveMinutes(entries)) {
+      byLabel.set(entry.label, (byLabel.get(entry.label) ?? 0) + minutes);
     }
     const minutes = [...byLabel.values()].reduce((sum, m) => sum + m, 0);
     const amount = rate.times(minutes / 60);
@@ -172,4 +285,45 @@ export class MonthlySettlement {
     readonly settlement: Settlement,
     readonly paidOn: LocalDate,
   ) {}
+}
+
+/** Minutos que aporta cada sesión sin contar dos veces lo que se solapa el mismo día. */
+function effectiveMinutes(entries: readonly TimesheetEntry[]): [TimesheetEntry, number][] {
+  const result: [TimesheetEntry, number][] = [];
+  const timed = new Map<string, TimesheetEntry[]>();
+  for (const entry of entries) {
+    if (entry.start === null) {
+      result.push([entry, entry.minutes().minutes]);
+      continue;
+    }
+    const key = entry.date.toString();
+    timed.set(key, [...(timed.get(key) ?? []), entry]);
+  }
+  for (const day of timed.values()) {
+    const ordered = [...day].sort((a, b) =>
+      b.minutes().minutes - a.minutes().minutes || (a.start ?? 0) - (b.start ?? 0)
+    );
+    // Tramos ya contados, fusionados (sin solapes entre sí).
+    let taken: [number, number][] = [];
+    for (const entry of ordered) {
+      const from = entry.start ?? 0;
+      const to = from + entry.minutes().minutes;
+      let free = to - from;
+      for (const [a, b] of taken) free -= Math.max(0, Math.min(to, b) - Math.max(from, a));
+      result.push([entry, Math.max(0, free)]);
+      taken = merge([...taken, [from, to]]);
+    }
+  }
+  return result;
+}
+
+function merge(intervals: [number, number][]): [number, number][] {
+  const sorted = [...intervals].sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const [from, to] of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && from <= last[1]) last[1] = Math.max(last[1], to);
+    else merged.push([from, to]);
+  }
+  return merged;
 }

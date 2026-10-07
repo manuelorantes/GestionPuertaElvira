@@ -12,12 +12,21 @@ import { ProfitabilityTab } from './ProfitabilityTab';
 import { SessionDialog } from './SessionDialog';
 import { SessionsTab } from './SessionsTab';
 import { SettlementsTab } from './SettlementsTab';
+import { DutiesTab } from './DutiesTab';
+import { SubstitutionsTab } from './SubstitutionsTab';
+import { TeachersPanel } from '../classes/TeachersPanel';
 
 const TABS = [
   { id: 'rentabilidad', label: 'Rentabilidad' },
   { id: 'horas', label: 'Registro de horas' },
   { id: 'liquidacion', label: 'Liquidación mensual' },
+  { id: 'sustituciones', label: 'Sustituciones y festivos' },
+  { id: 'encargado', label: 'Encargado del club' },
+  { id: 'equipo', label: 'Equipo' },
 ];
+
+/** Pestañas que no dependen del mes. */
+const WITHOUT_MONTH = ['encargado', 'equipo'];
 
 export function TeachersPayPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -54,6 +63,10 @@ export function TeachersPayPage() {
         />
       );
     if (tab === 'liquidacion') return <SettlementsTab month={month} />;
+    if (tab === 'sustituciones')
+      return <SubstitutionsTab month={month} teachers={teachers.data ?? []} />;
+    if (tab === 'encargado') return <DutiesTab teachers={teachers.data ?? []} />;
+    if (tab === 'equipo') return <TeachersPanel teachers={teachers.data ?? []} />;
     return <ProfitabilityTab month={month} />;
   }
 
@@ -68,7 +81,7 @@ export function TeachersPayPage() {
           onClick: () => setRecording(true),
         }}
       />
-      <div className="mb-6">
+      <div className={`mb-6 ${WITHOUT_MONTH.includes(tab) ? 'hidden' : ''}`}>
         <MonthNav
           label={monthLabel(month)}
           onPrevious={() => setParams({ mes: shiftMonth(month, -1) })}

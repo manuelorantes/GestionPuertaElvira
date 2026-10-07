@@ -207,6 +207,96 @@ describe('Profesorado', () => {
     );
   });
 
+  it('shows substitutions and holidays on the calendar and plans a substitution', async () => {
+    const fetch = api({
+      'GET /api/admin/payroll/substitutions?month=2026-10': [
+        200,
+        {
+          items: [
+            {
+              id: 's1',
+              date: '2026-10-05',
+              groupId: 'g1',
+              groupName: 'Iniciación A',
+              start: '17:00',
+              end: '18:00',
+              teacherId: 't1',
+              teacherName: 'Lucía Moreno Gil',
+              substituteId: 't2',
+              substituteName: 'Carlos Ruiz Márquez',
+              reason: 'Torneo',
+            },
+          ],
+        },
+      ],
+      'GET /api/admin/payroll/holidays?season=2026': [
+        200,
+        { items: [{ date: '2026-10-12', name: 'Fiesta Nacional' }] },
+      ],
+      'POST /api/admin/payroll/substitutions': [201, { id: 's2' }],
+    });
+    renderApp('/panel/profesores?mes=2026-10&pestana=sustituciones');
+
+    const calendar = await screen.findByRole('table', { name: 'Sustituciones de octubre 2026' });
+    expect(
+      await within(calendar).findByText('Carlos Ruiz Márquez por Lucía Moreno Gil'),
+    ).toBeInTheDocument();
+    expect(within(calendar).getByText('Festivo · Fiesta Nacional')).toBeInTheDocument();
+
+    await userEvent.click(
+      within(calendar).getByRole('button', { name: 'Nueva sustitución el 07/10/2026' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Clase'), 'g1');
+    await userEvent.selectOptions(within(dialog).getByLabelText('La da'), 't2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Planificar' }));
+    await waitFor(() => {
+      const call = fetch.mock.calls.find(
+        ([u, init]) => u === '/api/admin/payroll/substitutions' && init?.method === 'POST',
+      );
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+        groupId: 'g1',
+        date: '2026-10-07',
+        teacherId: 't2',
+        reason: null,
+      });
+    });
+  });
+
+  it('creates a club duty shift', async () => {
+    const fetch = api({
+      'GET /api/admin/payroll/duties': [200, { items: [] }],
+      'POST /api/admin/payroll/duties': [201, { id: 'd1' }],
+    });
+    renderApp('/panel/profesores?pestana=encargado');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo turno' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nuevo turno' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Profesor'), 't2');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() => {
+      const call = fetch.mock.calls.find(
+        ([u, init]) => u === '/api/admin/payroll/duties' && init?.method === 'POST',
+      );
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+        teacherId: 't2',
+        weekday: 5,
+        start: '17:00',
+        end: '20:00',
+        label: 'Encargado del club',
+      });
+    });
+  });
+
+  it('lets administration add and edit teachers from the team tab', async () => {
+    api();
+    renderApp('/panel/profesores?pestana=equipo');
+    expect(await screen.findByRole('button', { name: 'Añadir profesor' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Editar Lucía Moreno Gil' }),
+    ).toBeInTheDocument();
+  });
+
   it('explains why a settlement cannot be paid', async () => {
     api({
       'POST /api/admin/payroll/settlements/t1/2026-09/payment': [
