@@ -272,6 +272,8 @@ export class Charge {
     private reminded: LocalDate | null,
     private manual: boolean,
     private reason: string | null,
+    /** Descuento por pago adelantado que tuvo este mes (0, 10, 15, 20…): se mantiene al recalcular. */
+    private prepaid: number,
   ) {}
 
   static create(
@@ -281,7 +283,7 @@ export class Charge {
     period: YearMonth,
     amount: Money,
   ): Charge {
-    return new Charge(id, student, kind, period, amount, null, null, false, null);
+    return new Charge(id, student, kind, period, amount, null, null, false, null, 0);
   }
 
   static restore(fields: {
@@ -294,6 +296,7 @@ export class Charge {
     remindedOn: LocalDate | null;
     manual: boolean;
     note: string | null;
+    discountPercent?: number;
   }): Charge {
     return new Charge(
       fields.id,
@@ -305,6 +308,7 @@ export class Charge {
       fields.remindedOn,
       fields.manual,
       fields.note,
+      fields.discountPercent ?? 0,
     );
   }
 
@@ -323,9 +327,51 @@ export class Charge {
     return today.day > Charge.LAST_DAY_IN_TIME ? 'overdue' : 'due';
   }
 
-  /** Recálculo automático (cambio de grupos, familia…): no toca las cuotas fijadas a mano. */
-  reprice(amount: Money): void {
-    if (!this.manual) this.value = amount;
+  /**
+   * Recálculo automático (cambio de grupos, familia…) con la cuota de un mes nueva: conserva el descuento por pago
+   * adelantado de este mes y no toca las cuotas fijadas a mano.
+   */
+  reprice(fee: Money): void {
+    if (!this.manual) this.value = Charge.discounted(fee, this.prepaid);
+  }
+
+  /** Mes pagado por adelantado con descuento: se fija el porcentaje (si aún no tenía) y se descuenta del importe. */
+  applyPrepayment(percent: number): void {
+    if (this.prepaid > 0 || percent <= 0 || this.manual) return;
+    this.prepaid = percent;
+    this.value = Charge.discounted(this.value, percent);
+  }
+
+  /** Fija a mano el descuento por pago adelantado de este mes y recalcula con la cuota de un mes indicada. */
+  setDiscount(percent: number, fee: Money): void {
+    if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
+      throw new InvalidValue('percent', 'El descuento debe estar entre 0 y 100.');
+    }
+    this.prepaid = percent;
+    this.manual = false;
+    this.reason = null;
+    this.value = Charge.discounted(fee, percent);
+  }
+
+  discountPercent(): number {
+    return this.prepaid;
+  }
+
+  /**
+   * Deduce el descuento de una cuota que no lo tiene apuntado (p. ej. importada de la hoja) comparándola con la cuota
+   * de un mes que tenía el alumno: si coincide con uno de los porcentajes de pago adelantado, lo fija sin cambiar el
+   * importe.
+   */
+  inferDiscount(previousFee: Money, candidates: readonly number[]): void {
+    if (this.prepaid > 0 || this.manual || previousFee.cents <= 0) return;
+    if (this.value.cents >= previousFee.cents) return;
+    const percent = 100 - (this.value.cents * 100) / previousFee.cents;
+    const match = candidates.find((p) => p > 0 && Math.abs(p - percent) <= 1);
+    if (match !== undefined) this.prepaid = match;
+  }
+
+  private static discounted(fee: Money, percent: number): Money {
+    return percent > 0 ? fee.minus(fee.percent(percent)) : fee;
   }
 
   /** Importe fijado a mano, con su motivo; el recálculo automático ya no lo cambia. */
@@ -339,9 +385,9 @@ export class Charge {
     this.reason = [...reason.trim()].slice(0, 160).join('');
   }
 
-  /** Vuelve al importe calculado y deja de estar fijada a mano. */
-  resetTo(amount: Money): void {
-    this.value = amount;
+  /** Vuelve al importe calculado (con su descuento por pago adelantado, si lo tiene) y deja de estar fijada a mano. */
+  resetTo(fee: Money): void {
+    this.value = Charge.discounted(fee, this.prepaid);
     this.manual = false;
     this.reason = null;
   }

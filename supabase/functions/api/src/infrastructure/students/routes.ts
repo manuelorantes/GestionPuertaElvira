@@ -25,7 +25,7 @@ import {
 } from '../../application/students/mod.ts';
 import { StudentsStudentStatus, today } from '../classes/routes.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
-import { recalculateFees } from '../billing/recalculate.ts';
+import { recalculatingFees } from '../billing/recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
@@ -196,14 +196,19 @@ export function registerStudentRoutes(api: ApiApp): void {
           attendance: attendanceInput(e),
         })),
       ];
-      const id = await register.execute(
-        studentInput(body),
-        requested,
-        body.stringList('siblingIds'),
-        body.bool('confirmOverCapacity'),
-      );
       // Su familia directa pasa a tener descuento familiar.
-      await recalculateFees(api, scope, body.stringList('siblingIds'));
+      const id = await recalculatingFees(
+        api,
+        scope,
+        body.stringList('siblingIds'),
+        () =>
+          register.execute(
+            studentInput(body),
+            requested,
+            body.stringList('siblingIds'),
+            body.bool('confirmOverCapacity'),
+          ),
+      );
       return c.json({ id }, 201);
     },
   );
@@ -233,11 +238,16 @@ export function registerStudentRoutes(api: ApiApp): void {
     { method: 'POST', path: '/api/admin/students/:id/siblings', access: 'admin' },
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
-      await new LinkSiblings(students(scope), transactions(scope)).execute(
-        param(c, 'id'),
-        body.requiredString('siblingId'),
+      await recalculatingFees(
+        api,
+        scope,
+        [param(c, 'id'), body.requiredString('siblingId')],
+        () =>
+          new LinkSiblings(students(scope), transactions(scope)).execute(
+            param(c, 'id'),
+            body.requiredString('siblingId'),
+          ),
       );
-      await recalculateFees(api, scope, [param(c, 'id'), body.requiredString('siblingId')]);
       return c.body(null, 204);
     },
   );
@@ -245,11 +255,16 @@ export function registerStudentRoutes(api: ApiApp): void {
   api.defineRoute(
     { method: 'DELETE', path: '/api/admin/students/:id/siblings/:siblingId', access: 'admin' },
     async (c, scope) => {
-      await new UnlinkSiblings(students(scope), transactions(scope)).execute(
-        param(c, 'id'),
-        param(c, 'siblingId'),
+      await recalculatingFees(
+        api,
+        scope,
+        [param(c, 'id'), param(c, 'siblingId')],
+        () =>
+          new UnlinkSiblings(students(scope), transactions(scope)).execute(
+            param(c, 'id'),
+            param(c, 'siblingId'),
+          ),
       );
-      await recalculateFees(api, scope, [param(c, 'id'), param(c, 'siblingId')]);
       return c.body(null, 204);
     },
   );
@@ -263,14 +278,14 @@ export function registerStudentRoutes(api: ApiApp): void {
         new SqlEnrolmentRepository(scope.tx),
         clock,
       );
-      await enrol.execute(
-        param(c, 'id'),
-        body.requiredString('groupId'),
-        body.bool('confirmOverCapacity'),
-        undefined,
-        attendanceInput(body),
-      );
-      await recalculateFees(api, scope, [param(c, 'id')]);
+      await recalculatingFees(api, scope, [param(c, 'id')], () =>
+        enrol.execute(
+          param(c, 'id'),
+          body.requiredString('groupId'),
+          body.bool('confirmOverCapacity'),
+          undefined,
+          attendanceInput(body),
+        ));
       return c.body(null, 204);
     },
   );
@@ -279,17 +294,17 @@ export function registerStudentRoutes(api: ApiApp): void {
     { method: 'PUT', path: '/api/admin/students/:id/enrolments/:groupId', access: 'admin' },
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
-      await new ChangeAttendance(
-        new SqlClassGroupRepository(scope.tx),
-        new SqlEnrolmentRepository(scope.tx),
-        clock,
-      ).execute(
-        param(c, 'id'),
-        param(c, 'groupId'),
-        attendanceInput(body),
-        body.bool('confirmOverCapacity'),
-      );
-      await recalculateFees(api, scope, [param(c, 'id')]);
+      await recalculatingFees(api, scope, [param(c, 'id')], () =>
+        new ChangeAttendance(
+          new SqlClassGroupRepository(scope.tx),
+          new SqlEnrolmentRepository(scope.tx),
+          clock,
+        ).execute(
+          param(c, 'id'),
+          param(c, 'groupId'),
+          attendanceInput(body),
+          body.bool('confirmOverCapacity'),
+        ));
       return c.body(null, 204);
     },
   );
@@ -302,8 +317,12 @@ export function registerStudentRoutes(api: ApiApp): void {
         new StudentsStudentStatus(scope.tx, today(api)),
         clock,
       );
-      await unenrol.execute(param(c, 'id'), param(c, 'groupId'));
-      await recalculateFees(api, scope, [param(c, 'id')]);
+      await recalculatingFees(
+        api,
+        scope,
+        [param(c, 'id')],
+        () => unenrol.execute(param(c, 'id'), param(c, 'groupId')),
+      );
       return c.body(null, 204);
     },
   );
@@ -318,14 +337,14 @@ export function registerStudentRoutes(api: ApiApp): void {
         clock,
         transactions(scope),
       );
-      await move.execute(
-        param(c, 'id'),
-        param(c, 'groupId'),
-        body.requiredString('toGroupId'),
-        body.bool('confirmOverCapacity'),
-        attendanceInput(body),
-      );
-      await recalculateFees(api, scope, [param(c, 'id')]);
+      await recalculatingFees(api, scope, [param(c, 'id')], () =>
+        move.execute(
+          param(c, 'id'),
+          param(c, 'groupId'),
+          body.requiredString('toGroupId'),
+          body.bool('confirmOverCapacity'),
+          attendanceInput(body),
+        ));
       return c.body(null, 204);
     },
   );

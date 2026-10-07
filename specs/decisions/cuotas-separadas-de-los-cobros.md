@@ -14,6 +14,10 @@ obligaba a tocar recibos o descuentos. El club quiere reorganizar las cuotas sin
   alumno (por tipo: cuotas mensuales y cuota de socio por separado) entre sus cuotas, de la más antigua a la más
   reciente. Cada cuota queda cubierta, cubierta en parte o pendiente; lo que sobra es saldo a favor y cubre las
   siguientes cuotas en cuanto existen. Se calcula al leer (en SQL con funciones de ventana), no se guarda.
+- **Descuento por pago adelantado en la cuota** (`billing_charge.discount_percent`): un cobro de 3, 6 meses o del año
+  completo fija su porcentaje en cada mes que cubre y la cuota guarda el importe ya descontado (40 € con un 10 % → 36 €).
+  Al recalcular se conserva: si la tarifa sube a 55 €, la cuota pasa a 49,50 €. En cuotas sin porcentaje apuntado
+  (importadas de la hoja) se deduce comparando su importe con la cuota que tenía el alumno antes del cambio.
 - **Importe de una cuota editable**: se puede fijar a mano con un motivo, solo ese mes o ese y los siguientes de la
   temporada (se crean las cuotas que falten). Las fijadas a mano no cambian con el recálculo automático.
 - **Recálculo automático**: al cambiar lo que determina la cuota de un alumno (grupos, horario especial, familia

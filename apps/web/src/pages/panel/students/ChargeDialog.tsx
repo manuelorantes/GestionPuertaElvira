@@ -4,6 +4,7 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import {
   adjustCharge,
   resetCharge,
+  setChargeDiscount,
   type AccountCharge,
   type ChargeScope,
 } from '@/features/billing/api';
@@ -12,6 +13,7 @@ import { formatCents, monthLabel } from '@/features/billing/money';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Dialog } from '@/shared/ui/Dialog';
+import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
@@ -48,10 +50,14 @@ export function ChargeDialog({
     adjustCharge(studentId, charge.period, { ...input, scope }),
   );
   const reset = useBillingMutation(() => resetCharge(studentId, charge.period));
+  const [discount, setDiscount] = useState(String(charge.discountPercent));
+  const applyDiscount = useBillingMutation((percent: number) =>
+    setChargeDiscount(studentId, charge.period, percent),
+  );
   const cents = toCents(amount);
   const ready = cents !== null && reason.trim() !== '';
   const month = monthLabel(charge.period).toLowerCase();
-  const error = save.error ?? reset.error;
+  const error = save.error ?? reset.error ?? applyDiscount.error;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -109,6 +115,37 @@ export function ChargeDialog({
             Se aplica a {month} y a todos los meses siguientes hasta junio.
           </p>
         )}
+        <div className="flex flex-wrap items-end gap-3 rounded-sm bg-surface-muted p-3">
+          <Select
+            label="Descuento por pago adelantado"
+            options={[
+              { value: '0', label: 'Sin descuento' },
+              { value: '10', label: '10 % (3 meses)' },
+              { value: '15', label: '15 % (6 meses)' },
+              { value: '20', label: '20 % (todo el año)' },
+            ]}
+            value={discount}
+            onChange={setDiscount}
+          />
+          <Button
+            variant="secondary"
+            disabled={Number(discount) === charge.discountPercent}
+            busy={applyDiscount.isPending}
+            busyLabel="Aplicando…"
+            onClick={() =>
+              void applyDiscount.mutateAsync(Number(discount)).then(
+                () => onDone('Descuento aplicado'),
+                () => undefined,
+              )
+            }
+          >
+            Aplicar
+          </Button>
+          <p className="w-full text-[13px] text-ink-muted">
+            Recalcula la cuota con la tarifa de hoy y ese descuento. Se mantiene si después cambian
+            sus grupos.
+          </p>
+        </div>
         <div className="flex flex-wrap justify-between gap-3 border-t border-line pt-4">
           {charge.manual ? (
             <Button

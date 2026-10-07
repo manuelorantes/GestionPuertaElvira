@@ -19,7 +19,7 @@ import { SqlClassGroupRepository, SqlClassQuery } from '../persistence/classes.t
 import type { Sql } from '../persistence/sql.ts';
 import { SqlStudentRepository } from '../persistence/students.ts';
 import { SqlTeacherRepository } from '../persistence/teachers.ts';
-import { recalculateGroupFees } from '../billing/recalculate.ts';
+import { recalculatingGroupFees } from '../billing/recalculate.ts';
 
 /** Clases pregunta a Profesorado si un profesor está activo. */
 export class TeachersTeacherDirectory implements TeacherDirectory {
@@ -153,8 +153,13 @@ export function registerClassRoutes(api: ApiApp): void {
         new SqlClassGroupRepository(scope.tx),
         new TeachersTeacherDirectory(scope.tx),
       );
-      await update.execute(param(c, 'id'), groupInput(await JsonBody.from(c.req.raw)));
-      await recalculateGroupFees(api, scope, param(c, 'id'));
+      const input = groupInput(await JsonBody.from(c.req.raw));
+      await recalculatingGroupFees(
+        api,
+        scope,
+        param(c, 'id'),
+        () => update.execute(param(c, 'id'), input),
+      );
       return c.body(null, 204);
     },
   );

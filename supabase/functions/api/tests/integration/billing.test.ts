@@ -350,7 +350,8 @@ Deno.test({
     });
     assertEquals(paid.status, 201, JSON.stringify(paid.body));
 
-    // Pasa de 2 h (45 €) a 3 h (55 €): las cuotas se recalculan aunque estén cobradas.
+    // Pagó 3 meses a 45 € con un 10 % (40,50 €). Pasa a 3 h (55 €): las cuotas se recalculan aunque estén cobradas,
+    // conservando el 10 % (49,50 €).
     const friday = await newGroup(fx.client, fx.teacher, {
       name: 'Viernes',
       days: ['fri'],
@@ -369,11 +370,11 @@ Deno.test({
     const includesThisMonth = Number(today.slice(8, 10)) <= 10;
     const rows = await charges();
     assertEquals(rows.length, 3);
-    assertEquals(rows[0]?.amountCents, includesThisMonth ? 5500 : 4500);
+    assertEquals(rows[0]?.amountCents, includesThisMonth ? 4950 : 4050);
     assertEquals(
       rows.slice(1).map((r) => [r.amountCents, r.pendingCents]),
-      // Lo que falta (10 € por mes recalculado) queda en el último: el reparto cubre primero los más antiguos.
-      [[5500, 0], [5500, includesThisMonth ? 3000 : 2000]],
+      // Lo que falta (9 € por mes recalculado) queda en el último: el reparto cubre primero los más antiguos.
+      [[4950, 0], [4950, includesThisMonth ? 2700 : 1800]],
     );
 
     // Fijar a mano el último mes y volver a la calculada.
@@ -391,7 +392,7 @@ Deno.test({
     );
     assertEquals(
       list.items.find((i) => i.studentId === fx.student && i.kind === 'monthly')?.status,
-      includesThisMonth ? 'partial' : 'paid',
+      'partial',
     );
 
     const reset = await fx.client.json(
@@ -401,7 +402,11 @@ Deno.test({
     );
     assertEquals(reset.status, 204);
     const afterReset = (await charges()).find((r) => r.period === last);
-    assertEquals([afterReset?.amountCents, afterReset?.manual], [5500, false]);
+    assertEquals(
+      [afterReset?.amountCents, afterReset?.manual],
+      [4950, false],
+      'calculada, con su 10 %',
+    );
   },
 });
 

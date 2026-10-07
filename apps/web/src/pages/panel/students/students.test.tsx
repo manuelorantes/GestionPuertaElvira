@@ -262,12 +262,13 @@ describe('Alumnos', () => {
         {
           id: 'c9',
           period: '2026-09',
-          amountCents: 4000,
-          coveredCents: 4000,
+          amountCents: 3600,
+          coveredCents: 3600,
           pendingCents: 0,
           status: 'paid',
           manual: false,
           note: null,
+          discountPercent: 10,
         },
         {
           id: 'c10',
@@ -301,6 +302,7 @@ describe('Alumnos', () => {
     const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
     expect(within(season).getByText('Faltan 30 €')).toBeInTheDocument();
     expect(within(season).getByText('Fijada a mano · Cambio de tarifa')).toBeInTheDocument();
+    expect(within(season).getByText('−10 % pago adelantado')).toBeInTheDocument();
 
     await user.click(
       within(season).getByRole('button', { name: 'Editar la cuota de noviembre 2026' }),

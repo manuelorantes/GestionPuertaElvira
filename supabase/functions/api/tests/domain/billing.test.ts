@@ -215,6 +215,25 @@ Deno.test('Charge should keep a manual amount with its reason and ignore automat
   assertEquals(charge.paidBy(), payment, 'recuerda el primer cobro que la cubrió');
 });
 
+Deno.test('Charge should keep its prepayment discount when it is repriced', () => {
+  const charge = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-10'),
+    Money.euros(40),
+  );
+  charge.applyPrepayment(10);
+  assertEquals([charge.amount.cents, charge.discountPercent()], [3600, 10]);
+  charge.reprice(Money.euros(55));
+  assertEquals(charge.amount.cents, 4950, '55 € con el mismo 10 %');
+  charge.applyPrepayment(20);
+  assertEquals(charge.discountPercent(), 10, 'el descuento ya fijado no se acumula');
+  charge.setDiscount(0, Money.euros(55));
+  assertEquals([charge.amount.cents, charge.discountPercent()], [5500, 0]);
+  assertThrows(() => charge.setDiscount(120, Money.euros(55)), InvalidValue);
+});
+
 Deno.test('allocateCredit should cover the oldest charges first and keep what is left as balance', () => {
   const charge = (period: string, euros: number) =>
     Charge.create(
