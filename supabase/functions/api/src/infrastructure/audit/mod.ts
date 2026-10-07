@@ -37,6 +37,7 @@ export class AuditLabels {
     'PUT /api/admin/payroll/sessions/:id': 'Editar sesión',
     'DELETE /api/admin/payroll/sessions/:id': 'Quitar sesión',
     'POST /api/admin/payroll/holidays': 'Añadir festivo',
+    'POST /api/admin/payroll/teacher-substitutions': 'Sustituir a un profesor',
     'POST /api/admin/payroll/days/:date/refill': 'Apuntar las horas de un día',
     'DELETE /api/admin/payroll/holidays/:date': 'Quitar festivo',
     'POST /api/admin/payroll/substitutions': 'Planificar sustitución',
