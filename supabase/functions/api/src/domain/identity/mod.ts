@@ -128,10 +128,18 @@ export class Session {
     readonly userId: UserId,
     readonly startedAt: Date,
     private lastActivity: Date,
+    /** Superadministración que abrió esta sesión en nombre de la cuenta (suplantación), o null. */
+    readonly impersonator: UserId | null = null,
   ) {}
 
-  static start(id: SessionId, tokenHash: SessionTokenHash, userId: UserId, now: Date): Session {
-    return new Session(id, tokenHash, userId, now, now);
+  static start(
+    id: SessionId,
+    tokenHash: SessionTokenHash,
+    userId: UserId,
+    now: Date,
+    impersonator: UserId | null = null,
+  ): Session {
+    return new Session(id, tokenHash, userId, now, now, impersonator);
   }
 
   static restore(
@@ -140,8 +148,9 @@ export class Session {
     userId: UserId,
     startedAt: Date,
     lastActivityAt: Date,
+    impersonator: UserId | null = null,
   ): Session {
-    return new Session(id, tokenHash, userId, startedAt, lastActivityAt);
+    return new Session(id, tokenHash, userId, startedAt, lastActivityAt, impersonator);
   }
 
   isExpiredAt(now: Date, policy: SessionPolicy): boolean {

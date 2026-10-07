@@ -48,3 +48,25 @@ export class CannotChangeOwnAccount extends Error {
     this.name = 'CannotChangeOwnAccount';
   }
 }
+
+export class CannotImpersonate extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'CannotImpersonate';
+  }
+}
+
+export class NotImpersonating extends Error {
+  constructor() {
+    super('No estás suplantando ninguna cuenta.');
+    this.name = 'NotImpersonating';
+  }
+}
+
+/** Mientras se suplanta una cuenta no se puede cambiar su contraseña. */
+export class ForbiddenWhileImpersonating extends Error {
+  constructor() {
+    super('Mientras suplantas una cuenta no puedes cambiar su contraseña.');
+    this.name = 'ForbiddenWhileImpersonating';
+  }
+}

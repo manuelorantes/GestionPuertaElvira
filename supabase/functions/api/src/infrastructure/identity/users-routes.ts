@@ -6,11 +6,13 @@ import {
   ListUsers,
   RegisterUser,
   ResetUserPassword,
+  StartImpersonation,
   UserNotFound,
 } from '../../application/identity/mod.ts';
 import { AuditedSecurityEventLog } from '../audit/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { httpError } from '../http/errors.ts';
+import { presentUser } from './routes.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
   SqlSessionRepository,
@@ -78,6 +80,19 @@ export function registerUserRoutes(api: ApiApp): void {
   api.defineRoute(route('POST', '/api/admin/users/:id/enable'), async (c, scope) => {
     await new EnableUser(users(scope), log(scope)).execute(await emailOf(scope, param(c, 'id')));
     return c.body(null, 204);
+  });
+
+  api.defineRoute(route('POST', '/api/admin/users/:id/impersonate'), async (c, scope) => {
+    if (scope.user === null) throw httpError(401);
+    const result = await new StartImpersonation(
+      users(scope),
+      sessions(scope),
+      deps.tokens,
+      log(scope),
+      deps.clock,
+    ).execute(scope.user, param(c, 'id'));
+    deps.cookie.attach(c, result.token.value);
+    return c.json(presentUser(result.user));
   });
 
   api.defineRoute(route('PUT', '/api/admin/users/:id/role'), async (c, scope) => {

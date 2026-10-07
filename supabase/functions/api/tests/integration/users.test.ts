@@ -90,3 +90,66 @@ Deno.test('users should be created, reset, disabled, enabled and change role fro
     'not_found',
   );
 });
+
+Deno.test('superadministrators can act as another account and come back, signing what they do', async () => {
+  const { client, selfId } = await superadmin();
+  const junta = await createUser('junta@club.es');
+  const otherSuper = await createUser('otro@club.es', 'superadministrator');
+
+  const started = await client.json('POST', `/api/admin/users/${junta.id.value}/impersonate`);
+  assertEquals(started.status, 200, JSON.stringify(started.body));
+  const me = (await client.get('/api/auth/me')).body as {
+    user: { email: string; role: string; impersonatedBy: { id: string; fullName: string } | null };
+  };
+  assertEquals(me.user.email, 'junta@club.es');
+  assertEquals(me.user.impersonatedBy?.id, selfId);
+  assertError(await client.get('/api/admin/users'), 403, 'forbidden');
+  assertError(
+    await client.json('PUT', '/api/auth/password', {
+      currentPassword: 'x',
+      newPassword: 'otra-contraseña-larga',
+    }),
+    403,
+    'impersonating',
+  );
+
+  // Lo que hace queda firmado por la cuenta y por quien la suplanta.
+  const teacher = await client.json('POST', '/api/admin/teachers', {
+    fullName: 'Ana Belén Torres',
+  });
+  assertEquals(teacher.status, 201);
+
+  const stopped = await client.json('POST', '/api/auth/impersonation/stop');
+  assertEquals(stopped.status, 200, JSON.stringify(stopped.body));
+  const back = (await client.get('/api/auth/me')).body as {
+    user: { email: string; impersonatedBy: unknown };
+  };
+  assertEquals([back.user.email, back.user.impersonatedBy], ['super@club.es', null]);
+
+  const actions = (await client.get('/api/admin/audit/actions')).body as {
+    items: { label: string; userName: string }[];
+  };
+  const created = actions.items.find((a) => a.label === 'Crear profesor');
+  assertEquals(created?.userName, 'Lucía Moreno Gil (suplantada por Lucía Moreno Gil)');
+  assert(actions.items.some((a) => a.label === 'Empieza a suplantar una cuenta'));
+  assert(actions.items.some((a) => a.label === 'Deja de suplantar una cuenta'));
+
+  // Límites: ni a sí mismo, ni a otra superadministración, ni cuentas desactivadas.
+  assertError(
+    await client.json('POST', `/api/admin/users/${selfId}/impersonate`),
+    409,
+    'cannot_impersonate',
+  );
+  assertError(
+    await client.json('POST', `/api/admin/users/${otherSuper.id.value}/impersonate`),
+    409,
+    'cannot_impersonate',
+  );
+  await client.json('POST', `/api/admin/users/${junta.id.value}/disable`);
+  assertError(
+    await client.json('POST', `/api/admin/users/${junta.id.value}/impersonate`),
+    409,
+    'cannot_impersonate',
+  );
+  assertError(await client.json('POST', '/api/auth/impersonation/stop'), 409, 'not_impersonating');
+});

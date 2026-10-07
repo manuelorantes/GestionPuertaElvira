@@ -128,6 +128,43 @@ describe('Usuarios', () => {
     );
   });
 
+  it('enters as another account after confirming, and shows who is acting', async () => {
+    const spy = api({
+      'POST /api/admin/users/u2/impersonate': [
+        200,
+        {
+          user: {
+            id: 'u2',
+            fullName: 'Club Ajedrez',
+            email: 'club@ejemplo.com',
+            role: 'administrator',
+            mustChangePassword: false,
+            impersonatedBy: { id: 'u0', fullName: 'Administración Pruebas' },
+          },
+        },
+      ],
+      'GET /api/admin/dashboard': [500, {}],
+    });
+    renderApp('/panel/usuarios');
+
+    const table = await screen.findByRole('table', { name: 'Cuentas de usuario' });
+    const me = within(table).getByRole('row', { name: /Administración Pruebas/ });
+    expect(within(me).queryByRole('button', { name: /Entrar como/ })).not.toBeInTheDocument();
+    const club = within(table).getByRole('row', { name: /Club Ajedrez/ });
+    await userEvent.click(within(club).getByRole('button', { name: 'Entrar como Club Ajedrez' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog', { name: 'Entrar como esta cuenta' })).getByRole('button', {
+        name: 'Entrar',
+      }),
+    );
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Estás usando la aplicación como Club Ajedrez',
+    );
+    expect(screen.getByRole('button', { name: 'Volver a mi cuenta' })).toBeInTheDocument();
+    expect(spy.mock.calls.some(([u]) => u === '/api/admin/users/u2/impersonate')).toBe(true);
+  });
+
   it('sends a plain administrator back to the summary', async () => {
     mockApi({ 'GET /api/auth/me': [200, { user: ADMIN }], 'GET /api/admin/users': [403, {}] });
     renderApp('/panel/usuarios');
