@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { formatCents, monthLabel } from '@/features/billing/money';
+import { currentMonth, formatCents, monthLabel } from '@/features/billing/money';
 import type { ProfitabilityRow } from '@/features/payroll/api';
 import { useProfitability } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
@@ -29,6 +29,8 @@ export function ProfitabilityTab({ month }: { month: string }) {
   const profitability = useProfitability(month);
   const [order, setOrder] = useState('margin');
   const rows = profitability.data ?? [];
+  // En un mes ya pasado cuentan las horas realmente imputadas; en el actual y los futuros, las esperadas.
+  const past = month < currentMonth();
 
   if (profitability.isPending) return <p className="text-ink-muted">Cargando rentabilidad…</p>;
   if (rows.length === 0)
@@ -41,7 +43,10 @@ export function ProfitabilityTab({ month }: { month: string }) {
     .sort((a, b) => b.marginCents - a.marginCents)[0];
   const maxMargin = Math.max(1, ...rows.map((r) => r.marginCents));
   const totals = [
-    { label: 'Horas esperadas', value: hoursLabel(rows.reduce((sum, r) => sum + r.minutes, 0)) },
+    {
+      label: past ? 'Horas imputadas' : 'Horas esperadas',
+      value: hoursLabel(rows.reduce((sum, r) => sum + r.minutes, 0)),
+    },
     {
       label: 'Coste de profesores',
       value: formatCents(rows.reduce((sum, r) => sum + r.costCents, 0)),
@@ -169,13 +174,72 @@ export function ProfitabilityTab({ month }: { month: string }) {
             ))}
           </tbody>
         </table>
+        <MonthTotals rows={rows} />
         <p className="px-5 py-3 text-[13px] text-ink-muted">
-          Coste = horas esperadas del mes según el horario (sin festivos ni sustituciones) × tarifa.
-          Ingresos = cuotas mensuales de sus alumnos ya con descuentos (sin cuotas de socio); si un
-          alumno va con varios profesores, se reparte según las horas con cada uno. Ocupación =
-          plazas ocupadas de todas sus clases, contando cada día. Margen = ingresos − coste.
+          {past
+            ? 'Mes cerrado: coste = horas realmente imputadas (su liquidación).'
+            : 'Coste = horas esperadas del mes según el horario (sin festivos ni sustituciones) × tarifa.'}
+          Ingresos = cuotas mensuales de sus alumnos de ese mes, cobradas o pendientes, ya con
+          descuentos (sin cuotas de socio); si un alumno va con varios profesores, se reparte según
+          las horas con cada uno. Ocupación = plazas ocupadas de todas sus clases, contando cada
+          día. Margen = ingresos − coste.
         </p>
       </Card>
     </div>
+  );
+}
+
+/**
+ * Totales del mes: horas, tarifa media (ponderada por las horas de cada profesor), coste, ingresos, margen, ganancia o
+ * pérdida por hora y ocupación de todas las clases.
+ */
+function MonthTotals({ rows }: { rows: ProfitabilityRow[] }) {
+  const minutes = rows.reduce((sum, r) => sum + r.minutes, 0);
+  const cost = rows.reduce((sum, r) => sum + r.costCents, 0);
+  const income = rows.reduce((sum, r) => sum + r.incomeCents, 0);
+  const margin = income - cost;
+  const occupied = rows.reduce((sum, r) => sum + r.occupied, 0);
+  const capacity = rows.reduce((sum, r) => sum + r.capacity, 0);
+  const perHour = (cents: number) => (minutes > 0 ? Math.round((cents * 60) / minutes) : null);
+  const averageRate = perHour(cost);
+  const marginPerHour = perHour(margin);
+  const stats = [
+    { label: 'Horas', value: hoursLabel(minutes) },
+    {
+      label: 'Tarifa media',
+      value: averageRate === null ? '—' : `${formatCents(averageRate)}/h`,
+    },
+    { label: 'Coste en profesores', value: formatCents(cost) },
+    { label: 'Ingresos', value: formatCents(income) },
+    { label: 'Margen', value: formatCents(margin), negative: margin < 0 },
+    {
+      label: margin < 0 ? 'Pérdida por hora' : 'Ganancia por hora',
+      value: marginPerHour === null ? '—' : formatCents(marginPerHour),
+      negative: margin < 0,
+    },
+    {
+      label: 'Ocupación media',
+      value: capacity > 0 ? `${Math.round((occupied / capacity) * 100)} %` : '—',
+    },
+  ];
+  return (
+    <section
+      aria-label="Totales del mes"
+      className="border-t border-line bg-surface-muted/60 px-5 py-4"
+    >
+      <h3 className="mb-3 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+        Totales del mes
+      </h3>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:grid-cols-7">
+        {stats.map((stat) => (
+          <div key={stat.label}>
+            <dt className="text-[13px] text-ink-muted">{stat.label}</dt>
+            <dd className={`text-lg font-semibold ${stat.negative ? 'text-danger-fg' : ''}`}>
+              {stat.value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }

@@ -93,6 +93,7 @@ function payroll(api: ApiApp, scope: RequestScope) {
       list,
       new SqlPayrollQuery(tx, today),
       new SqlMonthlyFees(tx, (month) => billing(api, scope).generate.expected(month)),
+      clock,
     ),
     settings: new SqlBillingSettingsRepository(tx),
   };
