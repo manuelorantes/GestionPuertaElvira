@@ -14,19 +14,18 @@ import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { StudentDialog } from './StudentDialog';
 import { StudentsList } from './StudentsList';
 
-const ALL = { param: 'todos', filter: 'all' as StudentFilter, label: 'Todos' };
+// «Activos» incluye a la familia directa y a los socios sin clases (la etiqueta «Familia directa» sigue en cada fila).
+const ACTIVE = { param: 'activos', filter: 'active' as StudentFilter, label: 'Activos' };
 const FILTERS: { param: string; filter: StudentFilter; label: string }[] = [
-  ALL,
-  { param: 'activos', filter: 'active', label: 'Activos' },
-  { param: 'familia', filter: 'siblings', label: 'Familia directa' },
-  { param: 'baja', filter: 'withdrawn', label: 'De baja' },
+  ACTIVE,
   { param: 'socios', filter: 'no_classes', label: 'Socios sin clases' },
+  { param: 'baja', filter: 'withdrawn', label: 'De baja' },
 ];
 
 export function StudentsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const current = FILTERS.find((f) => f.param === searchParams.get('filtro')) ?? ALL;
+  const current = FILTERS.find((f) => f.param === searchParams.get('filtro')) ?? ACTIVE;
   const [search, setSearch] = useState(searchParams.get('q') ?? '');
   const debouncedSearch = useDebouncedValue(search, 250);
   const [creating, setCreating] = useState(false);
@@ -35,10 +34,7 @@ export function StudentsPage() {
   const canImport = useSession().data?.role === 'superadministrator';
   const items = students.data?.items ?? [];
   const total = students.data?.total ?? 0;
-  const activeCount =
-    current.filter === 'all' && !debouncedSearch
-      ? items.filter((s) => s.status === 'active').length
-      : null;
+  const activeCount = current.filter === 'active' && !debouncedSearch ? items.length : null;
   const query = searchParams.toString();
   const sort = sortFrom(searchParams.get('orden'));
 
@@ -105,7 +101,7 @@ export function StudentsPage() {
                 key={f.param}
                 tone="ink"
                 pressed={f.param === current.param}
-                onClick={() => updateParams({ filtro: f.param === 'todos' ? '' : f.param })}
+                onClick={() => updateParams({ filtro: f.param === 'activos' ? '' : f.param })}
                 className="shrink-0 rounded-full font-medium"
               >
                 {f.label}

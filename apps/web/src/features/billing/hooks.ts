@@ -4,8 +4,11 @@ import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
 import * as api from './api';
 
-export function useMonthlyCharges(month: string) {
-  return useQuery({ queryKey: ['charges', month], queryFn: () => api.fetchCharges(month) });
+export function useMonthlyCharges(month: string, kind: api.ChargesKind) {
+  return useQuery({
+    queryKey: ['charges', month, kind],
+    queryFn: () => api.fetchCharges(month, kind),
+  });
 }
 
 export function usePayments(studentId?: string) {

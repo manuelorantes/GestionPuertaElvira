@@ -45,7 +45,14 @@ test('should show last month overdue charges with a WhatsApp reminder', async ({
   test.skip(month === 9, 'En septiembre no hay mes anterior de temporada');
   await openBilling(page);
 
-  await page.getByRole('button', { name: 'Mes anterior' }).click();
+  const previous = new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1);
+  const label = previous
+    .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+    .replace(' de ', ' ');
+  await page
+    .getByRole('group', { name: 'Cuotas a ver' })
+    .getByRole('button', { name: label.charAt(0).toUpperCase() + label.slice(1) })
+    .click();
 
   const row = page.getByRole('row', { name: /Irene Moreno Salas/ });
   await expect(row.getByText('Vencida')).toBeVisible();

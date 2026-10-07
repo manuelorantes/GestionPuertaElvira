@@ -152,8 +152,11 @@ export interface BillingSettings {
 
 const BASE = '/api/admin/billing';
 
-export function fetchCharges(month: string): Promise<MonthlyCharges> {
-  return apiGet(`${BASE}/charges?month=${month}`);
+export type ChargesKind = 'monthly' | 'membership';
+
+/** Cuotas mensuales de un mes, o las cuotas de socio de la temporada de ese mes. */
+export function fetchCharges(month: string, kind: ChargesKind): Promise<MonthlyCharges> {
+  return apiGet(`${BASE}/charges?month=${month}&kind=${kind}`);
 }
 
 export function quotePayment(request: PaymentRequest): Promise<Quote> {

@@ -106,8 +106,8 @@ const ACCOUNT = {
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /api/auth/me': [200, { user: ADMIN }],
-    'GET /api/admin/billing/charges?month=2026-10': [200, OCTOBER],
-    'GET /api/admin/billing/charges?month=2026-09': [
+    'GET /api/admin/billing/charges?month=2026-10&kind=monthly': [200, OCTOBER],
+    'GET /api/admin/billing/charges?month=2026-09&kind=monthly': [
       200,
       { ...OCTOBER, month: '2026-09', label: 'Septiembre 2026', items: [] },
     ],
@@ -191,14 +191,62 @@ describe('Cobros y cuotas', () => {
     expect(screen.getByText('1 vencida')).toBeInTheDocument();
   });
 
-  it('moves between months', async () => {
+  it('moves between the months of the season and shows membership fees apart', async () => {
+    const fetch = api({
+      'GET /api/admin/billing/charges?month=2026-10&kind=membership': [
+        200,
+        { ...OCTOBER, items: [] },
+      ],
+    });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const months = await screen.findByRole('group', { name: 'Cuotas a ver' });
+    expect(
+      within(months)
+        .getAllByRole('button')
+        .map((b) => b.textContent),
+    ).toEqual([
+      'Cuotas de socio',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+    ]);
+    await userEvent.click(within(months).getByRole('button', { name: 'Septiembre 2026' }));
+    expect(await screen.findByText('No hay cuotas este mes.')).toBeInTheDocument();
+
+    await userEvent.click(within(months).getByRole('button', { name: 'Cuotas de socio' }));
+    expect(await screen.findByText('No hay cuotas de socio esta temporada.')).toBeInTheDocument();
+    expect(
+      fetch.mock.calls.some(
+        ([u]) => u === '/api/admin/billing/charges?month=2026-10&kind=membership',
+      ),
+    ).toBe(true);
+  });
+
+  it('filters and sorts the charges by status from the status header', async () => {
     api();
     renderApp('/panel/cobros?mes=2026-10');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Mes anterior' }));
-
-    expect(await screen.findByText('No hay cuotas este mes.')).toBeInTheDocument();
-    expect(screen.getByText('Septiembre 2026')).toBeInTheDocument();
+    const table = await screen.findByRole('table');
+    const rowsBefore = within(table).getAllByRole('row').length;
+    await userEvent.click(within(table).getByRole('button', { name: /Estado/ }));
+    const menu = screen.getByRole('dialog', { name: 'Ordenar y filtrar por estado' });
+    const options = within(within(menu).getByRole('group', { name: 'Filtrar' })).getAllByRole(
+      'checkbox',
+    );
+    await userEvent.click(options[0] as HTMLElement);
+    expect(within(table).getAllByRole('row').length).toBeLessThan(rowsBefore);
+    await userEvent.click(within(menu).getByRole('button', { name: 'Ver todos' }));
+    expect(within(table).getAllByRole('row')).toHaveLength(rowsBefore);
+    await userEvent.click(within(menu).getByRole('radio', { name: 'Lo cobrado primero' }));
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Cobrada');
   });
 
   it('registers a payment with a live quote and shows the receipt', async () => {

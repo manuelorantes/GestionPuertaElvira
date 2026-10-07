@@ -289,13 +289,23 @@ export class ListMonthlyCharges {
     private readonly clock: Clock,
   ) {}
 
-  async execute(month: string | null): Promise<MonthlyCharges> {
+  /**
+   * `kind`: «monthly» (solo las cuotas del mes), «membership» (las cuotas de socio de la temporada de ese mes, cobradas
+   * o no) o «all» (las del mes y las de socio pendientes; lo que usa el resumen).
+   */
+  async execute(
+    month: string | null,
+    kind: 'all' | 'monthly' | 'membership' = 'all',
+  ): Promise<MonthlyCharges> {
     const today = LocalDate.fromInstant(this.clock.now());
-    const period = month === null || month === ''
+    const requested = month === null || month === ''
       ? YearMonth.of(today)
       : YearMonth.fromString(month);
+    // Las cuotas de socio cuelgan del primer mes de la temporada.
+    const period = kind === 'membership' ? Season.containing(requested).firstMonth() : requested;
     await this.generate.execute(period.toString());
-    const items = await this.query.charges(period, today);
+    const all = await this.query.charges(period, today);
+    const items = kind === 'all' ? all : all.filter((c) => c.kind === kind);
     const sum = (charges: ChargeView[]) => charges.reduce((total, c) => total + c.amountCents, 0);
     return {
       month: period.toString(),
