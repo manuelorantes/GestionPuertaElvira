@@ -164,6 +164,7 @@ function toCharge(row: Row): Charge {
     remindedOn: remindedOn === null ? null : LocalDate.fromString(remindedOn),
     manual: row.bool('manual'),
     note: row.nullableString('note'),
+    discountPercent: row.int('discount_percent'),
   });
 }
 
@@ -222,10 +223,12 @@ export class SqlChargeRepository implements ChargeRepository {
       reminded_on: charge.remindedOn()?.toString() ?? null,
       manual: charge.isManual(),
       note: charge.note(),
+      discount_percent: charge.discountPercent(),
     };
     await this.sql`INSERT INTO billing_charge ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET amount_cents = EXCLUDED.amount_cents, paid_by = EXCLUDED.paid_by,
-        reminded_on = EXCLUDED.reminded_on, manual = EXCLUDED.manual, note = EXCLUDED.note`;
+        reminded_on = EXCLUDED.reminded_on, manual = EXCLUDED.manual, note = EXCLUDED.note,
+        discount_percent = EXCLUDED.discount_percent`;
   }
 }
 

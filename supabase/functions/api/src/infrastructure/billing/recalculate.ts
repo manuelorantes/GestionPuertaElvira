@@ -1,4 +1,5 @@
 import { RecalculateCharges } from '../../application/billing/mod.ts';
+import type { Money } from '../../domain/common/mod.ts';
 import type { ApiApp, RequestScope } from '../http/app.ts';
 import {
   SqlBillingSettingsRepository,
@@ -8,32 +9,49 @@ import {
 } from '../persistence/billing.ts';
 import { Row } from '../persistence/sql.ts';
 
-/**
- * Recalcula las cuotas de unos alumnos tras cambiar lo que las determina (grupos, horario especial, familia directa,
- * precio de particulares). Va en la misma transacción que el cambio.
- */
-export async function recalculateFees(
-  api: ApiApp,
-  scope: RequestScope,
-  studentIds: string[],
-): Promise<void> {
-  const recalculate = new RecalculateCharges(
+function recalculator(api: ApiApp, scope: RequestScope): RecalculateCharges {
+  return new RecalculateCharges(
     new SqlStudentDirectory(scope.tx),
     new SqlStudentAccountRepository(scope.tx),
     new SqlBillingSettingsRepository(scope.tx),
     new SqlChargeRepository(scope.tx),
     api.deps.clock,
   );
-  for (const id of new Set(studentIds)) await recalculate.execute(id);
 }
 
-/** Recalcula las cuotas de todos los alumnos inscritos ahora en un grupo (p. ej. si cambia su horario). */
-export async function recalculateGroupFees(
+/**
+ * Aplica un cambio que afecta a la cuota de unos alumnos (grupos, horario especial, familia directa, precio de
+ * particulares) y recalcula sus cuotas, en la misma transacción. Guarda antes su cuota para conservar el descuento
+ * por pago adelantado de las cuotas que no lo tienen apuntado.
+ */
+export async function recalculatingFees<T>(
+  api: ApiApp,
+  scope: RequestScope,
+  studentIds: string[],
+  change: () => Promise<T>,
+): Promise<T> {
+  const recalculate = recalculator(api, scope);
+  const ids = [...new Set(studentIds)];
+  const before = new Map<string, Money | null>();
+  for (const id of ids) before.set(id, await recalculate.currentFee(id));
+  const result = await change();
+  for (const id of ids) await recalculate.execute(id, before.get(id) ?? null);
+  return result;
+}
+
+/** Igual, para todos los alumnos inscritos ahora en un grupo (p. ej. si cambia su horario). */
+export async function recalculatingGroupFees<T>(
   api: ApiApp,
   scope: RequestScope,
   groupId: string,
-): Promise<void> {
+  change: () => Promise<T>,
+): Promise<T> {
   const rows = await scope.tx`SELECT DISTINCT student_id FROM classes_enrolment
     WHERE class_group_id = ${groupId} AND (ends_on IS NULL OR ends_on > CURRENT_DATE)`;
-  await recalculateFees(api, scope, Row.all(rows).map((r) => r.string('student_id')));
+  return await recalculatingFees(
+    api,
+    scope,
+    Row.all(rows).map((r) => r.string('student_id')),
+    change,
+  );
 }

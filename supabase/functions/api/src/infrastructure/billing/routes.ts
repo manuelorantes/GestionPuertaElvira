@@ -18,11 +18,12 @@ import {
   RegisterPayment,
   ReschedulePayment,
   ResetCharge,
+  SetChargeDiscount,
   UpdateBillingSettings,
   UpdateStudentAccount,
 } from '../../application/billing/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
-import { recalculateFees } from './recalculate.ts';
+import { recalculatingFees } from './recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
@@ -238,13 +239,13 @@ export function registerBillingRoutes(api: ApiApp): void {
       throw new BillingStudentNotFound();
     }
     const body = await JsonBody.from(c.req.raw);
-    await new UpdateStudentAccount(b.accounts).execute(
-      id,
-      body.requiredString('preferredPlan'),
-      body.bool('member'),
-      body.optionalString('privateRate'),
-    );
-    await recalculateFees(api, scope, [id]);
+    await recalculatingFees(api, scope, [id], () =>
+      new UpdateStudentAccount(b.accounts).execute(
+        id,
+        body.requiredString('preferredPlan'),
+        body.bool('member'),
+        body.optionalString('privateRate'),
+      ));
     return c.body(null, 204);
   });
 
@@ -259,6 +260,17 @@ export function registerBillingRoutes(api: ApiApp): void {
         body.requiredString('reason'),
         body.requiredString('scope') as 'one' | 'rest',
       );
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    admin('PUT', '/api/admin/billing/accounts/:id/charges/:month/discount'),
+    async (c, scope) => {
+      const b = billing(api, scope);
+      const body = await JsonBody.from(c.req.raw);
+      await new SetChargeDiscount(b.directory, b.accounts, b.settings, b.charges, api.deps.clock)
+        .execute(param(c, 'id'), param(c, 'month'), body.requiredInt('percent'));
       return c.body(null, 204);
     },
   );

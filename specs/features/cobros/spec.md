@@ -90,9 +90,13 @@ de particulares o el horario de uno de sus grupos), sus cuotas MUST recalcularse
 siguiente o, si es del día 1 al 10, desde el mes actual, hasta junio, estén cobradas o no. Las cuotas fijadas a mano
 no cambian. La diferencia queda como pendiente o como saldo a favor.
 
+Los meses pagados por adelantado (3, 6 meses o todo el año) MUST conservar su descuento al recalcularse: la cuota
+nueva es la tarifa nueva con el mismo porcentaje. En cuotas sin porcentaje apuntado (importadas) se deduce de la cuota
+que tenía el alumno antes del cambio. Administración MUST poder fijar a mano el descuento de una cuota.
+
 #### Scenario: Cambio de tarifa a mitad de un pago trimestral
-- **WHEN** un alumno pagó septiembre, octubre y noviembre a 40 € y el 3 de octubre pasa a 3 horas (55 €)
-- **THEN** sus cuotas son 40, 55 y 55 €, noviembre queda con 30 € pendientes y un cobro de 30 € lo deja todo cobrado
+- **WHEN** un alumno pagó septiembre, octubre y noviembre a 40 € con un 10 % (36 € cada mes) y el 3 de octubre pasa a 3 horas (55 €)
+- **THEN** sus cuotas son 36, 49,50 y 49,50 €, noviembre queda con 27 € pendientes y un cobro de 27 € lo deja todo cobrado
 
 ### Requirement: Editar una cuota
 Administración MUST poder fijar a mano el importe de una cuota con un motivo, eligiendo si afecta solo a ese mes o

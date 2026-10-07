@@ -372,6 +372,8 @@ export interface PaymentQuote {
   monthlyCharge: Money;
   /** Lo que cubre en cuotas (antes de descuentos): se reparte entre las cuotas del alumno. */
   credit: Money;
+  /** Descuento por pago adelantado (3, 6 meses o todo el año) que queda fijado en cada mes que cubre. */
+  prepaymentPercent: number;
 }
 
 function concept(periods: readonly YearMonth[]): string {
@@ -449,6 +451,7 @@ export class QuotePayment {
       concept: concept(periods),
       monthlyCharge: monthly,
       credit: items.reduce((sum, l) => sum.plus(l.amount), Money.zero()),
+      prepaymentPercent: settings.tariff.prepaymentPercent(periods.length),
     };
   }
 
@@ -521,6 +524,7 @@ export class QuotePayment {
       concept: label,
       monthlyCharge: charge?.amount ?? settings.tariff.membershipFee,
       credit: pendingFee,
+      prepaymentPercent: 0,
     };
   }
 }
@@ -546,6 +550,25 @@ export class RegisterPayment {
       await PeriodClosed.guard(this.closed, quote.date);
       const ref = StudentRef.fromString(quote.student.id);
       const season = Season.containing(YearMonth.of(quote.date));
+      // Los meses que cubre quedan con su descuento por pago adelantado fijado; lo que cubre el cobro es lo que les
+      // faltaba ya con ese descuento.
+      const pendingBefore = new Map(
+        (await pendingCharges(this.charges, ref, quote.kind)).map((p) => [
+          p.charge.period.toString(),
+          p.pending,
+        ]),
+      );
+      const covered: Charge[] = [];
+      let credit = Money.zero();
+      for (const period of quote.periods) {
+        const charge = (await this.charges.chargeFor(ref, quote.kind, period)) ??
+          Charge.create(ChargeId.generate(), ref, quote.kind, period, quote.monthlyCharge);
+        const already = charge.amount.minus(pendingBefore.get(period.toString()) ?? charge.amount);
+        charge.applyPrepayment(quote.prepaymentPercent);
+        const left = charge.amount.minus(already);
+        if (!left.isNegative()) credit = credit.plus(left);
+        covered.push(charge);
+      }
       const payment = Payment.register({
         id: PaymentId.generate(),
         student: ref,
@@ -560,12 +583,10 @@ export class RegisterPayment {
         lines: quote.quote.lines,
         total: quote.quote.total,
         periods: quote.periods,
-        credit: quote.credit,
+        credit: quote.kind === 'membership' ? quote.credit : credit,
       });
       await this.payments.savePayment(payment);
-      for (const period of quote.periods) {
-        const charge = (await this.charges.chargeFor(ref, quote.kind, period)) ??
-          Charge.create(ChargeId.generate(), ref, quote.kind, period, quote.monthlyCharge);
+      for (const charge of covered) {
         charge.coveredBy(payment.id);
         await this.charges.saveCharge(charge);
       }
@@ -738,6 +759,8 @@ export interface AccountCharge {
   status: string;
   manual: boolean;
   note: string | null;
+  /** Descuento por pago adelantado fijado en este mes. */
+  discountPercent: number;
 }
 
 export class GetStudentAccount {
@@ -791,6 +814,7 @@ export class GetStudentAccount {
           status: c.statusOn(today, allocation.covered(c)),
           manual: c.isManual(),
           note: c.note(),
+          discountPercent: c.discountPercent(),
         })),
       balanceCents: allocation.balance.cents,
     };
@@ -917,7 +941,22 @@ export class RecalculateCharges {
     private readonly clock: Clock,
   ) {}
 
-  async execute(studentId: string): Promise<void> {
+  /** Cuota de un mes con lo que hace hoy el alumno (para guardarla antes de un cambio). */
+  currentFee(studentId: string): Promise<Money | null> {
+    return currentMonthlyFee(
+      this.directory,
+      this.accounts,
+      this.settings,
+      StudentRef.fromString(studentId),
+      LocalDate.fromInstant(this.clock.now()),
+    );
+  }
+
+  /**
+   * `previousFee`: la cuota de un mes que tenía antes del cambio; sirve para deducir el descuento por pago adelantado
+   * de cuotas que no lo tienen apuntado (las importadas de la hoja).
+   */
+  async execute(studentId: string, previousFee: Money | null = null): Promise<void> {
     const ref = StudentRef.fromString(studentId);
     const today = LocalDate.fromInstant(this.clock.now());
     const thisMonth = YearMonth.of(today);
@@ -927,11 +966,18 @@ export class RecalculateCharges {
     const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
     if (fee === null) return;
     const season = Season.containing(from);
+    const tariff = (await this.settings.get()).tariff;
+    const percents = [tariff.threeMonthsPercent, tariff.sixMonthsPercent, tariff.seasonPercent];
     for (const charge of await this.charges.allFor(ref, 'monthly')) {
-      if (charge.period.isBefore(from) || !season.includes(charge.period)) continue;
-      if (charge.isManual() || charge.amount.equals(fee)) continue;
+      if (charge.period.isBefore(from) || !season.includes(charge.period) || charge.isManual()) {
+        continue;
+      }
+      const before = charge.amount;
+      if (previousFee !== null) charge.inferDiscount(previousFee, percents);
       charge.reprice(fee);
-      await this.charges.saveCharge(charge);
+      if (!charge.amount.equals(before) || charge.discountPercent() > 0) {
+        await this.charges.saveCharge(charge);
+      }
     }
   }
 }
@@ -986,6 +1032,28 @@ export class ResetCharge {
     const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
     if (fee === null) throw new BillingStudentNotFound();
     charge.resetTo(fee);
+    await this.charges.saveCharge(charge);
+  }
+}
+
+/** Fija a mano el descuento por pago adelantado de una cuota y la recalcula con lo que hace hoy el alumno. */
+export class SetChargeDiscount {
+  constructor(
+    private readonly directory: StudentDirectory,
+    private readonly accounts: StudentAccountRepository,
+    private readonly settings: BillingSettingsRepository,
+    private readonly charges: ChargeRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string, month: string, percent: number): Promise<void> {
+    const ref = StudentRef.fromString(studentId);
+    const charge = await this.charges.chargeFor(ref, 'monthly', YearMonth.fromString(month));
+    if (charge === null) throw new ChargeNotFound();
+    const today = LocalDate.fromInstant(this.clock.now());
+    const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
+    if (fee === null) throw new BillingStudentNotFound();
+    charge.setDiscount(percent, fee);
     await this.charges.saveCharge(charge);
   }
 }
