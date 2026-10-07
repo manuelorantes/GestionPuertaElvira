@@ -20,10 +20,12 @@ import {
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { httpError, registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
+import { billing } from '../billing/routes.ts';
 import { SqlBillingSettingsRepository, SqlClosedPeriods } from '../persistence/billing.ts';
 import {
   SqlDutyRepository,
   SqlHolidayCalendar,
+  SqlMonthlyFees,
   SqlPayrollQuery,
   SqlPlanningQuery,
   SqlScheduleDirectory,
@@ -83,7 +85,15 @@ function payroll(api: ApiApp, scope: RequestScope) {
     list,
     pay,
     payAll: new PayAllSettlements(pay, list, transactions),
-    profitability: new Profitability(list, new SqlPayrollQuery(tx, today), teachers),
+    profitability: new Profitability(
+      schedule,
+      duties,
+      holidays,
+      teachers,
+      list,
+      new SqlPayrollQuery(tx, today),
+      new SqlMonthlyFees(tx, (month) => billing(api, scope).generate.expected(month)),
+    ),
     settings: new SqlBillingSettingsRepository(tx),
   };
 }

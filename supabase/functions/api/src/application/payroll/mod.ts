@@ -10,6 +10,7 @@ import {
   ClubDuty,
   DailyPlanner,
   DutyRef,
+  ExpectedHours,
   GroupRef,
   MonthlySettlement,
   type ScheduledGroup,
@@ -107,18 +108,35 @@ export interface SessionView {
   locked: boolean;
 }
 
-export interface TeacherActivity {
+/** Grupos de un profesor y plazas de sus clases: ocupadas y totales, contando cada día de clase. */
+export interface TeacherSeats {
   groups: string[];
   occupied: number;
   capacity: number;
-  incomeCents: number;
+}
+
+export interface ClassLoad {
+  teachers: Map<string, TeacherSeats>;
+  /** Minutos semanales de cada alumno con cada profesor durante el mes (claves: alumno → profesor). */
+  students: Map<string, Map<string, number>>;
+}
+
+/** Carga de clases del mes para la rentabilidad. */
+export interface ClassLoadQuery {
+  classLoad(month: YearMonth): Promise<ClassLoad>;
+}
+
+/**
+ * Cuota mensual de cada alumno en el mes, después de descuentos (hermanos, pago adelantado…): la cobrada o por cobrar
+ * y, en los meses futuros, la prevista. Sin cuotas de socio. Claves: id de alumno; importe en céntimos.
+ */
+export interface MonthlyFees {
+  monthlyFees(month: YearMonth): Promise<Map<string, number>>;
 }
 
 export interface PayrollQuery {
   /** Sesiones del mes, por fecha; el coste usa la tarifa congelada si la liquidación está pagada. */
   sessions(month: YearMonth, teacherId: string | null): Promise<SessionView[]>;
-  /** Grupos, ocupación e ingresos atribuidos por profesor en el mes (claves: id de profesor). */
-  activity(month: YearMonth): Promise<Map<string, TeacherActivity>>;
 }
 
 export class SessionNotFound extends Error {
@@ -473,40 +491,70 @@ export interface ProfitabilityRow {
   capacity: number;
 }
 
-/** Rentabilidad del mes por profesor: coste de su liquidación frente a los ingresos atribuidos a sus grupos. */
+/**
+ * Rentabilidad del mes por profesor. Coste: las horas esperadas del mes según el horario (sin festivos ni
+ * sustituciones) a su tarifa. Ingresos: las cuotas mensuales de sus alumnos, repartidas entre profesores según las horas
+ * que pasa con cada uno. Ocupación: plazas ocupadas de todas sus clases frente a las totales.
+ */
 export class Profitability {
   constructor(
-    private readonly settlements: ListSettlements,
-    private readonly query: PayrollQuery,
+    private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
+    private readonly holidays: HolidayCalendar,
     private readonly teachers: TeacherRates,
+    private readonly settlements: ListSettlements,
+    private readonly load: ClassLoadQuery,
+    private readonly fees: MonthlyFees,
   ) {}
 
   /** Ordenadas por margen, de mayor a menor. */
   async execute(month: string): Promise<ProfitabilityRow[]> {
-    const settlements = new Map(
-      (await this.settlements.execute(month)).map((s) => [s.teacherId, s]),
+    const period = YearMonth.fromString(month);
+    const holidays = new Set<string>();
+    for (let day = period.firstDay(); !period.lastDay().isBefore(day); day = day.plusDays(1)) {
+      if (await this.holidays.isHoliday(day)) holidays.add(day.toString());
+    }
+    const expected = new ExpectedHours().ofMonth(
+      period,
+      await this.schedule.groups(),
+      await this.duties.all(),
+      holidays,
     );
-    const activity = await this.query.activity(YearMonth.fromString(month));
+    // La tarifa congelada si la liquidación ya está pagada; si no, la actual.
+    const rates = new Map(
+      (await this.settlements.execute(month)).map((s) => [s.teacherId, s.rateCents]),
+    );
+    const load = await this.load.classLoad(period);
+    const income = new Map<string, number>();
+    for (const [student, fee] of await this.fees.monthlyFees(period)) {
+      const shares = load.students.get(student);
+      if (!shares) continue;
+      const total = [...shares.values()].reduce((sum, m) => sum + m, 0);
+      if (total === 0) continue;
+      for (const [teacher, minutes] of shares) {
+        income.set(teacher, (income.get(teacher) ?? 0) + (fee * minutes) / total);
+      }
+    }
     const rows: ProfitabilityRow[] = [];
     for (const teacher of await this.teachers.all()) {
-      const s = settlements.get(teacher.id) ?? null;
-      const a = activity.get(teacher.id) ?? null;
-      if (s === null && a === null) continue;
-      const minutes = s?.minutes ?? 0;
-      const cost = s?.amountCents ?? 0;
-      const income = a?.incomeCents ?? 0;
+      const minutes = expected.get(teacher.id) ?? 0;
+      const seats = load.teachers.get(teacher.id) ?? null;
+      const earned = Math.round(income.get(teacher.id) ?? 0);
+      if (minutes === 0 && earned === 0 && seats === null) continue;
+      const rate = rates.get(teacher.id) ?? teacher.rate.cents;
+      const cost = Math.round((rate * minutes) / 60);
       rows.push({
         teacherId: teacher.id,
         teacherName: teacher.name,
-        groups: a?.groups ?? [],
+        groups: seats?.groups ?? [],
         minutes,
-        rateCents: s?.rateCents ?? teacher.rate.cents,
+        rateCents: rate,
         costCents: cost,
-        incomeCents: income,
-        marginCents: income - cost,
-        incomePerHourCents: minutes > 0 ? Math.round((income * 60) / minutes) : null,
-        occupied: a?.occupied ?? 0,
-        capacity: a?.capacity ?? 0,
+        incomeCents: earned,
+        marginCents: earned - cost,
+        incomePerHourCents: minutes > 0 ? Math.round((earned * 60) / minutes) : null,
+        occupied: seats?.occupied ?? 0,
+        capacity: seats?.capacity ?? 0,
       });
     }
     return rows.sort((a, b) => b.marginCents - a.marginCents);
