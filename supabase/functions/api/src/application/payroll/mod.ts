@@ -206,6 +206,53 @@ export class ProposeSessions {
   }
 }
 
+/**
+ * Apunta las horas automáticas de un día ya pasado que falten (p. ej. si ese día no se llegaron a apuntar), sin
+ * duplicar las que ya hay. No hace nada en festivos ni toca liquidaciones pagadas. Devuelve cuántas creó.
+ */
+export class RefillDay {
+  constructor(
+    private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
+    private readonly substitutions: SubstitutionRepository,
+    private readonly holidays: HolidayCalendar,
+    private readonly timesheets: TimesheetRepository,
+    private readonly settlements: SettlementRepository,
+    private readonly log: ProposalLog,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(date: string): Promise<number> {
+    const day = LocalDate.fromString(date);
+    if (!day.isBefore(LocalDate.fromInstant(this.clock.now()))) {
+      throw new InvalidValue('date', 'Solo se pueden apuntar días que ya han pasado.');
+    }
+    if (await this.holidays.isHoliday(day)) return 0;
+    const existing = new Set(
+      (await this.timesheets.onDate(day)).map((e) => e.source).filter((s) => s !== null),
+    );
+    let created = 0;
+    for (
+      const session of new DailyPlanner().plan(
+        day,
+        await this.schedule.groups(),
+        await this.duties.all(),
+        await this.substitutions.onDate(day),
+        null,
+      )
+    ) {
+      if (existing.has(session.source)) continue;
+      if ((await this.settlements.settlement(session.teacher, YearMonth.of(day))) !== null) {
+        continue;
+      }
+      await this.timesheets.save(TimesheetEntry.planned(TimesheetEntryId.generate(), session));
+      created++;
+    }
+    await this.log.markProposed(day);
+    return created;
+  }
+}
+
 export interface SessionInput {
   teacherId: string;
   date: string;
