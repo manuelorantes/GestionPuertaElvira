@@ -22,7 +22,7 @@ BillingPage (/panel/cobros)
 │   ├── Tarjeta de progreso: «N de M cuotas cobradas · X € de Y €» + barra de progreso (brand) + «N vencidas»
 │   └── ChargesTable (escritorio: cabecera Alumno | Concepto | Importe | Estado | acciones; móvil: tarjetas)
 │       └── Fila: avatar con iniciales + nombre | «Cuota de octubre» o «Cuota de socio 2026/27» | importe |
-│           badge Cobrada/En plazo/Vencida (+ «Avisado») | acciones:
+│           badge Cobrada/Pagada en parte (+ «Faltan X»)/En plazo/Vencida (+ «Avisado») | acciones:
 │           - pendiente: «Registrar cobro»
 │           - vencida: «WhatsApp» (outline, icono message-circle) + «Cobrar»
 │           - cobrada: «Recibo» (icono printer, abre el recibo)
@@ -53,6 +53,8 @@ BillingPage (/panel/cobros)
 
 StudentPanel (ficha de alumno) → nueva tarjeta «Cuotas y cobros»
 ├── Forma de pago preferida (Select) · Socio (Switch) · Precio por hora de particulares (opcional, €/h) · «Guardar»
+├── «Cuotas de la temporada»: fila por mes (mes · importe · «Fijada a mano · motivo» · Cobrada / Faltan X / Pendiente / Vencida / Próxima · lápiz «Editar la cuota de <mes>») + «Saldo a favor» si sobra
+│   └── ChargeDialog «Cuota de <mes>»: Importe (€) · Motivo · «Solo este mes | Este y los siguientes» · «Volver a la calculada» (si está fijada a mano) · Cancelar · Guardar
 ├── Puntos: valor + botones «−1» / «+1» (aria-label «Restar un punto» / «Sumar un punto»)
 ├── «Registrar cobro» (abre PaymentDialog con el alumno elegido)
 └── Historial: últimos cobros (fecha · concepto · importe) con «Ver recibo»

@@ -1,6 +1,7 @@
 import { LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import { paymentMethodFromName, paymentMethodLabel, StudentRef } from '../../domain/billing/mod.ts';
 import {
+  AdjustCharge,
   AdjustPoints,
   BillingStudentNotFound,
   ChangePaymentMethod,
@@ -16,10 +17,12 @@ import {
   QuotePayment,
   RegisterPayment,
   ReschedulePayment,
+  ResetCharge,
   UpdateBillingSettings,
   UpdateStudentAccount,
 } from '../../application/billing/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
+import { recalculateFees } from './recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
@@ -107,7 +110,6 @@ export function registerBillingRoutes(api: ApiApp): void {
     ChargeNotFound: [404, 'not_found'],
     BillingStudentNotFound: [404, 'not_found'],
     InvoiceAlreadyIssued: [409, 'invoice_already_issued'],
-    ChargeAlreadyPaid: [409, 'charge_already_paid'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT', path: string) => ({
     method,
@@ -235,8 +237,36 @@ export function registerBillingRoutes(api: ApiApp): void {
       body.bool('member'),
       body.optionalString('privateRate'),
     );
+    await recalculateFees(api, scope, [id]);
     return c.body(null, 204);
   });
+
+  api.defineRoute(
+    admin('PUT', '/api/admin/billing/accounts/:id/charges/:month'),
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      await new AdjustCharge(billing(api, scope).charges).execute(
+        param(c, 'id'),
+        param(c, 'month'),
+        body.requiredInt('amountCents'),
+        body.requiredString('reason'),
+        body.requiredString('scope') as 'one' | 'rest',
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    admin('POST', '/api/admin/billing/accounts/:id/charges/:month/reset'),
+    async (c, scope) => {
+      const b = billing(api, scope);
+      await new ResetCharge(b.directory, b.accounts, b.settings, b.charges, api.deps.clock).execute(
+        param(c, 'id'),
+        param(c, 'month'),
+      );
+      return c.body(null, 204);
+    },
+  );
 
   api.defineRoute(admin('POST', '/api/admin/billing/accounts/:id/points'), async (c, scope) => {
     const b = billing(api, scope);

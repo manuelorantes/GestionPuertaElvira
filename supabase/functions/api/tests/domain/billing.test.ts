@@ -2,9 +2,9 @@ import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
 
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
+  allocateCredit,
   BillingSettings,
   Charge,
-  ChargeAlreadyPaid,
   ChargeId,
   ClubFiscalData,
   DocumentNumber,
@@ -151,15 +151,17 @@ Deno.test('StudentAccount should open monthly, update preferences and keep point
   assertThrows(() => account.adjustPoints(-3), InvalidValue);
 });
 
-Deno.test('Charge should derive the status of a monthly charge from the date', () => {
-  const cases: [string, string, string][] = [
-    ['2026-10', '2026-10-01', 'due'],
-    ['2026-10', '2026-10-05', 'due'],
-    ['2026-10', '2026-10-06', 'overdue'],
-    ['2026-09', '2026-10-02', 'overdue'],
-    ['2026-11', '2026-10-20', 'upcoming'],
+Deno.test('Charge should derive its status from the date and how much of it is covered', () => {
+  const cases: [string, string, number, string][] = [
+    ['2026-10', '2026-10-01', 0, 'due'],
+    ['2026-10', '2026-10-05', 0, 'due'],
+    ['2026-10', '2026-10-06', 0, 'overdue'],
+    ['2026-09', '2026-10-02', 0, 'overdue'],
+    ['2026-11', '2026-10-20', 0, 'upcoming'],
+    ['2026-09', '2026-10-02', 4500, 'paid'],
+    ['2026-09', '2026-10-02', 2000, 'partial'],
   ];
-  for (const [period, today, expected] of cases) {
+  for (const [period, today, covered, expected] of cases) {
     const charge = Charge.create(
       ChargeId.generate(),
       StudentRef.generate(),
@@ -167,7 +169,7 @@ Deno.test('Charge should derive the status of a monthly charge from the date', (
       YearMonth.fromString(period),
       Money.euros(45),
     );
-    assertEquals(charge.statusOn(LocalDate.fromString(today)), expected);
+    assertEquals(charge.statusOn(LocalDate.fromString(today), Money.cents(covered)), expected);
   }
   const membership = Charge.create(
     ChargeId.generate(),
@@ -176,22 +178,70 @@ Deno.test('Charge should derive the status of a monthly charge from the date', (
     YearMonth.fromString('2026-09'),
     Money.euros(50),
   );
-  assertEquals(membership.statusOn(LocalDate.fromString('2027-03-10')), 'due');
+  assertEquals(membership.statusOn(LocalDate.fromString('2027-03-10'), Money.zero()), 'due');
 });
 
-Deno.test('Charge should be paid once and remember reminders', () => {
+Deno.test('Charge should keep a manual amount with its reason and ignore automatic repricing', () => {
   const charge = Charge.create(
     ChargeId.generate(),
     StudentRef.generate(),
     'monthly',
-    YearMonth.fromString('2026-09'),
-    Money.euros(45),
+    YearMonth.fromString('2026-10'),
+    Money.euros(40),
   );
+  charge.reprice(Money.euros(55));
+  assertEquals(charge.amount.cents, 5500);
+  assertFalse(charge.isManual());
+
+  charge.adjust(Money.euros(25), 'Media mensualidad');
+  assertEquals([charge.amount.cents, charge.isManual(), charge.note()], [
+    2500,
+    true,
+    'Media mensualidad',
+  ]);
+  charge.reprice(Money.euros(55));
+  assertEquals(charge.amount.cents, 2500, 'las fijadas a mano no se recalculan');
+  assertThrows(() => charge.adjust(Money.euros(10), '  '), InvalidValue);
+  assertThrows(() => charge.adjust(Money.cents(-1), 'x'), InvalidValue);
+
+  charge.resetTo(Money.euros(55));
+  assertEquals([charge.amount.cents, charge.isManual(), charge.note()], [5500, false, null]);
+
   charge.markReminded(LocalDate.fromString('2026-10-02'));
   assert(charge.remindedOn()?.equals(LocalDate.fromString('2026-10-02')));
-  charge.payWith(PaymentId.generate());
-  assertEquals(charge.statusOn(LocalDate.fromString('2026-10-02')), 'paid');
-  assertThrows(() => charge.payWith(PaymentId.generate()), ChargeAlreadyPaid);
+  const payment = PaymentId.generate();
+  charge.coveredBy(payment);
+  charge.coveredBy(PaymentId.generate());
+  assertEquals(charge.paidBy(), payment, 'recuerda el primer cobro que la cubrió');
+});
+
+Deno.test('allocateCredit should cover the oldest charges first and keep what is left as balance', () => {
+  const charge = (period: string, euros: number) =>
+    Charge.create(
+      ChargeId.generate(),
+      StudentRef.generate(),
+      'monthly',
+      YearMonth.fromString(period),
+      Money.euros(euros),
+    );
+  // Cambio de tarifa a mitad de un trimestre: 40, 55, 55 con 120 € cubiertos.
+  const sep = charge('2026-09', 40);
+  const oct = charge('2026-10', 55);
+  const nov = charge('2026-11', 55);
+  const result = allocateCredit([nov, sep, oct], Money.euros(120));
+  assertEquals(result.covered(sep).cents, 4000);
+  assertEquals(result.covered(oct).cents, 5500);
+  assertEquals(result.covered(nov).cents, 2500);
+  assertEquals(result.pending(nov).cents, 3000);
+  assertEquals(result.balance.cents, 0);
+  assertEquals(result.pendingTotal.cents, 3000);
+
+  // Septiembre cobrado de más y octubre de menos: 50 + 25 € cubren 25 + 50 €.
+  const fixed = allocateCredit([charge('2026-09', 25), charge('2026-10', 50)], Money.euros(75));
+  assertEquals([fixed.pendingTotal.cents, fixed.balance.cents], [0, 0]);
+
+  const extra = allocateCredit([charge('2026-09', 25)], Money.euros(40));
+  assertEquals(extra.balance.cents, 1500, 'saldo a favor');
 });
 
 function payment(total: Money): Payment {

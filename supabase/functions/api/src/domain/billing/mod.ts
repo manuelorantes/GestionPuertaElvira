@@ -15,7 +15,7 @@ export class StudentRef extends Uuid {}
 export class TeacherRef extends Uuid {}
 
 export type ChargeKind = 'monthly' | 'membership';
-export type ChargeStatus = 'paid' | 'due' | 'overdue' | 'upcoming';
+export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming';
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 
@@ -43,13 +43,6 @@ export function preferredPlanFromName(name: string): PreferredPlan {
 export function monthsWithin(plan: PreferredPlan, remaining: number): number {
   const wanted = { monthly: 1, three_months: 3, six_months: 6, rest_of_season: remaining }[plan];
   return Math.max(1, Math.min(remaining, wanted));
-}
-
-export class ChargeAlreadyPaid extends Error {
-  constructor() {
-    super('Esa cuota ya está pagada.');
-    this.name = 'ChargeAlreadyPaid';
-  }
 }
 
 export class InvoiceAlreadyIssued extends Error {
@@ -262,6 +255,10 @@ export class DocumentNumber {
  * Cuota de un alumno: mensual (una por mes de temporada) o de socio (una por temporada).
  * Plazo de las mensuales: del día 1 al 5 de su mes.
  */
+/**
+ * Cuota de un mes (o de socio de una temporada): lo que el alumno debe. No sabe por sí sola si está pagada: eso sale
+ * de repartir lo que cubren sus cobros (ver `allocateCredit` y cuotas-separadas-de-los-cobros.md).
+ */
 export class Charge {
   static readonly LAST_DAY_IN_TIME = 5;
 
@@ -270,9 +267,11 @@ export class Charge {
     readonly student: StudentRef,
     readonly kind: ChargeKind,
     readonly period: YearMonth,
-    readonly amount: Money,
-    private paid: PaymentId | null,
+    private value: Money,
+    private firstPayment: PaymentId | null,
     private reminded: LocalDate | null,
+    private manual: boolean,
+    private reason: string | null,
   ) {}
 
   static create(
@@ -282,23 +281,41 @@ export class Charge {
     period: YearMonth,
     amount: Money,
   ): Charge {
-    return new Charge(id, student, kind, period, amount, null, null);
+    return new Charge(id, student, kind, period, amount, null, null, false, null);
   }
 
-  static restore(
-    id: ChargeId,
-    student: StudentRef,
-    kind: ChargeKind,
-    period: YearMonth,
-    amount: Money,
-    paidBy: PaymentId | null,
-    remindedOn: LocalDate | null,
-  ): Charge {
-    return new Charge(id, student, kind, period, amount, paidBy, remindedOn);
+  static restore(fields: {
+    id: ChargeId;
+    student: StudentRef;
+    kind: ChargeKind;
+    period: YearMonth;
+    amount: Money;
+    paidBy: PaymentId | null;
+    remindedOn: LocalDate | null;
+    manual: boolean;
+    note: string | null;
+  }): Charge {
+    return new Charge(
+      fields.id,
+      fields.student,
+      fields.kind,
+      fields.period,
+      fields.amount,
+      fields.paidBy,
+      fields.remindedOn,
+      fields.manual,
+      fields.note,
+    );
   }
 
-  statusOn(today: LocalDate): ChargeStatus {
-    if (this.paid !== null) return 'paid';
+  get amount(): Money {
+    return this.value;
+  }
+
+  /** Estado según la fecha y lo que tiene cubierto por los cobros del alumno. */
+  statusOn(today: LocalDate, covered: Money): ChargeStatus {
+    if (!covered.isNegative() && covered.cents >= this.value.cents) return 'paid';
+    if (covered.cents > 0) return 'partial';
     if (this.kind === 'membership') return 'due';
     const current = YearMonth.of(today);
     if (current.isBefore(this.period)) return 'upcoming';
@@ -306,26 +323,99 @@ export class Charge {
     return today.day > Charge.LAST_DAY_IN_TIME ? 'overdue' : 'due';
   }
 
-  payWith(payment: PaymentId): void {
-    if (this.paid !== null) throw new ChargeAlreadyPaid();
-    this.paid = payment;
+  /** Recálculo automático (cambio de grupos, familia…): no toca las cuotas fijadas a mano. */
+  reprice(amount: Money): void {
+    if (!this.manual) this.value = amount;
+  }
+
+  /** Importe fijado a mano, con su motivo; el recálculo automático ya no lo cambia. */
+  adjust(amount: Money, reason: string): void {
+    if (amount.isNegative()) {
+      throw new InvalidValue('amountCents', 'El importe no puede ser negativo.');
+    }
+    if (reason.trim() === '') throw new InvalidValue('reason', 'Indica el motivo del cambio.');
+    this.value = amount;
+    this.manual = true;
+    this.reason = [...reason.trim()].slice(0, 160).join('');
+  }
+
+  /** Vuelve al importe calculado y deja de estar fijada a mano. */
+  resetTo(amount: Money): void {
+    this.value = amount;
+    this.manual = false;
+    this.reason = null;
+  }
+
+  /** Recuerda el primer cobro que la cubrió (para enlazar el recibo); el estado no depende de esto. */
+  coveredBy(payment: PaymentId): void {
+    this.firstPayment ??= payment;
   }
 
   markReminded(on: LocalDate): void {
     this.reminded = on;
   }
 
-  isPaid(): boolean {
-    return this.paid !== null;
+  isManual(): boolean {
+    return this.manual;
+  }
+
+  note(): string | null {
+    return this.reason;
   }
 
   paidBy(): PaymentId | null {
-    return this.paid;
+    return this.firstPayment;
   }
 
   remindedOn(): LocalDate | null {
     return this.reminded;
   }
+}
+
+/** Resultado de repartir lo cubierto por los cobros entre las cuotas de un alumno. */
+export class CreditAllocation {
+  constructor(
+    private readonly coveredById: Map<string, Money>,
+    private readonly amounts: Map<string, Money>,
+    /** Lo que sobra tras cubrir todas las cuotas: saldo a favor. */
+    readonly balance: Money,
+  ) {}
+
+  covered(charge: Charge): Money {
+    return this.coveredById.get(charge.id.value) ?? Money.zero();
+  }
+
+  pending(charge: Charge): Money {
+    return charge.amount.minus(this.covered(charge));
+  }
+
+  get pendingTotal(): Money {
+    let total = Money.zero();
+    for (const [id, amount] of this.amounts) {
+      total = total.plus(amount.minus(this.coveredById.get(id) ?? Money.zero()));
+    }
+    return total;
+  }
+}
+
+/**
+ * Reparte lo que cubren los cobros de un alumno (de un mismo tipo) entre sus cuotas, de la más antigua a la más
+ * reciente. Lo que sobra queda como saldo a favor.
+ */
+export function allocateCredit(charges: readonly Charge[], credit: Money): CreditAllocation {
+  const ordered = [...charges].sort((a, b) =>
+    a.period.toString().localeCompare(b.period.toString())
+  );
+  let left = credit.isNegative() ? Money.zero() : credit;
+  const covered = new Map<string, Money>();
+  const amounts = new Map<string, Money>();
+  for (const charge of ordered) {
+    amounts.set(charge.id.value, charge.amount);
+    const share = left.cents >= charge.amount.cents ? charge.amount : left;
+    covered.set(charge.id.value, share);
+    left = left.minus(share);
+  }
+  return new CreditAllocation(covered, amounts, left);
 }
 
 /**
@@ -627,6 +717,8 @@ export class Payment {
     private amount: Money,
     readonly periods: readonly YearMonth[],
     private issued: Invoice | null,
+    /** Lo que cubre en importes de cuota, antes de descuentos (ver cuotas-separadas-de-los-cobros.md). */
+    private covering: Money,
   ) {}
 
   static register(fields: {
@@ -640,6 +732,8 @@ export class Payment {
     lines: readonly QuoteLine[];
     total: Money;
     periods: readonly YearMonth[];
+    /** Por defecto, el total cobrado. */
+    credit?: Money;
   }): Payment {
     return new Payment(
       fields.id,
@@ -653,6 +747,7 @@ export class Payment {
       fields.total,
       fields.periods,
       null,
+      fields.credit ?? fields.total,
     );
   }
 
@@ -695,6 +790,10 @@ export class Payment {
     return this.amount;
   }
 
+  get credit(): Money {
+    return this.covering;
+  }
+
   /** Corrige el día del cobro: dentro de la temporada de su recibo y nunca en el futuro. */
   reschedule(on: LocalDate, today: LocalDate): void {
     if (Season.containing(YearMonth.of(on)).startYear !== this.receipt.seasonYear) {
@@ -724,6 +823,7 @@ export class Payment {
       new QuoteLine(`Corrección: ${reason.trim()}`, difference),
     ];
     this.amount = total;
+    this.covering = this.covering.plus(difference);
   }
 
   /** Corrige cómo se cobró (p. ej. se anotó como transferencia y fue en efectivo); el importe no cambia. */

@@ -1,4 +1,4 @@
-import type { LocalDate, YearMonth } from '../../src/domain/common/mod.ts';
+import { type LocalDate, Money, type YearMonth } from '../../src/domain/common/mod.ts';
 import {
   BillingSettings,
   type Charge,
@@ -116,11 +116,19 @@ export class BillingFixture
     );
   }
 
-  unpaidFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]> {
+  allFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]> {
     return Promise.resolve(
       [...this.charges.values()]
-        .filter((c) => c.student.equals(student) && c.kind === kind && !c.isPaid())
+        .filter((c) => c.student.equals(student) && c.kind === kind)
         .sort((a, b) => a.period.toString().localeCompare(b.period.toString())),
+    );
+  }
+
+  creditFor(student: StudentRef, kind: ChargeKind): Promise<Money> {
+    return Promise.resolve(
+      [...this.payments.values()]
+        .filter((p) => p.student.equals(student) && p.kind === kind)
+        .reduce((sum, p) => sum.plus(p.credit), Money.zero()),
     );
   }
 

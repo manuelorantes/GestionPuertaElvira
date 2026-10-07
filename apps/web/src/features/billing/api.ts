@@ -1,6 +1,6 @@
 import { apiGet, apiSend } from '@/shared/api/client';
 
-export type ChargeStatus = 'paid' | 'due' | 'overdue' | 'upcoming';
+export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming';
 export type ChargeKind = 'monthly' | 'membership';
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 
@@ -24,6 +24,11 @@ export interface Charge {
   paymentId: string | null;
   receiptNumber: string | null;
   remindedOn: string | null;
+  /** Lo que tiene cubierto por los cobros del alumno. */
+  coveredCents: number;
+  /** Fijada a mano, con su motivo. */
+  manual: boolean;
+  note: string | null;
 }
 
 export interface MonthlyCharges {
@@ -111,6 +116,21 @@ export interface Account {
   hasPrivateLessons: boolean;
   membershipPaid: boolean;
   membershipFeeCents: number;
+  /** Cuotas mensuales de la temporada con lo cubierto y lo que falta. */
+  charges: AccountCharge[];
+  /** Lo que sobra de los cobros tras cubrir todas las cuotas. */
+  balanceCents: number;
+}
+
+export interface AccountCharge {
+  id: string;
+  period: string;
+  amountCents: number;
+  coveredCents: number;
+  pendingCents: number;
+  status: ChargeStatus;
+  manual: boolean;
+  note: string | null;
 }
 
 export interface BillingSettings {
@@ -187,4 +207,20 @@ export function fetchSettings(): Promise<BillingSettings> {
 
 export function updateSettings(settings: BillingSettings): Promise<void> {
   return apiSend('PUT', `${BASE}/settings`, settings);
+}
+
+export type ChargeScope = 'one' | 'rest';
+
+/** Fija a mano el importe de una cuota: solo ese mes o ese y los siguientes de la temporada. */
+export function adjustCharge(
+  studentId: string,
+  month: string,
+  input: { amountCents: number; reason: string; scope: ChargeScope },
+): Promise<void> {
+  return apiSend('PUT', `${BASE}/accounts/${studentId}/charges/${month}`, input);
+}
+
+/** Devuelve la cuota al importe calculado con lo que hace hoy el alumno. */
+export function resetCharge(studentId: string, month: string): Promise<void> {
+  return apiSend('POST', `${BASE}/accounts/${studentId}/charges/${month}/reset`, {});
 }
