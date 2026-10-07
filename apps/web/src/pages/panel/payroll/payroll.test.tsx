@@ -136,10 +136,14 @@ describe('Profesorado', () => {
     const table = await screen.findByRole('table', { name: 'Rentabilidad de septiembre 2026' });
     const lucia = within(table).getByRole('row', { name: /Lucía/ });
     expect(within(lucia).getByText('Más rentable')).toBeInTheDocument();
+    const totals = screen.getByRole('region', { name: 'Totales del mes' });
+    // 14 h; 236 € de coste (16,86 €/h de media); 650 € de ingresos; 414 € de margen (29,57 €/h); 16 de 24 plazas.
+    for (const text of ['14 h', '16,86 €/h', '236 €', '650 €', '414 €', '29,57 €', '67 %']) {
+      expect(within(totals).getByText(text)).toBeInTheDocument();
+    }
+    expect(within(totals).getByText('Ganancia por hora')).toBeInTheDocument();
     expect(within(lucia).getByText('322 €')).toBeInTheDocument();
     expect(within(lucia).getByText('83 %')).toBeInTheDocument();
-    expect(screen.getByText('14 h')).toBeInTheDocument();
-    expect(screen.getByText('236 €')).toBeInTheDocument();
   });
 
   it('records hours for another activity', async () => {

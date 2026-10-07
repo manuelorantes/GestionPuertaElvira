@@ -493,8 +493,8 @@ export interface ProfitabilityRow {
 }
 
 /**
- * Rentabilidad del mes por profesor. Coste: las horas esperadas del mes según el horario (sin festivos ni
- * sustituciones) a su tarifa. Ingresos: las cuotas mensuales de sus alumnos, repartidas entre profesores según las horas
+ * Rentabilidad del mes por profesor. Coste: en el mes en curso y los futuros, las horas esperadas según el horario (sin
+ * festivos ni sustituciones) a su tarifa; en un mes ya pasado, las horas realmente imputadas (su liquidación). Ingresos: las cuotas mensuales de sus alumnos, repartidas entre profesores según las horas
  * que pasa con cada uno. Ocupación: plazas ocupadas de todas sus clases frente a las totales.
  */
 export class Profitability {
@@ -506,11 +506,13 @@ export class Profitability {
     private readonly settlements: ListSettlements,
     private readonly load: ClassLoadQuery,
     private readonly fees: MonthlyFees,
+    private readonly clock: Clock,
   ) {}
 
   /** Ordenadas por margen, de mayor a menor. */
   async execute(month: string): Promise<ProfitabilityRow[]> {
     const period = YearMonth.fromString(month);
+    const past = period.isBefore(YearMonth.of(LocalDate.fromInstant(this.clock.now())));
     const holidays = new Set<string>();
     for (let day = period.firstDay(); !period.lastDay().isBefore(day); day = day.plusDays(1)) {
       if (await this.holidays.isHoliday(day)) holidays.add(day.toString());
@@ -522,9 +524,7 @@ export class Profitability {
       holidays,
     );
     // La tarifa congelada si la liquidación ya está pagada; si no, la actual.
-    const rates = new Map(
-      (await this.settlements.execute(month)).map((s) => [s.teacherId, s.rateCents]),
-    );
+    const settled = new Map((await this.settlements.execute(month)).map((s) => [s.teacherId, s]));
     const load = await this.load.classLoad(period);
     const income = new Map<string, number>();
     for (const [student, fee] of await this.fees.monthlyFees(period)) {
@@ -538,12 +538,13 @@ export class Profitability {
     }
     const rows: ProfitabilityRow[] = [];
     for (const teacher of await this.teachers.all()) {
-      const minutes = expected.get(teacher.id) ?? 0;
+      const settlement = settled.get(teacher.id) ?? null;
+      const minutes = past ? (settlement?.minutes ?? 0) : (expected.get(teacher.id) ?? 0);
       const seats = load.teachers.get(teacher.id) ?? null;
       const earned = Math.round(income.get(teacher.id) ?? 0);
       if (minutes === 0 && earned === 0 && seats === null) continue;
-      const rate = rates.get(teacher.id) ?? teacher.rate.cents;
-      const cost = Math.round((rate * minutes) / 60);
+      const rate = settlement?.rateCents ?? teacher.rate.cents;
+      const cost = past ? (settlement?.amountCents ?? 0) : Math.round((rate * minutes) / 60);
       rows.push({
         teacherId: teacher.id,
         teacherName: teacher.name,
