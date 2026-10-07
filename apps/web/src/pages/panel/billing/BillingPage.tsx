@@ -33,7 +33,11 @@ export function BillingPage() {
   const tab = tabs.some((t) => t.id === searchParams.get('pestana'))
     ? (searchParams.get('pestana') as string)
     : 'cuotas';
-  const [dialog, setDialog] = useState<BillingDialog>(null);
+  // ?recibo=<id> abre ese recibo (p. ej. desde el historial).
+  const [dialog, setDialog] = useState<BillingDialog>(() => {
+    const receipt = searchParams.get('recibo');
+    return receipt ? { type: 'receipt', paymentId: receipt } : null;
+  });
 
   function setParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams);

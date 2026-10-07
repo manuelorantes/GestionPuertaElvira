@@ -146,3 +146,24 @@ Deno.test('audit should record failed logins, list people and filter by them', a
   assert(filtered.every((a) => a.userId === people[0]?.id));
   assert(filtered.every((a) => Number(a.seq) < Number(list[0]?.seq)));
 });
+
+Deno.test('audit should say where each change can be seen in the app', async () => {
+  const client = await superadmin();
+  const teacherId = await newTeacher(client, 'Lucía Moreno Gil');
+  const created = await client.json('POST', '/api/admin/students', {
+    fullName: 'Martina López Herrera',
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const studentId = (created.body as { id: string }).id;
+
+  const detail = async () =>
+    (await client.get(`/api/admin/audit/actions/${await latestId(client)}`)).body as {
+      changes: { table: string; target: Record<string, unknown> | null }[];
+    };
+  const student = (await detail()).changes.find((c) => c.table === 'students_student');
+  assertEquals(student?.target, { kind: 'student', id: studentId });
+
+  await rename(client, teacherId, 'Lucía Moreno', '16');
+  const teacherChange = (await detail()).changes.find((c) => c.table === 'teachers_teacher');
+  assertEquals(teacherChange?.target, { kind: 'teacher', id: teacherId });
+});

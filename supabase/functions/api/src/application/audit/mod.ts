@@ -17,6 +17,13 @@ export interface AuditActionView {
   undoable: boolean;
 }
 
+/** Dónde se ve o se gestiona en la aplicación lo que tocó un cambio. */
+export type AuditTarget =
+  | { kind: 'payment' | 'student' | 'group' | 'teacher'; id: string }
+  | { kind: 'charges' | 'ledger' | 'settlement'; month: string }
+  | { kind: 'hours'; month: string; teacherId: string }
+  | { kind: 'invoices' | 'billing-settings' };
+
 /** Un registro tocado por una acción, con los campos que cambiaron (sin contraseñas). */
 export interface AuditChangeView {
   table: string;
@@ -24,6 +31,8 @@ export interface AuditChangeView {
   key: Record<string, unknown>;
   operation: string;
   fields: { field: string; before: unknown; after: unknown }[];
+  /** null si no hay dónde ir (p. ej. el registro se borró o es una cuenta de usuario). */
+  target: AuditTarget | null;
 }
 
 export interface AuditFilter {

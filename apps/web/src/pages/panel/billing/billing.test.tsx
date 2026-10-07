@@ -136,6 +136,14 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
 }
 
 describe('Cobros y cuotas', () => {
+  it('opens a receipt straight from its link', async () => {
+    api({ 'GET /api/admin/billing/payments/p9': [200, RECEIPT] });
+    renderApp('/panel/cobros?pestana=registro&recibo=p9');
+
+    const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
+    expect(await within(receipt).findByText(/R-2026-0002/)).toBeInTheDocument();
+  });
+
   it('lists the charges of the month with their status and progress', async () => {
     api();
     renderApp('/panel/cobros?mes=2026-10');
