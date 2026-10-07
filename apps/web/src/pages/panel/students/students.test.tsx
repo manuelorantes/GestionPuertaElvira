@@ -390,6 +390,64 @@ describe('Alumnos', () => {
     });
   });
 
+  it('sets a special schedule for a group while registering', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'POST /api/admin/students': [201, { id: 's9' }],
+      'GET /api/admin/students/s9': [
+        200,
+        { ...DETAIL, id: 's9', fullName: 'Lucía Fernández Ortiz' },
+      ],
+      'POST /api/admin/groups/resolve-schedule': [
+        200,
+        {
+          enrolments: [
+            {
+              groupId: 'g1',
+              groupName: 'Iniciación A',
+              slotLabel: 'Lun y Mié · 17:00–18:00',
+              attendance: null,
+              attendanceLabel: null,
+            },
+          ],
+          uncovered: [],
+          choices: [],
+          problems: [],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
+    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Lucía Fernández Ortiz');
+    await user.click(within(dialog).getByRole('button', { name: 'Añadir horario' }));
+    const block = within(within(dialog).getByRole('group', { name: 'Horario 1' }));
+    await user.selectOptions(block.getByLabelText('Día'), 'mon');
+    await user.click(
+      await within(dialog).findByRole('button', { name: 'Horario especial en Iniciación A' }),
+    );
+
+    const schedule = screen.getByRole('dialog', { name: 'Horario en el grupo' });
+    await user.click(within(schedule).getByRole('switch', { name: 'Horario especial' }));
+    await user.click(
+      within(within(schedule).getByRole('group', { name: 'Días' })).getByRole('button', {
+        name: 'Mié',
+      }),
+    );
+    await user.click(within(schedule).getByRole('button', { name: 'Guardar' }));
+
+    expect(await within(dialog).findByText(/horario especial: Lun · 17:00–18:00/)).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Dar de alta' }));
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/students')).toMatchObject({
+        enrolments: [
+          { groupId: 'g1', attendance: { days: ['mon'], start: '17:00', end: '18:00' } },
+        ],
+      }),
+    );
+  });
+
   it('should withdraw a student with a date', async () => {
     const user = userEvent.setup();
     const spy = api({ 'POST /api/admin/students/s1/withdrawal': [204] });

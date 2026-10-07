@@ -2,6 +2,8 @@ import { X } from 'lucide-react';
 import { useState } from 'react';
 
 import type { ScheduleBlock } from '@/features/classes/api';
+import { useGroups } from '@/features/classes/hooks';
+import type { Attendance } from '@/features/students/api';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import {
@@ -30,6 +32,7 @@ import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
+import { EnrolmentDialog } from './EnrolmentDialog';
 import { ScheduleEditor } from './ScheduleEditor';
 
 interface StudentDialogProps {
@@ -57,9 +60,13 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
   // Las horas a las que vendrá; la API las traduce a grupos (completos o con horario especial).
   const [schedule, setSchedule] = useState<ScheduleBlock[]>([]);
   const resolution = useScheduleResolution(detail ? [] : schedule);
+  // Horario especial ajustado a mano en el alta (como el reloj de la ficha), por grupo.
+  const [overrides, setOverrides] = useState<Record<string, Attendance | null>>({});
+  const [editingAttendance, setEditingAttendance] = useState<string | null>(null);
+  const groups = useGroups();
   const enrolments: Registration['enrolments'] = (resolution.data?.enrolments ?? []).map((e) => ({
     groupId: e.groupId,
-    attendance: e.attendance,
+    attendance: e.groupId in overrides ? (overrides[e.groupId] ?? null) : e.attendance,
   }));
   const register = useStudentMutation(
     ({ values, confirm }: { values: StudentFormValues; confirm: boolean }) =>
@@ -211,6 +218,8 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                   onChange={setSchedule}
                   resolution={resolution.data}
                   loading={resolution.isFetching}
+                  overrides={overrides}
+                  onEditAttendance={setEditingAttendance}
                 />
               )}
               <Switch
@@ -254,6 +263,21 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
           </div>
         </form>
       </Dialog>
+      {editingAttendance && (
+        <EnrolmentDialog
+          title="Horario en el grupo"
+          confirmLabel="Guardar"
+          groups={groups.data ?? []}
+          fixedGroup={(groups.data ?? []).find((g) => g.id === editingAttendance)}
+          current={enrolments.find((e) => e.groupId === editingAttendance)?.attendance ?? null}
+          onClose={() => setEditingAttendance(null)}
+          onConfirm={(groupId, attendance) => {
+            setOverrides((current) => ({ ...current, [groupId]: attendance }));
+            setEditingAttendance(null);
+            return Promise.resolve();
+          }}
+        />
+      )}
       {overCapacity.message && (
         <ConfirmDialog
           title="Grupo completo"
