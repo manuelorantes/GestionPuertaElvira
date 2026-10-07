@@ -17,7 +17,7 @@ const ALL = { param: 'todos', filter: 'all' as StudentFilter, label: 'Todos' };
 const FILTERS: { param: string; filter: StudentFilter; label: string }[] = [
   ALL,
   { param: 'activos', filter: 'active', label: 'Activos' },
-  { param: 'hermanos', filter: 'siblings', label: 'Hermanos' },
+  { param: 'familia', filter: 'siblings', label: 'Familia directa' },
   { param: 'baja', filter: 'withdrawn', label: 'De baja' },
   { param: 'socios', filter: 'no_classes', label: 'Socios sin clases' },
 ];

@@ -1,6 +1,6 @@
 # Alumnos
 
-Registro de alumnos del club: datos personales, contacto con la familia, hermanos, alta y baja,
+Registro de alumnos del club: datos personales, contacto con la familia, familia directa, alta y baja,
 y sus inscripciones en grupos.
 Solo administración puede verlos y gestionarlos.
 
@@ -22,7 +22,7 @@ listado del club), pero MUST NOT darles un número que no tenga ninguno de ellos
 ### Requirement: Lista de alumnos
 El sistema MUST mostrar los alumnos con su número de socio, nombre, edad (o «edad sin indicar»), grupos y
 estado, con búsqueda por cualquier parte del nombre (sin distinguir mayúsculas ni tildes) o por número de
-socio, y con los filtros Todos, Activos, Hermanos, De baja y Socios sin clases.
+socio, y con los filtros Todos, Activos, Familia directa, De baja y Socios sin clases.
 
 #### Scenario: Buscar sin tildes
 - **WHEN** administración busca «lopez»
@@ -47,7 +47,7 @@ La ficha MUST mostrar:
 - si está federado, con su licencia;
 - autorización de imagen;
 - fechas de alta y de baja;
-- hermanos en el club;
+- familia directa en el club;
 - todos sus grupos con horario, aula y profesor.
 
 #### Scenario: Consultar una ficha
@@ -62,7 +62,7 @@ En el alta no se eligen grupos: se indican las **horas a las que va a venir** (d
 medias horas) y el sistema MUST traducirlas a grupos: el grupo que da clase a esa hora ese día, completo si
 cubre todo su horario o con horario especial si solo cubre parte (o solo algunos de sus días). Si a una hora
 hay clase en varias aulas, MUST pedirse el aula; si no hay clase, MUST avisarse y no se puede dar de alta
-hasta corregirlo. Se pueden indicar hermanos ya inscritos. Un alumno MAY darse de alta sin ningún horario:
+hasta corregirlo. Se puede indicar familia directa ya inscrita. Un alumno MAY darse de alta sin ningún horario:
 es un socio sin clases, queda marcado como socio (se le pedirá la cuota de socio) y se podrá inscribir más adelante.
 
 #### Scenario: Alta en dos grupos
@@ -168,12 +168,13 @@ Inscribir o mover a un alumno a un grupo completo MUST requerir una confirmació
 - **WHEN** el grupo está completo y administración confirma «Inscribir igualmente»
 - **THEN** el alumno queda inscrito y el grupo aparece «Sobre el cupo»
 
-### Requirement: Hermanos
-La relación de hermanos MUST ser mutua.
+### Requirement: Familia directa
+La familia directa son hermanos, padres y madres que están en el club; da derecho al descuento familiar.
+La relación MUST ser mutua.
 
-#### Scenario: Vincular hermanos
-- **WHEN** administración indica que A es hermano de B
-- **THEN** la ficha de A muestra a B y la de B muestra a A, y ambos aparecen con el filtro «Hermanos»
+#### Scenario: Vincular familia directa
+- **WHEN** administración indica que A es familia directa de B (por ejemplo, su madre o su hermano)
+- **THEN** la ficha de A muestra a B y la de B muestra a A, y ambos aparecen con el filtro «Familia directa»
 
 ### Requirement: Acceso restringido
 Las operaciones de alumnos MUST estar reservadas a cuentas de administración.

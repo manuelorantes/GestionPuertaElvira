@@ -191,9 +191,9 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
               />
               {!form.isEdit && (
                 <Select
-                  label="Hermano en el club (opcional)"
+                  label="Familia directa en el club (opcional)"
                   options={[
-                    { value: '', label: 'Sin hermanos en el club' },
+                    { value: '', label: 'Sin familia directa en el club' },
                     ...(students.data?.items ?? []).map((s) => ({
                       value: s.id,
                       label: s.fullName,

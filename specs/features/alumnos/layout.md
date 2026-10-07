@@ -11,7 +11,7 @@ StudentsPage (/panel/alumnos)
 ├── SectionHeader: «N alumnos activos» | «Alumnos» | acción «Nuevo alumno» (icono user-plus)
 ├── Toolbar (tarjeta superior)
 │   ├── SearchField: icono lupa, placeholder «Buscar por nombre»
-│   ├── Chips de filtro: Todos · Activos · Hermanos · De baja · Socios sin clases
+│   ├── Chips de filtro: Todos · Activos · Familia directa · De baja · Socios sin clases
 │   ├── Enlaces: «Datos pendientes (N)» (/panel/alumnos/pendientes) · «Importar hoja»
 │   └── Recuento: «N de M mostrados»
 ├── StudentsTable (escritorio) / StudentCards (móvil)
@@ -22,17 +22,17 @@ StudentsPage (/panel/alumnos)
 │   ├── Cabecera: avatar, nombre, «12 años · Iniciación A», badge de estado, cerrar, acciones «Editar» y «Dar de baja»
 │   ├── Tarjeta «Grupos»: por grupo, nombre, horario, «Aula N · Profesor», acciones «Mover» y «Quitar»; «Añadir grupo»
 │   ├── Tarjeta «Datos personales»: fecha de nacimiento, DNI, email, federado (licencia), autorización de imagen, alta, baja
-│   └── Tarjeta «Familia y contacto»: tutores con teléfono (enlace tel:), teléfono propio, hermanos con «Abrir» y «Quitar»; «Añadir hermano»
+│   └── Tarjeta «Familia y contacto»: tutores con teléfono (enlace tel:), teléfono propio, familia directa con «Abrir» y «Quitar»; «Añadir hermano»
 ├── StudentDialog («Nuevo alumno» / «Editar alumno»)
 │   ├── Sección «Datos del alumno»: Nombre y apellidos · Fecha de nacimiento (DateField) · DNI (opcional) · Email de contacto (opcional)
 │   ├── Nota: «Solo el nombre es obligatorio…» con lo que quedará pendiente
 │   ├── Sección «Familia y contacto»: Tutor 1 + Teléfono · Tutor 2 (opcional) + Teléfono · Teléfono del alumno
-│   │   └── (solo alta) Hermano en el club (select opcional)
+│   │   └── (solo alta) Familia directa en el club (select opcional)
 │   ├── Sección «Club»: (solo alta) Grupo (select) + «Añadir otro grupo» · interruptor Federado + Nº de licencia · interruptor Autorización de imagen
 │   └── Pie: Cancelar | «Dar de alta» o «Guardar cambios»
 ├── WithdrawDialog: «Dar de baja a <nombre>», DateField «Fecha de baja» (por defecto hoy), texto «Desde ese día deja de ocupar plaza en sus grupos.», Cancelar | «Dar de baja»
 ├── GroupPickerDialog: «Añadir grupo» o «Mover de <grupo>», con un select de grupos (nombre · horario · ocupación N/M), Cancelar | Confirmar
-├── SiblingPickerDialog: «Añadir hermano», con un select de alumnos activos
+├── SiblingPickerDialog: «Añadir familia directa», con un select de alumnos activos
 └── OverCapacityConfirm (ConfirmDialog): «El grupo está completo (12/12). ¿Inscribir igualmente?», Cancelar | «Inscribir igualmente»
 
 ClassGroupPanel (Clases → pulsar un grupo; ficha lateral)
@@ -52,7 +52,7 @@ ClassGroupPanel (Clases → pulsar un grupo; ficha lateral)
 | guardians[0] | «Tutor 1» + «Teléfono tutor 1» | texto + tel | no (pendiente si es menor) | — |
 | guardians[1] | «Tutor 2 (opcional)» + «Teléfono tutor 2» | texto + tel | no | — |
 | ownPhone | «Teléfono del alumno» | tel | sí si es adulto sin tutor | visible si la edad calculada es ≥ 18 |
-| siblingId | «Hermano en el club (opcional)» | select | no | solo en el alta |
+| siblingId | «Familia directa en el club (opcional)» | select | no | solo en el alta |
 | schedule | «Horario N»: «Día», «Empieza», «Termina» (+ «Aula para …» si hay varias aulas) | selects | no (sin horario = socio sin clases) | la API traduce cada tramo a un grupo, completo o con horario especial; vista previa debajo |
 | federationLicence | interruptor «Federado» + «Nº de licencia federativa» | switch + texto | licencia si está federado | placeholder «AND-00000» |
 | imageConsent | interruptor «Autorización de imagen» | switch | — | ayuda: «Permite usar fotos del alumno en redes y cartelería del club.» |
@@ -63,7 +63,7 @@ ClassGroupPanel (Clases → pulsar un grupo; ficha lateral)
 - Buscar filtra mientras se escribe; los chips cambian el filtro.
 - Pulsar una fila abre la ficha.
 - Las acciones de la ficha abren sus diálogos.
-- «Abrir» en un hermano cambia la ficha a la de ese hermano.
+- «Abrir» en un familiar cambia la ficha a la de ese familiar.
 
 ## 4. Accessibility Structure
 

@@ -253,7 +253,7 @@ export function StudentPanel() {
           {s.siblings.map((sibling) => (
             <div key={sibling.id} className="flex items-center gap-2 py-1.5 text-sm">
               <span className="flex-1">
-                Hermano/a en el club: <strong>{sibling.fullName}</strong>
+                Familia directa en el club: <strong>{sibling.fullName}</strong>
               </span>
               <button
                 type="button"
@@ -265,12 +265,12 @@ export function StudentPanel() {
               </button>
               <button
                 type="button"
-                aria-label={`Quitar hermano ${sibling.fullName}`}
+                aria-label={`Quitar de la familia directa a ${sibling.fullName}`}
                 onClick={() =>
                   void mutate
                     .mutateAsync(() => api.unlinkSibling(s.id, sibling.id))
                     .then(
-                      () => done('Hermanos desvinculados'),
+                      () => done('Familiar desvinculado'),
                       (failure: unknown) => setError(apiErrorMessage(failure)),
                     )
                 }
@@ -282,7 +282,7 @@ export function StudentPanel() {
           ))}
           <Button variant="ghost" className="mt-2" onClick={() => setAction({ kind: 'sibling' })}>
             <Plus aria-hidden size={16} />
-            Añadir hermano
+            Añadir familia directa
           </Button>
         </Card>
         <StudentBillingCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
@@ -349,7 +349,7 @@ export function StudentPanel() {
       )}
       {action?.kind === 'sibling' && (
         <PickerDialog
-          title="Añadir hermano"
+          title="Añadir familia directa"
           label="Alumno"
           options={(others.data?.items ?? [])
             .filter((o) => o.id !== s.id && !s.siblings.some((sib) => sib.id === o.id))
@@ -359,7 +359,7 @@ export function StudentPanel() {
           onPick={(siblingId) =>
             mutate
               .mutateAsync(() => api.linkSibling(s.id, siblingId))
-              .then(() => done('Hermanos vinculados'))
+              .then(() => done('Familiar vinculado'))
           }
         />
       )}

@@ -24,7 +24,7 @@ más sus clases particulares:
 ### Requirement: Descuentos
 Los descuentos en porcentaje MUST sumarse sobre el importe bruto del cobro:
 
-- familiar (10 %), si tiene hermanos activos;
+- familiar (10 %), si tiene familia directa activa en el club (hermanos, padre o madre);
 - pago adelantado: 3 meses o más, 10 %; 6 meses o más, 15 %; todo el año, 20 %. El año son 10 meses
   (septiembre a junio): «Todo el año» cobra todos los meses que quedan y solo se ofrece si quedan 9 o 10;
   quien tenga 8 o menos (p. ej. entra en noviembre) no puede acogerse. Cobrar 9 meses cuando quedan 10 no
@@ -41,8 +41,8 @@ Después se restan los descuentos en euros, sin bajar de 0 €:
 El descuento especial MUST poder aplicarse a cualquier cobro, incluida la cuota de socio, y siempre lleva motivo.
 El total MUST redondearse a céntimos, y las líneas del desglose MUST sumar exactamente el total.
 
-#### Scenario: Hermanos que pagan tres meses
-- **WHEN** un alumno con hermanos y tramo de 55 € paga 3 meses
+#### Scenario: Familia directa que paga tres meses
+- **WHEN** un alumno con familia directa y tramo de 55 € paga 3 meses
 - **THEN** el bruto es 165 €, el descuento es del 20 % y el total es 132 €
 
 #### Scenario: Puntos en un cobro de seis meses

@@ -202,7 +202,7 @@ describe('Alumnos', () => {
     expect(within(history).getByText('Septiembre 2026')).toBeInTheDocument();
     expect(within(history).getByText('40,50 €')).toBeInTheDocument();
     expect(screen.getByText('2 h semanales')).toBeInTheDocument();
-    expect(screen.getByText('Sí, por hermanos')).toBeInTheDocument();
+    expect(screen.getByText('Sí, por familia directa')).toBeInTheDocument();
     expect(screen.getByText('Pendiente · 50 €')).toBeInTheDocument();
     expect(screen.queryByLabelText('Forma de pago preferida')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Socio del club' })).not.toBeInTheDocument();
