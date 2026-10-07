@@ -80,7 +80,7 @@ describe('Resumen', () => {
     expect(screen.getByText('2460 €')).toBeInTheDocument();
     expect(screen.getByText('157')).toBeInTheDocument();
     const chartFigure = screen.getByRole('img', {
-      name: /Ingresos y gastos de los últimos 12 meses/,
+      name: /Ingresos y gastos de la temporada, de septiembre a agosto/,
     });
     expect(chartFigure).toHaveAccessibleName(
       expect.stringContaining('octubre 2026: ingresos 4120 €, gastos 1180 €'),
