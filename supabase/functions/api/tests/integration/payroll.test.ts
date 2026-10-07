@@ -159,6 +159,7 @@ Deno.test('payroll should manage holidays, club duties and substitutions over HT
     end: '20:00',
   });
   assertEquals(duty.status, 201, JSON.stringify(duty.body));
+  const dutyId = (duty.body as { id: string }).id;
   const duties = (await client.get('/api/admin/payroll/duties')).body as {
     items: { teacherName: string; weekday: number; start: string; end: string; label: string }[];
   };
@@ -209,6 +210,24 @@ Deno.test('payroll should manage holidays, club duties and substitutions over HT
   assertEquals(
     (await client.json('DELETE', `/api/admin/payroll/substitutions/${id}`, {})).status,
     204,
+  );
+
+  // El turno de encargado de Ángel del viernes 6 de noviembre lo cubre el titular (con motivo: tiene clase a esa hora).
+  const dutySub = await client.json('POST', '/api/admin/payroll/substitutions', {
+    dutyId,
+    date: '2026-11-06',
+    teacherId: teacher,
+    reason: 'Ángel en un torneo',
+  });
+  assertEquals(dutySub.status, 201, JSON.stringify(dutySub.body));
+  const withDuty = (await client.get('/api/admin/payroll/substitutions?month=2026-11')).body as {
+    items: { date: string; groupName: string; dutyId: string | null; teacherName: string }[];
+  };
+  assertEquals(
+    withDuty.items.filter((s) => s.dutyId !== null).map((
+      s,
+    ) => [s.date, s.groupName, s.teacherName]),
+    [['2026-11-06', 'Encargado del club', 'Ángel Castillo Rodriguez']],
   );
 
   // Sustituir a una profesora con un solo grupo (lunes) por Ángel del 16 al 30 de noviembre: lunes 16, 23 y 30.

@@ -248,7 +248,7 @@ describe('Profesorado', () => {
     );
     const dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Una sola clase' }));
-    await userEvent.selectOptions(within(dialog).getByLabelText('Clase'), 'g1');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Clase o turno'), 'group:g1');
     await userEvent.selectOptions(within(dialog).getByLabelText('La da'), 't2');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Planificar' }));
     await waitFor(() => {
@@ -257,6 +257,7 @@ describe('Profesorado', () => {
       );
       expect(JSON.parse(String(call?.[1]?.body))).toEqual({
         groupId: 'g1',
+        dutyId: null,
         date: '2026-10-07',
         teacherId: 't2',
         reason: null,
@@ -264,7 +265,7 @@ describe('Profesorado', () => {
     });
   });
 
-  it('substitutes a teacher in all their classes of those days by default', async () => {
+  it('substitutes a teacher in all their classes of a day by default', async () => {
     const fetch = api({
       'GET /api/admin/payroll/substitutions?month=2026-10': [200, { month: '2026-10', items: [] }],
       'GET /api/admin/payroll/holidays?season=2026': [200, { items: [] }],
@@ -277,13 +278,13 @@ describe('Profesorado', () => {
       within(calendar).getByRole('button', { name: 'Nueva sustitución el 07/10/2026' }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
-    expect(within(dialog).getByRole('button', { name: 'Un profesor' })).toHaveAttribute(
+    expect(within(dialog).getByRole('button', { name: 'Un día' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
     await userEvent.selectOptions(within(dialog).getByLabelText('Falta'), 't1');
     await userEvent.selectOptions(within(dialog).getByLabelText('Le sustituye'), 't2');
-    expect(await within(dialog).findByText(/Se sustituye 1 clase/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/Se sustituye 1 clase o turno/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Planificar' }));
     await waitFor(() => {
       const call = fetch.mock.calls.find(
@@ -297,6 +298,21 @@ describe('Profesorado', () => {
         reason: null,
       });
     });
+  });
+
+  it('asks for the first and last day only for a long period', async () => {
+    api({
+      'GET /api/admin/payroll/substitutions?month=2026-10': [200, { month: '2026-10', items: [] }],
+      'GET /api/admin/payroll/holidays?season=2026': [200, { items: [] }],
+    });
+    renderApp('/panel/profesores?mes=2026-10&pestana=sustituciones');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva sustitución' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
+    expect(within(dialog).queryByText('Desde')).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Periodo largo' }));
+    expect(within(dialog).getByText('Desde')).toBeInTheDocument();
+    expect(within(dialog).getByText('Hasta')).toBeInTheDocument();
   });
 
   it('creates a club duty shift', async () => {
