@@ -393,7 +393,7 @@ const account = (fx: BillingFixture, id: string) =>
   new GetStudentAccount(fx, fx, quotes(fx), fx.clock, fx, fx).execute(id);
 
 Deno.test('RecalculateCharges should reprice from this month until the 10th, keep manual ones and leave the difference pending', async () => {
-  // 2 de octubre: entra octubre. Pagó septiembre, octubre y noviembre a 35 € (1 h).
+  // 2 de octubre: entra octubre. Pagó septiembre, octubre y noviembre a 35 € (1 h) con un 10 %: 31,50 € cada uno.
   const fx = new BillingFixture();
   const id = fx.student({ regularHours: 1 });
   await generate(fx, '2026-09');
@@ -404,16 +404,17 @@ Deno.test('RecalculateCharges should reprice from this month until the 10th, kee
 
   const view = await account(fx, id);
   assertEquals(view.charges.map((c) => [c.period, c.amountCents, c.pendingCents]), [
-    ['2026-09', 3500, 0],
-    ['2026-10', 5500, 0],
-    ['2026-11', 5500, 4000],
+    ['2026-09', 3150, 0],
+    ['2026-10', 4950, 0],
+    ['2026-11', 4950, 3600],
   ]);
   assertEquals(view.charges.find((c) => c.period === '2026-11')?.status, 'partial');
 
   // Lo que falta se cobra solo: noviembre por la diferencia.
   const rest = await quote(fx, id, 1);
+  // 55 € con el mismo 10 % (49,50 €) menos lo que ya cubría: 36 €, sin descontar otra vez.
   assertEquals(rest.periods.map((p) => p.toString()), ['2026-11']);
-  assertEquals(rest.quote.total.cents, 4000);
+  assertEquals(rest.quote.total.cents, 3600);
   await register(fx, id, 1);
   assertEquals((await account(fx, id)).charges.every((c) => c.pendingCents === 0), true);
 
@@ -469,4 +470,31 @@ Deno.test('AdjustCharge should move what was charged between months without touc
     () => new AdjustCharge(fx).execute(id, '2027-07', 1000, 'Verano', 'one'),
     InvalidValue,
   );
+});
+
+Deno.test('RecalculateCharges should keep the prepayment discount of imported charges, deduced from the previous fee', async () => {
+  // Importado de la hoja: octubre y noviembre a 36 € (40 € con un 10 % por pagar tres meses), sin el porcentaje apuntado.
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 1.5 });
+  const importer = new ImportPayment(fx, fx, fx, fx);
+  for (const month of ['2026-10', '2026-11']) {
+    await importer.execute(
+      id,
+      'monthly',
+      YearMonth.fromString(month),
+      Money.cents(3600),
+      LocalDate.fromString('2026-10-01'),
+    );
+  }
+  const recalculate = new RecalculateCharges(fx, fx, fx, fx, fx.clock);
+  const before = await recalculate.currentFee(id);
+  assertEquals(before?.cents, 4000);
+  fx.changeHours(id, 3);
+  await recalculate.execute(id, before);
+
+  const charges = (await account(fx, id)).charges;
+  assertEquals(charges.map((c) => [c.period, c.amountCents, c.discountPercent, c.pendingCents]), [
+    ['2026-10', 4950, 10, 0],
+    ['2026-11', 4950, 10, 2700],
+  ]);
 });

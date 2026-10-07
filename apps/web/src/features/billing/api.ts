@@ -131,6 +131,8 @@ export interface AccountCharge {
   status: ChargeStatus;
   manual: boolean;
   note: string | null;
+  /** Descuento por pago adelantado fijado en este mes (0 si no tiene). */
+  discountPercent: number;
 }
 
 export interface BillingSettings {
@@ -226,4 +228,13 @@ export function adjustCharge(
 /** Devuelve la cuota al importe calculado con lo que hace hoy el alumno. */
 export function resetCharge(studentId: string, month: string): Promise<void> {
   return apiSend('POST', `${BASE}/accounts/${studentId}/charges/${month}/reset`, {});
+}
+
+/** Fija el descuento por pago adelantado de una cuota; se recalcula con la cuota de hoy del alumno. */
+export function setChargeDiscount(
+  studentId: string,
+  month: string,
+  percent: number,
+): Promise<void> {
+  return apiSend('PUT', `${BASE}/accounts/${studentId}/charges/${month}/discount`, { percent });
 }

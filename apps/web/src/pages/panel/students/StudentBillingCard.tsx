@@ -233,6 +233,11 @@ function SeasonCharges({ studentId, account }: { studentId: string; account: Acc
               <span className="w-28 shrink-0">{month}</span>
               <span className="flex-1">
                 <span className="font-medium">{formatCents(charge.amountCents)}</span>
+                {charge.discountPercent > 0 && (
+                  <span className="ml-1.5 text-[12px] text-ink-muted">
+                    −{charge.discountPercent} % pago adelantado
+                  </span>
+                )}
                 {charge.manual && (
                   <span
                     className="block text-[12px] text-ink-muted"
