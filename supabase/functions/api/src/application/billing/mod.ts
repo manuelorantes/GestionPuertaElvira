@@ -1098,9 +1098,14 @@ export class SetChargeDiscount {
     const charge = await this.charges.chargeFor(ref, 'monthly', YearMonth.fromString(month));
     if (charge === null) throw new ChargeNotFound();
     const today = LocalDate.fromInstant(this.clock.now());
-    const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
-    if (fee === null) throw new BillingStudentNotFound();
-    charge.setDiscount(percent, fee);
+    // Un mes ya pasado es historia: solo se anota el descuento, su importe no se recalcula con la tarifa de hoy.
+    if (charge.period.isBefore(YearMonth.of(today))) {
+      charge.noteDiscount(percent);
+    } else {
+      const fee = await currentMonthlyFee(this.directory, this.accounts, this.settings, ref, today);
+      if (fee === null) throw new BillingStudentNotFound();
+      charge.setDiscount(percent, fee);
+    }
     await this.charges.saveCharge(charge);
   }
 }
