@@ -213,6 +213,15 @@ function chargeState(charge: AccountCharge): { text: string; tone: string } {
   return { text: 'Pendiente', tone: 'text-warning-fg' };
 }
 
+/** Descuentos que lleva una cuota mensual: el familiar y el de pago adelantado (o null si ninguno). */
+function discountsLabel(charge: AccountCharge, account: Account): string | null {
+  const parts: string[] = [];
+  if (account.familyPercent > 0 && !charge.manual)
+    parts.push(`−${account.familyPercent} % familia`);
+  if (charge.discountPercent > 0) parts.push(`−${charge.discountPercent} % pago adelantado`);
+  return parts.length === 0 ? null : parts.join(' · ');
+}
+
 /** Cuotas de la temporada: importe, si está fijada a mano, lo que falta y la acción de editarla. */
 function SeasonCharges({ studentId, account }: { studentId: string; account: Account }) {
   const [editing, setEditing] = useState<AccountCharge | null>(null);
@@ -233,9 +242,9 @@ function SeasonCharges({ studentId, account }: { studentId: string; account: Acc
               <span className="w-28 shrink-0">{month}</span>
               <span className="flex-1">
                 <span className="font-medium">{formatCents(charge.amountCents)}</span>
-                {charge.discountPercent > 0 && (
+                {discountsLabel(charge, account) && (
                   <span className="ml-1.5 text-[12px] text-ink-muted">
-                    −{charge.discountPercent} % pago adelantado
+                    {discountsLabel(charge, account)}
                   </span>
                 )}
                 {charge.manual && (

@@ -332,26 +332,27 @@ export class Charge {
    * Recálculo automático (cambio de grupos, familia…) con la cuota de un mes nueva: conserva el descuento por pago
    * adelantado de este mes y no toca las cuotas fijadas a mano.
    */
-  reprice(fee: Money): void {
-    if (!this.manual) this.value = Charge.discounted(fee, this.prepaid);
+  /** `family`: descuento familiar que ya lleva `fee` (el de pago adelantado se suma a él sobre la base). */
+  reprice(fee: Money, family = 0): void {
+    if (!this.manual) this.value = Charge.discounted(fee, this.prepaid, family);
   }
 
   /** Mes pagado por adelantado con descuento: se fija el porcentaje (si aún no tenía) y se descuenta del importe. */
-  applyPrepayment(percent: number): void {
+  applyPrepayment(percent: number, family = 0): void {
     if (this.prepaid > 0 || percent <= 0 || this.manual) return;
     this.prepaid = percent;
-    this.value = Charge.discounted(this.value, percent);
+    this.value = Charge.discounted(this.value, percent, family);
   }
 
   /** Fija a mano el descuento por pago adelantado de este mes y recalcula con la cuota de un mes indicada. */
-  setDiscount(percent: number, fee: Money): void {
+  setDiscount(percent: number, fee: Money, family = 0): void {
     if (!Number.isInteger(percent) || percent < 0 || percent > 100) {
       throw new InvalidValue('percent', 'El descuento debe estar entre 0 y 100.');
     }
     this.prepaid = percent;
     this.manual = false;
     this.reason = null;
-    this.value = Charge.discounted(fee, percent);
+    this.value = Charge.discounted(fee, percent, family);
   }
 
   discountPercent(): number {
@@ -371,16 +372,24 @@ export class Charge {
    * de un mes que tenía el alumno: si coincide con uno de los porcentajes de pago adelantado, lo fija sin cambiar el
    * importe.
    */
-  inferDiscount(previousFee: Money, candidates: readonly number[]): void {
+  inferDiscount(previousFee: Money, candidates: readonly number[], family = 0): void {
     if (this.prepaid > 0 || this.manual || previousFee.cents <= 0) return;
     if (this.value.cents >= previousFee.cents) return;
-    const percent = 100 - (this.value.cents * 100) / previousFee.cents;
+    const percent = (100 - family) * (1 - this.value.cents / previousFee.cents);
     const match = candidates.find((p) => p > 0 && Math.abs(p - percent) <= 1);
     if (match !== undefined) this.prepaid = match;
   }
 
-  private static discounted(fee: Money, percent: number): Money {
-    return percent > 0 ? fee.minus(fee.percent(percent)) : fee;
+  /**
+   * Los descuentos porcentuales se suman sobre la cuota base (como al cobrar): una cuota que ya lleva un `family` % pasa
+   * a llevar `family + percent` %. Base 40 €, familiar 10 % (36 €) y 20 % adelantado: 40 € − 30 % = 28 €.
+   */
+  private static discounted(fee: Money, percent: number, family = 0): Money {
+    if (percent <= 0) return fee;
+    if (family <= 0) return fee.minus(fee.percent(percent));
+    return Money.cents(
+      Math.round((fee.cents * Math.max(0, 100 - family - percent)) / (100 - family)),
+    );
   }
 
   /** Importe fijado a mano, con su motivo; el recálculo automático ya no lo cambia. */
