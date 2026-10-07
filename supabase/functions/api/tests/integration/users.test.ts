@@ -131,8 +131,8 @@ Deno.test('superadministrators can act as another account and come back, signing
   };
   const created = actions.items.find((a) => a.label === 'Crear profesor');
   assertEquals(created?.userName, 'Lucía Moreno Gil (suplantada por Lucía Moreno Gil)');
-  assert(actions.items.some((a) => a.label === 'Empieza a suplantar una cuenta'));
-  assert(actions.items.some((a) => a.label === 'Deja de suplantar una cuenta'));
+  // Empezar y dejar de suplantar son eventos de sesión: se registran, pero el historial no los lista.
+  assert(!actions.items.some((a) => a.label === 'Empieza a suplantar una cuenta'));
 
   // Límites: ni a sí mismo, ni a otra superadministración, ni cuentas desactivadas.
   assertError(
