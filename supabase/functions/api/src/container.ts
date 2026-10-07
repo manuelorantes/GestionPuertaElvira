@@ -7,6 +7,7 @@ import {
   SupabaseDocumentStorage,
 } from './infrastructure/accounting/storage.ts';
 import { registerAuditRoutes } from './infrastructure/audit/routes.ts';
+import { registerUserRoutes } from './infrastructure/identity/users-routes.ts';
 import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
 import { registerDashboardRoutes } from './infrastructure/dashboard/routes.ts';
@@ -99,6 +100,7 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
     );
   registerAccountingRoutes(api, storage);
   registerAuditRoutes(api);
+  registerUserRoutes(api);
   registerImportRoutes(api);
   registerDashboardRoutes(api);
   return api;

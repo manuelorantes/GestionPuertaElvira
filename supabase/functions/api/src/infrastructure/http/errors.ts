@@ -42,6 +42,8 @@ const DOMAIN_ERRORS = new Map<string, [number, string]>([
   ['CurrentPasswordMismatch', [422, 'current_password_mismatch']],
   ['WeakPassword', [422, 'weak_password']],
   ['EmailAlreadyRegistered', [409, 'email_already_registered']],
+  ['CannotChangeOwnAccount', [409, 'own_account']],
+  ['UserNotFound', [404, 'not_found']],
   ['InvalidValue', [422, 'unprocessable']],
   ['PeriodClosed', [409, 'period_closed']],
 ]);

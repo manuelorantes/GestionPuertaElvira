@@ -22,6 +22,7 @@ import {
   undoAction,
   type AuditAction,
 } from '@/features/audit/api';
+import { madridDateTime } from '@/shared/dateTime';
 import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
@@ -36,19 +37,7 @@ const OPERATION = { I: 'Alta', U: 'Cambio', D: 'Baja' } as const;
 const ICON_BUTTON =
   'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-2.5 text-[13px] font-semibold whitespace-nowrap hover:bg-surface-muted';
 
-const MADRID = new Intl.DateTimeFormat('es-ES', {
-  timeZone: 'Europe/Madrid',
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-/** Fecha y hora del club (Madrid), sea cual sea la zona del navegador. */
-function when(iso: string): string {
-  return MADRID.format(new Date(iso)).replace(',', '');
-}
+const when = madridDateTime;
 
 function ActionDetail({ id }: { id: string }) {
   const detail = useQuery({ queryKey: ['audit-action', id], queryFn: () => fetchAction(id) });
