@@ -12,6 +12,7 @@ import {
   UserId,
 } from '../../domain/identity/mod.ts';
 import {
+  CannotChangeOwnAccount,
   CurrentPasswordMismatch,
   EmailAlreadyRegistered,
   InvalidCredentials,
@@ -263,8 +264,10 @@ export class DisableUser {
     private readonly log: SecurityEventLog,
   ) {}
 
-  async execute(email: string): Promise<void> {
+  /** `actorId`: quien lo pide desde la aplicación, que no puede desactivarse a sí mismo. */
+  async execute(email: string, actorId?: string): Promise<void> {
     const user = await lookUp(this.users, email);
+    if (user.id.value === actorId) throw new CannotChangeOwnAccount();
     user.disable();
     await this.users.save(user);
     await this.sessions.removeAllForUser(user.id);
@@ -292,10 +295,39 @@ export class ChangeUserRole {
     private readonly log: SecurityEventLog,
   ) {}
 
-  async execute(email: string, role: string): Promise<void> {
+  async execute(email: string, role: string, actorId?: string): Promise<void> {
     const user = await lookUp(this.users, email);
+    if (user.id.value === actorId) throw new CannotChangeOwnAccount();
     user.changeRole(roleFromName(role));
     await this.users.save(user);
     await this.log.record('role_changed', 'success', user.id);
+  }
+}
+
+/** Cuenta tal y como se ve en la sección Usuarios (nunca con la contraseña). */
+export interface UserListItem {
+  id: string;
+  email: string;
+  fullName: string;
+  role: Role;
+  status: 'active' | 'disabled';
+  mustChangePassword: boolean;
+  createdAt: string;
+  /** Último inicio de sesión o actividad, o null si nunca ha entrado. */
+  lastSeenAt: string | null;
+}
+
+export interface UserDirectory {
+  /** Todas las cuentas, por nombre. */
+  list(): Promise<UserListItem[]>;
+  /** Email de una cuenta por su identificador, o null si no existe. */
+  emailOf(id: string): Promise<string | null>;
+}
+
+export class ListUsers {
+  constructor(private readonly directory: UserDirectory) {}
+
+  execute(): Promise<UserListItem[]> {
+    return this.directory.list();
   }
 }

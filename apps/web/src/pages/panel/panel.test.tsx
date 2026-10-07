@@ -143,6 +143,7 @@ describe('cambio de contraseña obligatorio', () => {
     renderApp('/panel');
     const nav = await screen.findByRole('navigation', { name: 'Secciones' });
     expect(within(nav).queryByRole('link', { name: /Historial/ })).not.toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: /Usuarios/ })).not.toBeInTheDocument();
     expect(screen.getByText('Administración')).toBeInTheDocument();
   });
 
@@ -153,6 +154,10 @@ describe('cambio de contraseña obligatorio', () => {
     expect(within(nav).getByRole('link', { name: /Historial/ })).toHaveAttribute(
       'href',
       '/panel/historial',
+    );
+    expect(within(nav).getByRole('link', { name: /Usuarios/ })).toHaveAttribute(
+      'href',
+      '/panel/usuarios',
     );
     expect(screen.getByText('Superadministración')).toBeInTheDocument();
   });

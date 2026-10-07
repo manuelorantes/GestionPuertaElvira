@@ -49,6 +49,11 @@ export class AuditLabels {
     'DELETE /api/admin/students/:id/siblings/:siblingId': 'Desvincular hermanos',
     'POST /api/admin/teachers': 'Crear profesor',
     'PUT /api/admin/teachers/:id': 'Editar profesor',
+    'POST /api/admin/users': 'Crear cuenta de usuario',
+    'POST /api/admin/users/:id/password-reset': 'Restablecer contraseña',
+    'POST /api/admin/users/:id/disable': 'Desactivar cuenta',
+    'POST /api/admin/users/:id/enable': 'Reactivar cuenta',
+    'PUT /api/admin/users/:id/role': 'Cambiar rol de cuenta',
     'POST /api/admin/import/rows': 'Importar fila de la hoja',
   };
 

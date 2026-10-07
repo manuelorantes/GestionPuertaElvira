@@ -107,6 +107,22 @@ MUST quedar en el historial a su nombre, como el resto de cuentas.
 - **WHEN** una cuenta de profesorado intenta acceder a una sección reservada a administración
 - **THEN** el sistema se lo impide indicando que no tiene permiso
 
+### Requirement: Sección Usuarios
+Superadministración MUST tener una sección «Usuarios», que nadie más ve, con todas las cuentas: nombre, email,
+rol, estado (activa o desactivada, y si tiene contraseña temporal) y última conexión (último inicio de sesión
+o actividad; «Nunca» si no ha entrado). Por defecto muestra las activas, con filtros Activos, Desactivados y
+Todos. Desde ella MUST poder crear cuentas, restablecer contraseñas (se muestra una contraseña temporal una
+sola vez y se cierran sus sesiones), desactivar y reactivar cuentas y cambiar su rol. Nadie MUST poder
+desactivar su propia cuenta ni cambiar su propio rol. Cada acción queda en el historial.
+
+#### Scenario: Restablecer una contraseña
+- **WHEN** superadministración restablece la contraseña de una cuenta y lo confirma
+- **THEN** ve una contraseña temporal para entregarla en persona, y esa persona tendrá que cambiarla al entrar
+
+#### Scenario: Su propia cuenta
+- **WHEN** superadministración intenta desactivarse o quitarse el rol
+- **THEN** no puede: en su fila no aparece «Desactivar» ni el selector de rol, y la API lo rechaza
+
 ### Requirement: Gestión técnica de cuentas
 Quien mantiene la aplicación MUST poder, mediante un procedimiento técnico:
 dar de alta cuentas con rol y contraseña temporal, desactivarlas y reactivarlas,

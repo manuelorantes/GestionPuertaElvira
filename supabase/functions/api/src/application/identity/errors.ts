@@ -40,3 +40,11 @@ export class UserNotFound extends Error {
     this.name = 'UserNotFound';
   }
 }
+
+/** Quien administra no puede desactivar su propia cuenta ni quitarse el rol (se quedaría fuera). */
+export class CannotChangeOwnAccount extends Error {
+  constructor() {
+    super('No puedes desactivar tu propia cuenta ni cambiar tu propio rol.');
+    this.name = 'CannotChangeOwnAccount';
+  }
+}
