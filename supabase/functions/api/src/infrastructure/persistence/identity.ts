@@ -84,6 +84,9 @@ function toSession(row: Row): Session {
     UserId.fromString(row.string('user_id')),
     row.date('started_at'),
     row.date('last_activity_at'),
+    row.nullableString('impersonator_id') === null
+      ? null
+      : UserId.fromString(row.string('impersonator_id')),
   );
 }
 
@@ -103,6 +106,7 @@ export class SqlSessionRepository implements SessionRepository {
       user_id: session.userId.value,
       started_at: session.startedAt,
       last_activity_at: session.lastActivityAt(),
+      impersonator_id: session.impersonator?.value ?? null,
     };
     await this.sql`
       INSERT INTO identity_session ${this.sql(record)}

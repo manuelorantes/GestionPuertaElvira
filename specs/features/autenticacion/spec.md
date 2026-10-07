@@ -123,6 +123,18 @@ desactivar su propia cuenta ni cambiar su propio rol. Cada acción queda en el h
 - **WHEN** superadministración intenta desactivarse o quitarse el rol
 - **THEN** no puede: en su fila no aparece «Desactivar» ni el selector de rol, y la API lo rechaza
 
+### Requirement: Entrar como otra cuenta
+Superadministración MUST poder entrar como otra cuenta desde la sección Usuarios, tras confirmarlo, para ver y
+usar la aplicación como esa persona. No se puede entrar como uno mismo, como otra superadministración ni como
+una cuenta desactivada. Mientras dura, un aviso fijo indica como quién se está usando y ofrece «Volver a mi
+cuenta»; no se puede cambiar la contraseña de esa persona. El inicio y el fin quedan en el historial, y cada
+acción se firma con la cuenta y con quien la suplanta («Junta (suplantada por Ana)»). Si quien suplanta deja de
+poder entrar o de ser superadministración, la suplantación termina.
+
+#### Scenario: Ver la aplicación como administración
+- **WHEN** superadministración pulsa «Entrar como» en una cuenta de administración y lo confirma
+- **THEN** ve el panel como esa cuenta, con el aviso arriba, y al pulsar «Volver a mi cuenta» vuelve a la suya
+
 ### Requirement: Gestión técnica de cuentas
 Quien mantiene la aplicación MUST poder, mediante un procedimiento técnico:
 dar de alta cuentas con rol y contraseña temporal, desactivarlas y reactivarlas,

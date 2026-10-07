@@ -13,9 +13,11 @@ import {
 } from '../../domain/identity/mod.ts';
 import {
   CannotChangeOwnAccount,
+  CannotImpersonate,
   CurrentPasswordMismatch,
   EmailAlreadyRegistered,
   InvalidCredentials,
+  NotImpersonating,
   SessionNotValid,
   UserNotFound,
 } from './errors.ts';
@@ -40,16 +42,26 @@ export interface AuthenticatedUser {
   email: string;
   role: Role;
   mustChangePassword: boolean;
+  /** Quien suplanta esta cuenta (superadministración), o null en una sesión normal. */
+  impersonatedBy: { id: string; fullName: string } | null;
 }
 
-export function authenticatedUser(user: User, session: Session): AuthenticatedUser {
+export function authenticatedUser(
+  user: User,
+  session: Session,
+  impersonator: User | null = null,
+): AuthenticatedUser {
   return {
     id: user.id.value,
     sessionId: session.id.value,
     fullName: user.fullName.value,
     email: user.email.value,
     role: user.role(),
-    mustChangePassword: user.mustChangePassword(),
+    // Quien suplanta no tiene que cambiar la contraseña temporal de otra persona.
+    mustChangePassword: impersonator === null && user.mustChangePassword(),
+    impersonatedBy: impersonator === null
+      ? null
+      : { id: impersonator.id.value, fullName: impersonator.fullName.value },
   };
 }
 
@@ -160,8 +172,20 @@ export class AuthenticateSession {
     }
     const user = await this.users.find(session.userId);
     if (user === null || !user.canAuthenticate()) throw new SessionNotValid();
+    let impersonator: User | null = null;
+    if (session.impersonator !== null) {
+      // Si quien suplanta deja de poder entrar o de ser superadministración, la suplantación acaba.
+      impersonator = await this.users.find(session.impersonator);
+      if (
+        impersonator === null || !impersonator.canAuthenticate() ||
+        impersonator.role() !== 'superadministrator'
+      ) {
+        await this.sessions.remove(session.id);
+        throw new SessionNotValid();
+      }
+    }
     if (session.touch(now)) await this.sessions.save(session);
-    return authenticatedUser(user, session);
+    return authenticatedUser(user, session, impersonator);
   }
 }
 
@@ -329,5 +353,78 @@ export class ListUsers {
 
   execute(): Promise<UserListItem[]> {
     return this.directory.list();
+  }
+}
+
+/**
+ * Superadministración entra como otra cuenta para ver lo que ve: se cierra su sesión y se abre una de esa cuenta
+ * que recuerda quién la abrió. No se puede suplantar a uno mismo, a otra superadministración ni una cuenta desactivada.
+ */
+export class StartImpersonation {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly sessions: SessionRepository,
+    private readonly tokens: SessionTokenGenerator,
+    private readonly log: SecurityEventLog,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(actor: AuthenticatedUser, targetId: string): Promise<LoginResult> {
+    if (actor.impersonatedBy !== null) {
+      throw new CannotImpersonate('Vuelve antes a tu cuenta para suplantar otra.');
+    }
+    const admin = await this.users.find(UserId.fromString(actor.id));
+    if (admin === null || admin.role() !== 'superadministrator') {
+      throw new CannotImpersonate('Solo superadministración puede suplantar cuentas.');
+    }
+    const target = await this.users.find(UserId.fromString(targetId));
+    if (target === null) throw new UserNotFound();
+    if (target.id.equals(admin.id)) throw new CannotImpersonate('Ya estás en tu cuenta.');
+    if (target.role() === 'superadministrator') {
+      throw new CannotImpersonate('No se puede suplantar a otra cuenta de superadministración.');
+    }
+    if (!target.canAuthenticate()) {
+      throw new CannotImpersonate('No se puede suplantar una cuenta desactivada.');
+    }
+    await this.sessions.remove(SessionId.fromString(actor.sessionId));
+    const token = this.tokens.generate();
+    const session = Session.start(
+      SessionId.generate(),
+      this.tokens.hash(token),
+      target.id,
+      this.clock.now(),
+      admin.id,
+    );
+    await this.sessions.save(session);
+    await this.log.record('impersonation_start', 'success', admin.id);
+    return { token, user: authenticatedUser(target, session, admin) };
+  }
+}
+
+/** Vuelve a la cuenta de superadministración: se cierra la sesión suplantada y se abre una suya nueva. */
+export class StopImpersonation {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly sessions: SessionRepository,
+    private readonly tokens: SessionTokenGenerator,
+    private readonly log: SecurityEventLog,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(current: AuthenticatedUser): Promise<LoginResult> {
+    if (current.impersonatedBy === null) throw new NotImpersonating();
+    const admin = await this.users.find(UserId.fromString(current.impersonatedBy.id));
+    if (admin === null || !admin.canAuthenticate()) throw new SessionNotValid();
+    await this.sessions.remove(SessionId.fromString(current.sessionId));
+    const token = this.tokens.generate();
+    const session = Session.start(
+      SessionId.generate(),
+      this.tokens.hash(token),
+      admin.id,
+      this.clock.now(),
+    );
+    await this.sessions.save(session);
+    await this.log.record('impersonation_stop', 'success', admin.id);
+    return { token, user: authenticatedUser(admin, session) };
   }
 }
