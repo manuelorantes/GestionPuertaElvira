@@ -27,7 +27,7 @@ export function MonthlyChart({ months, current }: MonthlyChartProps) {
   return (
     <div
       role="img"
-      aria-label={`Ingresos y gastos de los últimos 12 meses. ${description}`}
+      aria-label={`Ingresos y gastos de la temporada, de septiembre a agosto (las cuotas, en el mes al que corresponden). ${description}`}
       className="flex h-60 gap-3"
     >
       <div

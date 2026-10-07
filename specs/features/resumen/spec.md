@@ -11,8 +11,14 @@ El resumen MUST mostrar:
 - los alumnos activos frente a los registrados.
 
 ### Requirement: Mes a mes
-El resumen MUST mostrar un gráfico de barras de ingresos y gastos de los últimos 12 meses, con el mes en curso destacado
-y una descripción accesible con las cifras de cada mes.
+El resumen MUST mostrar un gráfico de barras de ingresos y gastos de la temporada en curso, de septiembre a agosto, con
+el mes en curso destacado y una descripción accesible con las cifras de cada mes. Las cuotas mensuales MUST contar en el
+mes al que corresponden (cada cobro repartido a partes iguales entre los meses que paga), no en el mes en que se
+cobran; el resto de ingresos (cuota de socio, subvenciones, promociones, apuntes) y los gastos, en su fecha.
+
+#### Scenario: Un pago trimestral
+- **WHEN** un alumno paga en octubre tres meses por 121,50 €
+- **THEN** el gráfico suma 40,50 € a octubre, a noviembre y a diciembre
 
 ### Requirement: Ocupación
 El resumen MUST mostrar la ocupación media de los grupos (plazas ocupadas sobre plazas totales), cuántos están completos
