@@ -347,8 +347,9 @@ export class SqlDutyRepository implements DutyRepository {
 }
 
 function toSubstitution(row: Row): Substitution {
+  const duty = row.nullableString('duty_id');
   return new Substitution(
-    GroupRef.fromString(row.string('group_id')),
+    duty === null ? GroupRef.fromString(row.string('group_id')) : DutyRef.fromString(duty),
     LocalDate.fromString(row.string('substitution_date')),
     TeacherRef.fromString(row.string('teacher_id')),
     row.nullableString('reason'),
@@ -366,9 +367,11 @@ export class SqlSubstitutionRepository implements SubstitutionRepository {
     ).map(toSubstitution);
   }
 
-  async find(group: GroupRef, date: LocalDate) {
+  async find(source: string, date: LocalDate) {
+    const [kind, id = ''] = source.split(':');
+    const column = kind === 'duty' ? 'duty_id' : 'group_id';
     const rows = await this.sql`SELECT * FROM payroll_substitution
-      WHERE group_id = ${group.value} AND substitution_date = ${date.toString()}`;
+      WHERE ${this.sql(column)}::text = ${id} AND substitution_date = ${date.toString()}`;
     if (!rows[0]) return null;
     const row = new Row(rows[0]);
     return { id: row.string('id'), substitution: toSubstitution(row) };
@@ -382,7 +385,8 @@ export class SqlSubstitutionRepository implements SubstitutionRepository {
   async save(id: string, s: Substitution): Promise<void> {
     const record = {
       id,
-      group_id: s.group.value,
+      group_id: s.group?.value ?? null,
+      duty_id: s.duty?.value ?? null,
       substitution_date: s.date.toString(),
       teacher_id: s.teacher.value,
       reason: s.reason,
@@ -400,7 +404,10 @@ export class SqlSubstitutionRepository implements SubstitutionRepository {
 export interface SubstitutionView {
   id: string;
   date: string;
-  groupId: string;
+  /** La clase sustituida, o null si es un turno. */
+  groupId: string | null;
+  dutyId: string | null;
+  /** Nombre de la clase o del turno. */
   groupName: string;
   start: string;
   end: string;
@@ -431,19 +438,24 @@ export class SqlPlanningQuery {
 
   async substitutions(from: LocalDate, to: LocalDate): Promise<SubstitutionView[]> {
     const rows = await this.sql`
-      SELECT s.id, s.substitution_date::text AS date, s.group_id, s.reason, g.name AS group_name,
-             g.start_minutes, g.end_minutes, g.teacher_id AS owner_id, o.full_name AS owner_name,
+      SELECT s.id, s.substitution_date::text AS date, s.group_id, s.duty_id, s.reason,
+             COALESCE(g.name, d.label) AS group_name,
+             COALESCE(g.start_minutes, d.start_minutes) AS start_minutes,
+             COALESCE(g.end_minutes, d.end_minutes) AS end_minutes,
+             o.id AS owner_id, o.full_name AS owner_name,
              s.teacher_id, t.full_name AS substitute_name
         FROM payroll_substitution s
-        JOIN classes_group g ON g.id = s.group_id
-        JOIN teachers_teacher o ON o.id = g.teacher_id
+        LEFT JOIN classes_group g ON g.id = s.group_id
+        LEFT JOIN payroll_duty d ON d.id = s.duty_id
+        JOIN teachers_teacher o ON o.id = COALESCE(g.teacher_id, d.teacher_id)
         JOIN teachers_teacher t ON t.id = s.teacher_id
        WHERE s.substitution_date BETWEEN ${from.toString()} AND ${to.toString()}
-       ORDER BY s.substitution_date, g.start_minutes`;
+       ORDER BY s.substitution_date, 7`;
     return Row.all(rows).map((r) => ({
       id: r.string('id'),
       date: r.string('date'),
-      groupId: r.string('group_id'),
+      groupId: r.nullableString('group_id'),
+      dutyId: r.nullableString('duty_id'),
       groupName: r.string('group_name'),
       start: hhmm(r.int('start_minutes')),
       end: hhmm(r.int('end_minutes')),

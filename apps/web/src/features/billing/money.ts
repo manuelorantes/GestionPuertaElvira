@@ -1,3 +1,5 @@
+import { fiscalYearOf } from '@/features/accounting/categories';
+
 const euros = (digits: number) =>
   new Intl.NumberFormat('es-ES', {
     style: 'currency',
@@ -70,4 +72,12 @@ export function reminderText(charge: {
 
 export function whatsappLink(phone: string, text: string): string {
   return `https://wa.me/34${phone.replace(/\s/g, '')}?text=${encodeURIComponent(text)}`;
+}
+
+/** Meses de clase de la temporada de `month` (de septiembre a junio). */
+export function seasonMonths(month: string): string[] {
+  const start = fiscalYearOf(month);
+  return [9, 10, 11, 12, 1, 2, 3, 4, 5, 6].map(
+    (m) => `${m >= 9 ? start : start + 1}-${String(m).padStart(2, '0')}`,
+  );
 }

@@ -73,8 +73,9 @@ export interface DutyRepository {
 /** Sustituciones planificadas. */
 export interface SubstitutionRepository {
   onDate(date: LocalDate): Promise<Substitution[]>;
+  /** La sustitución de una clase o turno («group:<id>» o «duty:<id>») un día. */
   find(
-    group: GroupRef,
+    source: string,
     date: LocalDate,
   ): Promise<{ id: string; substitution: Substitution } | null>;
   byId(id: string): Promise<Substitution | null>;
@@ -580,16 +581,53 @@ export class SubstitutionNotFound extends Error {
 }
 
 export interface SubstitutionInput {
-  groupId: string;
+  /** La clase sustituida, o null si es un turno. */
+  groupId: string | null;
+  /** El turno sustituido (encargado del club), en lugar de una clase. */
+  dutyId?: string | null;
   date: string;
   teacherId: string;
   reason: string | null;
 }
 
+/** Clase o turno semanal que se puede sustituir. */
+interface Slot {
+  target: GroupRef | DutyRef;
+  source: string;
+  name: string;
+  owner: TeacherRef;
+  weekdays: readonly number[];
+  start: number;
+  end: number;
+}
+
+function slotsOf(groups: readonly ScheduledGroup[], duties: readonly ClubDuty[]): Slot[] {
+  return [
+    ...groups.map((g) => ({
+      target: g.id,
+      source: `group:${g.id.value}`,
+      name: `la clase «${g.name}»`,
+      owner: g.teacher,
+      weekdays: g.weekdays,
+      start: g.start,
+      end: g.start + g.minutes,
+    })),
+    ...duties.map((d) => ({
+      target: d.id,
+      source: `duty:${d.id.value}`,
+      name: `el turno «${d.label}»`,
+      owner: d.teacher,
+      weekdays: [d.weekday],
+      start: d.start,
+      end: d.end,
+    })),
+  ];
+}
+
 /**
- * Planifica una sustitución: ese día la clase la da otro profesor. Si a esa hora ya tiene otra clase o un turno, es
- * un caso especial (da las dos a la vez, no suma horas dobles) y hay que indicar el motivo. Si la sesión de ese día ya
- * estaba apuntada, pasa a quien sustituye.
+ * Planifica que otro profesor dé una clase o un turno (encargado del club) un día. Si ya tiene otra clase o turno a esa
+ * hora hace falta un motivo (dará las dos a la vez, sin horas dobles). Si la sesión de ese día ya estaba apuntada, pasa
+ * a quien sustituye.
  */
 export class PlanSubstitution {
   constructor(
@@ -603,28 +641,44 @@ export class PlanSubstitution {
 
   async execute(input: SubstitutionInput): Promise<string> {
     const date = LocalDate.fromString(input.date);
-    const groupRef = GroupRef.fromString(input.groupId);
     const teacher = TeacherRef.fromString(input.teacherId);
     await ensureTeacherExists(this.teachers, teacher);
-    const groups = await this.schedule.groups();
-    const group = groups.find((g) => g.id.equals(groupRef));
-    if (!group) throw new InvalidValue('groupId', 'Ese grupo no existe.');
-    if (!group.weekdays.includes(date.isoWeekday())) {
-      throw new InvalidValue('date', 'Ese grupo no tiene clase ese día.');
+    const slots = slotsOf(await this.schedule.groups(), await this.duties.all());
+    const wanted = input.dutyId
+      ? `duty:${DutyRef.fromString(input.dutyId).value}`
+      : `group:${GroupRef.fromString(input.groupId ?? '').value}`;
+    const slot = slots.find((s) => s.source === wanted);
+    if (!slot) {
+      throw input.dutyId
+        ? new InvalidValue('dutyId', 'Ese turno no existe.')
+        : new InvalidValue('groupId', 'Ese grupo no existe.');
     }
-    if (group.teacher.equals(teacher)) {
+    if (!slot.weekdays.includes(date.isoWeekday())) {
+      throw new InvalidValue(
+        'date',
+        input.dutyId ? 'Ese turno no es ese día.' : 'Ese grupo no tiene clase ese día.',
+      );
+    }
+    if (slot.owner.equals(teacher)) {
       throw new InvalidValue('teacherId', 'Elige un profesor distinto del titular.');
     }
     const reason = input.reason?.trim() || null;
-    const busy = busyWith(group, teacher, date, groups, await this.duties.all());
+    const busy = busyWith(slot, teacher, date, slots);
     if (busy !== null && reason === null) throw new SubstitutionNeedsReason(busy);
-    const existing = await this.substitutions.find(groupRef, date);
-    const id = existing?.id ?? crypto.randomUUID();
-    await this.substitutions.save(id, new Substitution(groupRef, date, teacher, reason));
-    await reassignSession(this.timesheets, this.settlements, group, date, teacher);
-    return id;
+    return await save(
+      this.substitutions,
+      this.timesheets,
+      this.settlements,
+      slot,
+      date,
+      teacher,
+      reason,
+    );
   }
 }
+
+/** Máximo de días de una sustitución de profesor de una vez. */
+const MAX_SUBSTITUTION_DAYS = 62;
 
 export interface TeacherSubstitutionInput {
   teacherId: string;
@@ -634,13 +688,10 @@ export interface TeacherSubstitutionInput {
   reason: string | null;
 }
 
-/** Máximo de días de una sustitución de profesor de una vez. */
-const MAX_SUBSTITUTION_DAYS = 62;
-
 /**
- * Sustituye a un profesor por otro en todas sus clases de unos días (lo habitual): crea la sustitución de cada clase
- * suya en esos días, salvo festivos. Si quien sustituye ya tiene clase o turno a la hora de alguna, hace falta un
- * motivo y no se guarda nada. Devuelve cuántas clases sustituye.
+ * Sustituye a un profesor por otro en todas sus clases y turnos de unos días: crea la sustitución de cada una, salvo
+ * festivos. Si quien sustituye ya tiene clase o turno a la hora de alguna, hace falta un motivo y no se guarda nada.
+ * Devuelve cuántas sustituye.
  */
 export class SubstituteTeacher {
   constructor(
@@ -670,25 +721,28 @@ export class SubstituteTeacher {
       throw new InvalidValue('to', `Como mucho ${MAX_SUBSTITUTION_DAYS} días de una vez.`);
     }
     const reason = input.reason?.trim() || null;
-    const groups = await this.schedule.groups();
-    const duties = await this.duties.all();
-    const own = groups.filter((g) => g.teacher.equals(absent));
-    const planned: { group: ScheduledGroup; date: LocalDate }[] = [];
+    const slots = slotsOf(await this.schedule.groups(), await this.duties.all());
+    const own = slots.filter((s) => s.owner.equals(absent));
+    const planned: { slot: Slot; date: LocalDate }[] = [];
     for (let date = from; !to.isBefore(date); date = date.plusDays(1)) {
       if (await this.holidays.isHoliday(date)) continue;
-      for (const group of own.filter((g) => g.weekdays.includes(date.isoWeekday()))) {
-        const busy = busyWith(group, substitute, date, groups, duties);
+      for (const slot of own.filter((s) => s.weekdays.includes(date.isoWeekday()))) {
+        // Las demás clases y turnos del que falta también pasan al sustituto: no cuentan como «ocupado».
+        const busy = busyWith(slot, substitute, date, slots.filter((s) => !s.owner.equals(absent)));
         if (busy !== null && reason === null) throw new SubstitutionNeedsReason(busy);
-        planned.push({ group, date });
+        planned.push({ slot, date });
       }
     }
-    for (const { group, date } of planned) {
-      const existing = await this.substitutions.find(group.id, date);
-      await this.substitutions.save(
-        existing?.id ?? crypto.randomUUID(),
-        new Substitution(group.id, date, substitute, reason),
+    for (const { slot, date } of planned) {
+      await save(
+        this.substitutions,
+        this.timesheets,
+        this.settlements,
+        slot,
+        date,
+        substitute,
+        reason,
       );
-      await reassignSession(this.timesheets, this.settlements, group, date, substitute);
     }
     return planned.length;
   }
@@ -698,6 +752,7 @@ export class SubstituteTeacher {
 export class CancelSubstitution {
   constructor(
     private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
     private readonly substitutions: SubstitutionRepository,
     private readonly timesheets: TimesheetRepository,
     private readonly settlements: SettlementRepository,
@@ -707,52 +762,54 @@ export class CancelSubstitution {
     const substitution = await this.substitutions.byId(id);
     if (substitution === null) throw new SubstitutionNotFound();
     await this.substitutions.delete(id);
-    const group = (await this.schedule.groups()).find((g) => g.id.equals(substitution.group));
-    if (group) {
-      await reassignSession(
-        this.timesheets,
-        this.settlements,
-        group,
-        substitution.date,
-        group.teacher,
-      );
+    const slot = slotsOf(await this.schedule.groups(), await this.duties.all()).find((s) =>
+      s.source === substitution.source
+    );
+    if (slot) {
+      await reassignSession(this.timesheets, this.settlements, slot, substitution.date, slot.owner);
     }
   }
 }
 
-/** Otra clase o turno del profesor que se solapa con la del grupo ese día, o null. */
+async function save(
+  substitutions: SubstitutionRepository,
+  timesheets: TimesheetRepository,
+  settlements: SettlementRepository,
+  slot: Slot,
+  date: LocalDate,
+  teacher: TeacherRef,
+  reason: string | null,
+): Promise<string> {
+  const existing = await substitutions.find(slot.source, date);
+  const id = existing?.id ?? crypto.randomUUID();
+  await substitutions.save(id, new Substitution(slot.target, date, teacher, reason));
+  await reassignSession(timesheets, settlements, slot, date, teacher);
+  return id;
+}
+
+/** Otra clase o turno del profesor que se solapa con el sustituido ese día, o null. */
 function busyWith(
-  group: ScheduledGroup,
+  slot: Slot,
   teacher: TeacherRef,
   date: LocalDate,
-  groups: readonly ScheduledGroup[],
-  duties: readonly ClubDuty[],
+  slots: readonly Slot[],
 ): string | null {
   const weekday = date.isoWeekday();
-  const from = group.start;
-  const to = group.start + group.minutes;
-  const overlaps = (a: number, b: number) => a < to && from < b;
-  const other = groups.find((g) =>
-    !g.id.equals(group.id) && g.teacher.equals(teacher) && g.weekdays.includes(weekday) &&
-    overlaps(g.start, g.start + g.minutes)
+  const other = slots.find((s) =>
+    s.source !== slot.source && s.owner.equals(teacher) && s.weekdays.includes(weekday) &&
+    s.start < slot.end && slot.start < s.end
   );
-  if (other) return `la clase «${other.name}»`;
-  const duty = duties.find((d) =>
-    d.teacher.equals(teacher) && d.weekday === weekday && overlaps(d.start, d.end)
-  );
-  return duty ? `el turno «${duty.label}»` : null;
+  return other?.name ?? null;
 }
 
 async function reassignSession(
   timesheets: TimesheetRepository,
   settlements: SettlementRepository,
-  group: ScheduledGroup,
+  slot: Slot,
   date: LocalDate,
   teacher: TeacherRef,
 ): Promise<void> {
-  const session = (await timesheets.onDate(date)).find((e) =>
-    e.source === `group:${group.id.value}`
-  );
+  const session = (await timesheets.onDate(date)).find((e) => e.source === slot.source);
   if (!session || session.teacher().equals(teacher)) return;
   if ((await settlements.settlement(session.teacher(), session.month())) !== null) return;
   if ((await settlements.settlement(teacher, session.month())) !== null) return;

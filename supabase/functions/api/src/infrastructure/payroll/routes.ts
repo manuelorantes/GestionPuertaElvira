@@ -239,7 +239,8 @@ export function registerPayrollRoutes(api: ApiApp): void {
       p.settlements,
       p.teachers,
     ).execute({
-      groupId: b.requiredString('groupId'),
+      groupId: b.optionalString('groupId'),
+      dutyId: b.optionalString('dutyId'),
       date: b.requiredString('date'),
       teacherId: b.requiredString('teacherId'),
       reason: b.optionalString('reason'),
@@ -270,7 +271,13 @@ export function registerPayrollRoutes(api: ApiApp): void {
 
   api.defineRoute(admin('DELETE', '/api/admin/payroll/substitutions/:id'), async (c, scope) => {
     const p = payroll(api, scope);
-    await new CancelSubstitution(p.schedule, p.substitutions, p.timesheets, p.settlements).execute(
+    await new CancelSubstitution(
+      p.schedule,
+      p.duties,
+      p.substitutions,
+      p.timesheets,
+      p.settlements,
+    ).execute(
       param(c, 'id'),
     );
     return c.body(null, 204);

@@ -193,9 +193,9 @@ export class SubstitutionFixture implements SubstitutionRepository {
     return Promise.resolve([...this.fx.substitutions.values()].filter((s) => s.date.equals(date)));
   }
 
-  find(group: GroupRef, date: LocalDate) {
+  find(source: string, date: LocalDate) {
     const entry = [...this.fx.substitutions.entries()].find(([, s]) =>
-      s.group.equals(group) && s.date.equals(date)
+      s.source === source && s.date.equals(date)
     );
     return Promise.resolve(entry ? { id: entry[0], substitution: entry[1] } : null);
   }

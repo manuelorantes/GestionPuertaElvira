@@ -82,12 +82,25 @@ export class ClubDuty {
 
 /** Sustitución planificada: ese día la clase del grupo la da otro profesor. */
 export class Substitution {
+  /** Clase o turno sustituido: el mismo origen que su sesión automática («group:<id>» o «duty:<id>»). */
+  readonly source: string;
+
   constructor(
-    readonly group: GroupRef,
+    readonly target: GroupRef | DutyRef,
     readonly date: LocalDate,
     readonly teacher: TeacherRef,
     readonly reason: string | null,
-  ) {}
+  ) {
+    this.source = target instanceof DutyRef ? `duty:${target.value}` : `group:${target.value}`;
+  }
+
+  get group(): GroupRef | null {
+    return this.target instanceof GroupRef ? this.target : null;
+  }
+
+  get duty(): DutyRef | null {
+    return this.target instanceof DutyRef ? this.target : null;
+  }
 }
 
 /** Sesión que se apunta sola al acabar una clase o un turno. */
@@ -124,7 +137,7 @@ export class DailyPlanner {
     for (const group of groups) {
       if (!group.weekdays.includes(weekday) || !over(group.start + group.minutes)) continue;
       const substitution = substitutions.find((s) =>
-        s.group.equals(group.id) && s.date.equals(date)
+        s.source === `group:${group.id.value}` && s.date.equals(date)
       );
       sessions.push(
         new PlannedSession(
@@ -140,12 +153,15 @@ export class DailyPlanner {
     }
     for (const duty of duties) {
       if (duty.weekday !== weekday || !over(duty.end)) continue;
+      const substitution = substitutions.find((s) =>
+        s.source === `duty:${duty.id.value}` && s.date.equals(date)
+      );
       sessions.push(
         new PlannedSession(
-          duty.teacher,
+          substitution?.teacher ?? duty.teacher,
           null,
           date,
-          duty.label,
+          substitution ? `${duty.label} (sustitución)` : duty.label,
           duty.start,
           SessionMinutes.fromMinutes(duty.minutes()),
           `duty:${duty.id.value}`,
