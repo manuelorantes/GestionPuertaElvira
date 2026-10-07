@@ -24,6 +24,8 @@ fi
 METHOD="$1"
 ROUTE="$2"
 BODY="${3:-}"
+# La API exige JSON en todo lo que cambia datos, aunque no lleve cuerpo (DELETE, POST sin datos).
+if [ -z "$BODY" ] && [ "$METHOD" != "GET" ] && [ "$METHOD" != "HEAD" ]; then BODY='{}'; fi
 
 if [ ! -r "$ENV_FILE" ]; then
   echo "Falta $ENV_FILE (ASISTENTE_URL, ASISTENTE_EMAIL, ASISTENTE_PASSWORD)." >&2
