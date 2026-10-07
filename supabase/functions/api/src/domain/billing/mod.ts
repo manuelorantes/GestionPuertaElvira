@@ -15,7 +15,8 @@ export class StudentRef extends Uuid {}
 export class TeacherRef extends Uuid {}
 
 export type ChargeKind = 'monthly' | 'membership';
-export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming';
+/** `expected`: cuota prevista de un mes futuro que aún no existe (lo que se espera cobrar con la tarifa de hoy). */
+export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming' | 'expected';
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 

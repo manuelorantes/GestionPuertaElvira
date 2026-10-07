@@ -239,6 +239,30 @@ export class GenerateMonthlyCharges {
     });
   }
 
+  /**
+   * Cuotas previstas de un mes futuro: para cada alumno activo ese mes sin cuota de ese mes, lo que pagaría con lo
+   * que hace hoy. No se guardan (se crean al cobrarlas o al llegar el mes).
+   */
+  async expected(month: string): Promise<{ student: BillingStudent; amount: Money }[]> {
+    const period = YearMonth.fromString(month);
+    const current = YearMonth.of(LocalDate.fromInstant(this.clock.now()));
+    if (Season.teachingSeason(period) === null || !current.isBefore(period)) return [];
+    const settings = await this.settings.get();
+    const calculator = new FeeCalculator();
+    const result: { student: BillingStudent; amount: Money }[] = [];
+    for (const student of await this.directory.activeIn(period)) {
+      const ref = StudentRef.fromString(student.id);
+      if ((await this.charges.chargeFor(ref, 'monthly', period)) !== null) continue;
+      const amount = calculator.quote(
+        feeProfileOf(student, await this.accounts.account(ref), settings),
+        settings,
+        1,
+      ).total;
+      if (amount.cents > 0) result.push({ student, amount });
+    }
+    return result;
+  }
+
   private async generate(period: YearMonth, season: Season): Promise<void> {
     const settings = await this.settings.get();
     const calculator = new FeeCalculator();
@@ -305,7 +329,30 @@ export class ListMonthlyCharges {
     const period = kind === 'membership' ? Season.containing(requested).firstMonth() : requested;
     await this.generate.execute(period.toString());
     const all = await this.query.charges(period, today);
-    const items = kind === 'all' ? all : all.filter((c) => c.kind === kind);
+    const stored = kind === 'all' ? all : all.filter((c) => c.kind === kind);
+    // En los meses futuros, además de lo cobrado por adelantado, lo previsto de quien aún no lo ha pagado.
+    const expected: ChargeView[] = kind === 'membership'
+      ? []
+      : (await this.generate.expected(period.toString())).map(({ student, amount }) => ({
+        id: `prevista-${student.id}-${period.toString()}`,
+        studentId: student.id,
+        studentName: student.name,
+        guardianName: student.guardianName,
+        guardianPhone: student.guardianPhone,
+        kind: 'monthly',
+        period: period.toString(),
+        amountCents: amount.cents,
+        status: 'expected',
+        paymentId: null,
+        receiptNumber: null,
+        remindedOn: null,
+        coveredCents: 0,
+        manual: false,
+        note: null,
+      }));
+    const items = [...stored, ...expected].sort((a, b) =>
+      a.studentName.localeCompare(b.studentName, 'es') || b.kind.localeCompare(a.kind)
+    );
     const sum = (charges: ChargeView[]) => charges.reduce((total, c) => total + c.amountCents, 0);
     return {
       month: period.toString(),

@@ -438,3 +438,35 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name:
+    'billing should show the expected charges of a future month for students who have not paid it yet',
+  ignore: outsideSeason || ['06'].includes(today.slice(5, 7)),
+  async fn() {
+    const fx = await fixture();
+    const next = YearMonth.fromString(today.slice(0, 7)).next().toString();
+    const list = body<{
+      items: { studentId: string; status: string; amountCents: number; period: string }[];
+      totals: { expectedCents: number; collectedCents: number };
+    }>(await fx.client.get(`/api/admin/billing/charges?month=${next}&kind=monthly`));
+    assertEquals(list.items.map((i) => [i.studentId, i.status, i.amountCents, i.period]), [
+      [fx.student, 'expected', 4500, next],
+    ]);
+    assertEquals([list.totals.expectedCents, list.totals.collectedCents], [4500, 0]);
+
+    // Al pagarlo por adelantado deja de ser prevista.
+    await fx.client.get('/api/admin/billing/charges');
+    await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'monthly',
+      months: 2,
+      method: 'cash',
+      date: today,
+    });
+    const paid = body<{ items: { status: string }[] }>(
+      await fx.client.get(`/api/admin/billing/charges?month=${next}&kind=monthly`),
+    );
+    assertEquals(paid.items.map((i) => i.status), ['paid']);
+  },
+});
