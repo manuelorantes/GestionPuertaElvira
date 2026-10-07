@@ -59,7 +59,7 @@ Deno.test('audit should record who did each action with a field by field detail'
   assertEquals(list[0]?.affected, ['Profesor']);
   assertEquals(list[1]?.label, 'Crear profesor');
   assert(list[0]?.userName !== 'Sistema');
-  assert(list.some((a) => a.label === 'Inicio de sesión'));
+  assert(!list.some((a) => a.label === 'Inicio de sesión'));
   assertStringIncludes(String(list[0]?.occurredAt), 'T');
 
   const detail = (await client.get(`/api/admin/audit/actions/${list[0]?.id}`)).body as {
@@ -130,11 +130,14 @@ Deno.test('audit should go back to any point and undo the restore itself', async
   );
 });
 
-Deno.test('audit should record failed logins, list people and filter by them', async () => {
+Deno.test('audit should list only data changes, not session events, and filter by person', async () => {
   const client = await superadmin();
   await new ApiClient().logIn('nadie@club.es', 'incorrecta-123');
+  await newTeacher(client, 'Ana Belén Torres');
   const list = await actions(client);
-  assert(list.some((a) => a.label === 'Intento de acceso fallido'));
+  assert(!list.some((a) => a.label === 'Intento de acceso fallido'));
+  assert(!list.some((a) => a.label === 'Inicio de sesión'));
+  assert(list.every((a) => Number(a.changeCount) > 0));
   const people = ((await client.get('/api/admin/audit/actions')).body as {
     people: { id: string; name: string }[];
   }).people;

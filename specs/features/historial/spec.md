@@ -10,7 +10,9 @@ Todo cambio en los datos del club (desde la web o la consola) MUST quedar regist
 una petición de la web es una acción, firmada por quien la hace y con una etiqueta legible («Registrar cobro», «Editar profesor»…);
 lo que llega desde la consola se firma como «Sistema».
 Cada cambio MUST guardar lo que se tocó (tabla y clave), la operación (alta, cambio o baja) y la fila completa antes y después.
-Los inicios de sesión, cierres de sesión, intentos fallidos y cambios de cuentas MUST registrarse también.
+Los inicios de sesión, cierres de sesión, intentos fallidos, suplantaciones y cambios de cuentas MUST registrarse también,
+pero el historial MUST mostrar solo las acciones que cambiaron datos guardados: los eventos de sesión no se listan
+(sirven para la seguridad y para la última conexión de la sección Usuarios).
 Las consultas (ver pantallas) no se registran.
 
 #### Scenario: Ver quién hizo qué
