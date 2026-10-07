@@ -25,6 +25,7 @@ import {
 } from '../../application/students/mod.ts';
 import { StudentsStudentStatus, today } from '../classes/routes.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
+import { recalculateFees } from '../billing/recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
@@ -201,6 +202,8 @@ export function registerStudentRoutes(api: ApiApp): void {
         body.stringList('siblingIds'),
         body.bool('confirmOverCapacity'),
       );
+      // Su familia directa pasa a tener descuento familiar.
+      await recalculateFees(api, scope, body.stringList('siblingIds'));
       return c.json({ id }, 201);
     },
   );
@@ -234,6 +237,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         param(c, 'id'),
         body.requiredString('siblingId'),
       );
+      await recalculateFees(api, scope, [param(c, 'id'), body.requiredString('siblingId')]);
       return c.body(null, 204);
     },
   );
@@ -245,6 +249,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         param(c, 'id'),
         param(c, 'siblingId'),
       );
+      await recalculateFees(api, scope, [param(c, 'id'), param(c, 'siblingId')]);
       return c.body(null, 204);
     },
   );
@@ -265,6 +270,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         undefined,
         attendanceInput(body),
       );
+      await recalculateFees(api, scope, [param(c, 'id')]);
       return c.body(null, 204);
     },
   );
@@ -283,6 +289,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         attendanceInput(body),
         body.bool('confirmOverCapacity'),
       );
+      await recalculateFees(api, scope, [param(c, 'id')]);
       return c.body(null, 204);
     },
   );
@@ -296,6 +303,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         clock,
       );
       await unenrol.execute(param(c, 'id'), param(c, 'groupId'));
+      await recalculateFees(api, scope, [param(c, 'id')]);
       return c.body(null, 204);
     },
   );
@@ -317,6 +325,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         body.bool('confirmOverCapacity'),
         attendanceInput(body),
       );
+      await recalculateFees(api, scope, [param(c, 'id')]);
       return c.body(null, 204);
     },
   );

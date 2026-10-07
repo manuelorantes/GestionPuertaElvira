@@ -10,14 +10,19 @@ import {
   StudentRef,
 } from '../../src/domain/billing/mod.ts';
 import {
+  AdjustCharge,
   AdjustPoints,
   GenerateMonthlyCharges,
+  GetStudentAccount,
   ImportPayment,
   IssueInvoice,
   MarkReminded,
   type PaymentQuote,
+  pendingCharges,
   QuotePayment,
+  RecalculateCharges,
   RegisterPayment,
+  ResetCharge,
   type SettingsInput,
   UpdateBillingSettings,
   UpdateStudentAccount,
@@ -71,6 +76,18 @@ function register(
 
 const charge = (fx: BillingFixture, id: string, kind: 'monthly' | 'membership', period: string) =>
   fx.chargeFor(StudentRef.fromString(id), kind, YearMonth.fromString(period));
+
+/** Si la cuota de ese mes está cubierta por los cobros del alumno (reparto de la más antigua a la más reciente). */
+async function covered(
+  fx: BillingFixture,
+  id: string,
+  kind: 'monthly' | 'membership',
+  period: string,
+): Promise<boolean> {
+  const left = await pendingCharges(fx, StudentRef.fromString(id), kind);
+  return (await charge(fx, id, kind, period)) !== null &&
+    !left.some((p) => p.charge.period.toString() === period);
+}
 
 Deno.test('GenerateMonthlyCharges should create one charge per active student and month, idempotently', async () => {
   const fx = new BillingFixture();
@@ -141,7 +158,7 @@ Deno.test('RegisterPayment should pay the oldest pending charges first and creat
   assertEquals(payment?.concept, 'Septiembre – noviembre 2026');
   assertEquals(payment?.total.cents, 12150);
   for (const month of ['2026-09', '2026-10', '2026-11']) {
-    assert((await charge(fx, id, 'monthly', month))?.isPaid());
+    assert(await covered(fx, id, 'monthly', month));
   }
   assert(fx.locks.keys.includes(`billing:student:${id}`));
   assertEquals(
@@ -161,12 +178,13 @@ Deno.test('QuotePayment should fill gaps, charge pending months at their stored 
     YearMonth.fromString('2026-12'),
     Money.euros(45),
   );
-  december.payWith(PaymentId.generate());
   await fx.saveCharge(december);
+  await register(fx, id, 1);
+  // Octubre ya está cubierto; diciembre tiene cuota sin cubrir y noviembre y enero aún no existen.
   const paymentId = await register(fx, id, 3);
   assertEquals(
     (await fx.payment(PaymentId.fromString(paymentId)))?.periods.map((p) => p.toString()),
-    ['2026-10', '2026-11', '2027-01'],
+    ['2026-11', '2026-12', '2027-01'],
   );
 
   const other = new BillingFixture();
@@ -196,7 +214,7 @@ Deno.test('RegisterPayment should register the membership fee without discounts'
   const payment = await fx.payment(PaymentId.fromString(await register(fx, id, 1, 'membership')));
   assertEquals(payment?.total.cents, 5000);
   assertEquals(payment?.concept, 'Cuota de socio 2026/27');
-  assert((await charge(fx, id, 'membership', '2026-09'))?.isPaid());
+  assert(await covered(fx, id, 'membership', '2026-09'));
 });
 
 Deno.test('IssueInvoice should issue one invoice per payment with its own numbering', async () => {
@@ -243,7 +261,7 @@ Deno.test('ImportPayment should record the exact amount of the sheet, skip paid 
   assertEquals(payment?.concept, 'Septiembre 2026');
   const september = await charge(fx, id, 'monthly', '2026-09');
   assertEquals(september?.amount.cents, 2000);
-  assert(september?.isPaid());
+  assert(await covered(fx, id, 'monthly', '2026-09'));
 
   await generate(fx, '2026-10');
   assert(
@@ -369,4 +387,86 @@ Deno.test('RegisterPayment should spend the redeemed points and make a member of
   assertFalse((await fx.account(StudentRef.fromString(id)))?.isMember() ?? false);
   await register(fx, id, 1, 'membership');
   assert((await fx.account(StudentRef.fromString(id)))?.isMember());
+});
+
+const account = (fx: BillingFixture, id: string) =>
+  new GetStudentAccount(fx, fx, quotes(fx), fx.clock, fx, fx).execute(id);
+
+Deno.test('RecalculateCharges should reprice from this month until the 10th, keep manual ones and leave the difference pending', async () => {
+  // 2 de octubre: entra octubre. Pagó septiembre, octubre y noviembre a 35 € (1 h).
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 1 });
+  await generate(fx, '2026-09');
+  await generate(fx, '2026-10');
+  await register(fx, id, 3);
+  fx.changeHours(id, 3);
+  await new RecalculateCharges(fx, fx, fx, fx, fx.clock).execute(id);
+
+  const view = await account(fx, id);
+  assertEquals(view.charges.map((c) => [c.period, c.amountCents, c.pendingCents]), [
+    ['2026-09', 3500, 0],
+    ['2026-10', 5500, 0],
+    ['2026-11', 5500, 4000],
+  ]);
+  assertEquals(view.charges.find((c) => c.period === '2026-11')?.status, 'partial');
+
+  // Lo que falta se cobra solo: noviembre por la diferencia.
+  const rest = await quote(fx, id, 1);
+  assertEquals(rest.periods.map((p) => p.toString()), ['2026-11']);
+  assertEquals(rest.quote.total.cents, 4000);
+  await register(fx, id, 1);
+  assertEquals((await account(fx, id)).charges.every((c) => c.pendingCents === 0), true);
+
+  // Del 11 en adelante, el mes actual ya no cambia.
+  const late = new BillingFixture('2026-10-15T10:00:00+02:00');
+  const other = late.student({ regularHours: 1 });
+  await generate(late, '2026-10');
+  await new AdjustCharge(late).execute(other, '2026-11', 2000, 'Media mensualidad', 'one');
+  late.changeHours(other, 2);
+  await new RecalculateCharges(late, late, late, late, late.clock).execute(other);
+  const amounts = (await account(late, other)).charges.map((c) => [c.period, c.amountCents]);
+  assertEquals(
+    amounts,
+    [['2026-10', 3500], ['2026-11', 2000]],
+    'octubre igual y noviembre fijado a mano',
+  );
+});
+
+Deno.test('AdjustCharge should move what was charged between months without touching the payments', async () => {
+  // Septiembre se cobró a 45 € cuando debían ser 22,50 €, y octubre a 22,50 € para compensar.
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-09');
+  await generate(fx, '2026-10');
+  await register(fx, id, 1);
+  await new AdjustCharge(fx).execute(id, '2026-10', 2250, 'Compensa septiembre', 'one');
+  await register(fx, id, 1);
+  assertEquals((await account(fx, id)).charges.map((c) => c.pendingCents), [0, 0]);
+
+  await new AdjustCharge(fx).execute(id, '2026-09', 2250, 'Entró a mitad de mes', 'one');
+  await new AdjustCharge(fx).execute(id, '2026-10', 4500, 'Mes completo', 'one');
+  const view = await account(fx, id);
+  assertEquals(view.charges.map((c) => [c.amountCents, c.pendingCents, c.manual, c.note]), [
+    [2250, 0, true, 'Entró a mitad de mes'],
+    [4500, 0, true, 'Mes completo'],
+  ]);
+  assertEquals(view.balanceCents, 0);
+  assertEquals(fx.payments.size, 2);
+
+  // «Este y los siguientes» crea las cuotas que faltan hasta junio; volver a la calculada quita la marca.
+  await new AdjustCharge(fx).execute(id, '2027-03', 3000, 'Beca', 'rest');
+  const rest = (await account(fx, id)).charges.filter((c) => c.period >= '2027-03');
+  assertEquals(rest.map((c) => [c.period, c.amountCents]), [
+    ['2027-03', 3000],
+    ['2027-04', 3000],
+    ['2027-05', 3000],
+    ['2027-06', 3000],
+  ]);
+  await new ResetCharge(fx, fx, fx, fx, fx.clock).execute(id, '2027-04');
+  const april = (await account(fx, id)).charges.find((c) => c.period === '2027-04');
+  assertEquals([april?.amountCents, april?.manual], [4500, false]);
+  await assertRejects(
+    () => new AdjustCharge(fx).execute(id, '2027-07', 1000, 'Verano', 'one'),
+    InvalidValue,
+  );
 });

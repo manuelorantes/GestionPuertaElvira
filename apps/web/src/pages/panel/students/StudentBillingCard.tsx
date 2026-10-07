@@ -1,11 +1,16 @@
-import { Minus, Plus, Printer, Wallet } from 'lucide-react';
+import { Minus, Pencil, Plus, Printer, Wallet } from 'lucide-react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { adjustPoints, updateAccount, type Account } from '@/features/billing/api';
+import {
+  adjustPoints,
+  updateAccount,
+  type Account,
+  type AccountCharge,
+} from '@/features/billing/api';
 import { useAccount, useBillingMutation, usePayments } from '@/features/billing/hooks';
-import { formatCents } from '@/features/billing/money';
+import { formatCents, monthLabel } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Alert } from '@/shared/ui/Alert';
@@ -14,6 +19,8 @@ import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import { Card } from '@/shared/ui/Card';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+
+import { ChargeDialog } from './ChargeDialog';
 
 function hoursLabel(hours: number): string {
   return `${String(Math.round(hours * 100) / 100).replace('.', ',')} h semanales`;
@@ -164,6 +171,7 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
           </Button>
         </div>
       )}
+      <SeasonCharges studentId={studentId} account={account} />
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-line-soft pt-3 text-sm">
         <span>
           Puntos: <strong>{account.points}</strong>
@@ -193,5 +201,77 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
         </span>
       </div>
     </div>
+  );
+}
+
+function chargeState(charge: AccountCharge): { text: string; tone: string } {
+  if (charge.pendingCents <= 0) return { text: 'Cobrada', tone: 'text-success-fg' };
+  if (charge.coveredCents > 0)
+    return { text: `Faltan ${formatCents(charge.pendingCents)}`, tone: 'text-warning-fg' };
+  if (charge.status === 'upcoming') return { text: 'Próxima', tone: 'text-ink-muted' };
+  if (charge.status === 'overdue') return { text: 'Vencida', tone: 'text-danger-fg' };
+  return { text: 'Pendiente', tone: 'text-warning-fg' };
+}
+
+/** Cuotas de la temporada: importe, si está fijada a mano, lo que falta y la acción de editarla. */
+function SeasonCharges({ studentId, account }: { studentId: string; account: Account }) {
+  const [editing, setEditing] = useState<AccountCharge | null>(null);
+  const toast = useToast();
+  if (account.charges.length === 0 && account.balanceCents <= 0) return null;
+
+  return (
+    <section aria-label="Cuotas de la temporada" className="mt-2 border-t border-line-soft pt-3">
+      <h4 className="mb-1 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+        Cuotas de la temporada
+      </h4>
+      <ul>
+        {account.charges.map((charge) => {
+          const state = chargeState(charge);
+          const month = monthLabel(charge.period);
+          return (
+            <li key={charge.id} className="flex items-center gap-2 py-1 text-sm">
+              <span className="w-28 shrink-0">{month}</span>
+              <span className="flex-1">
+                <span className="font-medium">{formatCents(charge.amountCents)}</span>
+                {charge.manual && (
+                  <span
+                    className="block text-[12px] text-ink-muted"
+                    title={charge.note ?? undefined}
+                  >
+                    Fijada a mano{charge.note ? ` · ${charge.note}` : ''}
+                  </span>
+                )}
+              </span>
+              <span className={`text-[13px] font-medium ${state.tone}`}>{state.text}</span>
+              <button
+                type="button"
+                aria-label={`Editar la cuota de ${month.toLowerCase()}`}
+                title="Editar cuota"
+                onClick={() => setEditing(charge)}
+                className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+              >
+                <Pencil aria-hidden size={14} />
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      {account.balanceCents > 0 && (
+        <p className="mt-1 text-[13px] text-success-fg">
+          Saldo a favor: {formatCents(account.balanceCents)} (cubrirá las siguientes cuotas)
+        </p>
+      )}
+      {editing && (
+        <ChargeDialog
+          studentId={studentId}
+          charge={editing}
+          onClose={() => setEditing(null)}
+          onDone={(message) => {
+            setEditing(null);
+            toast(message);
+          }}
+        />
+      )}
+    </section>
   );
 }

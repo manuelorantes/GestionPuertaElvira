@@ -71,11 +71,37 @@ con el importe de un mes y su descuento familiar, salvo que ya la tenga pagada p
 Los socios MUST tener una cuota de socio por temporada (50 € por defecto, sin descuentos salvo el especial).
 Cualquier alumno que no haya pagado la cuota de socio de la temporada MUST poder pagarla desde «Registrar cobro»
 (concepto «Cuota de socio»); al pagarla pasa a ser socio.
-El importe de una cuota no cambia aunque después cambien las tarifas o los grupos.
+Cobros y cuotas son cosas distintas (ver [cuotas separadas de los cobros](../../decisions/cuotas-separadas-de-los-cobros.md)):
+el estado de cada cuota MUST salir de repartir lo que cubren todos los cobros del alumno entre sus cuotas, de la más
+antigua a la más reciente. Lo que cubre un cobro es su importe en cuotas antes de descuentos. Lo que sobra es saldo a
+favor y cubre las cuotas siguientes.
 
 #### Scenario: Estados según la fecha
 - **WHEN** administración consulta las cuotas del mes
-- **THEN** cada cuota aparece como «Cobrada», «En plazo» (del día 1 al 5 de su mes), «Vencida» (desde el día 6 o de meses anteriores) o «Próxima» (meses futuros)
+- **THEN** cada cuota aparece como «Cobrada», «Pagada en parte» (con lo que falta), «En plazo» (del día 1 al 5 de su mes), «Vencida» (desde el día 6 o de meses anteriores) o «Próxima» (meses futuros)
+
+### Requirement: Recálculo de cuotas
+Cuando cambia lo que determina la cuota de un alumno (sus grupos o su horario especial, su familia directa, su precio
+de particulares o el horario de uno de sus grupos), sus cuotas MUST recalcularse con la tarifa nueva desde el mes
+siguiente o, si es del día 1 al 10, desde el mes actual, hasta junio, estén cobradas o no. Las cuotas fijadas a mano
+no cambian. La diferencia queda como pendiente o como saldo a favor.
+
+#### Scenario: Cambio de tarifa a mitad de un pago trimestral
+- **WHEN** un alumno pagó septiembre, octubre y noviembre a 40 € y el 3 de octubre pasa a 3 horas (55 €)
+- **THEN** sus cuotas son 40, 55 y 55 €, noviembre queda con 30 € pendientes y un cobro de 30 € lo deja todo cobrado
+
+### Requirement: Editar una cuota
+Administración MUST poder fijar a mano el importe de una cuota con un motivo, eligiendo si afecta solo a ese mes o
+a ese y a todos los siguientes de la temporada, y MUST poder devolverla al importe calculado. Los cobros y sus recibos
+no cambian; el reparto se rehace solo.
+
+#### Scenario: Un mes cobrado de más y el siguiente de menos
+- **WHEN** un alumno pagó 50 € por septiembre (debían ser 25 €) y 25 € por octubre, y administración fija septiembre en 25 € y octubre en 50 €
+- **THEN** las dos cuotas quedan cobradas sin tocar los recibos
+
+### Requirement: Cuotas del alumno
+La tarjeta de cobros del alumno MUST mostrar sus cuotas de la temporada (mes, importe, si está fijada a mano y su
+motivo, lo cubierto y lo pendiente) y su saldo a favor, con la acción de editar cada cuota.
 
 #### Scenario: Julio y agosto
 - **WHEN** administración consulta julio o agosto
@@ -86,6 +112,7 @@ Un cobro MUST indicar el alumno, el concepto (1 mes, 3 meses, 6 meses, todo el a
 la forma de pago (efectivo, datáfono o transferencia) y la fecha, y MUST mostrar el desglose antes de guardarlo.
 La lista de cobros MUST mostrar los totales por forma de pago.
 Un cobro de N meses MUST pagar primero las cuotas pendientes más antiguas y después los meses siguientes, sin pasar de junio.
+De una cuota pagada en parte se cobra solo lo que falta.
 
 #### Scenario: Ponerse al día y adelantar
 - **WHEN** un alumno con septiembre y octubre pendientes paga 3 meses

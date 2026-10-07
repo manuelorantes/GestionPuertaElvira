@@ -332,3 +332,75 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name:
+    'billing should recalculate charges when groups change and let administration fix one by hand',
+  // Hacen falta tres meses de clase por delante (de septiembre a abril).
+  ignore: outsideSeason || ['05', '06'].includes(today.slice(5, 7)),
+  async fn() {
+    const fx = await fixture();
+    await fx.client.get('/api/admin/billing/charges');
+    const paid = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'monthly',
+      months: 3,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(paid.status, 201, JSON.stringify(paid.body));
+
+    // Pasa de 2 h (45 €) a 3 h (55 €): las cuotas se recalculan aunque estén cobradas.
+    const friday = await newGroup(fx.client, fx.teacher, {
+      name: 'Viernes',
+      days: ['fri'],
+      start: '18:00',
+      end: '19:00',
+    });
+    const enrolled = await fx.client.json('POST', `/api/admin/students/${fx.student}/enrolments`, {
+      groupId: friday,
+    });
+    assertEquals(enrolled.status, 204, JSON.stringify(enrolled.body));
+
+    type Row = { period: string; amountCents: number; pendingCents: number; manual: boolean };
+    const charges = async () =>
+      body<{ charges: Row[] }>(await fx.client.get(`/api/admin/billing/accounts/${fx.student}`))
+        .charges;
+    const includesThisMonth = Number(today.slice(8, 10)) <= 10;
+    const rows = await charges();
+    assertEquals(rows.length, 3);
+    assertEquals(rows[0]?.amountCents, includesThisMonth ? 5500 : 4500);
+    assertEquals(
+      rows.slice(1).map((r) => [r.amountCents, r.pendingCents]),
+      // Lo que falta (10 € por mes recalculado) queda en el último: el reparto cubre primero los más antiguos.
+      [[5500, 0], [5500, includesThisMonth ? 3000 : 2000]],
+    );
+
+    // Fijar a mano el último mes y volver a la calculada.
+    const last = rows[2]?.period ?? '';
+    const fixed = await fx.client.json(
+      'PUT',
+      `/api/admin/billing/accounts/${fx.student}/charges/${last}`,
+      { amountCents: 3500, reason: 'Precio acordado', scope: 'one' },
+    );
+    assertEquals(fixed.status, 204, JSON.stringify(fixed.body));
+    const afterFix = (await charges()).find((r) => r.period === last);
+    assertEquals([afterFix?.amountCents, afterFix?.manual], [3500, true]);
+    const list = body<{ items: { studentId: string; kind: string; status: string }[] }>(
+      await fx.client.get(`/api/admin/billing/charges?month=${last}`),
+    );
+    assertEquals(
+      list.items.find((i) => i.studentId === fx.student && i.kind === 'monthly')?.status,
+      includesThisMonth ? 'partial' : 'paid',
+    );
+
+    const reset = await fx.client.json(
+      'POST',
+      `/api/admin/billing/accounts/${fx.student}/charges/${last}/reset`,
+      {},
+    );
+    assertEquals(reset.status, 204);
+    const afterReset = (await charges()).find((r) => r.period === last);
+    assertEquals([afterReset?.amountCents, afterReset?.manual], [5500, false]);
+  },
+});

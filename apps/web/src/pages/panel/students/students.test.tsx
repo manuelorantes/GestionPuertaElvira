@@ -97,6 +97,11 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
   });
 }
 
+function postBodyFor(spy: ReturnType<typeof api>, method: string, url: string) {
+  const call = spy.mock.calls.find(([u, init]) => u === url && init?.method === method);
+  return JSON.parse(String(call?.[1]?.body ?? 'null')) as unknown;
+}
+
 function postBody(spy: ReturnType<typeof api>, url: string) {
   const call = spy.mock.calls.find(([u, init]) => u === url && init?.method === 'POST');
   return JSON.parse(String(call?.[1]?.body));
@@ -189,6 +194,8 @@ describe('Alumnos', () => {
       hasPrivateLessons: false,
       membershipPaid: false,
       membershipFeeCents: 5000,
+      charges: [],
+      balanceCents: 0,
     };
     const spy = api({
       'GET /api/admin/billing/accounts/s1': [
@@ -231,6 +238,86 @@ describe('Alumnos', () => {
     await user.click(screen.getByRole('button', { name: 'Sumar un punto' }));
     expect(postBody(spy, '/api/admin/billing/accounts/s1/points')).toEqual({ delta: 1 });
     expect(await screen.findByText('Puntos:')).toHaveTextContent('Puntos: 3');
+  });
+
+  it('lists the season charges and fixes one by hand for this and the following months', async () => {
+    const user = userEvent.setup();
+    const account = {
+      preferredPlan: 'monthly',
+      member: false,
+      privateRate: null,
+      points: 0,
+      suggestedMonths: 1,
+      remainingMonths: 9,
+      weeklyHours: 3,
+      monthlyFeeCents: 5500,
+      familyDiscount: false,
+      hasPrivateLessons: false,
+      membershipPaid: true,
+      membershipFeeCents: 5000,
+      charges: [
+        {
+          id: 'c9',
+          period: '2026-09',
+          amountCents: 4000,
+          coveredCents: 4000,
+          pendingCents: 0,
+          status: 'paid',
+          manual: false,
+          note: null,
+        },
+        {
+          id: 'c10',
+          period: '2026-10',
+          amountCents: 5500,
+          coveredCents: 5500,
+          pendingCents: 0,
+          status: 'paid',
+          manual: false,
+          note: null,
+        },
+        {
+          id: 'c11',
+          period: '2026-11',
+          amountCents: 5500,
+          coveredCents: 2500,
+          pendingCents: 3000,
+          status: 'partial',
+          manual: true,
+          note: 'Cambio de tarifa',
+        },
+      ],
+      balanceCents: 0,
+    };
+    const spy = api({
+      'GET /api/admin/billing/accounts/s1': [200, account],
+      'PUT /api/admin/billing/accounts/s1/charges/2026-11': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
+    expect(within(season).getByText('Faltan 30 €')).toBeInTheDocument();
+    expect(within(season).getByText('Fijada a mano · Cambio de tarifa')).toBeInTheDocument();
+
+    await user.click(
+      within(season).getByRole('button', { name: 'Editar la cuota de noviembre 2026' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Cuota de noviembre 2026' });
+    const amount = within(dialog).getByLabelText('Importe (€)');
+    await user.clear(amount);
+    await user.type(amount, '45');
+    await user.clear(within(dialog).getByLabelText('Motivo'));
+    await user.type(within(dialog).getByLabelText('Motivo'), 'Precio acordado');
+    await user.click(within(dialog).getByRole('button', { name: 'Este y los siguientes' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() =>
+      expect(postBodyFor(spy, 'PUT', '/api/admin/billing/accounts/s1/charges/2026-11')).toEqual({
+        amountCents: 4500,
+        reason: 'Precio acordado',
+        scope: 'rest',
+      }),
+    );
   });
 
   it('should keep «Alumnos» highlighted while a student card is open', async () => {

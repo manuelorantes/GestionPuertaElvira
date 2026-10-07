@@ -24,6 +24,8 @@ export class AuditLabels {
     'POST /api/admin/billing/payments/:id/invoice': 'Emitir factura',
     'PUT /api/admin/billing/accounts/:id': 'Cambiar datos de cobro del alumno',
     'POST /api/admin/billing/accounts/:id/points': 'Cambiar puntos',
+    'PUT /api/admin/billing/accounts/:id/charges/:month': 'Editar cuota',
+    'POST /api/admin/billing/accounts/:id/charges/:month/reset': 'Volver a la cuota calculada',
     'PUT /api/admin/billing/settings': 'Cambiar tarifas y ajustes',
     'GET /api/admin/billing/charges': 'Generar cuotas del mes',
     'GET /api/admin/dashboard': 'Generar cuotas del mes',
