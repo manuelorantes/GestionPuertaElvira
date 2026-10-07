@@ -194,6 +194,7 @@ describe('Alumnos', () => {
       weeklyHours: 2,
       monthlyFeeCents: 4050,
       familyDiscount: true,
+      familyPercent: 0,
       hasPrivateLessons: false,
       membershipPaid: false,
       membershipFeeCents: 5000,
@@ -254,7 +255,8 @@ describe('Alumnos', () => {
       remainingMonths: 9,
       weeklyHours: 3,
       monthlyFeeCents: 5500,
-      familyDiscount: false,
+      familyDiscount: true,
+      familyPercent: 10,
       hasPrivateLessons: false,
       membershipPaid: true,
       membershipFeeCents: 5000,
@@ -302,7 +304,7 @@ describe('Alumnos', () => {
     const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
     expect(within(season).getByText('Faltan 30 €')).toBeInTheDocument();
     expect(within(season).getByText('Fijada a mano · Cambio de tarifa')).toBeInTheDocument();
-    expect(within(season).getByText('−10 % pago adelantado')).toBeInTheDocument();
+    expect(within(season).getByText('−10 % familia · −10 % pago adelantado')).toBeInTheDocument();
 
     await user.click(
       within(season).getByRole('button', { name: 'Editar la cuota de noviembre 2026' }),

@@ -114,6 +114,8 @@ export interface Account {
   weeklyHours: number;
   monthlyFeeCents: number;
   familyDiscount: boolean;
+  /** Porcentaje del descuento familiar de sus cuotas mensuales (0 si no tiene). */
+  familyPercent: number;
   hasPrivateLessons: boolean;
   membershipPaid: boolean;
   membershipFeeCents: number;
