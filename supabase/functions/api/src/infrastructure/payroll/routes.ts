@@ -14,6 +14,7 @@ import {
   RefillDay,
   RemoveHoliday,
   SaveDuty,
+  SubstituteTeacher,
   UpdateSession,
 } from '../../application/payroll/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
@@ -234,6 +235,27 @@ export function registerPayrollRoutes(api: ApiApp): void {
       reason: b.optionalString('reason'),
     });
     return c.json({ id }, 201);
+  });
+
+  api.defineRoute(admin('POST', '/api/admin/payroll/teacher-substitutions'), async (c, scope) => {
+    const p = payroll(api, scope);
+    const b = await JsonBody.from(c.req.raw);
+    const created = await new SubstituteTeacher(
+      p.schedule,
+      p.duties,
+      p.substitutions,
+      p.holidays,
+      p.timesheets,
+      p.settlements,
+      p.teachers,
+    ).execute({
+      teacherId: b.requiredString('teacherId'),
+      substituteId: b.requiredString('substituteId'),
+      from: b.requiredString('from'),
+      to: b.requiredString('to'),
+      reason: b.optionalString('reason'),
+    });
+    return c.json({ created }, 201);
   });
 
   api.defineRoute(admin('DELETE', '/api/admin/payroll/substitutions/:id'), async (c, scope) => {

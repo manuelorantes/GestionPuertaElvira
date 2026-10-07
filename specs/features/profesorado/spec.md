@@ -49,14 +49,20 @@ genera horas. Administración MUST poder añadir festivos (con nombre) y quitarl
 de ese día salvo las de liquidaciones pagadas.
 
 ### Requirement: Sustituciones
-Administración MUST poder planificar una sustitución (día, clase de ese día, quién la da y motivo) y anularla, y verlas
-en un calendario del mes junto con los festivos. Ese día la sesión se apunta a quien sustituye; si ya estaba apuntada,
+Lo habitual es sustituir a un profesor por otro: administración MUST poder elegir quién falta, los días (de uno a 62
+seguidos) y quién le sustituye, y se planifica la sustitución de cada clase suya en esos días salvo festivos. Para casos
+especiales MUST poder planificarse una sola clase (día, clase de ese día y quién la da). Cada sustitución lleva un motivo
+opcional, se puede anular y se ve en un calendario del mes junto con los festivos. Ese día la sesión se apunta a quien sustituye; si ya estaba apuntada,
 pasa a quien sustituye (o vuelve al titular al anularla). Si quien sustituye ya tiene otra clase o un turno a esa hora,
 es un caso especial: MUST indicarse el motivo y no suma horas dobles.
 
+#### Scenario: Sustituir a un profesor
+- **WHEN** una profesora con clase lunes y miércoles falta del miércoles 7 al miércoles 14 y el lunes 12 es festivo
+- **THEN** se planifican las sustituciones del miércoles 7 y del miércoles 14 para quien la sustituye
+
 #### Scenario: Dos clases a la vez
 - **WHEN** se intenta que un profesor sustituya una clase a la misma hora que la suya sin indicar motivo
-- **THEN** se pide el motivo; con motivo, se planifica y sus horas de esa franja cuentan una sola vez
+- **THEN** se pide el motivo (y al sustituir a un profesor no se planifica ninguna de sus clases hasta indicarlo); con motivo, se planifica y sus horas de esa franja cuentan una sola vez
 
 ### Requirement: Encargado del club
 Administración MUST poder definir turnos fijos semanales (por defecto «Encargado del club»: día, franja y profesor),

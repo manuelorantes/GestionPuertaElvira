@@ -129,6 +129,18 @@ export async function planSubstitution(input: {
   return (await apiSend<{ id: string }>('POST', `${BASE}/substitutions`, input)).id;
 }
 
+/** Sustituye a un profesor por otro en todas sus clases de esos días (salvo festivos); devuelve cuántas. */
+export async function substituteTeacher(input: {
+  teacherId: string;
+  substituteId: string;
+  from: string;
+  to: string;
+  reason: string | null;
+}): Promise<number> {
+  return (await apiSend<{ created: number }>('POST', `${BASE}/teacher-substitutions`, input))
+    .created;
+}
+
 export function cancelSubstitution(id: string): Promise<void> {
   return apiSend('DELETE', `${BASE}/substitutions/${id}`, {});
 }
