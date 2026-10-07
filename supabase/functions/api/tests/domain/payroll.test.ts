@@ -5,6 +5,7 @@ import {
   ClubDuty,
   DailyPlanner,
   DutyRef,
+  ExpectedHours,
   GroupRef,
   ScheduledGroup,
   SessionMinutes,
@@ -146,4 +147,31 @@ Deno.test('SettlementCalculator should count once a stretch covered by several o
     Money.cents(1000),
   );
   assertEquals(settlement.minutes, 180);
+});
+
+Deno.test('ExpectedHours should count every class and duty of the month except holidays, overlaps once', () => {
+  const ana = TeacherRef.generate();
+  const angel = TeacherRef.generate();
+  const groups = [
+    new ScheduledGroup(GroupRef.generate(), 'Iniciación A', ana, [1, 3], 60, 17 * 60),
+    new ScheduledGroup(GroupRef.generate(), 'Competición', angel, [5], 90, 18 * 60),
+  ];
+  const duty = new ClubDuty(DutyRef.generate(), angel, 5, 17 * 60, 20 * 60, 'Encargado del club');
+  // Octubre de 2026: 4 lunes y 4 miércoles, uno de ellos (lunes 12) festivo; 5 viernes.
+  const minutes = new ExpectedHours().ofMonth(
+    YearMonth.fromString('2026-10'),
+    groups,
+    [duty],
+    new Set(['2026-10-12']),
+  );
+  assertEquals(minutes.get(ana.value), 7 * 60, 'lunes 5, 19, 26 y miércoles 7, 14, 21, 28');
+  assertEquals(
+    minutes.get(angel.value),
+    5 * 180,
+    'encargado de 17 a 20 con clase de 18 a 19:30: 3 h cada viernes',
+  );
+  assertEquals(
+    new ExpectedHours().ofMonth(YearMonth.fromString('2026-08'), groups, [duty], new Set()).size,
+    0,
+  );
 });

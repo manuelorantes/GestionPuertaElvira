@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { currentMonth, formatCents, monthLabel } from '@/features/billing/money';
+import { formatCents, monthLabel } from '@/features/billing/money';
 import type { ProfitabilityRow } from '@/features/payroll/api';
 import { useProfitability } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
@@ -41,7 +41,7 @@ export function ProfitabilityTab({ month }: { month: string }) {
     .sort((a, b) => b.marginCents - a.marginCents)[0];
   const maxMargin = Math.max(1, ...rows.map((r) => r.marginCents));
   const totals = [
-    { label: 'Horas impartidas', value: hoursLabel(rows.reduce((sum, r) => sum + r.minutes, 0)) },
+    { label: 'Horas esperadas', value: hoursLabel(rows.reduce((sum, r) => sum + r.minutes, 0)) },
     {
       label: 'Coste de profesores',
       value: formatCents(rows.reduce((sum, r) => sum + r.costCents, 0)),
@@ -62,12 +62,6 @@ export function ProfitabilityTab({ month }: { month: string }) {
           </Card>
         ))}
       </div>
-      {month === currentMonth() && (
-        <p className="rounded-sm bg-surface-muted p-3 text-[13px] text-ink-soft">
-          Mes en curso: el coste incluye las sesiones previstas hasta fin de mes y los ingresos solo
-          las cuotas ya cobradas.
-        </p>
-      )}
       <Card className="overflow-x-auto">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-5 py-4">
           <h2 className="font-display text-xl font-semibold tracking-[0.04em] uppercase">
@@ -168,14 +162,18 @@ export function ProfitabilityTab({ month }: { month: string }) {
                 <td className="px-5 py-3.5">
                   {row.incomePerHourCents === null ? '—' : formatCents(row.incomePerHourCents)}
                 </td>
-                <td className="px-5 py-3.5">{occupancy(row)} %</td>
+                <td className="px-5 py-3.5" title={`${row.occupied} de ${row.capacity} plazas`}>
+                  {occupancy(row)} %
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
         <p className="px-5 py-3 text-[13px] text-ink-muted">
-          Ingresos = cuotas cobradas de los alumnos de sus grupos, repartidas según sus horas.
-          Margen = ingresos − coste de sus horas.
+          Coste = horas esperadas del mes según el horario (sin festivos ni sustituciones) × tarifa.
+          Ingresos = cuotas mensuales de sus alumnos ya con descuentos (sin cuotas de socio); si un
+          alumno va con varios profesores, se reparte según las horas con cada uno. Ocupación =
+          plazas ocupadas de todas sus clases, contando cada día. Margen = ingresos − coste.
         </p>
       </Card>
     </div>

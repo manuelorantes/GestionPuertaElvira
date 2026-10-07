@@ -14,6 +14,7 @@ import {
   PayAllSettlements,
   PaySettlement,
   PlanSubstitution,
+  Profitability,
   ProposeSessions,
   RecordSession,
   RefillDay,
@@ -325,4 +326,44 @@ Deno.test('SubstituteTeacher should give all the classes of a teacher on those d
     SubstitutionNeedsReason,
   );
   assertEquals(fx.substitutions.size, 2);
+});
+
+Deno.test('Profitability should compare the expected hours of the month with the monthly fees of their students', async () => {
+  const { fx, lucia, carlos, duties } = setUp();
+  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
+  // Lucía: lunes y miércoles 1 h (7 clases con el festivo) a 16 €/h; Carlos: martes 1,5 h (4 clases) a 18 €/h.
+  const load = {
+    classLoad: () =>
+      Promise.resolve({
+        teachers: new Map([
+          [lucia, { groups: ['Iniciación A'], occupied: 15, capacity: 20 }],
+          [carlos, { groups: ['Adultos I'], occupied: 4, capacity: 10 }],
+        ]),
+        // Ana va 2 h con Lucía y 1,5 h con Carlos; Pablo solo con Lucía.
+        students: new Map([
+          ['ana', new Map([[lucia, 120], [carlos, 90]])],
+          ['pablo', new Map([[lucia, 120]])],
+        ]),
+      }),
+  };
+  const fees = {
+    monthlyFees: () => Promise.resolve(new Map([['ana', 7000], ['pablo', 4950], ['socio', 5000]])),
+  };
+  const rows = await new Profitability(
+    fx,
+    duties,
+    fx,
+    fx,
+    new ListSettlements(fx, fx, fx),
+    load,
+    fees,
+  )
+    .execute('2026-10');
+  assertEquals(
+    rows.map((r) => [r.teacherName, r.minutes, r.costCents, r.incomeCents, r.occupied, r.capacity]),
+    [
+      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20],
+      ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10],
+    ],
+  );
 });
