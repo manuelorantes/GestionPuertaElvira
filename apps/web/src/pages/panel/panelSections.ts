@@ -5,6 +5,7 @@ import {
   GraduationCap,
   History,
   LayoutDashboard,
+  UserCog,
   Users,
   Wallet,
   type LucideIcon,
@@ -39,6 +40,13 @@ export const PANEL_SECTIONS: PanelSection[] = [
     label: 'Historial',
     icon: History,
     path: '/panel/historial',
+    roles: ['superadministrator'],
+  },
+  {
+    id: 'usuarios',
+    label: 'Usuarios',
+    icon: UserCog,
+    path: '/panel/usuarios',
     roles: ['superadministrator'],
   },
 ];

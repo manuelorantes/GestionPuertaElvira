@@ -13,8 +13,11 @@ import {
   type LoginAttemptLimiter,
   type SessionRepository,
   TooManyLoginAttempts,
+  type UserDirectory,
+  type UserListItem,
   type UserRepository,
 } from '../../application/identity/mod.ts';
+import { AuditLabels } from '../audit/mod.ts';
 import { Row, type Sql } from './sql.ts';
 
 function toUser(row: Row): User {
@@ -180,3 +183,36 @@ async function emailKey(email: EmailAddress): Promise<string> {
 function ipKey(clientIp: string): string {
   return `ip:${clientIp}`.slice(0, 80);
 }
+
+/** Cuentas para la sección Usuarios, con su última conexión (último inicio de sesión o actividad de sesión). */
+export class SqlUserDirectory implements UserDirectory {
+  constructor(private readonly sql: Sql) {}
+
+  async list(): Promise<UserListItem[]> {
+    const rows = await this.sql`
+      SELECT u.id, u.email, u.full_name, u.role, u.status, u.must_change_password, u.created_at,
+             GREATEST(
+               (SELECT max(s.last_activity_at) FROM identity_session s WHERE s.user_id = u.id),
+               (SELECT max(a.occurred_at) FROM audit_action a
+                 WHERE a.kind = 'security' AND a.user_id = u.id AND a.label = ${LOGIN_LABEL})
+             ) AS last_seen_at
+        FROM identity_user u ORDER BY u.full_name, u.email`;
+    return Row.all(rows).map((r) => ({
+      id: r.string('id'),
+      email: r.string('email'),
+      fullName: r.string('full_name'),
+      role: roleFromName(r.string('role')),
+      status: r.string('status') === 'disabled' ? 'disabled' : 'active',
+      mustChangePassword: r.bool('must_change_password'),
+      createdAt: r.date('created_at').toISOString(),
+      lastSeenAt: r.json('last_seen_at') === null ? null : r.date('last_seen_at').toISOString(),
+    }));
+  }
+
+  async emailOf(id: string): Promise<string | null> {
+    const rows = await this.sql`SELECT email FROM identity_user WHERE id::text = ${id}`;
+    return rows[0] ? new Row(rows[0]).string('email') : null;
+  }
+}
+
+const LOGIN_LABEL = AuditLabels.security('login', 'success');
