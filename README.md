@@ -76,7 +76,7 @@ URLs locales:
 
 - Web: <http://localhost:8080>
 - API: <http://localhost:8080/api/health>
-- PostgreSQL: `localhost:5432` (usuario `club`, contraseña `club`; solo desarrollo)
+- PostgreSQL: `localhost:5480` (cambia el puerto con `DB_PORT`) (usuario `club`, contraseña `club`; solo desarrollo)
 
 Los puertos se cambian con `APP_PORT` y `DB_PORT`.
 
