@@ -21,7 +21,7 @@ const PRICES: { key: PriceKey; label: string; help: string }[] = [
 ];
 
 const PERCENTS: { key: PercentKey; label: string }[] = [
-  { key: 'familyPercent', label: 'Familiar (hermanos en el club)' },
+  { key: 'familyPercent', label: 'Familiar (familia directa en el club)' },
   { key: 'threeMonthsPercent', label: 'Pago adelantado de 3 meses' },
   { key: 'sixMonthsPercent', label: 'Pago adelantado de 6 meses' },
   { key: 'seasonPercent', label: 'Todo el año (septiembre a junio)' },
@@ -131,9 +131,9 @@ function SettingsForm({ initial }: { initial: BillingSettings }) {
             />
           ))}
           <p className="mt-3 rounded-sm bg-surface-muted p-3 text-[13px] text-ink-muted">
-            Los descuentos se suman sobre la cuota base. Ejemplo: hermanos (10 %) que pagan 3 meses
-            (10 %) tienen un 20 % de descuento. Los puntos se canjean con un descuento especial al
-            cobrar.
+            Los descuentos se suman sobre la cuota base. Ejemplo: familia directa (10 %) que pagan 3
+            meses (10 %) tienen un 20 % de descuento. Los puntos se canjean con un descuento
+            especial al cobrar.
           </p>
         </Card>
         <Card className="p-6">

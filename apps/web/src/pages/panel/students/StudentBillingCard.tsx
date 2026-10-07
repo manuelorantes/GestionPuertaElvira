@@ -132,7 +132,9 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
       <Row label="Cuota mensual">
         {account.monthlyFeeCents > 0 ? formatCents(account.monthlyFeeCents) : '—'}
       </Row>
-      <Row label="Descuento familiar">{account.familyDiscount ? 'Sí, por hermanos' : 'No'}</Row>
+      <Row label="Descuento familiar">
+        {account.familyDiscount ? 'Sí, por familia directa' : 'No'}
+      </Row>
       <Row label="Cuota de socio">
         {account.membershipPaid
           ? 'Pagada'

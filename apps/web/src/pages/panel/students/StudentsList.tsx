@@ -57,7 +57,7 @@ export function StudentsList({
               <Badge tone={student.status === 'active' ? 'success' : 'neutral'}>
                 {student.status === 'active' ? 'Activo' : 'De baja'}
               </Badge>
-              {student.hasSiblings && <Badge>Hermanos</Badge>}
+              {student.hasSiblings && <Badge>Familia directa</Badge>}
             </span>
           </button>
         </li>
