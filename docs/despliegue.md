@@ -100,18 +100,36 @@ cada tres días. Si el proyecto llegara a pausarse, se reactiva desde el panel d
 
 ## Copias de seguridad
 
-El workflow [Copia de seguridad](../.github/workflows/copia-seguridad.yml) hace un `pg_dump` el día 1 de
-cada mes (también a mano con *Run workflow*), lo cifra con la contraseña del secreto `BACKUP_PASSPHRASE`
-(el repositorio es público) y lo guarda como artefacto del run durante 90 días: siempre hay tres copias
-recientes fuera de Supabase. Se descargan desde *Actions → Copia de seguridad → el run → Artifacts*.
+El workflow [Copia de seguridad](../.github/workflows/copia-seguridad.yml) se ejecuta cada día a las 04:23 UTC
+(también a mano con *Run workflow*). Hace un `pg_dump` de la base de datos, descarga los documentos del bucket
+privado `documentos` (adjuntos de facturas), lo empaqueta todo en un tar y lo cifra con la contraseña del
+secreto `BACKUP_PASSPHRASE` (el repositorio es público). Se guarda como artefacto del run: 35 días las copias
+diarias y 90 días (el máximo en un repositorio público) la del día 1 de cada mes. Se descargan desde
+*Actions → Copia de seguridad → el run → Artifacts*.
+
+El tar contiene `copia.dump` y la carpeta `documentos/` con las mismas claves que en el bucket
+(`invoices/<uuid>/<uuid>.pdf`). Si el bucket tiene documentos y alguno no se descarga, el run falla.
 
 Para restaurar en un proyecto nuevo o en el mismo (borra lo que haya):
 
 ```sh
-gpg -d copia-2026-11-01.dump.gpg > copia.dump          # pide la contraseña del secreto
+gpg -d copia-2026-11-01.tar.gpg | tar -x                # pide la contraseña del secreto; deja copia.dump y documentos/
 docker compose run --rm --no-deps -v "$PWD:/copia" postgres \
   pg_restore -d 'postgresql://...session pooler...' --no-owner --no-privileges --clean --if-exists /copia/copia.dump
 ```
+
+Y para volver a subir los documentos (con la clave `service_role` de *Project Settings → API Keys*):
+
+```sh
+cd documentos
+find . -type f | sed 's#^\./##' | while read -r f; do
+  curl -fsS -o /dev/null -X POST "https://<ref>.supabase.co/storage/v1/object/documentos/$f" \
+    -H "Authorization: Bearer $SERVICE_ROLE_KEY" -H "x-upsert: true" -H "Content-Type: application/pdf" --data-binary "@$f"
+done
+```
+
+Las copias anteriores a octubre de 2026 son solo la base de datos (`copia-AAAA-MM-DD.dump.gpg`): se
+descifran con `gpg -d … > copia.dump`, sin `tar`.
 
 Conviene probar la restauración una vez al año contra la base local (`make db-reset` después).
 
@@ -126,6 +144,6 @@ Las migraciones no dependen del token, así que la base de datos queda al día a
 ## Qué vigilar
 
 - **Supabase → Edge Functions → Logs** para errores de la API (los logs son JSON con `requestId`).
-- **Copias de seguridad**: el plan gratuito de Supabase no las hace; las hace el workflow de abajo.
+- **Copias de seguridad**: el plan gratuito de Supabase no las hace; las hace el workflow de arriba, cada día.
 - **Límites gratuitos** (500 MB de base de datos, 1 GB de Storage, 500 000 invocaciones de funciones al mes):
   muy por encima del uso del club.
