@@ -16,6 +16,7 @@ import { TeachersPayPage } from '@/pages/panel/payroll/TeachersPayPage';
 import { PanelLayout } from '@/pages/panel/PanelLayout';
 import { StudentPanel } from '@/pages/panel/students/StudentPanel';
 import { StudentsPage } from '@/pages/panel/students/StudentsPage';
+import { TeacherStudentsPage } from '@/pages/panel/teacher/TeacherStudentsPage';
 import { PendingDataPage } from '@/pages/panel/students/PendingDataPage';
 
 export function AppRoutes() {
@@ -26,6 +27,7 @@ export function AppRoutes() {
         <Route path="cambiar-contrasena" element={<ChangePasswordPage />} />
         <Route element={<PanelLayout />}>
           <Route index element={<PanelHomePage />} />
+          <Route path="mis-alumnos" element={<TeacherStudentsPage />} />
           <Route element={<RequireStaff />}>
             <Route path="clases" element={<ClassesPage />} />
             <Route path="cobros" element={<BillingPage />} />
