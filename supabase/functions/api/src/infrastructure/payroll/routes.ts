@@ -11,7 +11,6 @@ import {
   PaySettlement,
   PlanSubstitution,
   Profitability,
-  ProposeSessions,
   RecordAdvance,
   RecordSession,
   RefillDay,
@@ -79,18 +78,6 @@ function payroll(api: ApiApp, scope: RequestScope) {
     today,
     query: new SqlPayrollQuery(tx, today),
     planning: new SqlPlanningQuery(tx),
-    propose: new ProposeSessions(
-      schedule,
-      duties,
-      substitutions,
-      holidays,
-      timesheets,
-      settlements,
-      settlements,
-      clock,
-      transactions,
-      locks,
-    ),
     list,
     pay,
     payAll: new PayAllSettlements(pay, list, transactions),
@@ -145,7 +132,6 @@ export function registerPayrollRoutes(api: ApiApp): void {
   api.defineRoute(admin('GET', '/api/admin/payroll/sessions'), async (c, scope) => {
     const p = payroll(api, scope);
     const period = month(c, p);
-    await p.propose.execute();
     const teacher = c.req.query('teacherId');
     return c.json({
       month: period.toString(),
@@ -334,7 +320,6 @@ export function registerPayrollRoutes(api: ApiApp): void {
   api.defineRoute(admin('GET', '/api/admin/payroll/settlements'), async (c, scope) => {
     const p = payroll(api, scope);
     const period = month(c, p);
-    await p.propose.execute();
     return c.json({ month: period.toString(), items: await p.list.execute(period.toString()) });
   });
 
@@ -401,7 +386,6 @@ export function registerPayrollRoutes(api: ApiApp): void {
   // ---- Ficha del profesor ----------------------------------------------------------------------
   api.defineRoute(admin('GET', '/api/admin/payroll/teachers/:id/report'), async (c, scope) => {
     const p = payroll(api, scope);
-    await p.propose.execute();
     const season = c.req.query('season');
     if (season !== undefined && !/^\d{4}$/.test(season)) {
       throw new InvalidValue('season', 'Indica la temporada con el año en que empieza.');
@@ -429,7 +413,6 @@ export function registerPayrollRoutes(api: ApiApp): void {
   api.defineRoute(admin('GET', '/api/admin/payroll/profitability'), async (c, scope) => {
     const p = payroll(api, scope);
     const period = month(c, p);
-    await p.propose.execute();
     return c.json({
       month: period.toString(),
       items: await p.profitability.execute(period.toString()),
