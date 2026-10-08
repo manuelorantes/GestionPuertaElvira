@@ -1,5 +1,11 @@
 import { RollCall } from '../../domain/attendance/mod.ts';
-import { type Clock, LocalDate, minutesOfDayInMadrid } from '../../domain/common/mod.ts';
+import {
+  type Clock,
+  LocalDate,
+  minutesOfDayInMadrid,
+  Season,
+  YearMonth,
+} from '../../domain/common/mod.ts';
 
 /** Clase (o turno) que da un profesor un día, según el horario y las sustituciones. */
 export interface ClassOnDay {
@@ -259,5 +265,40 @@ export class ConfirmWithoutRollCall {
     if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
     if ((await this.rollCalls.find(groupId, day)) !== null) return;
     await this.rollCalls.save(RollCall.confirm(groupId, day, userId, now));
+  }
+}
+
+/** Asistencia de un alumno en un periodo: clases con lista pasada en las que estaba y las que faltó. */
+export interface StudentAttendanceSummary {
+  classes: number;
+  absences: { date: string; label: string }[];
+}
+
+export interface StudentAttendanceQuery {
+  summary(studentId: string, from: LocalDate, to: LocalDate): Promise<StudentAttendanceSummary>;
+}
+
+export interface StudentAttendanceView extends StudentAttendanceSummary {
+  /** Año en que empieza la temporada. */
+  season: number;
+  attended: number;
+}
+
+/** La asistencia de un alumno en la temporada en curso (para la ficha del alumno). */
+export class StudentAttendance {
+  constructor(
+    private readonly query: StudentAttendanceQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string): Promise<StudentAttendanceView> {
+    const today = LocalDate.fromInstant(this.clock.now());
+    const season = Season.containing(YearMonth.of(today));
+    const summary = await this.query.summary(studentId, season.firstMonth().firstDay(), today);
+    return {
+      season: season.firstMonth().year,
+      ...summary,
+      attended: summary.classes - summary.absences.length,
+    };
   }
 }
