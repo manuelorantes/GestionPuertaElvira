@@ -1,5 +1,6 @@
 import { LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
 import {
+  Advance,
   ClubDuty,
   DutyRef,
   GroupRef,
@@ -14,6 +15,7 @@ import {
   TimesheetEntryId,
 } from '../../domain/payroll/mod.ts';
 import type {
+  AdvanceRepository,
   ClassLoad,
   ClassLoadQuery,
   DutyRepository,
@@ -25,9 +27,14 @@ import type {
   SessionView,
   SettlementRepository,
   SubstitutionRepository,
+  TeacherDutyView,
+  TeacherGroupView,
   TeacherRate,
   TeacherRates,
+  TeacherReportQuery,
   TeacherSeats,
+  TeacherStudentView,
+  TeacherSubstitutionView,
   TimesheetRepository,
 } from '../../application/payroll/mod.ts';
 import { Row, type Sql } from './sql.ts';
@@ -135,6 +142,11 @@ export class SqlSettlementRepository implements SettlementRepository, ProposalLo
               ${s.paidOn.toString()})`;
   }
 
+  async changePaidOn(teacher: TeacherRef, month: YearMonth, date: LocalDate): Promise<void> {
+    await this.sql`UPDATE payroll_settlement SET paid_on = ${date.toString()}
+      WHERE teacher_id = ${teacher.value} AND month = ${month.toString()}`;
+  }
+
   async wasProposed(date: LocalDate): Promise<boolean> {
     return (await this
       .sql`SELECT 1 FROM payroll_proposed_day WHERE proposed_date = ${date.toString()}`)
@@ -144,6 +156,152 @@ export class SqlSettlementRepository implements SettlementRepository, ProposalLo
   async markProposed(date: LocalDate): Promise<void> {
     await this
       .sql`INSERT INTO payroll_proposed_day (proposed_date) VALUES (${date.toString()}) ON CONFLICT DO NOTHING`;
+  }
+}
+
+function toAdvance(row: Row): Advance {
+  return new Advance(
+    row.string('id'),
+    TeacherRef.fromString(row.string('teacher_id')),
+    YearMonth.fromString(row.string('month')),
+    Money.cents(row.int('amount_cents')),
+    LocalDate.fromString(row.string('paid_on')),
+    row.nullableString('note'),
+  );
+}
+
+/** Anticipos a profesores (tabla `payroll_advance`). */
+export class SqlAdvanceRepository implements AdvanceRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async forTeacherAdvances(teacher: TeacherRef): Promise<Advance[]> {
+    return Row.all(
+      await this.sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note
+        FROM payroll_advance WHERE teacher_id = ${teacher.value} ORDER BY paid_on DESC`,
+    ).map(toAdvance);
+  }
+
+  async advancesOf(month: YearMonth): Promise<Advance[]> {
+    return Row.all(
+      await this.sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note
+        FROM payroll_advance WHERE month = ${month.toString()}`,
+    ).map(toAdvance);
+  }
+
+  async advance(id: string): Promise<Advance | null> {
+    const rows = await this
+      .sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note
+      FROM payroll_advance WHERE id::text = ${id}`;
+    return rows[0] ? toAdvance(new Row(rows[0])) : null;
+  }
+
+  async saveAdvance(a: Advance): Promise<void> {
+    await this.sql`INSERT INTO payroll_advance ${
+      this.sql({
+        id: a.id,
+        teacher_id: a.teacher.value,
+        month: a.month.toString(),
+        amount_cents: a.amount.cents,
+        paid_on: a.paidOn.toString(),
+        note: a.note,
+      })
+    }`;
+  }
+
+  async deleteAdvance(id: string): Promise<void> {
+    await this.sql`DELETE FROM payroll_advance WHERE id::text = ${id}`;
+  }
+}
+
+const WEEKDAY_CODES = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+/** Ficha del profesor: sus clases, alumnos, sustituciones y turnos. */
+export class SqlTeacherReportQuery implements TeacherReportQuery {
+  constructor(private readonly sql: Sql) {}
+
+  async groups(teacherId: string, on: LocalDate): Promise<TeacherGroupView[]> {
+    const day = on.toString();
+    const rows = await this.sql`
+      SELECT g.id, g.name, g.days, g.start_minutes, g.end_minutes, g.classroom, g.capacity,
+             (SELECT COUNT(*) FROM classes_enrolment e WHERE e.class_group_id = g.id
+                AND e.enrolled_on <= ${day} AND (e.ends_on IS NULL OR e.ends_on > ${day})) AS students,
+             (SELECT COALESCE(jsonb_object_agg(d.day, (
+                SELECT COUNT(*) FROM classes_enrolment e WHERE e.class_group_id = g.id
+                   AND e.enrolled_on <= ${day} AND (e.ends_on IS NULL OR e.ends_on > ${day})
+                   AND (e.attendance_days IS NULL OR e.attendance_days::jsonb @> jsonb_build_array(d.day::int)))), '{}'::jsonb)
+                FROM jsonb_array_elements_text(g.days::jsonb) AS d(day)) AS by_day
+        FROM classes_group g WHERE g.teacher_id = ${teacherId} ORDER BY g.start_minutes, g.name`;
+    return Row.all(rows).map((r) => ({
+      id: r.string('id'),
+      name: r.string('name'),
+      days: r.intList('days').map((d) => WEEKDAY_CODES[d - 1] ?? String(d)),
+      start: hhmm(r.int('start_minutes')),
+      end: hhmm(r.int('end_minutes')),
+      classroom: r.string('classroom'),
+      capacity: r.int('capacity'),
+      occupancyByDay: Object.fromEntries(
+        Object.entries(r.json('by_day') as Record<string, unknown>).map((
+          [k, v],
+        ) => [WEEKDAY_CODES[Number(k) - 1] ?? k, Number(v)]),
+      ),
+      students: r.int('students'),
+    }));
+  }
+
+  async students(teacherId: string, on: LocalDate): Promise<TeacherStudentView[]> {
+    const day = on.toString();
+    const rows = await this.sql`
+      SELECT s.id, s.full_name, array_agg(g.name ORDER BY g.name) AS groups,
+             SUM((COALESCE(e.attendance_end_minutes, g.end_minutes) - COALESCE(e.attendance_start_minutes, g.start_minutes))
+                 * COALESCE(jsonb_array_length(e.attendance_days::jsonb), jsonb_array_length(g.days::jsonb))) AS minutes
+        FROM classes_enrolment e
+        JOIN classes_group g ON g.id = e.class_group_id
+        JOIN students_student s ON s.id = e.student_id
+       WHERE g.teacher_id = ${teacherId} AND e.enrolled_on <= ${day} AND (e.ends_on IS NULL OR e.ends_on > ${day})
+       GROUP BY s.id, s.full_name, s.search_name ORDER BY s.search_name`;
+    return Row.all(rows).map((r) => ({
+      id: r.string('id'),
+      name: r.string('full_name'),
+      groups: r.stringList('groups'),
+      weeklyMinutes: r.int('minutes'),
+    }));
+  }
+
+  async substitutions(
+    teacherId: string,
+    from: LocalDate,
+    to: LocalDate,
+  ): Promise<TeacherSubstitutionView[]> {
+    const rows = await this.sql`
+      SELECT s.substitution_date::text AS date, COALESCE(g.name, d.label) AS label, s.reason,
+             CASE WHEN s.teacher_id = ${teacherId} THEN 'gave' ELSE 'received' END AS role,
+             CASE WHEN s.teacher_id = ${teacherId} THEN o.full_name ELSE t.full_name END AS other_name
+        FROM payroll_substitution s
+        LEFT JOIN classes_group g ON g.id = s.group_id
+        LEFT JOIN payroll_duty d ON d.id = s.duty_id
+        JOIN teachers_teacher o ON o.id = COALESCE(g.teacher_id, d.teacher_id)
+        JOIN teachers_teacher t ON t.id = s.teacher_id
+       WHERE (s.teacher_id = ${teacherId} OR COALESCE(g.teacher_id, d.teacher_id) = ${teacherId})
+         AND s.substitution_date BETWEEN ${from.toString()} AND ${to.toString()}
+       ORDER BY s.substitution_date DESC`;
+    return Row.all(rows).map((r) => ({
+      date: r.string('date'),
+      label: r.string('label'),
+      role: r.string('role') === 'gave' ? 'gave' as const : 'received' as const,
+      otherName: r.string('other_name'),
+      reason: r.nullableString('reason'),
+    }));
+  }
+
+  async duties(teacherId: string): Promise<TeacherDutyView[]> {
+    const rows = await this.sql`SELECT * FROM payroll_duty WHERE teacher_id = ${teacherId}
+      ORDER BY weekday, start_minutes`;
+    return Row.all(rows).map((r) => ({
+      weekday: r.int('weekday'),
+      start: hhmm(r.int('start_minutes')),
+      end: hhmm(r.int('end_minutes')),
+      label: r.string('label'),
+    }));
   }
 }
 
@@ -224,7 +382,7 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
              g.capacity * jsonb_array_length(g.days::jsonb) AS capacity,
              (SELECT COUNT(*) FROM classes_enrolment e, jsonb_array_elements_text(g.days::jsonb) AS d(day)
                WHERE e.class_group_id = g.id AND e.enrolled_on <= ${on} AND (e.ends_on IS NULL OR e.ends_on > ${on})
-                 AND (e.attendance_days IS NULL OR e.attendance_days::jsonb ? d.day)) AS occupied
+                 AND (e.attendance_days IS NULL OR e.attendance_days::jsonb @> jsonb_build_array(d.day::int))) AS occupied
         FROM classes_group g ORDER BY g.name`;
     const teachers = new Map<string, TeacherSeats>();
     for (const row of Row.all(seats)) {

@@ -2,6 +2,8 @@ import { InvalidValue, LocalDate, Season, YearMonth } from '../../domain/common/
 import {
   AddHoliday,
   CancelSubstitution,
+  ChangeSettlementPaymentDate,
+  DeleteAdvance,
   DeleteDuty,
   DeleteSession,
   ListSettlements,
@@ -10,11 +12,13 @@ import {
   PlanSubstitution,
   Profitability,
   ProposeSessions,
+  RecordAdvance,
   RecordSession,
   RefillDay,
   RemoveHoliday,
   SaveDuty,
   SubstituteTeacher,
+  TeacherReport,
   UpdateSession,
 } from '../../application/payroll/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
@@ -23,6 +27,7 @@ import { JsonBody } from '../http/json-body.ts';
 import { billing } from '../billing/routes.ts';
 import { SqlBillingSettingsRepository, SqlClosedPeriods } from '../persistence/billing.ts';
 import {
+  SqlAdvanceRepository,
   SqlDutyRepository,
   SqlHolidayCalendar,
   SqlMonthlyFees,
@@ -32,6 +37,7 @@ import {
   SqlSettlementRepository,
   SqlSubstitutionRepository,
   SqlTeacherRates,
+  SqlTeacherReportQuery,
   SqlTimesheetRepository,
 } from '../persistence/payroll.ts';
 import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
@@ -50,7 +56,8 @@ function payroll(api: ApiApp, scope: RequestScope) {
   const transactions = new SavepointTransactionRunner(tx);
   const locks = new PostgresAdvisoryLocks(tx);
   const today = () => LocalDate.fromInstant(clock.now());
-  const list = new ListSettlements(timesheets, settlements, teachers);
+  const advances = new SqlAdvanceRepository(tx);
+  const list = new ListSettlements(timesheets, settlements, teachers, advances);
   const pay = new PaySettlement(
     timesheets,
     settlements,
@@ -60,6 +67,8 @@ function payroll(api: ApiApp, scope: RequestScope) {
     locks,
   );
   return {
+    advances,
+    closed: new SqlClosedPeriods(tx),
     timesheets,
     settlements,
     teachers,
@@ -110,6 +119,8 @@ export function registerPayrollRoutes(api: ApiApp): void {
   registerDomainErrors({
     SessionNotFound: [404, 'not_found'],
     SettlementAlreadyPaid: [409, 'settlement_paid'],
+    AdvanceNotFound: [404, 'not_found'],
+    TeacherNotFound: [404, 'not_found'],
     SubstitutionNotFound: [404, 'not_found'],
     DutyNotFound: [404, 'not_found'],
     SubstitutionNeedsReason: [409, 'reason_required'],
@@ -352,6 +363,60 @@ export function registerPayrollRoutes(api: ApiApp): void {
       return c.body(null, 204);
     },
   );
+
+  api.defineRoute(
+    admin('PUT', '/api/admin/payroll/settlements/:teacherId/:month/payment'),
+    async (c, scope) => {
+      const p = payroll(api, scope);
+      const b = await JsonBody.from(c.req.raw);
+      await new ChangeSettlementPaymentDate(p.settlements, p.closed).execute(
+        param(c, 'teacherId'),
+        param(c, 'month'),
+        b.requiredString('date'),
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  // ---- Anticipos -------------------------------------------------------------------------------
+  api.defineRoute(admin('POST', '/api/admin/payroll/advances'), async (c, scope) => {
+    const p = payroll(api, scope);
+    const b = await JsonBody.from(c.req.raw);
+    const id = await new RecordAdvance(p.advances, p.settlements, p.teachers, p.closed).execute({
+      teacherId: b.requiredString('teacherId'),
+      month: b.requiredString('month'),
+      amount: b.requiredString('amount'),
+      date: b.requiredString('date'),
+      note: b.optionalString('note'),
+    });
+    return c.json({ id }, 201);
+  });
+
+  api.defineRoute(admin('DELETE', '/api/admin/payroll/advances/:id'), async (c, scope) => {
+    const p = payroll(api, scope);
+    await new DeleteAdvance(p.advances, p.settlements, p.closed).execute(param(c, 'id'));
+    return c.body(null, 204);
+  });
+
+  // ---- Ficha del profesor ----------------------------------------------------------------------
+  api.defineRoute(admin('GET', '/api/admin/payroll/teachers/:id/report'), async (c, scope) => {
+    const p = payroll(api, scope);
+    await p.propose.execute();
+    const season = c.req.query('season');
+    if (season !== undefined && !/^\d{4}$/.test(season)) {
+      throw new InvalidValue('season', 'Indica la temporada con el año en que empieza.');
+    }
+    return c.json(
+      await new TeacherReport(
+        p.teachers,
+        p.list,
+        p.profitability,
+        p.advances,
+        new SqlTeacherReportQuery(scope.tx),
+        api.deps.clock,
+      ).execute(param(c, 'id'), season === undefined ? null : Number(season)),
+    );
+  });
 
   api.defineRoute(
     admin('POST', '/api/admin/payroll/settlements/:month/payment'),

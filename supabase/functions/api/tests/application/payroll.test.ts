@@ -9,6 +9,8 @@ import {
 import {
   AddHoliday,
   CancelSubstitution,
+  ChangeSettlementPaymentDate,
+  DeleteAdvance,
   DeleteSession,
   ListSettlements,
   PayAllSettlements,
@@ -16,11 +18,13 @@ import {
   PlanSubstitution,
   Profitability,
   ProposeSessions,
+  RecordAdvance,
   RecordSession,
   RefillDay,
   SaveDuty,
   SubstituteTeacher,
   SubstitutionNeedsReason,
+  TeacherReport,
   UpdateSession,
 } from '../../src/application/payroll/mod.ts';
 import { PeriodClosed } from '../../src/application/common/mod.ts';
@@ -49,7 +53,7 @@ function setUp() {
   fx.markMonthProposed(YearMonth.fromString('2026-09'));
   const propose = (_month?: string) => proposer().execute();
   const pay = () => new PaySettlement(fx, fx, fx, fx, fx.transactions, fx.locks);
-  const list = () => new ListSettlements(fx, fx, fx);
+  const list = () => new ListSettlements(fx, fx, fx, fx);
   return { fx, lucia, carlos, propose, pay, list, duties, substitutions };
 }
 
@@ -354,7 +358,7 @@ Deno.test('Profitability should compare the expected hours of the month with the
     duties,
     fx,
     fx,
-    new ListSettlements(fx, fx, fx),
+    new ListSettlements(fx, fx, fx, fx),
     load,
     fees,
     fx.clock,
@@ -439,7 +443,7 @@ Deno.test('Profitability should use the hours actually recorded in a month alrea
     duties,
     fx,
     fx,
-    new ListSettlements(fx, fx, fx),
+    new ListSettlements(fx, fx, fx, fx),
     load,
     fees,
     fx.clock,
@@ -447,5 +451,119 @@ Deno.test('Profitability should use the hours actually recorded in a month alrea
   assertEquals(rows.map((r) => [r.teacherName, r.minutes, r.costCents, r.incomeCents]), [
     ['Carlos Ruiz Márquez', 0, 0, 4500],
     ['Lucía Moreno Gil', 180, 4800, 0],
+  ]);
+});
+
+Deno.test('Advances should be discounted from the settlement of their month and count as paid ahead before it', async () => {
+  const { fx, carlos, list } = setUp();
+  // Carlos: martes de octubre 1,5 h a 18 €/h (4 martes: 108 €). Se le adelantaron 90 € el 30 de septiembre.
+  await fx.recordMonth('2026-10');
+  const record = new RecordAdvance(fx, fx, fx, fx);
+  const id = await record.execute({
+    teacherId: carlos,
+    month: '2026-10',
+    amount: '90',
+    date: '2026-09-30',
+    note: 'Pago de más en septiembre',
+  });
+  const october = (await list().execute('2026-10')).find((s) => s.teacherId === carlos);
+  assertEquals([october?.amountCents, october?.advancesCents, october?.toPayCents], [
+    10800,
+    9000,
+    1800,
+  ]);
+  await assertRejects(
+    () =>
+      record.execute({
+        teacherId: carlos,
+        month: '2026-10',
+        amount: '0',
+        date: '2026-09-30',
+        note: null,
+      }),
+    InvalidValue,
+  );
+  // Pagada la liquidación de octubre, su anticipo ya no se puede quitar.
+  await new PaySettlement(fx, fx, fx, fx, fx.transactions, fx.locks).execute(
+    carlos,
+    '2026-10',
+    '2026-11-02',
+  );
+  await assertRejects(() => new DeleteAdvance(fx, fx, fx).execute(id), SettlementAlreadyPaid);
+});
+
+Deno.test('ChangeSettlementPaymentDate should move the payment date of a paid settlement', async () => {
+  const { fx, carlos } = setUp();
+  await fx.recordMonth('2026-10');
+  const change = new ChangeSettlementPaymentDate(fx, fx);
+  await assertRejects(() => change.execute(carlos, '2026-10', '2026-10-31'), InvalidValue);
+  await new PaySettlement(fx, fx, fx, fx, fx.transactions, fx.locks).execute(
+    carlos,
+    '2026-10',
+    '2026-11-08',
+  );
+  await change.execute(carlos, '2026-10', '2026-10-31');
+  assertEquals(
+    (await fx.settlement(TeacherRef.fromString(carlos), YearMonth.fromString('2026-10')))?.paidOn
+      .toString(),
+    '2026-10-31',
+  );
+});
+
+Deno.test('TeacherReport should gather the months, payments and balance of a teacher', async () => {
+  const { fx, carlos, duties, list } = setUp();
+  await fx.recordMonth('2026-09');
+  await fx.recordMonth('2026-10');
+  // Septiembre pagado; octubre pendiente con 90 € adelantados; 50 € adelantados para noviembre.
+  await new PaySettlement(fx, fx, fx, fx, fx.transactions, fx.locks).execute(
+    carlos,
+    '2026-09',
+    '2026-09-30',
+  );
+  const advance = new RecordAdvance(fx, fx, fx, fx);
+  await advance.execute({
+    teacherId: carlos,
+    month: '2026-10',
+    amount: '90',
+    date: '2026-09-30',
+    note: null,
+  });
+  await advance.execute({
+    teacherId: carlos,
+    month: '2026-11',
+    amount: '50',
+    date: '2026-10-20',
+    note: null,
+  });
+  const query = {
+    groups: () => Promise.resolve([]),
+    students: () => Promise.resolve([]),
+    substitutions: () => Promise.resolve([]),
+    duties: () => Promise.resolve([]),
+  };
+  const profitability = new Profitability(
+    fx,
+    duties,
+    fx,
+    fx,
+    list(),
+    { classLoad: () => Promise.resolve({ teachers: new Map(), students: new Map() }) },
+    { monthlyFees: () => Promise.resolve(new Map()) },
+    fx.clock,
+  );
+  const report = await new TeacherReport(fx, list(), profitability, fx, query, fx.clock).execute(
+    carlos,
+    null,
+  );
+  assertEquals(report.months.map((m) => [m.month, m.minutes, m.toPayCents, m.status]), [
+    ['2026-09', 450, 13500, 'paid'],
+    ['2026-10', 360, 1800, 'pending'],
+  ]);
+  // Le debemos 18 € de octubre, pero ya tiene 50 € de noviembre: 32 € pagados de más.
+  assertEquals(report.balanceCents, 1800 - 5000);
+  assertEquals(report.payments.map((p) => [p.date, p.kind, p.month, p.amountCents]), [
+    ['2026-10-20', 'advance', '2026-11', 5000],
+    ['2026-09-30', 'settlement', '2026-09', 13500],
+    ['2026-09-30', 'advance', '2026-10', 9000],
   ]);
 });

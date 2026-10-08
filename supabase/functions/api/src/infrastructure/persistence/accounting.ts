@@ -178,9 +178,18 @@ export class SqlLedgerQuery implements LedgerQuery {
        WHERE p.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
       SELECT 'settlement', st.teacher_id::text || '/' || st.month, st.paid_on::text, 'expense',
-             'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', 'transfer', st.amount_cents
+             'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', 'transfer',
+             -- Lo adelantado a cuenta de ese mes ya salió como anticipo.
+             st.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM payroll_advance a
+                WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0)
         FROM payroll_settlement st JOIN teachers_teacher t ON t.id = st.teacher_id
        WHERE st.paid_on BETWEEN ${from} AND ${to}
+      UNION ALL
+      SELECT 'advance', a.teacher_id::text || '/' || a.id::text, a.paid_on::text, 'expense',
+             'Anticipo a cuenta de ' || a.month || ' · ' || t.full_name || COALESCE(' · ' || a.note, ''),
+             'teachers', 'transfer', a.amount_cents
+        FROM payroll_advance a JOIN teachers_teacher t ON t.id = a.teacher_id
+       WHERE a.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
       SELECT 'invoice', i.id::text, i.paid_on::text, 'expense', i.supplier || ' · ' || i.concept, i.category, i.method, i.amount_cents
         FROM accounting_invoice i
