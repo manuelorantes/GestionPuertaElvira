@@ -5,6 +5,7 @@ import type {
   Session,
   SessionId,
   SessionTokenHash,
+  TeacherLink,
   User,
   UserId,
 } from '../../domain/identity/mod.ts';
@@ -13,6 +14,13 @@ export interface UserRepository {
   find(id: UserId): Promise<User | null>;
   findByEmail(email: EmailAddress): Promise<User | null>;
   save(user: User): Promise<void>;
+}
+
+/** Fichas de profesores a las que se puede vincular una cuenta de profesorado. */
+export interface TeacherAccounts {
+  exists(teacher: TeacherLink): Promise<boolean>;
+  /** Cuenta ya vinculada a ese profesor, o null. */
+  linkedUser(teacher: TeacherLink): Promise<UserId | null>;
 }
 
 export interface SessionRepository {

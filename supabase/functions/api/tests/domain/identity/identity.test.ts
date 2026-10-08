@@ -10,6 +10,7 @@ import {
   SessionId,
   SessionPolicy,
   SessionTokenHash,
+  TeacherLink,
   User,
   UserId,
   WeakPassword,
@@ -132,4 +133,23 @@ Deno.test('User should not authenticate when disabled and again when enabled; ro
   assert(user.canAuthenticate());
   user.changeRole('teacher');
   assertEquals(user.role(), 'teacher');
+});
+
+Deno.test('User should link a teacher only while it has the teacher role', () => {
+  const teacher = TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa');
+  const user = registeredUser();
+  assertThrows(() => user.linkTeacher(teacher), InvalidValue, 'profesorado');
+  user.changeRole('teacher');
+  user.linkTeacher(teacher);
+  assertEquals(user.linkedTeacher()?.value, teacher.value);
+  user.linkTeacher(null);
+  assertEquals(user.linkedTeacher(), null);
+});
+
+Deno.test('User should drop the teacher link when it leaves the teacher role', () => {
+  const user = registeredUser();
+  user.changeRole('teacher');
+  user.linkTeacher(TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa'));
+  user.changeRole('administrator');
+  assertEquals(user.linkedTeacher(), null);
 });
