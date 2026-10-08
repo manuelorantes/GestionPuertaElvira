@@ -98,6 +98,12 @@ export class AccountingFixture
     return (await this.closing(FiscalYear.of(date))) !== null;
   }
 
+  async linesBetween(from: YearMonth, to: YearMonth): Promise<LedgerLine[]> {
+    const lines: LedgerLine[] = [];
+    for (let m = from; !to.isBefore(m); m = m.next()) lines.push(...(await this.lines(m)));
+    return lines;
+  }
+
   lines(month: YearMonth): Promise<LedgerLine[]> {
     const lines = this.external.filter((l) => l.date.startsWith(month.toString()));
     for (const e of this.entries.values()) {

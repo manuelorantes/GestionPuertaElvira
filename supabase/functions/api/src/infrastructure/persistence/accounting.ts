@@ -167,9 +167,13 @@ export class SqlInvoiceQuery implements InvoiceQuery {
 export class SqlLedgerQuery implements LedgerQuery {
   constructor(private readonly sql: Sql) {}
 
-  async lines(month: YearMonth): Promise<LedgerLine[]> {
-    const from = month.firstDay().toString();
-    const to = month.lastDay().toString();
+  lines(month: YearMonth): Promise<LedgerLine[]> {
+    return this.linesBetween(month, month);
+  }
+
+  async linesBetween(first: YearMonth, last: YearMonth): Promise<LedgerLine[]> {
+    const from = first.firstDay().toString();
+    const to = last.lastDay().toString();
     const rows = await this.sql`
       SELECT 'payment' AS source, p.id::text AS source_id, p.paid_on::text AS date, 'income' AS kind,
              p.concept || ' · ' || s.full_name AS concept,
