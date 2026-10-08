@@ -33,7 +33,7 @@ Después abre <http://localhost:8080>.
 |---|---|---|
 | `admin@puertaelvira.test` | `desarrollo-admin` | Superadministración (también el historial) |
 | `junta@puertaelvira.test` | `desarrollo-junta` | Administración |
-| `profe@puertaelvira.test` | `desarrollo-profe` | Profesorado |
+| `profe@puertaelvira.test` | `desarrollo-profe` | Profesorado (con los datos de demostración, vinculada a Lucía Moreno Gil) |
 | `nuevo@puertaelvira.test` | `desarrollo-nuevo` | Administración, con contraseña temporal |
 | `ia@puertaelvira.test` | `desarrollo-ia` | Asistente (la IA; ver [docs/asistente.md](docs/asistente.md)) |
 
