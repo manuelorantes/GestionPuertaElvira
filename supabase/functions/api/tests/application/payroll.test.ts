@@ -387,7 +387,7 @@ Deno.test('Profitability should compare the expected hours of the month with the
   // Ana va con los dos: cuenta una vez en el total y sale entre los compartidos.
   assertEquals(rows.students, {
     total: 2,
-    shared: [{ name: 'Ana Pérez', teachers: ['Carlos Ruiz Márquez', 'Lucía Moreno Gil'] }],
+    shared: [{ id: 'ana', name: 'Ana Pérez' }],
   });
 });
 

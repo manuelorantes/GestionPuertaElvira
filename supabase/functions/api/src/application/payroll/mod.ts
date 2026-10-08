@@ -529,7 +529,7 @@ export interface ProfitabilityRow {
 /** Alumnos del mes sin repetir, y los que van con más de un profesor (cuentan en la fila de cada uno). */
 export interface ProfitabilityStudents {
   total: number;
-  shared: { name: string; teachers: string[] }[];
+  shared: { id: string; name: string }[];
 }
 
 export interface ProfitabilityReport {
@@ -607,16 +607,9 @@ export class Profitability {
         students: [...load.students.values()].filter((shares) => shares.has(teacher.id)).length,
       });
     }
-    const names = new Map(rows.map((r) => [r.teacherId, r.teacherName]));
     const shared = [...load.students]
       .filter(([, shares]) => shares.size > 1)
-      .map(([student, shares]) => ({
-        name: load.studentNames.get(student) ?? '',
-        teachers: [...shares.keys()]
-          .map((t) => names.get(t) ?? '')
-          .filter((n) => n !== '')
-          .sort((a, b) => a.localeCompare(b, 'es')),
-      }))
+      .map(([student]) => ({ id: student, name: load.studentNames.get(student) ?? '' }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es'));
     return {
       items: rows.sort((a, b) => b.marginCents - a.marginCents),
