@@ -71,8 +71,8 @@ export class ClubSummary {
     const chart: ClubSummaryView['chart'] = [];
     let current: { expenseCents: number; lines: LedgerLine[] } | null = null;
     let previousLines: LedgerLine[] = [];
-    for (let m = first, i = 0; i < ClubSummary.CHART_MONTHS; m = m.next(), i++) {
-      const view = await this.ledger.execute(m.toString());
+    for (const view of await this.ledger.between(first, last)) {
+      const m = YearMonth.fromString(view.month);
       chart.push({
         month: m.toString(),
         incomeCents: view.incomeCents - (collected.get(m.toString()) ?? 0) +

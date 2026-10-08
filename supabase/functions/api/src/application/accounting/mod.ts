@@ -44,6 +44,24 @@ export interface LedgerLine {
 export interface LedgerQuery {
   /** Movimientos del mes: cobros, liquidaciones pagadas, facturas pagadas y apuntes manuales. */
   lines(month: YearMonth): Promise<LedgerLine[]>;
+  /** Los movimientos de varios meses seguidos de una vez (de `from` a `to`, ambos incluidos). */
+  linesBetween(from: YearMonth, to: YearMonth): Promise<LedgerLine[]>;
+}
+
+/** Ingresos y gastos de cada mes («AAAA-MM») a partir de sus movimientos. */
+function totalsByMonth(lines: LedgerLine[]): Map<string, [number, number]> {
+  const totals = new Map<string, [number, number]>();
+  for (const line of lines) {
+    const month = line.date.slice(0, 7);
+    const [income, expenses] = totals.get(month) ?? [0, 0];
+    totals.set(
+      month,
+      line.kind === 'income'
+        ? [income + line.amountCents, expenses]
+        : [income, expenses + line.amountCents],
+    );
+  }
+  return totals;
 }
 
 export interface InvoiceView {
@@ -311,7 +329,22 @@ export class MonthLedger {
   constructor(private readonly ledger: LedgerQuery) {}
 
   async execute(month: string): Promise<MonthLedgerView> {
-    const lines = (await this.ledger.lines(YearMonth.fromString(month)))
+    return this.view(month, await this.ledger.lines(YearMonth.fromString(month)));
+  }
+
+  /** Los libros de varios meses seguidos, leídos de una vez (el gráfico del resumen). */
+  async between(from: YearMonth, to: YearMonth): Promise<MonthLedgerView[]> {
+    const lines = await this.ledger.linesBetween(from, to);
+    const views: MonthLedgerView[] = [];
+    for (let m = from; !to.isBefore(m); m = m.next()) {
+      const key = m.toString();
+      views.push(this.view(key, lines.filter((l) => l.date.startsWith(key))));
+    }
+    return views;
+  }
+
+  private view(month: string, monthLines: LedgerLine[]): MonthLedgerView {
+    const lines = [...monthLines]
       .sort((a, b) => b.date.localeCompare(a.date) || b.sourceId.localeCompare(a.sourceId));
     let income = 0;
     let expenses = 0;
@@ -371,8 +404,11 @@ export class FiscalYearSummary {
     let accumulated = opening;
     let income = 0;
     let expenses = 0;
+    const byMonth = totalsByMonth(
+      await this.ledger.linesBetween(year.firstMonth(), year.lastMonth()),
+    );
     for (const month of year.months()) {
-      const [monthIncome, monthExpenses] = await this.totals(month);
+      const [monthIncome, monthExpenses] = byMonth.get(month.toString()) ?? [0, 0];
       accumulated += monthIncome - monthExpenses;
       income += monthIncome;
       expenses += monthExpenses;
