@@ -2,7 +2,9 @@ import { assert, assertEquals, assertMatch } from '@std/assert';
 
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
-import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
+import { ApiClient, assertError, createUser, db, resetDatabase } from '../support/http.ts';
+import { inTransaction } from '../../src/infrastructure/persistence/sql.ts';
+import { runCommand } from '../../scripts/console.ts';
 
 const today = LocalDate.fromInstant(new Date()).toString();
 const outsideSeason = Season.teachingSeason(YearMonth.of(LocalDate.fromString(today))) === null;
@@ -468,5 +470,28 @@ Deno.test({
       await fx.client.get(`/api/admin/billing/charges?month=${next}&kind=monthly`),
     );
     assertEquals(paid.items.map((i) => i.status), ['paid']);
+  },
+});
+
+Deno.test({
+  name:
+    'charges should be created when a student is registered and every night, never when reading',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const monthly = async () =>
+      body<{ items: { studentId: string }[] }>(
+        await fx.client.get('/api/admin/billing/charges?kind=monthly'),
+      ).items.map((c) => c.studentId);
+    // Al dar de alta, su cuota está al momento.
+    assertEquals(await monthly(), [fx.student]);
+
+    // Si falta (p. ej. borrada a mano), consultar no la crea; la tarea de la noche, sí.
+    await db()`DELETE FROM billing_charge WHERE student_id = ${fx.student}`;
+    assertEquals(await monthly(), []);
+    assertEquals((await fx.client.get('/api/admin/dashboard')).status, 200);
+    assertEquals(await monthly(), []);
+    await inTransaction(db(), (tx) => runCommand(tx, 4, ['app:billing:generate-charges']));
+    assertEquals(await monthly(), [fx.student]);
   },
 });

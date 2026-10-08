@@ -25,7 +25,7 @@ import {
 } from '../../application/students/mod.ts';
 import { StudentsStudentStatus, today } from '../classes/routes.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
-import { recalculatingFees } from '../billing/recalculate.ts';
+import { generatingCharges, recalculatingFees } from '../billing/recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
@@ -209,6 +209,8 @@ export function registerStudentRoutes(api: ApiApp): void {
             body.bool('confirmOverCapacity'),
           ),
       );
+      // Su cuota de este mes, al momento.
+      await generatingCharges(api, scope, [id]);
       return c.json({ id }, 201);
     },
   );
