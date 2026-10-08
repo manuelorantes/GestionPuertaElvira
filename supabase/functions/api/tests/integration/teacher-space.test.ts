@@ -95,6 +95,14 @@ Deno.test({
       { id: students[0]?.students[1]?.id, name: 'Pablo Gil Ruiz', days: ['mon'] },
     ]);
 
+    // Sus horas y pagos de la temporada, sin ingresos ni márgenes del club.
+    const pay = body<{ months: Record<string, unknown>[]; totals: Record<string, number> }>(
+      await teacher.get('/api/teacher/pay'),
+    );
+    assertEquals(pay.months.at(-1)?.month, today.toString().slice(0, 7));
+    assertEquals(pay.months.some((m) => 'incomeCents' in m || 'marginCents' in m), false);
+    assertEquals(Object.keys(pay.totals), ['minutes', 'amountCents', 'receivedCents', 'owedCents']);
+
     // Nada de administración para el profesorado, ni del profesorado para administración.
     assertError(await teacher.get('/api/admin/payroll/settlements'), 403, 'forbidden');
     assertError(await admin.get('/api/teacher/classes'), 403, 'forbidden');
