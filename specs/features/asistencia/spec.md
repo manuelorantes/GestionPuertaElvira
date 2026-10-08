@@ -25,7 +25,9 @@ historial.
 ### Requirement: Listas sin pasar
 Una clase apuntada en las horas (sesión de un grupo) cuya lista no se pasó cuando acaba su plazo MUST aparecer en el
 bloque «Listas sin pasar» del resumen, con fecha, clase y profesor, y en un contador junto a «Resumen» en el menú.
-Solo cuentan las clases desde el día en que se activó la asistencia. Para cada una, administración MUST poder:
+Solo cuentan las clases de profesores que pueden pasar lista (con su cuenta de profesorado activa y vinculada), desde
+el día en que se vinculó su cuenta y nunca antes del día en que se activó la asistencia. Para cada una, administración
+MUST poder:
 - **quitar la sesión** («No se dio»): deja de contar horas y de salir en el aviso; no se puede si la liquidación de
   ese mes ya está pagada;
 - **darla por buena** («Se dio»): sigue contando y deja de salir en el aviso.
@@ -34,6 +36,10 @@ No se puede dar por buena una clase cuyo plazo para pasar lista no ha acabado.
 #### Scenario: Un profesor que no pasó lista
 - **WHEN** Carlos no pasa la lista de su clase del martes 13 y es viernes 16
 - **THEN** administración la ve en «Listas sin pasar» y el menú muestra el contador
+
+#### Scenario: Un profesor sin cuenta
+- **WHEN** Ana no tiene cuenta de profesorado y su clase del martes no tiene lista
+- **THEN** no sale en «Listas sin pasar»: no podía pasarla
 
 #### Scenario: No se dio
 - **WHEN** administración pulsa «No se dio» en esa clase y lo confirma

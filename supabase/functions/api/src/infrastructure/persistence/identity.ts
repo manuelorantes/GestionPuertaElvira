@@ -36,6 +36,7 @@ function toUser(row: Row): User {
     teacher: row.nullableString('teacher_id') === null
       ? null
       : TeacherLink.fromString(row.string('teacher_id')),
+    teacherLinkedAt: row.json('teacher_linked_at') === null ? null : row.date('teacher_linked_at'),
   });
 }
 
@@ -65,6 +66,7 @@ export class SqlUserRepository implements UserRepository {
       created_at: user.createdAt,
       password_changed_at: user.passwordChangedAt(),
       teacher_id: user.linkedTeacher()?.value ?? null,
+      teacher_linked_at: user.linkedSince(),
     };
     await this.sql`
       INSERT INTO identity_user ${this.sql(record)}
@@ -79,6 +81,7 @@ export class SqlUserRepository implements UserRepository {
         'must_change_password',
         'password_changed_at',
         'teacher_id',
+        'teacher_linked_at',
       )
     }`;
   }

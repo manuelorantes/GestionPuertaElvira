@@ -593,12 +593,10 @@ async function seedPayroll(
   }
 }
 
-/** Profesor con las listas de la última semana sin pasar (para ver el aviso de listas sin pasar). */
-const FORGETFUL_TEACHER = 'p2';
-
 /**
- * Asistencia de la última semana: la cuenta de pruebas de profesorado ve las clases de Lucía; las listas están
- * pasadas (con alguna falta) salvo las de Carlos, que salen en «Listas sin pasar».
+ * Asistencia de la última semana: la cuenta de pruebas de profesorado es la de Lucía (vinculada hace una semana); sus
+ * listas están pasadas, con alguna falta, salvo las del primer día, que salen en «Listas sin pasar». Los demás
+ * profesores no tienen cuenta, así que sus clases no avisan; aun así se pasan sus listas para ver la asistencia.
  */
 async function seedAttendance(
   tx: TransactionSql,
@@ -607,7 +605,8 @@ async function seedAttendance(
 ): Promise<void> {
   const today = LocalDate.fromInstant(clock.now());
   const since = today.plusDays(-7).toString();
-  await tx`UPDATE identity_user SET teacher_id = ${id(teacherIds, 'p1')}
+  const lucia = id(teacherIds, 'p1');
+  await tx`UPDATE identity_user SET teacher_id = ${lucia}, teacher_linked_at = ${since}
             WHERE email = 'profe@puertaelvira.test' AND role = 'teacher'`;
   await tx`INSERT INTO attendance_settings (id, since) VALUES (1, ${since})
            ON CONFLICT (id) DO UPDATE SET since = EXCLUDED.since`;
@@ -616,7 +615,9 @@ async function seedAttendance(
     SELECT s.group_id, s.session_date, 'taken', s.teacher_id, now()
       FROM payroll_session s
      WHERE s.group_id IS NOT NULL AND s.session_date BETWEEN ${since} AND ${today.toString()}
-       AND s.teacher_id <> ${id(teacherIds, FORGETFUL_TEACHER)}
+       AND NOT (s.teacher_id = ${lucia} AND s.session_date = (
+             SELECT min(f.session_date) FROM payroll_session f
+              WHERE f.teacher_id = ${lucia} AND f.group_id IS NOT NULL AND f.session_date >= ${since}))
     ON CONFLICT DO NOTHING`;
   // Una falta en cada una de las tres primeras listas: el primer alumno de esa clase.
   await tx`
