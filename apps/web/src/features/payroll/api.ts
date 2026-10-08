@@ -195,7 +195,7 @@ export async function payAllSettlements(month: string): Promise<number> {
 
 // ---- Ficha del profesor ----------------------------------------------------------------------
 
-export interface TeacherMonth {
+interface TeacherMonth {
   month: string;
   minutes: number;
   amountCents: number;
