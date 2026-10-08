@@ -443,6 +443,12 @@ export class SqlMonthlyFees implements MonthlyFees {
 export class SqlHolidayCalendar implements HolidayCalendar {
   constructor(private readonly sql: Sql) {}
 
+  async holidaysBetween(from: LocalDate, to: LocalDate): Promise<Set<string>> {
+    const rows = await this.sql`SELECT holiday_date::text AS day FROM payroll_holiday
+      WHERE holiday_date BETWEEN ${from.toString()} AND ${to.toString()}`;
+    return new Set(Row.all(rows).map((r) => r.string('day')));
+  }
+
   async isHoliday(date: LocalDate): Promise<boolean> {
     return (await this.sql`SELECT 1 FROM payroll_holiday WHERE holiday_date = ${date.toString()}`)
       .length > 0;
