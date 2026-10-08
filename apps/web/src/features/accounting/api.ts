@@ -3,7 +3,7 @@ import { apiGet, apiSend, apiUpload } from '@/shared/api/client';
 import type { EntryKind } from './categories';
 
 export interface LedgerItem {
-  source: 'payment' | 'settlement' | 'invoice' | 'manual';
+  source: 'payment' | 'settlement' | 'advance' | 'invoice' | 'manual';
   sourceId: string;
   date: string;
   kind: EntryKind;

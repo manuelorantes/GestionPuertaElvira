@@ -1,17 +1,20 @@
 import type { LocalDate } from '../../src/domain/common/mod.ts';
-import { Money, type YearMonth } from '../../src/domain/common/mod.ts';
+import { Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
+  type Advance,
   type ClubDuty,
+  DailyPlanner,
   type DutyRef,
   GroupRef,
-  type MonthlySettlement,
+  MonthlySettlement,
   ScheduledGroup,
   type Substitution,
   TeacherRef,
-  type TimesheetEntry,
-  type TimesheetEntryId,
+  TimesheetEntry,
+  TimesheetEntryId,
 } from '../../src/domain/payroll/mod.ts';
 import type {
+  AdvanceRepository,
   DutyRepository,
   HolidayCalendar,
   ProposalLog,
@@ -36,7 +39,8 @@ export class PayrollFixture
     TimesheetRepository,
     SettlementRepository,
     ProposalLog,
-    HolidayCalendar {
+    HolidayCalendar,
+    AdvanceRepository {
   scheduledGroups: ScheduledGroup[] = [];
   teachers = new Map<string, TeacherRate>();
   entries = new Map<string, TimesheetEntry>();
@@ -45,6 +49,7 @@ export class PayrollFixture
   holidays = new Map<string, string>();
   duties = new Map<string, ClubDuty>();
   substitutions = new Map<string, Substitution>();
+  advances = new Map<string, Advance>();
   closed = false;
   readonly clock: FrozenClock;
   readonly transactions = new ImmediateTransactionRunner();
@@ -112,6 +117,51 @@ export class PayrollFixture
 
   settlementsOf(month: YearMonth): Promise<MonthlySettlement[]> {
     return Promise.resolve([...this.paidSettlements.values()].filter((s) => s.month.equals(month)));
+  }
+
+  changePaidOn(teacher: TeacherRef, month: YearMonth, date: LocalDate): Promise<void> {
+    const s = this.paidSettlements.get(teacher.value + month.toString());
+    if (s) {
+      this.paidSettlements.set(
+        teacher.value + month.toString(),
+        new MonthlySettlement(s.teacher, s.month, s.settlement, date),
+      );
+    }
+    return Promise.resolve();
+  }
+
+  /** Apunta todas las clases del horario de un mes, como si se hubieran dado. */
+  recordMonth(month: string): Promise<void> {
+    const period = YearMonth.fromString(month);
+    for (let day = period.firstDay(); !period.lastDay().isBefore(day); day = day.plusDays(1)) {
+      for (const session of new DailyPlanner().plan(day, this.scheduledGroups, [], [], null)) {
+        const entry = TimesheetEntry.planned(TimesheetEntryId.generate(), session);
+        this.entries.set(entry.id.value, entry);
+      }
+    }
+    return Promise.resolve();
+  }
+
+  forTeacherAdvances(teacher: TeacherRef): Promise<Advance[]> {
+    return Promise.resolve([...this.advances.values()].filter((a) => a.teacher.equals(teacher)));
+  }
+
+  advancesOf(month: YearMonth): Promise<Advance[]> {
+    return Promise.resolve([...this.advances.values()].filter((a) => a.month.equals(month)));
+  }
+
+  advance(id: string): Promise<Advance | null> {
+    return Promise.resolve(this.advances.get(id) ?? null);
+  }
+
+  saveAdvance(advance: Advance): Promise<void> {
+    this.advances.set(advance.id, advance);
+    return Promise.resolve();
+  }
+
+  deleteAdvance(id: string): Promise<void> {
+    this.advances.delete(id);
+    return Promise.resolve();
   }
 
   saveSettlement(settlement: MonthlySettlement): Promise<void> {

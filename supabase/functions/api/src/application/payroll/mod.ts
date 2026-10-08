@@ -3,10 +3,12 @@ import {
   InvalidValue,
   LocalDate,
   minutesOfDayInMadrid,
-  type Money,
+  Money,
+  Season,
   YearMonth,
 } from '../../domain/common/mod.ts';
 import {
+  Advance,
   ClubDuty,
   DailyPlanner,
   DutyRef,
@@ -87,6 +89,17 @@ export interface SettlementRepository {
   settlement(teacher: TeacherRef, month: YearMonth): Promise<MonthlySettlement | null>;
   settlementsOf(month: YearMonth): Promise<MonthlySettlement[]>;
   saveSettlement(settlement: MonthlySettlement): Promise<void>;
+  /** Corrige la fecha de pago de una liquidación ya pagada. */
+  changePaidOn(teacher: TeacherRef, month: YearMonth, date: LocalDate): Promise<void>;
+}
+
+/** Anticipos a profesores. */
+export interface AdvanceRepository {
+  forTeacherAdvances(teacher: TeacherRef): Promise<Advance[]>;
+  advancesOf(month: YearMonth): Promise<Advance[]>;
+  advance(id: string): Promise<Advance | null>;
+  saveAdvance(advance: Advance): Promise<void>;
+  deleteAdvance(id: string): Promise<void>;
 }
 
 /** Días cuyas sesiones ya se apuntaron solas (lo que se borre después no vuelve a aparecer). */
@@ -359,6 +372,10 @@ export interface SettlementView {
   minutes: number;
   rateCents: number;
   amountCents: number;
+  /** Anticipos de ese mes, que se descuentan de lo que hay que pagarle. */
+  advancesCents: number;
+  /** Importe menos anticipos (negativo si se le adelantó más de lo que ha hecho). */
+  toPayCents: number;
   lines: { label: string; minutes: number; amountCents: number }[];
   status: 'pending' | 'paid';
   paidOn: string | null;
@@ -370,6 +387,7 @@ export class ListSettlements {
     private readonly timesheets: TimesheetRepository,
     private readonly settlements: SettlementRepository,
     private readonly teachers: TeacherRates,
+    private readonly advances: AdvanceRepository,
   ) {}
 
   /** Ordenadas por nombre. */
@@ -385,14 +403,19 @@ export class ListSettlements {
     const paid = new Map(
       (await this.settlements.settlementsOf(period)).map((s) => [s.teacher.value, s]),
     );
+    const advanced = new Map<string, number>();
+    for (const a of await this.advances.advancesOf(period)) {
+      advanced.set(a.teacher.value, (advanced.get(a.teacher.value) ?? 0) + a.amount.cents);
+    }
     const views: SettlementView[] = [];
     for (const teacher of await this.teachers.all()) {
       const settled = paid.get(teacher.id) ?? null;
       const entries = byTeacher.get(teacher.id) ?? [];
-      if (settled === null && entries.length === 0) continue;
+      const advances = advanced.get(teacher.id) ?? 0;
+      if (settled === null && entries.length === 0 && advances === 0) continue;
       const settlement = settled?.settlement ??
         new SettlementCalculator().settle(entries, teacher.rate);
-      views.push(view(teacher, period, settlement, settled?.paidOn.toString() ?? null));
+      views.push(view(teacher, period, settlement, settled?.paidOn.toString() ?? null, advances));
     }
     return views.sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'es'));
   }
@@ -403,6 +426,7 @@ function view(
   month: YearMonth,
   s: Settlement,
   paidOn: string | null,
+  advances: number,
 ): SettlementView {
   return {
     teacherId: teacher.id,
@@ -411,6 +435,8 @@ function view(
     minutes: s.minutes,
     rateCents: s.rate.cents,
     amountCents: s.amount.cents,
+    advancesCents: advances,
+    toPayCents: s.amount.cents - advances,
     lines: s.lines.map((l) => ({
       label: l.label,
       minutes: l.minutes,
@@ -907,5 +933,295 @@ export class RemoveHoliday {
 
   async execute(date: string): Promise<void> {
     await this.holidays.remove(LocalDate.fromString(date));
+  }
+}
+
+// ---- Anticipos y fecha de pago ---------------------------------------------------------------
+
+export interface AdvanceInput {
+  teacherId: string;
+  /** Mes de cuya liquidación se descuenta. */
+  month: string;
+  amount: string;
+  /** Día en que se pagó. */
+  date: string;
+  note: string | null;
+}
+
+/** Apunta un anticipo a cuenta de la liquidación de un mes aún sin pagar. */
+export class RecordAdvance {
+  constructor(
+    private readonly advances: AdvanceRepository,
+    private readonly settlements: SettlementRepository,
+    private readonly teachers: TeacherRates,
+    private readonly closed: ClosedPeriods,
+  ) {}
+
+  async execute(input: AdvanceInput): Promise<string> {
+    const teacher = TeacherRef.fromString(input.teacherId);
+    await ensureTeacherExists(this.teachers, teacher);
+    const month = YearMonth.fromString(input.month);
+    await ensureOpen(this.settlements, teacher, month);
+    const paidOn = LocalDate.fromString(input.date);
+    await PeriodClosed.guard(this.closed, paidOn);
+    const id = crypto.randomUUID();
+    await this.advances.saveAdvance(
+      new Advance(
+        id,
+        teacher,
+        month,
+        Money.fromDecimal(input.amount),
+        paidOn,
+        input.note?.trim() || null,
+      ),
+    );
+    return id;
+  }
+}
+
+export class AdvanceNotFound extends Error {
+  constructor() {
+    super('No existe ese anticipo.');
+    this.name = 'AdvanceNotFound';
+  }
+}
+
+/** Quita un anticipo mientras la liquidación de su mes no esté pagada. */
+export class DeleteAdvance {
+  constructor(
+    private readonly advances: AdvanceRepository,
+    private readonly settlements: SettlementRepository,
+    private readonly closed: ClosedPeriods,
+  ) {}
+
+  async execute(id: string): Promise<void> {
+    const advance = await this.advances.advance(id);
+    if (advance === null) throw new AdvanceNotFound();
+    await ensureOpen(this.settlements, advance.teacher, advance.month);
+    await PeriodClosed.guard(this.closed, advance.paidOn);
+    await this.advances.deleteAdvance(id);
+  }
+}
+
+/** Corrige el día en que se pagó una liquidación (p. ej. se marcó pagada otro día). */
+export class ChangeSettlementPaymentDate {
+  constructor(
+    private readonly settlements: SettlementRepository,
+    private readonly closed: ClosedPeriods,
+  ) {}
+
+  async execute(teacherId: string, month: string, date: string): Promise<void> {
+    const teacher = TeacherRef.fromString(teacherId);
+    const period = YearMonth.fromString(month);
+    const settlement = await this.settlements.settlement(teacher, period);
+    if (settlement === null) {
+      throw new InvalidValue('month', 'La liquidación de ese mes aún no está pagada.');
+    }
+    const paidOn = LocalDate.fromString(date);
+    await PeriodClosed.guard(this.closed, settlement.paidOn);
+    await PeriodClosed.guard(this.closed, paidOn);
+    await this.settlements.changePaidOn(teacher, period, paidOn);
+  }
+}
+
+// ---- Ficha del profesor ----------------------------------------------------------------------
+
+export interface TeacherGroupView {
+  id: string;
+  name: string;
+  days: string[];
+  start: string;
+  end: string;
+  classroom: string;
+  capacity: number;
+  /** Alumnos que van cada día de clase. */
+  occupancyByDay: Record<string, number>;
+  students: number;
+}
+
+export interface TeacherStudentView {
+  id: string;
+  name: string;
+  groups: string[];
+  /** Minutos semanales con este profesor. */
+  weeklyMinutes: number;
+}
+
+export interface TeacherSubstitutionView {
+  date: string;
+  /** Clase o turno. */
+  label: string;
+  /** `gave`: dio la clase de otro; `received`: otro dio la suya. */
+  role: 'gave' | 'received';
+  otherName: string;
+  reason: string | null;
+}
+
+export interface TeacherDutyView {
+  weekday: number;
+  start: string;
+  end: string;
+  label: string;
+}
+
+/** Lecturas de Clases, Alumnos y Profesorado restringidas a un profesor. */
+export interface TeacherReportQuery {
+  groups(teacherId: string, on: LocalDate): Promise<TeacherGroupView[]>;
+  students(teacherId: string, on: LocalDate): Promise<TeacherStudentView[]>;
+  substitutions(
+    teacherId: string,
+    from: LocalDate,
+    to: LocalDate,
+  ): Promise<TeacherSubstitutionView[]>;
+  duties(teacherId: string): Promise<TeacherDutyView[]>;
+}
+
+export interface TeacherMonthView {
+  month: string;
+  minutes: number;
+  amountCents: number;
+  advancesCents: number;
+  toPayCents: number;
+  /** `none`: sin horas ni anticipos. */
+  status: 'paid' | 'pending' | 'none';
+  paidOn: string | null;
+  incomeCents: number;
+  marginCents: number;
+}
+
+export interface TeacherPaymentView {
+  /** Id del anticipo (null en las liquidaciones). */
+  id: string | null;
+  date: string;
+  kind: 'settlement' | 'advance';
+  month: string;
+  amountCents: number;
+  note: string | null;
+}
+
+export interface TeacherReportView {
+  teacher: { id: string; name: string; rateCents: number; active: boolean };
+  season: number;
+  months: TeacherMonthView[];
+  /** Lo que le debemos hoy (positivo) o lo que se le ha pagado de más (negativo). */
+  balanceCents: number;
+  payments: TeacherPaymentView[];
+  groups: TeacherGroupView[];
+  occupancy: { occupied: number; capacity: number };
+  students: TeacherStudentView[];
+  substitutions: TeacherSubstitutionView[];
+  duties: TeacherDutyView[];
+}
+
+export class TeacherNotFound extends Error {
+  constructor() {
+    super('No existe ese profesor.');
+    this.name = 'TeacherNotFound';
+  }
+}
+
+/**
+ * Ficha de un profesor en una temporada: horas, liquidación, anticipos y rentabilidad de cada mes hasta hoy, pagos
+ * recibidos, saldo (lo que le debemos o lo pagado de más), sus clases con su ocupación, sus alumnos, sustituciones y
+ * turnos.
+ */
+export class TeacherReport {
+  constructor(
+    private readonly teachers: TeacherRates,
+    private readonly settlements: ListSettlements,
+    private readonly profitability: Profitability,
+    private readonly advances: AdvanceRepository,
+    private readonly query: TeacherReportQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string, seasonYear: number | null): Promise<TeacherReportView> {
+    const ref = TeacherRef.fromString(teacherId);
+    const teacher = (await this.teachers.all()).find((t) => t.id === ref.value);
+    if (!teacher) throw new TeacherNotFound();
+    const today = LocalDate.fromInstant(this.clock.now());
+    const current = YearMonth.of(today);
+    const season = seasonYear === null ? Season.containing(current) : Season.startingIn(seasonYear);
+    const months: TeacherMonthView[] = [];
+    // De septiembre a junio, hasta el mes en curso.
+    for (
+      let m = season.firstMonth();
+      !current.isBefore(m) && !season.lastMonth().isBefore(m);
+      m = m.next()
+    ) {
+      const settlement = (await this.settlements.execute(m.toString())).find((s) =>
+        s.teacherId === ref.value
+      );
+      const row = (await this.profitability.execute(m.toString())).find((r) =>
+        r.teacherId === ref.value
+      );
+      months.push({
+        month: m.toString(),
+        minutes: settlement?.minutes ?? 0,
+        amountCents: settlement?.amountCents ?? 0,
+        advancesCents: settlement?.advancesCents ?? 0,
+        toPayCents: settlement?.toPayCents ?? 0,
+        status: settlement === undefined ? 'none' : settlement.status,
+        paidOn: settlement?.paidOn ?? null,
+        incomeCents: row?.incomeCents ?? 0,
+        marginCents: row?.marginCents ?? 0,
+      });
+    }
+    const advances = await this.advances.forTeacherAdvances(ref);
+    const owed = months.filter((m) => m.status === 'pending').reduce(
+      (sum, m) => sum + m.toPayCents,
+      0,
+    );
+    const ahead = advances.filter((a) => current.isBefore(a.month)).reduce(
+      (sum, a) => sum + a.amount.cents,
+      0,
+    );
+    const payments: TeacherPaymentView[] = [
+      ...months.filter((m) => m.status === 'paid' && m.paidOn !== null).map((m) => ({
+        id: null,
+        date: m.paidOn as string,
+        kind: 'settlement' as const,
+        month: m.month,
+        amountCents: m.toPayCents,
+        note: null,
+      })),
+      ...advances.map((a) => ({
+        id: a.id,
+        date: a.paidOn.toString(),
+        kind: 'advance' as const,
+        month: a.month.toString(),
+        amountCents: a.amount.cents,
+        note: a.note,
+      })),
+    ].sort((a, b) => b.date.localeCompare(a.date) || b.kind.localeCompare(a.kind));
+    const groups = await this.query.groups(ref.value, today);
+    const occupancy = groups.reduce(
+      (acc, g) => ({
+        occupied: acc.occupied + Object.values(g.occupancyByDay).reduce((s, n) => s + n, 0),
+        capacity: acc.capacity + g.capacity * g.days.length,
+      }),
+      { occupied: 0, capacity: 0 },
+    );
+    return {
+      teacher: {
+        id: teacher.id,
+        name: teacher.name,
+        rateCents: teacher.rate.cents,
+        active: teacher.active,
+      },
+      season: season.startYear,
+      months,
+      balanceCents: owed - ahead,
+      payments,
+      groups,
+      occupancy,
+      students: await this.query.students(ref.value, today),
+      substitutions: await this.query.substitutions(
+        ref.value,
+        season.firstMonth().firstDay(),
+        season.lastMonth().lastDay(),
+      ),
+      duties: await this.query.duties(ref.value),
+    };
   }
 }

@@ -254,3 +254,46 @@ Deno.test('payroll should manage holidays, club duties and substitutions over HT
     ['2026-11-16', '2026-11-23', '2026-11-30'],
   );
 });
+
+Deno.test({
+  name: 'payroll should report a teacher, with advances discounted and shown in accounting',
+  ignore: outsideSeason,
+  async fn() {
+    const { client, teacher } = await fixture();
+    const next = YearMonth.fromString(month).next().toString();
+    const advance = await client.json('POST', '/api/admin/payroll/advances', {
+      teacherId: teacher,
+      month: next,
+      amount: '90',
+      date: today,
+      note: 'Pago de más',
+    });
+    assertEquals(advance.status, 201, JSON.stringify(advance.body));
+    const report = body<{
+      teacher: { name: string };
+      balanceCents: number;
+      months: { status: string; toPayCents: number }[];
+      groups: { name: string; students: number }[];
+      payments: { kind: string; amountCents: number }[];
+    }>(await client.get(`/api/admin/payroll/teachers/${teacher}/report`));
+    assertEquals(report.teacher.name, 'Lucía Moreno Gil');
+    assertEquals(report.groups.length, 1);
+    assertEquals(report.payments.map((p) => [p.kind, p.amountCents]), [['advance', 9000]]);
+    // Saldo: lo pendiente de los meses hasta hoy menos lo adelantado para el mes que viene.
+    const pending = report.months.filter((m) => m.status === 'pending')
+      .reduce((sum, m) => sum + m.toPayCents, 0);
+    assertEquals(report.balanceCents, pending - 9000);
+    const ledger = body<{ items: { source: string; amountCents: number; concept: string }[] }>(
+      await client.get(`/api/admin/accounting/ledger?month=${month}`),
+    );
+    assertEquals(
+      ledger.items.filter((i) => i.source === 'advance').map((i) => i.amountCents),
+      [9000],
+    );
+    assertError(
+      await client.get('/api/admin/payroll/teachers/01990000-0000-7000-8000-000000000000/report'),
+      404,
+      'not_found',
+    );
+  },
+});
