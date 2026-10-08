@@ -189,6 +189,12 @@ export class PayrollFixture
     return Promise.resolve(this.holidays.has(date.toString()));
   }
 
+  holidaysBetween(from: LocalDate, to: LocalDate): Promise<Set<string>> {
+    return Promise.resolve(
+      new Set([...this.holidays.keys()].filter((d) => d >= from.toString() && d <= to.toString())),
+    );
+  }
+
   add(date: LocalDate, name: string): Promise<void> {
     this.holidays.set(date.toString(), name);
     return Promise.resolve();
