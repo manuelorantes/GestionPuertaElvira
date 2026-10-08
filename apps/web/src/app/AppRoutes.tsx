@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router';
 
 import { RequireSession } from '@/features/auth/RequireSession';
+import { RequireStaff } from '@/features/auth/RequireStaff';
 import { HomePage } from '@/pages/home/HomePage';
 import { AccountingPage } from '@/pages/panel/accounting/AccountingPage';
 import { AuditPage } from '@/pages/panel/audit/AuditPage';
@@ -25,17 +26,19 @@ export function AppRoutes() {
         <Route path="cambiar-contrasena" element={<ChangePasswordPage />} />
         <Route element={<PanelLayout />}>
           <Route index element={<PanelHomePage />} />
-          <Route path="clases" element={<ClassesPage />} />
-          <Route path="cobros" element={<BillingPage />} />
-          <Route path="profesores" element={<TeachersPayPage />} />
-          <Route path="profesores/:id" element={<TeacherPage />} />
-          <Route path="contabilidad" element={<AccountingPage />} />
-          <Route path="historial" element={<AuditPage />} />
-          <Route path="usuarios" element={<UsersPage />} />
-          <Route path="importar" element={<ImportPage />} />
-          <Route path="alumnos/pendientes" element={<PendingDataPage />} />
-          <Route path="alumnos" element={<StudentsPage />}>
-            <Route path=":id" element={<StudentPanel />} />
+          <Route element={<RequireStaff />}>
+            <Route path="clases" element={<ClassesPage />} />
+            <Route path="cobros" element={<BillingPage />} />
+            <Route path="profesores" element={<TeachersPayPage />} />
+            <Route path="profesores/:id" element={<TeacherPage />} />
+            <Route path="contabilidad" element={<AccountingPage />} />
+            <Route path="historial" element={<AuditPage />} />
+            <Route path="usuarios" element={<UsersPage />} />
+            <Route path="importar" element={<ImportPage />} />
+            <Route path="alumnos/pendientes" element={<PendingDataPage />} />
+            <Route path="alumnos" element={<StudentsPage />}>
+              <Route path=":id" element={<StudentPanel />} />
+            </Route>
           </Route>
         </Route>
       </Route>

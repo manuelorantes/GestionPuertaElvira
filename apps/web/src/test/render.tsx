@@ -61,6 +61,7 @@ export const ADMIN = {
   fullName: 'Lucía Moreno Gil',
   email: 'junta@club.es',
   role: 'administrator',
+  teacherId: null,
   mustChangePassword: false,
   impersonatedBy: null,
 } as const;
@@ -70,6 +71,16 @@ export const SUPERADMIN = {
   id: 'u0',
   fullName: 'Administración Pruebas',
   role: 'superadministrator',
+} as const;
+
+/** Profesora con la cuenta vinculada a su ficha (t1). */
+export const TEACHER = {
+  ...ADMIN,
+  id: 'u2',
+  fullName: 'Lucía Moreno Gil',
+  email: 'lucia@club.es',
+  role: 'teacher',
+  teacherId: 't1',
 } as const;
 
 export const NO_SESSION: Reply = [

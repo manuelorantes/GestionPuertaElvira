@@ -105,14 +105,30 @@ MUST quedar en el historial a su nombre, como el resto de cuentas.
 
 #### Scenario: Profesorado en una sección de administración
 - **WHEN** una cuenta de profesorado intenta acceder a una sección reservada a administración
-- **THEN** el sistema se lo impide indicando que no tiene permiso
+- **THEN** el sistema se lo impide indicando que no tiene permiso, y en la aplicación vuelve a sus clases
+
+### Requirement: Cuenta de profesorado vinculada a su profesor
+Una cuenta de profesorado MUST vincularse a la ficha de un profesor para ver lo suyo, y solo lo suyo: sus clases,
+sus alumnos y sus pagos (ver la spec de profesorado). Su menú tiene solo esas secciones. Un profesor MUST tener
+como mucho una cuenta, y solo las cuentas de profesorado se vinculan; al cambiar una cuenta a otro rol se
+desvincula. Una cuenta de profesorado sin vincular entra y ve un aviso para que administración la vincule, sin
+ningún dato.
+
+#### Scenario: Vincular al crear la cuenta
+- **WHEN** superadministración crea una cuenta con rol profesorado y elige a Lucía Moreno Gil como profesor
+- **THEN** esa cuenta ve las clases de Lucía al entrar
+
+#### Scenario: Un profesor ya vinculado
+- **WHEN** superadministración vincula a Lucía a una segunda cuenta
+- **THEN** el sistema lo rechaza: ese profesor ya tiene otra cuenta vinculada
 
 ### Requirement: Sección Usuarios
 Superadministración MUST tener una sección «Usuarios», que nadie más ve, con todas las cuentas: nombre, email,
 rol, estado (activa o desactivada, y si tiene contraseña temporal) y última conexión (último inicio de sesión
 o actividad; «Nunca» si no ha entrado). Por defecto muestra las activas, con filtros Activos, Desactivados y
 Todos. Desde ella MUST poder crear cuentas, restablecer contraseñas (se muestra una contraseña temporal una
-sola vez y se cierran sus sesiones), desactivar y reactivar cuentas y cambiar su rol. Nadie MUST poder
+sola vez y se cierran sus sesiones), desactivar y reactivar cuentas, cambiar su rol y, en las de profesorado,
+elegir el profesor al que corresponden («Sin vincular» si ninguno). Nadie MUST poder
 desactivar su propia cuenta ni cambiar su propio rol. Cada acción queda en el historial.
 
 #### Scenario: Restablecer una contraseña

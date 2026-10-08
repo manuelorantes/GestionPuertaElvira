@@ -9,6 +9,8 @@ export interface ClubUser {
   status: 'active' | 'disabled';
   mustChangePassword: boolean;
   createdAt: string;
+  /** Profesor vinculado (solo cuentas de profesorado), o null. */
+  teacher: { id: string; name: string } | null;
   /** Último inicio de sesión o actividad, o null si nunca ha entrado. */
   lastSeenAt: string | null;
 }
@@ -22,6 +24,8 @@ export async function createUser(input: {
   email: string;
   fullName: string;
   role: Role;
+  /** Profesor al que se vincula una cuenta de profesorado. */
+  teacherId?: string | null;
 }): Promise<string> {
   return (await apiSend<{ temporaryPassword: string }>('POST', '/api/admin/users', input))
     .temporaryPassword;
@@ -39,4 +43,9 @@ export function setEnabled(id: string, enabled: boolean): Promise<void> {
 
 export function changeRole(id: string, role: Role): Promise<void> {
   return apiSend('PUT', `/api/admin/users/${id}/role`, { role });
+}
+
+/** Vincula una cuenta de profesorado a un profesor, o la desvincula con null. */
+export function linkTeacher(id: string, teacherId: string | null): Promise<void> {
+  return apiSend('PUT', `/api/admin/users/${id}/teacher`, { teacherId });
 }

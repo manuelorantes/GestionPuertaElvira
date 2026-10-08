@@ -12,6 +12,7 @@ const USERS = [
     status: 'active',
     mustChangePassword: false,
     createdAt: '2026-10-01T08:00:00.000Z',
+    teacher: null,
     lastSeenAt: '2026-10-07T06:40:00.000Z',
   },
   {
@@ -22,6 +23,7 @@ const USERS = [
     status: 'active',
     mustChangePassword: true,
     createdAt: '2026-10-07T08:00:00.000Z',
+    teacher: null,
     lastSeenAt: null,
   },
   {
@@ -32,14 +34,32 @@ const USERS = [
     status: 'disabled',
     mustChangePassword: false,
     createdAt: '2026-09-01T08:00:00.000Z',
+    teacher: null,
     lastSeenAt: '2026-09-15T16:00:00.000Z',
   },
+  {
+    id: 'u4',
+    email: 'lucia@club.es',
+    fullName: 'Lucía Moreno Gil',
+    role: 'teacher',
+    status: 'active',
+    mustChangePassword: false,
+    createdAt: '2026-10-08T08:00:00.000Z',
+    teacher: { id: 't1', name: 'Lucía Moreno Gil' },
+    lastSeenAt: null,
+  },
+];
+
+const TEACHERS = [
+  { id: 't1', fullName: 'Lucía Moreno Gil', active: true, groupCount: 2, hourlyRate: '16' },
+  { id: 't2', fullName: 'Carlos Ruiz Márquez', active: true, groupCount: 1, hourlyRate: '15' },
 ];
 
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /api/auth/me': [200, { user: SUPERADMIN }],
     'GET /api/admin/users': [200, { items: USERS }],
+    'GET /api/admin/teachers': [200, { items: TEACHERS }],
     ...extra,
   });
 }
@@ -172,5 +192,45 @@ describe('Usuarios', () => {
       expect(screen.queryByRole('heading', { name: 'Usuarios' })).not.toBeInTheDocument(),
     );
     expect(screen.queryByRole('table', { name: 'Cuentas de usuario' })).not.toBeInTheDocument();
+  });
+
+  it('links a teacher account to its teacher when creating it and from its row', async () => {
+    const spy = api({
+      'POST /api/admin/users': [201, { id: 'u5', temporaryPassword: 'alfil-torre-42' }],
+      'PUT /api/admin/users/u4/teacher': [204],
+    });
+    renderApp('/panel/usuarios');
+
+    const table = await screen.findByRole('table', { name: 'Cuentas de usuario' });
+    const lucia = within(table).getByRole('row', { name: /lucia@club.es/ });
+    const link = within(lucia).getByRole('combobox', { name: 'Profesor de Lucía Moreno Gil' });
+    await waitFor(() => expect(link).toHaveValue('t1'));
+    await userEvent.selectOptions(link, 'Sin vincular');
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/users/u4/teacher')).toEqual({ teacherId: null }),
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Nueva cuenta' }));
+    const dialog = await screen.findByRole('dialog');
+    await userEvent.type(within(dialog).getByLabelText('Email'), 'carlos@club.es');
+    await userEvent.type(within(dialog).getByLabelText(/Nombre/), 'Carlos Ruiz Márquez');
+    expect(within(dialog).queryByRole('combobox', { name: 'Profesor' })).not.toBeInTheDocument();
+    await userEvent.selectOptions(
+      within(dialog).getByRole('combobox', { name: 'Rol' }),
+      'Profesorado',
+    );
+    await userEvent.selectOptions(
+      within(dialog).getByRole('combobox', { name: 'Profesor' }),
+      'Carlos Ruiz Márquez',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Crear cuenta' }));
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/users')).toEqual({
+        email: 'carlos@club.es',
+        fullName: 'Carlos Ruiz Márquez',
+        role: 'teacher',
+        teacherId: 't2',
+      }),
+    );
   });
 });

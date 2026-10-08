@@ -1,9 +1,10 @@
 import { LogOut } from 'lucide-react';
 import { NavLink, useLocation, type Location } from 'react-router';
 
+import type { Role } from '@/features/auth/api';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 
-import { MOBILE_SECTIONS } from './panelSections';
+import { MOBILE_SECTIONS, sectionsFor } from './panelSections';
 
 /**
  * Un acceso con parámetros (p. ej. «Horas» → Profesores, pestaña de horas) solo se marca si la URL los tiene:
@@ -38,14 +39,17 @@ export function PanelMobileHeader({ title, onLogout }: { title: string; onLogout
   );
 }
 
-export function PanelMobileNav() {
+const COLUMNS: Record<number, string> = { 3: 'grid-cols-3', 4: 'grid-cols-4' };
+
+export function PanelMobileNav({ role }: { role: Role }) {
   const location = useLocation();
+  const sections = sectionsFor(MOBILE_SECTIONS, role);
   return (
     <nav
       aria-label="Secciones móvil"
-      className="grid grid-cols-4 border-t border-line-soft bg-surface-raised pb-2 md:hidden"
+      className={`grid ${COLUMNS[sections.length] ?? 'grid-cols-4'} border-t border-line-soft bg-surface-raised pb-2 md:hidden`}
     >
-      {MOBILE_SECTIONS.map(({ id, label, icon: Icon, path }) =>
+      {sections.map(({ id, label, icon: Icon, path }) =>
         path ? (
           <NavLink
             key={id}

@@ -7,19 +7,22 @@ import { useSession } from '@/features/auth/useSession';
 
 import { PanelMobileHeader, PanelMobileNav } from './PanelMobileBars';
 import { PanelSidebar } from './PanelSidebar';
-import { PANEL_SECTIONS } from './panelSections';
+import { PANEL_SECTIONS, sectionsFor } from './panelSections';
 
 export function PanelLayout() {
   const { data: user } = useSession();
   const logout = useLogout();
   const stop = useStopImpersonation();
   const { pathname } = useLocation();
-  const title =
-    PANEL_SECTIONS.filter((section) => section.path && section.path !== '/panel').find((section) =>
-      pathname.startsWith(section.path ?? ''),
-    )?.label ?? 'Resumen';
-
   if (!user) return null;
+
+  const sections = sectionsFor(PANEL_SECTIONS, user.role);
+  const title =
+    sections
+      .filter((section) => section.path && section.path !== '/panel')
+      .find((section) => pathname.startsWith(section.path ?? ''))?.label ??
+    sections.find((section) => section.path === '/panel')?.label ??
+    'Resumen';
 
   const handleLogout = () => logout.mutate();
 
@@ -51,7 +54,7 @@ export function PanelLayout() {
         <div className="min-h-0 min-w-0 flex-1 overflow-auto">
           <Outlet />
         </div>
-        <PanelMobileNav />
+        <PanelMobileNav role={user.role} />
       </div>
     </div>
   );
