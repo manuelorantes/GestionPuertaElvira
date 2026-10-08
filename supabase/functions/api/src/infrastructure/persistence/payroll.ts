@@ -349,7 +349,12 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
 
   async sessions(month: YearMonth, teacherId: string | null): Promise<SessionView[]> {
     const rows = await this.sql`
-      SELECT s.*, t.full_name, COALESCE(st.rate_cents, t.hourly_rate_cents) AS rate_cents, st.teacher_id IS NOT NULL AS locked
+      SELECT s.*, t.full_name, COALESCE(st.rate_cents, t.hourly_rate_cents) AS rate_cents, st.teacher_id IS NOT NULL AS locked,
+             EXISTS (
+               SELECT 1 FROM payroll_substitution sub
+                WHERE sub.teacher_id = s.teacher_id AND sub.substitution_date = s.session_date
+                  AND (s.group_id = sub.group_id OR s.source = 'duty:' || sub.duty_id)
+             ) AS substitution
         FROM payroll_session s
         JOIN teachers_teacher t ON t.id = s.teacher_id
         LEFT JOIN payroll_settlement st ON st.teacher_id = s.teacher_id AND st.month = ${month.toString()}
@@ -367,6 +372,7 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
       costCents: Math.round((row.int('rate_cents') * row.int('minutes')) / 60),
       fromSchedule: row.bool('from_schedule'),
       locked: row.bool('locked'),
+      substitution: row.bool('substitution'),
     }));
   }
 
