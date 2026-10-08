@@ -2,6 +2,7 @@ import { CheckHealth } from './application/health/mod.ts';
 import { ApiApp } from './infrastructure/http/app.ts';
 import { SessionCookie } from './infrastructure/http/cookie.ts';
 import { registerAccountingRoutes } from './infrastructure/accounting/routes.ts';
+import { registerAttendanceRoutes } from './infrastructure/attendance/routes.ts';
 import {
   LocalDocumentStorage,
   SupabaseDocumentStorage,
@@ -103,5 +104,6 @@ export function buildApp(config: Config, options: { db?: Db; logger?: Logger } =
   registerUserRoutes(api);
   registerImportRoutes(api);
   registerDashboardRoutes(api);
+  registerAttendanceRoutes(api);
   return api;
 }
