@@ -120,6 +120,8 @@ export interface SessionView {
   costCents: number;
   fromSchedule: boolean;
   locked: boolean;
+  /** La dio en lugar de su profesor (sustitución planificada de esa clase o turno ese día). */
+  substitution: boolean;
 }
 
 /** Grupos de un profesor y plazas de sus clases: ocupadas y totales, contando cada día de clase. */
