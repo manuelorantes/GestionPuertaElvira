@@ -118,6 +118,22 @@ Deno.test('GenerateMonthlyCharges should charge members their season fee once an
   assertEquals(summer.charges.size, 0);
 });
 
+Deno.test('GenerateMonthlyCharges should create the missing charges of some students only, right away', async () => {
+  const fx = new BillingFixture();
+  const martina = fx.student({ regularHours: 2 });
+  const pablo = fx.student({ regularHours: 2 });
+  await new UpdateStudentAccount(fx).execute(martina, 'monthly', true, null);
+  const generator = new GenerateMonthlyCharges(fx, fx, fx, fx, fx.clock, fx.transactions, fx.locks);
+
+  await generator.forStudents([martina]);
+  assertEquals(
+    [...fx.charges.values()].map((c) => [c.student.value, c.kind, c.period.toString()]).sort(),
+    [[martina, 'membership', '2026-09'], [martina, 'monthly', '2026-10']].sort(),
+  );
+  await generator.forStudents([martina, pablo]);
+  assertEquals(fx.charges.size, 3, 'solo crea la que le falta a Pablo');
+});
+
 Deno.test('QuotePayment should use the agreed private rate, quote without saving and suggest months from the preference', async () => {
   const fx = new BillingFixture();
   const privateStudent = fx.student({
