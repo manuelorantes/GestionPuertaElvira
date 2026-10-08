@@ -3,6 +3,7 @@ import { assertEquals, assertRejects } from '@std/assert';
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
   SettlementAlreadyPaid,
+  Substitution,
   TeacherRef,
   type TimesheetEntry,
 } from '../../src/domain/payroll/mod.ts';
@@ -24,6 +25,7 @@ import {
   SaveDuty,
   SubstituteTeacher,
   SubstitutionNeedsReason,
+  TeacherAgenda,
   TeacherReport,
   UpdateSession,
 } from '../../src/application/payroll/mod.ts';
@@ -566,4 +568,38 @@ Deno.test('TeacherReport should gather the months, payments and balance of a tea
     ['2026-09-30', 'settlement', '2026-09', 13500],
     ['2026-09-30', 'advance', '2026-10', 9000],
   ]);
+});
+
+Deno.test('TeacherAgenda should list the classes a teacher gives each day, with substitutions and without holidays', async () => {
+  const { fx, lucia, carlos, duties, substitutions } = setUp();
+  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
+  const iniciacion = fx.scheduledGroups[0];
+  if (!iniciacion) throw new Error('Falta el grupo');
+  // Carlos da la clase de Lucía del miércoles 14.
+  fx.substitutions.set(
+    'sub-1',
+    new Substitution(
+      iniciacion.id,
+      LocalDate.fromString('2026-10-14'),
+      TeacherRef.fromString(carlos),
+      'Torneo',
+    ),
+  );
+  const agenda = new TeacherAgenda(fx, duties, substitutions, fx);
+  const week = (teacher: string) =>
+    agenda.execute(teacher, '2026-10-12', '2026-10-18').then((items) =>
+      items.map((i) => [i.date, i.label, i.start, i.minutes, i.substitution])
+    );
+
+  assertEquals(await week(lucia), [], 'el lunes es festivo y el miércoles la da Carlos');
+  assertEquals(await week(carlos), [
+    ['2026-10-13', 'Adultos I', '17:00', 90, false],
+    ['2026-10-14', 'Iniciación A', '17:00', 60, true],
+  ]);
+  assertEquals((await agenda.execute(lucia, '2026-10-19', '2026-10-25')).length, 2);
+  await assertRejects(
+    () => agenda.execute(lucia, '2026-10-01', '2026-12-31'),
+    InvalidValue,
+    '62 días',
+  );
 });

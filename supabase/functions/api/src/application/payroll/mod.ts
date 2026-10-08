@@ -1227,3 +1227,69 @@ export class TeacherReport {
     };
   }
 }
+
+/** Clase o turno de un profesor un día de su agenda. */
+export interface AgendaItem {
+  date: string;
+  groupId: string | null;
+  dutyId: string | null;
+  label: string;
+  /** «HH:MM». */
+  start: string;
+  end: string;
+  minutes: number;
+  /** La da sustituyendo a su titular. */
+  substitution: boolean;
+}
+
+/** Como mucho dos meses de agenda de una vez. */
+const MAX_AGENDA_DAYS = 62;
+
+const clockTime = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+/**
+ * Las clases y turnos que da un profesor cada día de un periodo según el horario: las suyas salvo las que le
+ * sustituyen, más las que da sustituyendo a otro; los festivos no tienen clase. No depende de las horas apuntadas,
+ * así que la agenda de hoy está completa aunque las horas se apunten por la noche.
+ */
+export class TeacherAgenda {
+  constructor(
+    private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
+    private readonly substitutions: SubstitutionRepository,
+    private readonly holidays: HolidayCalendar,
+  ) {}
+
+  async execute(teacherId: string, from: string, to: string): Promise<AgendaItem[]> {
+    const teacher = TeacherRef.fromString(teacherId);
+    const first = LocalDate.fromString(from);
+    const last = LocalDate.fromString(to);
+    if (last.isBefore(first) || first.plusDays(MAX_AGENDA_DAYS).isBefore(last)) {
+      throw new InvalidValue('to', `Como mucho ${MAX_AGENDA_DAYS} días de agenda de una vez.`);
+    }
+    const groups = await this.schedule.groups();
+    const duties = await this.duties.all();
+    const items: AgendaItem[] = [];
+    for (let date = first; !last.isBefore(date); date = date.plusDays(1)) {
+      if (await this.holidays.isHoliday(date)) continue;
+      const substitutions = await this.substitutions.onDate(date);
+      for (const planned of new DailyPlanner().plan(date, groups, duties, substitutions, null)) {
+        if (!planned.teacher.equals(teacher)) continue;
+        const group = groups.find((g) => planned.group?.equals(g.id));
+        const duty = duties.find((d) => planned.source === `duty:${d.id.value}`);
+        items.push({
+          date: date.toString(),
+          groupId: group?.id.value ?? null,
+          dutyId: duty?.id.value ?? null,
+          label: group?.name ?? duty?.label ?? planned.label,
+          start: clockTime(planned.start),
+          end: clockTime(planned.start + planned.minutes.minutes),
+          minutes: planned.minutes.minutes,
+          substitution: substitutions.some((s) => s.source === planned.source),
+        });
+      }
+    }
+    return items;
+  }
+}
