@@ -1,14 +1,18 @@
 import { assertEquals, assertRejects } from '@std/assert';
 
-import type { LocalDate } from '../../src/domain/common/mod.ts';
+import { LocalDate } from '../../src/domain/common/mod.ts';
 import { type RollCall, RollCallClosed } from '../../src/domain/attendance/mod.ts';
 import {
   type ClassAssignments,
   ClassNotGiven,
   type ClassOnDay,
   type ClassRoster,
+  ConfirmWithoutRollCall,
+  type MissedRollCallQuery,
+  MissedRollCalls,
   OpenRollCall,
   type RollCallRepository,
+  RollCallStillOpen,
   TakeRollCall,
   TeacherClasses,
 } from '../../src/application/attendance/mod.ts';
@@ -113,4 +117,40 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, a
     () => new TakeRollCall(agenda, roster, rolls, late).execute('t1', 'g1', '2026-10-13', []),
     RollCallClosed,
   );
+});
+
+const MISSED = {
+  sessionId: 'p1',
+  groupId: 'g1',
+  date: '2026-10-13',
+  label: 'Martes y jueves 17:00 · Intermedio · Alfil',
+  teacherName: 'Lucía Moreno Gil',
+  locked: false,
+};
+
+Deno.test('MissedRollCalls should list the recorded classes without a roll call once the deadline is over', async () => {
+  const asked: string[] = [];
+  const query: MissedRollCallQuery = {
+    since: () => Promise.resolve(LocalDate.fromString('2026-10-10')),
+    missed: (from, until) => {
+      asked.push(`${from.toString()}…${until.toString()}`);
+      return Promise.resolve([MISSED]);
+    },
+  };
+  const clock = new FrozenClock('2026-10-16T09:00:00+02:00');
+  assertEquals(await new MissedRollCalls(query, clock).execute(), [MISSED]);
+  // El plazo del 14 acaba el 15 a medianoche: el 16 se avisa hasta el 14.
+  assertEquals(asked, ['2026-10-10…2026-10-14']);
+});
+
+Deno.test('ConfirmWithoutRollCall should keep a missed class only once its deadline is over and without a list', async () => {
+  const rolls = new InMemoryRollCalls();
+  const confirm = (now: string, date = '2026-10-13') =>
+    new ConfirmWithoutRollCall(rolls, new FrozenClock(now)).execute('g1', date, 'u1');
+
+  await assertRejects(() => confirm('2026-10-14T20:00:00+02:00'), RollCallStillOpen);
+  await confirm('2026-10-15T09:00:00+02:00');
+  assertEquals((await rolls.find('g1', LocalDate.fromString('2026-10-13')))?.kind(), 'confirmed');
+  await confirm('2026-10-15T10:00:00+02:00');
+  assertEquals(rolls.saved.size, 1, 'darla por buena dos veces no cambia nada');
 });

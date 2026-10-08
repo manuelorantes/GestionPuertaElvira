@@ -1,6 +1,8 @@
-import type { LocalDate } from '../../domain/common/mod.ts';
+import { LocalDate } from '../../domain/common/mod.ts';
 import type {
   ClassRoster,
+  MissedRollCall,
+  MissedRollCallQuery,
   RosterStudent,
   TeacherGroupRoster,
   TeacherRosterQuery,
@@ -67,6 +69,42 @@ export class SqlTeacherRosterQuery implements TeacherRosterQuery {
           name: s.string('full_name'),
           days: codes(s.intList('days')),
         })),
+    }));
+  }
+}
+
+/** Clases apuntadas en las horas sin lista ni confirmación (sesiones de grupo frente a `attendance_roll_call`). */
+export class SqlMissedRollCallQuery implements MissedRollCallQuery {
+  constructor(private readonly sql: Sql) {}
+
+  async since(): Promise<LocalDate> {
+    const rows = await this.sql`SELECT since::text AS since FROM attendance_settings WHERE id = 1`;
+    return rows[0]
+      ? LocalDate.fromString(new Row(rows[0]).string('since'))
+      : LocalDate.fromInstant(new Date());
+  }
+
+  async missed(from: LocalDate, until: LocalDate): Promise<MissedRollCall[]> {
+    const rows = await this.sql`
+      SELECT s.id, s.group_id, s.session_date::text AS date, COALESCE(g.name, s.label) AS label,
+             t.full_name, st.teacher_id IS NOT NULL AS locked
+        FROM payroll_session s
+        JOIN teachers_teacher t ON t.id = s.teacher_id
+        LEFT JOIN classes_group g ON g.id = s.group_id
+        LEFT JOIN payroll_settlement st
+               ON st.teacher_id = s.teacher_id AND st.month = to_char(s.session_date, 'YYYY-MM')
+       WHERE s.group_id IS NOT NULL
+         AND s.session_date BETWEEN ${from.toString()} AND ${until.toString()}
+         AND NOT EXISTS (SELECT 1 FROM attendance_roll_call r
+                          WHERE r.group_id = s.group_id AND r.roll_date = s.session_date)
+       ORDER BY s.session_date, s.start_minutes NULLS LAST, label`;
+    return Row.all(rows).map((r) => ({
+      sessionId: r.string('id'),
+      groupId: r.string('group_id'),
+      date: r.string('date'),
+      label: r.string('label'),
+      teacherName: r.string('full_name'),
+      locked: r.bool('locked'),
     }));
   }
 }

@@ -199,3 +199,65 @@ export class TakeRollCall {
     await this.rollCalls.save(roll);
   }
 }
+
+/** Clase apuntada en las horas (sesión de un grupo) sin lista y con el plazo acabado. */
+export interface MissedRollCall {
+  /** Sesión de horas de esa clase, para quitarla si no se dio. */
+  sessionId: string;
+  groupId: string;
+  date: string;
+  label: string;
+  teacherName: string;
+  /** Su liquidación ya está pagada: la sesión no se puede quitar. */
+  locked: boolean;
+}
+
+export interface MissedRollCallQuery {
+  /** Primer día que cuenta (el día en que se activó la asistencia). */
+  since(): Promise<LocalDate>;
+  /** Sesiones de grupo entre esas fechas sin lista ni confirmación, de la más antigua a la más reciente. */
+  missed(from: LocalDate, until: LocalDate): Promise<MissedRollCall[]>;
+}
+
+/** Último día cuyo plazo ya acabó: anteayer (el de ayer se puede pasar hasta el final de hoy). */
+const lastClosedDay = (now: Date) => LocalDate.fromInstant(now).plusDays(-2);
+
+/** Listas sin pasar: clases apuntadas cuyo plazo acabó sin lista (para quitarlas o darlas por buenas). */
+export class MissedRollCalls {
+  constructor(
+    private readonly query: MissedRollCallQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(): Promise<MissedRollCall[]> {
+    const until = lastClosedDay(this.clock.now());
+    const since = await this.query.since();
+    return until.isBefore(since) ? [] : await this.query.missed(since, until);
+  }
+}
+
+/** Aún se puede pasar la lista: no se puede dar por buena todavía. */
+export class RollCallStillOpen extends Error {
+  constructor() {
+    super(
+      'El profesor todavía puede pasar esta lista (hasta el final del día siguiente a la clase).',
+    );
+    this.name = 'RollCallStillOpen';
+  }
+}
+
+/** Administración da por buena una clase sin lista (se dio y cuenta): deja de salir en el aviso. */
+export class ConfirmWithoutRollCall {
+  constructor(
+    private readonly rollCalls: RollCallRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(groupId: string, date: string, userId: string): Promise<void> {
+    const day = LocalDate.fromString(date);
+    const now = this.clock.now();
+    if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
+    if ((await this.rollCalls.find(groupId, day)) !== null) return;
+    await this.rollCalls.save(RollCall.confirm(groupId, day, userId, now));
+  }
+}
