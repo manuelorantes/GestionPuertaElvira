@@ -155,3 +155,50 @@ describe('Pasar lista', () => {
     expect(screen.queryByRole('button', { name: 'Guardar lista' })).not.toBeInTheDocument();
   });
 });
+
+describe('Mis pagos', () => {
+  it('shows the season totals and each month with its status, latest first', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      'GET /api/teacher/pay': [
+        200,
+        {
+          season: 2026,
+          months: [
+            {
+              month: '2026-09',
+              minutes: 900,
+              amountCents: 22500,
+              advancesCents: 0,
+              toPayCents: 22500,
+              status: 'paid',
+              paidOn: '2026-09-30',
+            },
+            {
+              month: '2026-10',
+              minutes: 540,
+              amountCents: 13500,
+              advancesCents: 5000,
+              toPayCents: 8500,
+              status: 'pending',
+              paidOn: null,
+            },
+          ],
+          totals: { minutes: 1440, amountCents: 36000, receivedCents: 27500, owedCents: 8500 },
+        },
+      ],
+    });
+    renderApp('/panel/mis-pagos');
+
+    const season = await screen.findByRole('region', { name: 'Temporada' });
+    expect(season).toHaveTextContent('Te debemos85 €');
+    expect(season).toHaveTextContent('Cobrado275 €');
+    expect(season).toHaveTextContent('Horas24 h');
+    const months = screen.getByRole('region', { name: 'Mes a mes' });
+    const [first, second] = within(months).getAllByRole('heading');
+    expect(first).toHaveTextContent('Octubre 2026');
+    expect(second).toHaveTextContent('Septiembre 2026');
+    expect(months).toHaveTextContent('Pagada el 30/09/2026');
+    expect(months).toHaveTextContent('Anticipos−50 €');
+  });
+});
