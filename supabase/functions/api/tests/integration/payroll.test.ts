@@ -197,6 +197,22 @@ Deno.test('payroll should manage holidays, club duties and substitutions over HT
   assertEquals(listed.items.map((s) => [s.date, s.substituteName, s.start, s.reason]), [
     ['2026-11-09', 'Ángel Castillo Rodriguez', '17:00', 'Torneo'],
   ]);
+  // Las horas de ese lunes de Ángel salen como sustitución; las del titular otro lunes, no.
+  for (const [who, date] of [[other, '2026-11-09'], [teacher, '2026-11-02']]) {
+    const recorded = await client.json('POST', '/api/admin/payroll/sessions', {
+      teacherId: who,
+      date,
+      groupId: group,
+      hours: 1,
+    });
+    assertEquals(recorded.status, 201, JSON.stringify(recorded.body));
+  }
+  const sessionsOf = async (who: string) =>
+    ((await client.get(`/api/admin/payroll/sessions?month=2026-11&teacherId=${who}`)).body as {
+      items: { date: string; substitution: boolean }[];
+    }).items.map((s) => [s.date, s.substitution]);
+  assertEquals(await sessionsOf(other), [['2026-11-09', true]]);
+  assertEquals(await sessionsOf(teacher), [['2026-11-02', false]]);
   assertError(
     await client.json('POST', '/api/admin/payroll/substitutions', {
       groupId: group,
