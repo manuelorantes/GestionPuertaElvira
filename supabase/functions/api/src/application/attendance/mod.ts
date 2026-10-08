@@ -1,4 +1,5 @@
-import { type Clock, LocalDate } from '../../domain/common/mod.ts';
+import { RollCall } from '../../domain/attendance/mod.ts';
+import { type Clock, LocalDate, minutesOfDayInMadrid } from '../../domain/common/mod.ts';
 
 /** Clase (o turno) que da un profesor un día, según el horario y las sustituciones. */
 export interface ClassOnDay {
@@ -46,10 +47,49 @@ export interface TeacherRosterQuery {
   groupsOf(teacherId: string, on: LocalDate): Promise<TeacherGroupRoster[]>;
 }
 
-/** Una clase de la agenda del profesor, con su aula y los alumnos que van ese día. */
+export interface RollCallRepository {
+  find(group: string, date: LocalDate): Promise<RollCall | null>;
+  save(rollCall: RollCall): Promise<void>;
+}
+
+/** La clase no es de ese profesor ese día (ni suya ni la sustituye). */
+export class ClassNotGiven extends Error {
+  constructor() {
+    super('Esa clase no la das tú ese día.');
+    this.name = 'ClassNotGiven';
+  }
+}
+
+/**
+ * Estado de la lista de una clase: pasada (o dada por buena), abierta (se puede pasar ya), aún no (no ha empezado)
+ * o sin pasar (acabó el plazo).
+ */
+export type RollCallStatus = 'taken' | 'open' | 'upcoming' | 'missed';
+
+const minutesOf = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+};
+
+function statusOf(item: ClassOnDay, roll: RollCall | null, now: Date): RollCallStatus {
+  if (roll !== null) return 'taken';
+  const date = LocalDate.fromString(item.date);
+  const today = LocalDate.fromInstant(now);
+  if (
+    today.isBefore(date) ||
+    (today.equals(date) && minutesOfDayInMadrid(now) < minutesOf(item.start))
+  ) {
+    return 'upcoming';
+  }
+  return date.plusDays(1).isBefore(today) ? 'missed' : 'open';
+}
+
+/** Una clase de la agenda del profesor, con su aula, los alumnos que van ese día y el estado de su lista. */
 export interface TeacherClassView extends ClassOnDay {
   classroom: string | null;
   students: number;
+  /** null en los turnos, que no tienen lista. */
+  rollCall: RollCallStatus | null;
 }
 
 /** Las clases de un profesor en un periodo (hoy, la semana…) con aula y alumnos de cada día. */
@@ -57,21 +97,25 @@ export class TeacherClasses {
   constructor(
     private readonly assignments: ClassAssignments,
     private readonly roster: ClassRoster,
+    private readonly rollCalls: RollCallRepository,
+    private readonly clock: Clock,
   ) {}
 
   async execute(teacherId: string, from: string, to: string): Promise<TeacherClassView[]> {
     const classes = await this.assignments.agenda(teacherId, from, to);
+    const now = this.clock.now();
     const views: TeacherClassView[] = [];
     for (const item of classes) {
       if (item.groupId === null) {
-        views.push({ ...item, classroom: null, students: 0 });
+        views.push({ ...item, classroom: null, students: 0, rollCall: null });
         continue;
       }
+      const date = LocalDate.fromString(item.date);
       views.push({
         ...item,
         classroom: await this.roster.classroomOf(item.groupId),
-        students: (await this.roster.studentsOn(item.groupId, LocalDate.fromString(item.date)))
-          .length,
+        students: (await this.roster.studentsOn(item.groupId, date)).length,
+        rollCall: statusOf(item, await this.rollCalls.find(item.groupId, date), now),
       });
     }
     return views;
@@ -87,5 +131,71 @@ export class TeacherStudents {
 
   execute(teacherId: string): Promise<TeacherGroupRoster[]> {
     return this.query.groupsOf(teacherId, LocalDate.fromInstant(this.clock.now()));
+  }
+}
+
+/** La lista de una clase tal y como la ve el profesor: alumnos de ese día, marcados como presentes por defecto. */
+export interface RollCallView extends TeacherClassView {
+  groupId: string;
+  students: number;
+  list: { id: string; name: string; present: boolean }[];
+}
+
+/** La clase de ese grupo que da el profesor ese día, o ClassNotGiven. */
+async function givenClass(
+  assignments: ClassAssignments,
+  teacherId: string,
+  groupId: string,
+  date: LocalDate,
+): Promise<ClassOnDay & { groupId: string }> {
+  const day = date.toString();
+  const found = (await assignments.agenda(teacherId, day, day)).find((c) => c.groupId === groupId);
+  if (!found || found.groupId === null) throw new ClassNotGiven();
+  return { ...found, groupId: found.groupId };
+}
+
+export class OpenRollCall {
+  constructor(
+    private readonly assignments: ClassAssignments,
+    private readonly roster: ClassRoster,
+    private readonly rollCalls: RollCallRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string, groupId: string, date: string): Promise<RollCallView> {
+    const day = LocalDate.fromString(date);
+    const item = await givenClass(this.assignments, teacherId, groupId, day);
+    const students = await this.roster.studentsOn(groupId, day);
+    const roll = await this.rollCalls.find(groupId, day);
+    const absent = roll?.absent() ?? [];
+    return {
+      ...item,
+      classroom: await this.roster.classroomOf(groupId),
+      students: students.length,
+      rollCall: statusOf(item, roll, this.clock.now()),
+      list: students.map((s) => ({ ...s, present: !absent.includes(s.id) })),
+    };
+  }
+}
+
+/** El profesor pasa (o corrige) la lista de una clase que da ese día, marcando a quien falta. */
+export class TakeRollCall {
+  constructor(
+    private readonly assignments: ClassAssignments,
+    private readonly roster: ClassRoster,
+    private readonly rollCalls: RollCallRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string, groupId: string, date: string, absent: string[]): Promise<void> {
+    const day = LocalDate.fromString(date);
+    const item = await givenClass(this.assignments, teacherId, groupId, day);
+    const roster = (await this.roster.studentsOn(groupId, day)).map((s) => s.id);
+    const now = this.clock.now();
+    const start = minutesOf(item.start);
+    const existing = await this.rollCalls.find(groupId, day);
+    const roll = existing ?? RollCall.take(groupId, day, start, teacherId, roster, absent, now);
+    if (existing) existing.correct(start, teacherId, roster, absent, now);
+    await this.rollCalls.save(roll);
   }
 }
