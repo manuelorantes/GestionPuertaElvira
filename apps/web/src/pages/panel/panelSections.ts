@@ -33,7 +33,13 @@ export function sectionsFor(sections: PanelSection[], role: Role): PanelSection[
 /** Lo que ve una cuenta de profesorado: sus clases (para pasar lista), sus alumnos y sus pagos. */
 const TEACHER_SECTIONS: PanelSection[] = [
   { id: 'mis-clases', label: 'Mis clases', icon: CalendarDays, path: '/panel', roles: ['teacher'] },
-  { id: 'mis-alumnos', label: 'Mis alumnos', icon: Users, path: null, roles: ['teacher'] },
+  {
+    id: 'mis-alumnos',
+    label: 'Mis alumnos',
+    icon: Users,
+    path: '/panel/mis-alumnos',
+    roles: ['teacher'],
+  },
   { id: 'mis-pagos', label: 'Mis pagos', icon: Wallet, path: null, roles: ['teacher'] },
 ];
 
