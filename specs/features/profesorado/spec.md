@@ -135,6 +135,26 @@ Contabilidad al pagarla). Administración MUST poder corregir el día en que se 
 - **WHEN** a un profesor se le pagaron 90 € de más en septiembre y se apuntan como anticipo de octubre
 - **THEN** su liquidación de octubre muestra −90 € de anticipo y lo que queda por pagar
 
+### Requirement: Espacio del profesorado
+Una cuenta de profesorado vinculada a un profesor (ver la spec de autenticación) MUST ver, pensado para el móvil, solo
+lo suyo:
+- **Mis clases**: las de hoy y las de la semana, día a día, según el horario: las suyas salvo las que le sustituyen,
+  más las que da sustituyendo a otro (marcadas «Sustitución»), sin festivos; con hora, aula, alumnos que van ese día y
+  el estado de la lista (pasada, por pasar o sin pasar). Desde ahí pasa lista (ver la spec de asistencia).
+- **Mis alumnos**: los alumnos de cada una de sus clases y los días que vienen si no son todos, sin datos de contacto.
+- **Mis pagos**: el mes a mes de la temporada hasta el mes en curso (horas, importe, anticipos, a pagar y estado:
+  pagada y cuándo, pendiente o en curso) y los totales (lo que se le debe, lo cobrado, horas e importe), sin ingresos
+  ni márgenes del club.
+No MUST poder apuntar ni cambiar horas, sustituciones, turnos ni pagos.
+
+#### Scenario: Una sustitución en su semana
+- **WHEN** Lucía da el martes la clase de Carlos y consulta su semana
+- **THEN** ve esa clase el martes marcada «Sustitución», y Carlos no la ve en la suya
+
+#### Scenario: Sus pagos
+- **WHEN** Lucía abre Mis pagos con septiembre pagado y octubre en curso
+- **THEN** ve octubre «En curso» y septiembre «Pagada el 30/09/2026», lo que se le debe y lo cobrado en la temporada
+
 ### Requirement: Acceso restringido
 La gestión del profesorado MUST estar reservada a cuentas de administración.
 
