@@ -632,3 +632,9 @@ export async function generateCharges(
   await useCases(tx, clock).generateCharges.execute(period.toString());
   return `Cuotas de ${period.label()} generadas.`;
 }
+
+/** Apunta las horas automáticas que falten, desde el mes anterior hasta hoy (lo lanza cada noche un workflow). */
+export async function proposeSessions(tx: TransactionSql, clock: Clock): Promise<string> {
+  await useCases(tx, clock).proposeSessions.execute();
+  return `Horas automáticas apuntadas hasta el ${LocalDate.fromInstant(clock.now()).toString()}.`;
+}

@@ -34,14 +34,20 @@ La lista MUST mostrar cada profesor ordenado por nombre, con su tarifa por hora,
 Cada profesor MUST tener una tarifa por hora (lo que el club le paga), de 15 €/h al darlo de alta, editable y nunca negativa.
 
 ### Requirement: Horas apuntadas solas
-Las horas MUST apuntarse solas día a día: al acabar cada clase se crea su sesión, con la duración y la hora de inicio
-del grupo, para quien la da ese día (el titular o quien le sustituye); al acabar cada turno fijo (encargado del club),
-la suya. Solo se rellenan los días desde el mes anterior hasta hoy; un día ya apuntado no se rellena otra vez (lo que
-administración borre no vuelve) y no se tocan las liquidaciones pagadas.
+Las horas MUST apuntarse solas cada noche, con una tarea diaria que se ejecuta después del cierre del club: cada clase
+del día crea su sesión, con la duración y la hora de inicio del grupo, para quien la da ese día (el titular o quien le
+sustituye); cada turno fijo (encargado del club), la suya. La tarea rellena lo que falte desde el mes anterior hasta
+hoy, así que si una noche no se ejecuta, la siguiente lo recupera; un día ya apuntado no se rellena otra vez (lo que
+administración borre no vuelve) y no se tocan las liquidaciones pagadas. Consultar el registro de horas, las
+liquidaciones, la rentabilidad o la ficha de un profesor no apunta nada.
 
 #### Scenario: A media tarde
 - **WHEN** se consulta el registro de horas a las 17:30 de un martes
-- **THEN** están las clases de ese martes que ya han acabado y no las que siguen en curso
+- **THEN** están las clases hasta el lunes y todavía no las de ese martes, que se apuntan esa noche
+
+#### Scenario: Una noche sin tarea
+- **WHEN** la tarea no se ejecuta el martes por la noche
+- **THEN** el miércoles por la noche se apuntan las clases del martes y las del miércoles
 
 ### Requirement: Festivos
 El club MUST tener su calendario de festivos (nacionales, de Andalucía y locales de Granada capital). Un festivo no
