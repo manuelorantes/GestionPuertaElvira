@@ -351,6 +351,7 @@ Deno.test('Profitability should compare the expected hours of the month with the
           ['ana', new Map([[lucia, 120], [carlos, 90]])],
           ['pablo', new Map([[lucia, 120]])],
         ]),
+        studentNames: new Map([['ana', 'Ana Pérez'], ['pablo', 'Pablo Gil']]),
       }),
   };
   const fees = {
@@ -365,14 +366,29 @@ Deno.test('Profitability should compare the expected hours of the month with the
     load,
     fees,
     fx.clock,
-  ).execute('2026-10');
+  ).report('2026-10');
   assertEquals(
-    rows.map((r) => [r.teacherName, r.minutes, r.costCents, r.incomeCents, r.occupied, r.capacity]),
+    rows.items.map((
+      r,
+    ) => [
+      r.teacherName,
+      r.minutes,
+      r.costCents,
+      r.incomeCents,
+      r.occupied,
+      r.capacity,
+      r.students,
+    ]),
     [
-      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20],
-      ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10],
+      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20, 2],
+      ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10, 1],
     ],
   );
+  // Ana va con los dos: cuenta una vez en el total y sale entre los compartidos.
+  assertEquals(rows.students, {
+    total: 2,
+    shared: [{ name: 'Ana Pérez', teachers: ['Carlos Ruiz Márquez', 'Lucía Moreno Gil'] }],
+  });
 });
 
 Deno.test('Substitutions should cover club duty shifts too, alone or with all the classes of the teacher', async () => {
@@ -438,6 +454,7 @@ Deno.test('Profitability should use the hours actually recorded in a month alrea
       Promise.resolve({
         teachers: new Map([[carlos, { groups: ['Adultos I'], occupied: 4, capacity: 10 }]]),
         students: new Map([['ana', new Map([[carlos, 90]])]]),
+        studentNames: new Map([['ana', 'Ana Pérez']]),
       }),
   };
   const fees = { monthlyFees: () => Promise.resolve(new Map([['ana', 4500]])) };
@@ -550,7 +567,10 @@ Deno.test('TeacherReport should gather the months, payments and balance of a tea
     fx,
     fx,
     list(),
-    { classLoad: () => Promise.resolve({ teachers: new Map(), students: new Map() }) },
+    {
+      classLoad: () =>
+        Promise.resolve({ teachers: new Map(), students: new Map(), studentNames: new Map() }),
+    },
     { monthlyFees: () => Promise.resolve(new Map()) },
     fx.clock,
   );

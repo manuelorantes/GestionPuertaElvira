@@ -415,7 +415,7 @@ export function registerPayrollRoutes(api: ApiApp): void {
     const period = month(c, p);
     return c.json({
       month: period.toString(),
-      items: await p.profitability.execute(period.toString()),
+      ...(await p.profitability.report(period.toString())),
     });
   });
 }

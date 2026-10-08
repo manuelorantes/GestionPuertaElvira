@@ -401,19 +401,23 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
     }
     // Minutos semanales de cada alumno con cada profesor durante el mes (con su horario especial, si lo tiene).
     const hours = await this.sql`
-      SELECT e.student_id, g.teacher_id,
+      SELECT e.student_id, s.full_name, g.teacher_id,
              SUM((COALESCE(e.attendance_end_minutes, g.end_minutes) - COALESCE(e.attendance_start_minutes, g.start_minutes))
                  * COALESCE(jsonb_array_length(e.attendance_days::jsonb), jsonb_array_length(g.days::jsonb))) AS minutes
-        FROM classes_enrolment e JOIN classes_group g ON g.id = e.class_group_id
+        FROM classes_enrolment e
+        JOIN classes_group g ON g.id = e.class_group_id
+        JOIN students_student s ON s.id = e.student_id
        WHERE e.enrolled_on <= ${to} AND (e.ends_on IS NULL OR e.ends_on > ${from})
-       GROUP BY e.student_id, g.teacher_id`;
+       GROUP BY e.student_id, s.full_name, g.teacher_id`;
     const students = new Map<string, Map<string, number>>();
+    const studentNames = new Map<string, string>();
     for (const row of Row.all(hours)) {
+      studentNames.set(row.string('student_id'), row.string('full_name'));
       const shares = students.get(row.string('student_id')) ?? new Map<string, number>();
       shares.set(row.string('teacher_id'), row.int('minutes'));
       students.set(row.string('student_id'), shares);
     }
-    return { teachers, students };
+    return { teachers, students, studentNames };
   }
 }
 
