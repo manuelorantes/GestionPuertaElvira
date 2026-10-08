@@ -1,3 +1,4 @@
+import type { Clock } from './domain/common/mod.ts';
 import { CheckHealth } from './application/health/mod.ts';
 import { ApiApp } from './infrastructure/http/app.ts';
 import { SessionCookie } from './infrastructure/http/cookie.ts';
@@ -64,12 +65,15 @@ export function configFromEnv(env: (name: string) => string | undefined = Deno.e
 }
 
 /** Monta la aplicación completa: cada contexto registra sus rutas aquí, en el orden de los prefijos. */
-export function buildApp(config: Config, options: { db?: Db; logger?: Logger } = {}): ApiApp {
+export function buildApp(
+  config: Config,
+  options: { db?: Db; logger?: Logger; clock?: Clock } = {},
+): ApiApp {
   const db = options.db ?? createDb(config.databaseUrl);
   const api = new ApiApp({
     db,
     logger: options.logger ?? new Logger(),
-    clock: { now: () => new Date() },
+    clock: options.clock ?? { now: () => new Date() },
     cookie: new SessionCookie(config.sessionCookieName, config.sessionCookieSecure),
     hasher: new BcryptPasswordHasher(config.passwordHashCost),
     tokens: new RandomSessionTokenGenerator(),

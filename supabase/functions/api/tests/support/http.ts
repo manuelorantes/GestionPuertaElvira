@@ -27,11 +27,25 @@ interface Shared {
 
 let shared: Shared | null = null;
 
+/** Reloj de la aplicación de test: la hora real, salvo mientras un test la fija con `atTime`. */
+let fixedNow: Date | null = null;
+const testClock = { now: () => (fixedNow === null ? new Date() : new Date(fixedNow)) };
+
+/** Ejecuta `body` con la aplicación a esa hora (p. ej. para probar plazos) y luego vuelve a la real. */
+export async function atTime<T>(instant: string, body: () => Promise<T>): Promise<T> {
+  fixedNow = new Date(instant);
+  try {
+    return await body();
+  } finally {
+    fixedNow = null;
+  }
+}
+
 /** Una sola aplicación y un solo pool para todos los tests del proceso. */
 function app(): Shared {
   if (shared === null) {
     const db = createDb(TEST_CONFIG.databaseUrl, { max: 2 });
-    const api = buildApp(TEST_CONFIG, { db, logger: new SilentLogger() });
+    const api = buildApp(TEST_CONFIG, { db, logger: new SilentLogger(), clock: testClock });
     // Rutas solo de test para probar el control de acceso por rol sin depender de un contexto concreto.
     const pong = (c: ApiContext) => Promise.resolve(c.json({ pong: true }));
     api.defineRoute({ method: 'GET', path: '/api/_ping', access: 'user' }, pong);

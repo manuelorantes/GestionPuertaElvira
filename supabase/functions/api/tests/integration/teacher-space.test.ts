@@ -2,7 +2,7 @@ import { assertEquals } from '@std/assert';
 
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
-import { ApiClient, assertError, createUser, db, resetDatabase } from '../support/http.ts';
+import { ApiClient, assertError, atTime, createUser, db, resetDatabase } from '../support/http.ts';
 
 const today = LocalDate.fromInstant(new Date());
 // El lunes de la semana que viene (siempre en el futuro, así las inscripciones de hoy cuentan).
@@ -107,4 +107,87 @@ Deno.test('an unlinked teacher account is told to ask administration', async () 
   const teacher = new ApiClient();
   await teacher.logIn('profe@club.es');
   assertError(await teacher.get('/api/teacher/classes'), 403, 'teacher_not_linked');
+});
+
+// Martes 13 de octubre de 2026 a las 18:00, al acabar la clase de Lucía de los martes.
+const TUESDAY_EVENING = '2026-10-13T18:00:00+02:00';
+
+Deno.test('a teacher should take the roll call of their class, all present by default, until the next day', async () => {
+  const { teacher, group, other, pablo } = await atTime(TUESDAY_EVENING, async () => {
+    await resetDatabase();
+    await createUser('junta@club.es');
+    const admin = new ApiClient();
+    await admin.logIn('junta@club.es');
+    const lucia = await newTeacher(admin, 'Lucía Moreno Gil');
+    const group = await newGroup(admin, lucia, {
+      name: 'Martes 17:00',
+      days: ['tue'],
+      start: '17:00',
+      end: '18:00',
+      classroom: 'alfil',
+    });
+    const other = await newGroup(admin, await newTeacher(admin, 'Carlos Ruiz Márquez'), {
+      name: 'Martes 19:00',
+      days: ['tue'],
+      start: '19:00',
+      end: '20:00',
+      classroom: 'caballo',
+    });
+    const ids: string[] = [];
+    for (const fullName of ['Martina López Herrera', 'Pablo Gil Ruiz']) {
+      const created = await admin.json('POST', '/api/admin/students', {
+        fullName,
+        groupIds: [group],
+      });
+      assertEquals(created.status, 201, JSON.stringify(created.body));
+      ids.push(body<{ id: string }>(created).id);
+    }
+    await createUser('profe@club.es', 'teacher');
+    await db()`UPDATE identity_user SET teacher_id = ${lucia} WHERE email = 'profe@club.es'`;
+    const teacher = new ApiClient();
+    await teacher.logIn('profe@club.es');
+    return { teacher, group, other, pablo: ids[1] ?? '' };
+  });
+  const url = `/api/teacher/roll-calls/${group}/2026-10-13`;
+
+  const list = async () =>
+    body<{ list: { id: string; name: string; present: boolean }[] }>(await teacher.get(url)).list
+      .map((s) => [s.name, s.present]);
+
+  await atTime(TUESDAY_EVENING, async () => {
+    const today = body<{ items: { rollCall: string }[] }>(
+      await teacher.get('/api/teacher/classes'),
+    );
+    assertEquals(today.items.map((c) => c.rollCall), ['open']);
+    assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', true]]);
+
+    assertEquals((await teacher.json('PUT', url, { absent: [pablo] })).status, 204);
+    assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', false]]);
+    const taken = body<{ items: { rollCall: string }[] }>(
+      await teacher.get('/api/teacher/classes'),
+    );
+    assertEquals(taken.items.map((c) => c.rollCall), ['taken']);
+
+    assertError(
+      await teacher.json('PUT', url, { absent: ['01990000-0000-7000-8000-000000000000'] }),
+      422,
+      'unprocessable',
+    );
+    assertError(
+      await teacher.json('PUT', `/api/teacher/roll-calls/${other}/2026-10-13`, { absent: [] }),
+      404,
+      'not_found',
+    );
+  });
+
+  // Se corrige hasta el final del día siguiente; después, ya no (entrando de nuevo: la sesión caduca).
+  await atTime('2026-10-14T23:30:00+02:00', async () => {
+    await teacher.logIn('profe@club.es');
+    assertEquals((await teacher.json('PUT', url, { absent: [] })).status, 204);
+  });
+  await atTime('2026-10-15T09:00:00+02:00', async () => {
+    await teacher.logIn('profe@club.es');
+    assertError(await teacher.json('PUT', url, { absent: [pablo] }), 409, 'roll_call_closed');
+    assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', true]]);
+  });
 });
