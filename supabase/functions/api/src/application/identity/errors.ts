@@ -70,3 +70,10 @@ export class ForbiddenWhileImpersonating extends Error {
     this.name = 'ForbiddenWhileImpersonating';
   }
 }
+
+export class TeacherAlreadyLinked extends Error {
+  constructor() {
+    super('Ese profesor ya tiene otra cuenta vinculada.');
+    this.name = 'TeacherAlreadyLinked';
+  }
+}

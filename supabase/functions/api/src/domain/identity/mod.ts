@@ -179,9 +179,13 @@ export type UserEvent =
   | { type: 'UserPasswordReset'; userId: UserId }
   | { type: 'UserDisabled'; userId: UserId };
 
+/** Profesor al que corresponde una cuenta de profesorado (la ficha vive en el contexto de profesores). */
+export class TeacherLink extends Uuid {}
+
 /** Cuenta de una persona con acceso al panel. */
 export class User {
   private events: UserEvent[] = [];
+  private teacher: TeacherLink | null = null;
 
   private constructor(
     readonly id: UserId,
@@ -220,8 +224,9 @@ export class User {
     mustChangePassword: boolean;
     createdAt: Date;
     passwordChangedAt: Date;
+    teacher?: TeacherLink | null;
   }): User {
-    return new User(
+    const user = new User(
       fields.id,
       fields.email,
       fields.fullName,
@@ -232,6 +237,8 @@ export class User {
       fields.createdAt,
       fields.passwordChangedAt,
     );
+    user.teacher = fields.teacher ?? null;
+    return user;
   }
 
   changePassword(newPassword: PasswordHash, now: Date): void {
@@ -262,8 +269,25 @@ export class User {
     this.currentStatus = 'active';
   }
 
+  /** Al dejar el rol de profesorado se pierde el vínculo con el profesor. */
   changeRole(role: Role): void {
     this.currentRole = role;
+    if (role !== 'teacher') this.teacher = null;
+  }
+
+  /** Vincula (o desvincula, con null) la cuenta a la ficha de un profesor: solo cuentas de profesorado. */
+  linkTeacher(teacher: TeacherLink | null): void {
+    if (teacher !== null && this.currentRole !== 'teacher') {
+      throw new InvalidValue(
+        'teacherId',
+        'Solo una cuenta de profesorado se puede vincular a un profesor.',
+      );
+    }
+    this.teacher = teacher;
+  }
+
+  linkedTeacher(): TeacherLink | null {
+    return this.teacher;
   }
 
   canAuthenticate(): boolean {

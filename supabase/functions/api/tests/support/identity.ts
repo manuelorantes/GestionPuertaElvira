@@ -55,6 +55,10 @@ export class InMemoryUserRepository implements UserRepository {
     this.users.set(user.id.value, user);
     return Promise.resolve();
   }
+
+  all(): Promise<User[]> {
+    return Promise.resolve([...this.users.values()]);
+  }
 }
 
 export class InMemorySessionRepository implements SessionRepository {
