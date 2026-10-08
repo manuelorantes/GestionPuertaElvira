@@ -105,6 +105,27 @@ El de mayor margen positivo se destaca como «Más rentable».
 Al pie MUST mostrarse los totales del mes: horas, tarifa media (ponderada por las horas de cada profesor), coste en
 profesores, ingresos, margen, ganancia o pérdida por hora y ocupación media de todas las clases.
 
+### Requirement: Ficha del profesor
+Al pinchar el nombre de un profesor en cualquier pestaña de Profesores (o en la lista de profesores), MUST abrirse su
+ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
+- saldo a día de hoy: lo que le debemos (liquidaciones pendientes hasta hoy menos anticipos) o lo pagado de más;
+- mes a mes de la temporada hasta hoy: horas, importe, anticipos, a pagar, estado (pagada y cuándo, pendiente o en
+  curso), ingresos atribuidos y margen;
+- clases dadas en el mes que se elija (fecha, clase o actividad, horas y coste);
+- sus clases asignadas con días, horario, aula, alumnos y ocupación, y la ocupación total de sus clases;
+- sus alumnos, con sus clases y las horas semanales con él o ella;
+- pagos recibidos (liquidaciones y anticipos), sustituciones (dadas y recibidas) y turnos fijos.
+
+### Requirement: Anticipos y fecha de pago
+Administración MUST poder apuntar un anticipo a un profesor (importe, mes del que se descuenta, día en que se pagó y
+nota) mientras la liquidación de ese mes no esté pagada, y quitarlo en las mismas condiciones. El anticipo sale en
+Contabilidad el día que se paga y se descuenta de la liquidación de su mes (lo que queda por pagar y lo que sale en
+Contabilidad al pagarla). Administración MUST poder corregir el día en que se pagó una liquidación.
+
+#### Scenario: Pago de más
+- **WHEN** a un profesor se le pagaron 90 € de más en septiembre y se apuntan como anticipo de octubre
+- **THEN** su liquidación de octubre muestra −90 € de anticipo y lo que queda por pagar
+
 ### Requirement: Acceso restringido
 La gestión del profesorado MUST estar reservada a cuentas de administración.
 
