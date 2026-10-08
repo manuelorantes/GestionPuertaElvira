@@ -26,6 +26,7 @@ import {
   SubstituteTeacher,
   SubstitutionNeedsReason,
   TeacherAgenda,
+  TeacherPayStatus,
   TeacherReport,
   UpdateSession,
 } from '../../src/application/payroll/mod.ts';
@@ -602,4 +603,26 @@ Deno.test('TeacherAgenda should list the classes a teacher gives each day, with 
     InvalidValue,
     '62 días',
   );
+});
+
+Deno.test('TeacherPayStatus should show a teacher their hours and pay month by month and the season totals', async () => {
+  const { fx, lucia, propose, pay } = setUp();
+  await propose();
+  await pay().execute(lucia, '2026-10', '2026-10-31');
+  const status = await new TeacherPayStatus(fx, new ListSettlements(fx, fx, fx, fx), fx.clock)
+    .execute(lucia, null);
+
+  assertEquals(status.season, 2026);
+  assertEquals(status.months.map((m) => [m.month, m.minutes, m.status]), [
+    ['2026-09', 0, 'none'],
+    ['2026-10', 8 * 60, 'paid'],
+  ]);
+  const october = status.months[1];
+  assertEquals(status.totals, {
+    minutes: 8 * 60,
+    amountCents: october?.amountCents,
+    receivedCents: october?.toPayCents,
+    owedCents: 0,
+  });
+  assertEquals(Object.keys(october ?? {}).includes('incomeCents'), false, 'sin ingresos ni margen');
 });

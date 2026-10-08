@@ -1,4 +1,4 @@
-import { LocalDate } from '../../domain/common/mod.ts';
+import { InvalidValue, LocalDate } from '../../domain/common/mod.ts';
 import {
   type ClassAssignments,
   ConfirmWithoutRollCall,
@@ -8,7 +8,7 @@ import {
   TeacherClasses,
   TeacherStudents,
 } from '../../application/attendance/mod.ts';
-import { TeacherAgenda } from '../../application/payroll/mod.ts';
+import { ListSettlements, TeacherAgenda, TeacherPayStatus } from '../../application/payroll/mod.ts';
 import { type ApiApp, param, type RequestScope, sessionTeacher } from '../http/app.ts';
 import { httpError } from '../http/errors.ts';
 import { registerDomainErrors } from '../http/errors.ts';
@@ -19,11 +19,14 @@ import {
   SqlTeacherRosterQuery,
 } from '../persistence/attendance.ts';
 import {
+  SqlAdvanceRepository,
   SqlDutyRepository,
   SqlHolidayCalendar,
   SqlScheduleDirectory,
+  SqlSettlementRepository,
   SqlSubstitutionRepository,
   SqlTeacherRates,
+  SqlTimesheetRepository,
 } from '../persistence/payroll.ts';
 import { SqlRollCallRepository } from '../persistence/rollcalls.ts';
 import type { Sql } from '../persistence/sql.ts';
@@ -103,6 +106,27 @@ export function registerAttendanceRoutes(api: ApiApp): void {
       body.stringList('absent'),
     );
     return c.body(null, 204);
+  });
+
+  api.defineRoute(teacher('GET', '/api/teacher/pay'), async (c, scope) => {
+    const season = c.req.query('season');
+    if (season !== undefined && !/^\d{4}$/.test(season)) {
+      throw new InvalidValue('season', 'Indica la temporada con el año en que empieza.');
+    }
+    const tx = scope.tx;
+    const teachers = new SqlTeacherRates(tx);
+    const settlements = new ListSettlements(
+      new SqlTimesheetRepository(tx),
+      new SqlSettlementRepository(tx),
+      teachers,
+      new SqlAdvanceRepository(tx),
+    );
+    return c.json(
+      await new TeacherPayStatus(teachers, settlements, api.deps.clock).execute(
+        sessionTeacher(scope),
+        season === undefined ? null : Number(season),
+      ),
+    );
   });
 
   // ---- Administración: listas sin pasar ---------------------------------------------------------

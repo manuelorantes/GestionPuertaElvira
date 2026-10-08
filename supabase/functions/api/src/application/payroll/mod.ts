@@ -1293,3 +1293,76 @@ export class TeacherAgenda {
     return items;
   }
 }
+
+/** Un mes de la temporada tal como lo ve el profesor: sin ingresos ni margen del club. */
+export interface TeacherPayMonth {
+  month: string;
+  minutes: number;
+  amountCents: number;
+  advancesCents: number;
+  toPayCents: number;
+  /** `none`: sin horas ni anticipos. */
+  status: 'paid' | 'pending' | 'none';
+  paidOn: string | null;
+}
+
+export interface TeacherPayStatusView {
+  /** Año en que empieza la temporada. */
+  season: number;
+  months: TeacherPayMonth[];
+  totals: {
+    minutes: number;
+    amountCents: number;
+    /** Liquidaciones pagadas y anticipos. */
+    receivedCents: number;
+    /** Liquidaciones pendientes, ya descontados sus anticipos. */
+    owedCents: number;
+  };
+}
+
+/** Mis horas y pagos: el mes a mes de la temporada de un profesor (hasta el mes en curso) y sus totales. */
+export class TeacherPayStatus {
+  constructor(
+    private readonly teachers: TeacherRates,
+    private readonly settlements: ListSettlements,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string, seasonYear: number | null): Promise<TeacherPayStatusView> {
+    const ref = TeacherRef.fromString(teacherId);
+    if (!(await this.teachers.all()).some((t) => t.id === ref.value)) throw new TeacherNotFound();
+    const current = YearMonth.of(LocalDate.fromInstant(this.clock.now()));
+    const season = seasonYear === null ? Season.containing(current) : Season.startingIn(seasonYear);
+    const months: TeacherPayMonth[] = [];
+    for (
+      let m = season.firstMonth();
+      !current.isBefore(m) && !season.lastMonth().isBefore(m);
+      m = m.next()
+    ) {
+      const settlement = (await this.settlements.execute(m.toString())).find((s) =>
+        s.teacherId === ref.value
+      );
+      months.push({
+        month: m.toString(),
+        minutes: settlement?.minutes ?? 0,
+        amountCents: settlement?.amountCents ?? 0,
+        advancesCents: settlement?.advancesCents ?? 0,
+        toPayCents: settlement?.toPayCents ?? 0,
+        status: settlement === undefined ? 'none' : settlement.status,
+        paidOn: settlement?.paidOn ?? null,
+      });
+    }
+    const sum = (pick: (m: TeacherPayMonth) => number) =>
+      months.reduce((total, m) => total + pick(m), 0);
+    return {
+      season: season.firstMonth().year,
+      months,
+      totals: {
+        minutes: sum((m) => m.minutes),
+        amountCents: sum((m) => m.amountCents),
+        receivedCents: sum((m) => m.advancesCents + (m.status === 'paid' ? m.toPayCents : 0)),
+        owedCents: sum((m) => (m.status === 'pending' ? m.toPayCents : 0)),
+      },
+    };
+  }
+}
