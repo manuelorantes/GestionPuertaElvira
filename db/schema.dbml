@@ -11,13 +11,16 @@ Table identity_user {
   id uuid [pk, note: 'UUIDv7']
   email varchar(254) [not null, unique, note: 'normalizado a minúsculas']
   full_name varchar(120) [not null]
-  role varchar(20) [not null, note: 'administrator | teacher']
+  role varchar(20) [not null, note: 'superadministrator | administrator | teacher | assistant']
   password_hash varchar(255) [not null]
   status varchar(20) [not null, note: 'active | disabled']
   must_change_password boolean [not null, note: 'true tras alta o restablecimiento']
   created_at timestamptz [not null]
   password_changed_at timestamptz [not null]
+  teacher_id uuid [unique, note: 'profesor de una cuenta de profesorado (solo rol teacher); uno por cuenta']
 }
+
+Ref: identity_user.teacher_id - teachers_teacher.id [delete: set null]
 
 Table identity_session {
   id uuid [pk, note: 'UUIDv7']
@@ -284,3 +287,42 @@ Table cache_items {
   item_time int [not null]
   Note: 'Almacén compartido del limitador de intentos de inicio de sesión'
 }
+
+// ---- Asistencia -------------------------------------------------------------------------------
+
+Table attendance_roll_call {
+  group_id uuid [not null]
+  roll_date date [not null]
+  kind varchar(20) [not null, note: 'taken (la pasó quien da la clase) | confirmed (administración la dio por buena sin lista)']
+  taken_by_teacher uuid [note: 'profesor que la pasó']
+  taken_by_user uuid [note: 'cuenta de administración que la dio por buena']
+  taken_at timestamptz [not null]
+
+  indexes {
+    (group_id, roll_date) [pk]
+  }
+  Note: 'Lista de una clase un día. Se pasa desde que empieza la clase hasta el final del día siguiente.'
+}
+
+Table attendance_absence {
+  group_id uuid [not null]
+  roll_date date [not null]
+  student_id uuid [not null]
+
+  indexes {
+    (group_id, roll_date, student_id) [pk]
+    student_id
+  }
+  Note: 'Ausentes de una lista; el resto de alumnos de ese día vino.'
+}
+
+Table attendance_settings {
+  id smallint [pk, note: 'siempre 1']
+  since date [not null, note: 'primer día que cuenta para las listas sin pasar']
+}
+
+Ref: attendance_roll_call.group_id > classes_group.id [delete: cascade]
+Ref: attendance_roll_call.taken_by_teacher > teachers_teacher.id [delete: set null]
+Ref: attendance_roll_call.taken_by_user > identity_user.id [delete: set null]
+Ref: attendance_absence.(group_id, roll_date) > attendance_roll_call.(group_id, roll_date) [delete: cascade]
+Ref: attendance_absence.student_id > students_student.id [delete: cascade]
