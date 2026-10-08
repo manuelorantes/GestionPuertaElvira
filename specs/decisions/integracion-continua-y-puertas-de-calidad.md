@@ -30,8 +30,8 @@ y `make ci` lanza el conjunto completo.
 - **Dependabot:** semanal, contra `staging`.
 - **Despliegue:** el workflow `Despliegue` se ejecuta con cada push a `main` (es decir, con cada release
   ya validada por CI), `Mantener activo` consulta la API cada tres días y `Copia de seguridad` guarda
-  cada día el `pg_dump` y los documentos del bucket privado, cifrados, como artefacto. `Horas automáticas`
-  apunta cada noche las sesiones del día (ver `docs/despliegue.md`).
+  cada día el `pg_dump` y los documentos del bucket privado, cifrados, como artefacto. `Horas automáticas y cuotas`
+  apunta cada noche las sesiones del día y crea las cuotas que falten del mes (ver `docs/despliegue.md`).
 
 ## Consequences
 
