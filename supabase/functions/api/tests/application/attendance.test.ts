@@ -13,6 +13,7 @@ import {
   OpenRollCall,
   type RollCallRepository,
   RollCallStillOpen,
+  StudentAttendance,
   TakeRollCall,
   TeacherClasses,
 } from '../../src/application/attendance/mod.ts';
@@ -153,4 +154,22 @@ Deno.test('ConfirmWithoutRollCall should keep a missed class only once its deadl
   assertEquals((await rolls.find('g1', LocalDate.fromString('2026-10-13')))?.kind(), 'confirmed');
   await confirm('2026-10-15T10:00:00+02:00');
   assertEquals(rolls.saved.size, 1, 'darla por buena dos veces no cambia nada');
+});
+
+Deno.test('StudentAttendance should summarise the season so far', async () => {
+  const asked: string[] = [];
+  const view = await new StudentAttendance(
+    {
+      summary: (_student, from, to) => {
+        asked.push(`${from.toString()}…${to.toString()}`);
+        return Promise.resolve({
+          classes: 6,
+          absences: [{ date: '2026-10-06', label: 'Martes 19:00' }],
+        });
+      },
+    },
+    new FrozenClock('2026-10-16T09:00:00+02:00'),
+  ).execute('s1');
+  assertEquals(asked, ['2026-09-01…2026-10-16']);
+  assertEquals([view.season, view.classes, view.attended], [2026, 6, 5]);
 });
