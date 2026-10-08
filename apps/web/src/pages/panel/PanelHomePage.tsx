@@ -13,6 +13,7 @@ import { Avatar } from '@/shared/ui/Avatar';
 import { Card } from '@/shared/ui/Card';
 
 import { MonthlyChart } from './MonthlyChart';
+import { MissedRollCalls } from './attendance/MissedRollCalls';
 import { TeacherHomePage } from './teacher/TeacherHomePage';
 
 function Kpi({
@@ -255,6 +256,7 @@ function ClubSummaryPage() {
           Resumen del club
         </h1>
       </div>
+      <MissedRollCalls />
       {isAdmin && dashboard.isPending && <p className="text-ink-muted">Cargando resumen…</p>}
       {dashboard.data && <Summary data={dashboard.data} />}
     </main>

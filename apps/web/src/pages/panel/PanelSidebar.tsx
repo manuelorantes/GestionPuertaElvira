@@ -7,6 +7,7 @@ import { currentMonth } from '@/features/billing/money';
 import { ROLE_LABEL, type SessionUser } from '@/features/auth/api';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 
+import { MissedRollCallsCount } from './MissedRollCallsCount';
 import { PANEL_SECTIONS, sectionsFor } from './panelSections';
 
 interface PanelSidebarProps {
@@ -36,6 +37,7 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
             >
               <Icon aria-hidden size={18} className="shrink-0" />
               {label}
+              {id === 'resumen' && <MissedRollCallsCount role={user.role} className="ml-auto" />}
             </NavLink>
           ) : (
             <span
