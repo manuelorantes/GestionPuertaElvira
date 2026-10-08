@@ -319,6 +319,8 @@ const INVOICES: [number, number, string, string, string, string, string, boolean
 
 /** Tablas que se vacían con `--reset` (en orden seguro para las claves ajenas). */
 const RESET_TABLES = [
+  'attendance_absence',
+  'attendance_roll_call',
   'accounting_entry',
   'accounting_invoice',
   'accounting_closing',
@@ -489,6 +491,7 @@ export async function seedDemoData(
   }
   const payments = await seedBilling(tx, app, clock, studentIds);
   await seedPayroll(app, clock, teacherIds);
+  await seedAttendance(tx, clock, teacherIds);
   await seedAccounting(app, clock);
   return `Creados ${
     Object.keys(TEACHERS).length
@@ -588,6 +591,42 @@ async function seedPayroll(
       }
     }
   }
+}
+
+/** Profesor con las listas de la última semana sin pasar (para ver el aviso de listas sin pasar). */
+const FORGETFUL_TEACHER = 'p2';
+
+/**
+ * Asistencia de la última semana: la cuenta de pruebas de profesorado ve las clases de Lucía; las listas están
+ * pasadas (con alguna falta) salvo las de Carlos, que salen en «Listas sin pasar».
+ */
+async function seedAttendance(
+  tx: TransactionSql,
+  clock: Clock,
+  teacherIds: Record<string, string>,
+): Promise<void> {
+  const today = LocalDate.fromInstant(clock.now());
+  const since = today.plusDays(-7).toString();
+  await tx`UPDATE identity_user SET teacher_id = ${id(teacherIds, 'p1')}
+            WHERE email = 'profe@puertaelvira.test' AND role = 'teacher'`;
+  await tx`INSERT INTO attendance_settings (id, since) VALUES (1, ${since})
+           ON CONFLICT (id) DO UPDATE SET since = EXCLUDED.since`;
+  await tx`
+    INSERT INTO attendance_roll_call (group_id, roll_date, kind, taken_by_teacher, taken_at)
+    SELECT s.group_id, s.session_date, 'taken', s.teacher_id, now()
+      FROM payroll_session s
+     WHERE s.group_id IS NOT NULL AND s.session_date BETWEEN ${since} AND ${today.toString()}
+       AND s.teacher_id <> ${id(teacherIds, FORGETFUL_TEACHER)}
+    ON CONFLICT DO NOTHING`;
+  // Una falta en cada una de las tres primeras listas: el primer alumno de esa clase.
+  await tx`
+    INSERT INTO attendance_absence (group_id, roll_date, student_id)
+    SELECT r.group_id, r.roll_date,
+           (SELECT e.student_id FROM classes_enrolment e WHERE e.class_group_id = r.group_id
+             ORDER BY e.student_id LIMIT 1)
+      FROM (SELECT * FROM attendance_roll_call ORDER BY roll_date, group_id LIMIT 3) r
+     WHERE EXISTS (SELECT 1 FROM classes_enrolment e WHERE e.class_group_id = r.group_id)
+    ON CONFLICT DO NOTHING`;
 }
 
 /** Facturas de proveedores del mes actual y del anterior, y un par de apuntes manuales. */
