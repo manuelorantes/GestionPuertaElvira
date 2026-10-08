@@ -5,6 +5,7 @@ import { useStopImpersonation } from '@/features/auth/useImpersonation';
 import { useLogout } from '@/features/auth/useLogout';
 import { useSession } from '@/features/auth/useSession';
 
+import { FetchingBar } from './FetchingBar';
 import { PanelMobileHeader, PanelMobileNav } from './PanelMobileBars';
 import { PanelSidebar } from './PanelSidebar';
 import { PANEL_SECTIONS, sectionsFor } from './panelSections';
@@ -28,6 +29,7 @@ export function PanelLayout() {
 
   return (
     <div className="flex h-screen flex-col">
+      <FetchingBar />
       {user.impersonatedBy && (
         <div
           role="status"

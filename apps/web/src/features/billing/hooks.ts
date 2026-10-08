@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 
 import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
@@ -7,6 +7,8 @@ import * as api from './api';
 export function useMonthlyCharges(month: string, kind: api.ChargesKind) {
   return useQuery({
     queryKey: ['charges', month, kind],
+    // Al cambiar de mes se sigue viendo el anterior hasta que llega el nuevo.
+    placeholderData: keepPreviousData,
     queryFn: () => api.fetchCharges(month, kind),
   });
 }
