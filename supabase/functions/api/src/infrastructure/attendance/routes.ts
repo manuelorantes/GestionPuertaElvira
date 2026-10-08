@@ -1,6 +1,8 @@
 import { LocalDate } from '../../domain/common/mod.ts';
 import {
   type ClassAssignments,
+  ConfirmWithoutRollCall,
+  MissedRollCalls,
   OpenRollCall,
   TakeRollCall,
   TeacherClasses,
@@ -8,9 +10,14 @@ import {
 } from '../../application/attendance/mod.ts';
 import { TeacherAgenda } from '../../application/payroll/mod.ts';
 import { type ApiApp, param, type RequestScope, sessionTeacher } from '../http/app.ts';
+import { httpError } from '../http/errors.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
-import { SqlClassRoster, SqlTeacherRosterQuery } from '../persistence/attendance.ts';
+import {
+  SqlClassRoster,
+  SqlMissedRollCallQuery,
+  SqlTeacherRosterQuery,
+} from '../persistence/attendance.ts';
 import {
   SqlDutyRepository,
   SqlHolidayCalendar,
@@ -41,6 +48,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     ClassNotGiven: [404, 'not_found'],
     RollCallNotOpenYet: [409, 'roll_call_not_open'],
     RollCallClosed: [409, 'roll_call_closed'],
+    RollCallStillOpen: [409, 'roll_call_still_open'],
   });
   const teacher = (method: 'GET' | 'PUT', path: string) =>
     ({ method, path, access: 'teacher' }) as const;
@@ -96,4 +104,32 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     );
     return c.body(null, 204);
   });
+
+  // ---- Administración: listas sin pasar ---------------------------------------------------------
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/attendance/pending', access: 'admin' },
+    async (c, scope) => {
+      return c.json({
+        items: await new MissedRollCalls(new SqlMissedRollCallQuery(scope.tx), api.deps.clock)
+          .execute(),
+      });
+    },
+  );
+
+  api.defineRoute(
+    {
+      method: 'POST',
+      path: '/api/admin/attendance/pending/:groupId/:date/confirm',
+      access: 'admin',
+    },
+    async (c, scope) => {
+      if (scope.user === null) throw httpError(401);
+      await new ConfirmWithoutRollCall(new SqlRollCallRepository(scope.tx), api.deps.clock).execute(
+        param(c, 'groupId'),
+        param(c, 'date'),
+        scope.user.id,
+      );
+      return c.body(null, 204);
+    },
+  );
 }

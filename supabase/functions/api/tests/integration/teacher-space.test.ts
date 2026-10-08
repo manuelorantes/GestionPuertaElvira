@@ -191,3 +191,105 @@ Deno.test('a teacher should take the roll call of their class, all present by de
     assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', true]]);
   });
 });
+
+Deno.test('administration should see the classes without a roll call once the deadline is over, and settle them', async () => {
+  const { admin, teacher, lucia, carlos, luciaGroup, carlosGroup } = await atTime(
+    TUESDAY_EVENING,
+    async () => {
+      await resetDatabase();
+      await db()`INSERT INTO attendance_settings (id, since) VALUES (1, '2026-10-01')`;
+      await createUser('junta@club.es');
+      const admin = new ApiClient();
+      await admin.logIn('junta@club.es');
+      const lucia = await newTeacher(admin, 'Lucía Moreno Gil');
+      const carlos = await newTeacher(admin, 'Carlos Ruiz Márquez');
+      const luciaGroup = await newGroup(admin, lucia, {
+        name: 'Martes 17:00',
+        days: ['tue'],
+        start: '17:00',
+        end: '18:00',
+        classroom: 'alfil',
+      });
+      const carlosGroup = await newGroup(admin, carlos, {
+        name: 'Martes 19:00',
+        days: ['tue'],
+        start: '19:00',
+        end: '20:00',
+        classroom: 'caballo',
+      });
+      await createUser('profe@club.es', 'teacher');
+      await db()`UPDATE identity_user SET teacher_id = ${lucia} WHERE email = 'profe@club.es'`;
+      const teacher = new ApiClient();
+      await teacher.logIn('profe@club.es');
+      return { admin, teacher, lucia, carlos, luciaGroup, carlosGroup };
+    },
+  );
+  const record = async (teacherId: string, groupId: string, date: string) => {
+    const response = await admin.json('POST', '/api/admin/payroll/sessions', {
+      teacherId,
+      groupId,
+      date,
+      hours: 1,
+    });
+    assertEquals(response.status, 201, JSON.stringify(response.body));
+    return body<{ id: string }>(response).id;
+  };
+
+  await atTime(TUESDAY_EVENING, async () => {
+    await record(lucia, luciaGroup, '2026-10-13');
+    await record(carlos, carlosGroup, '2026-10-13');
+    await record(carlos, carlosGroup, '2026-10-06');
+    // Lucía pasa su lista; Carlos no pasa ninguna.
+    const taken = await teacher.json('PUT', `/api/teacher/roll-calls/${luciaGroup}/2026-10-13`, {
+      absent: [],
+    });
+    assertEquals(taken.status, 204);
+  });
+
+  await atTime('2026-10-15T20:00:00+02:00', async () => {
+    await admin.logIn('junta@club.es');
+    const pending = body<{ items: { date: string; label: string; teacherName: string }[] }>(
+      await admin.get('/api/admin/attendance/pending'),
+    ).items;
+    // La del martes 13 aún se puede pasar hasta el final del 14… y el 15 ya no: sale.
+    assertEquals(pending.map((p) => [p.date, p.label, p.teacherName]), [
+      ['2026-10-06', 'Martes 19:00', 'Carlos Ruiz Márquez'],
+      ['2026-10-13', 'Martes 19:00', 'Carlos Ruiz Márquez'],
+    ]);
+    assertError(
+      await admin.json(
+        'POST',
+        `/api/admin/attendance/pending/${carlosGroup}/2026-10-14/confirm`,
+        {},
+      ),
+      409,
+      'roll_call_still_open',
+    );
+  });
+
+  await atTime('2026-10-16T09:00:00+02:00', async () => {
+    await admin.logIn('junta@club.es');
+    const pending = () =>
+      admin.get('/api/admin/attendance/pending').then((r) =>
+        body<{ items: { sessionId: string; date: string }[] }>(r).items
+      );
+    const [first] = await pending();
+    // La del 6 no se dio: se quita su sesión. La del 13 sí: se da por buena.
+    assertEquals(
+      (await admin.json('DELETE', `/api/admin/payroll/sessions/${first?.sessionId}`, {})).status,
+      204,
+    );
+    assertEquals(
+      (await admin.json(
+        'POST',
+        `/api/admin/attendance/pending/${carlosGroup}/2026-10-13/confirm`,
+        {},
+      ))
+        .status,
+      204,
+    );
+    assertEquals(await pending(), []);
+    await teacher.logIn('profe@club.es');
+    assertError(await teacher.get('/api/admin/attendance/pending'), 403, 'forbidden');
+  });
+});
