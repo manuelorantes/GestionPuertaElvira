@@ -19,3 +19,15 @@ export async function fetchMissedRollCalls(): Promise<MissedRollCall[]> {
 export function confirmWithoutRollCall(groupId: string, date: string): Promise<void> {
   return apiSend('POST', `/api/admin/attendance/pending/${groupId}/${date}/confirm`);
 }
+
+/** Asistencia de un alumno en la temporada: clases con lista en las que estaba, a cuántas vino y sus faltas. */
+export interface StudentAttendance {
+  season: number;
+  classes: number;
+  attended: number;
+  absences: { date: string; label: string }[];
+}
+
+export function fetchStudentAttendance(studentId: string): Promise<StudentAttendance> {
+  return apiGet<StudentAttendance>(`/api/admin/students/${studentId}/attendance`);
+}

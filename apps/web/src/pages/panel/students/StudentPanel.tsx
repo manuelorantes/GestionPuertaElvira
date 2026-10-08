@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { SidePanel } from '@/shared/ui/SidePanel';
 import { useToast } from '@/shared/ui/Toast';
 
+import { StudentAttendanceCard } from './StudentAttendanceCard';
 import { StudentBillingCard } from './StudentBillingCard';
 import { EnrolmentDialog } from './EnrolmentDialog';
 import { PickerDialog } from './PickerDialog';
@@ -286,6 +287,7 @@ export function StudentPanel() {
           </Button>
         </Card>
         <StudentBillingCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
+        <StudentAttendanceCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
       </div>
 
       {action?.kind === 'edit' && (

@@ -182,6 +182,31 @@ describe('Alumnos', () => {
     expect(within(card).getByText('Aula Alfil · Lucía Moreno Gil')).toBeVisible();
   });
 
+  it('should show the attendance of the season on the card', async () => {
+    const user = userEvent.setup();
+    api({
+      'GET /api/admin/students/s1/attendance': [
+        200,
+        {
+          season: 2026,
+          classes: 8,
+          attended: 7,
+          absences: [{ date: '2026-10-06', label: 'Iniciación A' }],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: /martina lópez herrera/i }));
+    const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    expect(await within(card).findByText(/Vino a/)).toHaveTextContent(
+      'Vino a 7 de 8 clases (88 %)',
+    );
+    expect(within(card).getByRole('list', { name: 'Faltas' })).toHaveTextContent(
+      'Faltó el 06/10/2026 · Iniciación A',
+    );
+  });
+
   it('should show what the student pays and why, the points and the history on the card', async () => {
     const user = userEvent.setup();
     const account = {
