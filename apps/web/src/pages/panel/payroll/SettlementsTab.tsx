@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { useToast } from '@/shared/ui/Toast';
 
 import { SettlementSheetDialog } from './SettlementSheetDialog';
+import { TeacherLink } from './TeacherLink';
 
 export function SettlementsTab({ month }: { month: string }) {
   const settlements = useSettlements(month);
@@ -96,10 +97,20 @@ export function SettlementsTab({ month }: { month: string }) {
                       )}
                     </button>
                   </td>
-                  <td className="px-4 py-3 font-medium">{s.teacherName}</td>
+                  <td className="px-4 py-3">
+                    <TeacherLink id={s.teacherId} name={s.teacherName} />
+                  </td>
                   <td className="px-4 py-3">{hoursLabel(s.minutes)}</td>
                   <td className="px-4 py-3">{formatCents(s.rateCents)}/h</td>
-                  <td className="px-4 py-3 font-semibold">{formatCents(s.amountCents)}</td>
+                  <td className="px-4 py-3">
+                    <span className="font-semibold">{formatCents(s.amountCents)}</span>
+                    {s.advancesCents > 0 && (
+                      <span className="block text-[12px] text-ink-muted">
+                        −{formatCents(s.advancesCents)} anticipo · a pagar{' '}
+                        {formatCents(s.toPayCents)}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {s.status === 'paid' ? (
                       <Badge tone="success">Pagada el {formatDate(s.paidOn)}</Badge>

@@ -17,6 +17,7 @@ import { useToast } from '@/shared/ui/Toast';
 
 import { HolidayDialog } from './HolidayDialog';
 import { SessionDialog } from './SessionDialog';
+import { TeacherLink } from './TeacherLink';
 
 const ICON_BUTTON =
   'flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted';
@@ -75,7 +76,9 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
             {items.map((s) => (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <td className="px-5 py-2.5 text-ink-muted">{formatDate(s.date)}</td>
-                <td className="px-5 py-2.5 font-medium">{s.teacherName}</td>
+                <td className="px-5 py-2.5">
+                  <TeacherLink id={s.teacherId} name={s.teacherName} />
+                </td>
                 <td className="px-5 py-2.5">{s.label}</td>
                 <td className="px-5 py-2.5">{hoursLabel(s.minutes)}</td>
                 <td className="px-5 py-2.5 text-right font-medium">{formatCents(s.costCents)}</td>

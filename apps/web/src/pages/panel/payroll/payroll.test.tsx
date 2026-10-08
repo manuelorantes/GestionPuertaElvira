@@ -319,6 +319,125 @@ describe('Profesorado', () => {
     expect(within(dialog).getByText('Hasta')).toBeInTheDocument();
   });
 
+  it('opens the teacher page with balance, months, classes, students and payments', async () => {
+    const fetch = api({
+      'GET /api/admin/payroll/teachers/t1/report': [
+        200,
+        {
+          teacher: { id: 't1', name: 'Lucía Moreno Gil', rateCents: 1600, active: true },
+          season: 2026,
+          months: [
+            {
+              month: '2026-09',
+              minutes: 1800,
+              amountCents: 48000,
+              advancesCents: 0,
+              toPayCents: 48000,
+              status: 'paid',
+              paidOn: '2026-09-30',
+              incomeCents: 60000,
+              marginCents: 12000,
+            },
+            {
+              month: '2026-10',
+              minutes: 600,
+              amountCents: 16000,
+              advancesCents: 9000,
+              toPayCents: 7000,
+              status: 'pending',
+              paidOn: null,
+              incomeCents: 50000,
+              marginCents: 2000,
+            },
+          ],
+          balanceCents: 7000,
+          payments: [
+            {
+              id: null,
+              date: '2026-09-30',
+              kind: 'settlement',
+              month: '2026-09',
+              amountCents: 48000,
+              note: null,
+            },
+            {
+              id: 'a1',
+              date: '2026-09-30',
+              kind: 'advance',
+              month: '2026-10',
+              amountCents: 9000,
+              note: 'Pago de más',
+            },
+          ],
+          groups: [
+            {
+              id: 'g1',
+              name: 'Iniciación A',
+              days: ['mon', 'wed'],
+              start: '17:00',
+              end: '18:00',
+              classroom: 'alfil',
+              capacity: 10,
+              occupancyByDay: { mon: 6, wed: 4 },
+              students: 7,
+            },
+          ],
+          occupancy: { occupied: 10, capacity: 20 },
+          students: [{ id: 's1', name: 'Ana Pérez', groups: ['Iniciación A'], weeklyMinutes: 120 }],
+          substitutions: [
+            {
+              date: '2026-10-05',
+              label: 'Iniciación A',
+              role: 'received',
+              otherName: 'Carlos Ruiz Márquez',
+              reason: 'Torneo',
+            },
+          ],
+          duties: [],
+        },
+      ],
+      'PUT /api/admin/payroll/settlements/t1/2026-09/payment': [204],
+    });
+    renderApp('/panel/profesores/t1');
+
+    expect(await screen.findByRole('heading', { name: 'Lucía Moreno Gil' })).toBeInTheDocument();
+    expect(screen.getByText('Le debemos').parentElement).toHaveTextContent('70 €');
+    expect(screen.getByText('Ocupación de sus clases').parentElement).toHaveTextContent('50 %');
+    const months = screen.getByRole('table', { name: 'Mes a mes de Lucía Moreno Gil' });
+    expect(within(months).getByRole('row', { name: /Octubre 2026/ })).toHaveTextContent('−90 €');
+    const classes = screen.getByRole('table', { name: 'Clases asignadas' });
+    expect(within(classes).getByRole('row', { name: /Iniciación A/ })).toHaveTextContent('7 / 10');
+    expect(screen.getByRole('link', { name: 'Ana Pérez' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s1',
+    );
+    expect(screen.getByText(/le sustituyó Carlos Ruiz Márquez/)).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Cambiar la fecha de pago de septiembre 2026' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Fecha de pago' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([u, init]) =>
+            u === '/api/admin/payroll/settlements/t1/2026-09/payment' && init?.method === 'PUT',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('links each teacher name to their page', async () => {
+    api();
+    renderApp('/panel/profesores?mes=2026-09');
+    const table = await screen.findByRole('table', { name: 'Rentabilidad de septiembre 2026' });
+    expect(within(table).getByRole('link', { name: 'Lucía Moreno Gil' })).toHaveAttribute(
+      'href',
+      '/panel/profesores/t1',
+    );
+  });
+
   it('creates a club duty shift', async () => {
     const fetch = api({
       'GET /api/admin/payroll/duties': [200, { items: [] }],

@@ -13,6 +13,7 @@ import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+import { TeacherLink } from './TeacherLink';
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
@@ -76,7 +77,9 @@ export function DutiesTab({ teachers }: { teachers: Teacher[] }) {
                     {d.start}–{d.end}
                   </td>
                   <td className="px-5 py-3">{d.label}</td>
-                  <td className="px-5 py-3">{d.teacherName}</td>
+                  <td className="px-5 py-3">
+                    <TeacherLink id={d.teacherId} name={d.teacherName} />
+                  </td>
                   <td className="px-3 py-2">
                     <span className="flex justify-end gap-1">
                       <button

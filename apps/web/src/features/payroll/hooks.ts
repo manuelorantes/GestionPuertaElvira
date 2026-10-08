@@ -25,6 +25,13 @@ export function useSettlementSheet(teacherId: string, month: string) {
   });
 }
 
+export function useTeacherReport(teacherId: string) {
+  return useQuery({
+    queryKey: ['payroll-teacher', teacherId],
+    queryFn: () => api.fetchTeacherReport(teacherId),
+  });
+}
+
 export function useProfitability(month: string) {
   return useQuery({
     queryKey: ['payroll-profitability', month],
