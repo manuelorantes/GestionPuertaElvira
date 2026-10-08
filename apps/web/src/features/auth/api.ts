@@ -7,6 +7,8 @@ export interface SessionUser {
   fullName: string;
   email: string;
   role: Role;
+  /** Profesor vinculado a una cuenta de profesorado, o null (sin vincular u otro rol). */
+  teacherId: string | null;
   mustChangePassword: boolean;
   /** Superadministración que está usando esta cuenta (suplantación), o null. */
   impersonatedBy: { id: string; fullName: string } | null;

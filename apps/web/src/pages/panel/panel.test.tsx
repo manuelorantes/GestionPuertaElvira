@@ -1,11 +1,11 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ADMIN, NO_SESSION, SUPERADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, NO_SESSION, SUPERADMIN, TEACHER, mockApi, renderApp } from '@/test/render';
 
 describe('armazón del panel', () => {
   it('should link every section and show the person with their role', async () => {
-    mockApi({ 'GET /api/auth/me': [200, { user: { ...ADMIN, role: 'teacher' } }] });
+    mockApi({ 'GET /api/auth/me': [200, { user: ADMIN }] });
 
     renderApp('/panel');
 
@@ -23,7 +23,7 @@ describe('armazón del panel', () => {
       expect(within(nav).getByRole('link', { name })).toHaveAttribute('href', href);
     }
     expect(screen.getAllByText('Lucía Moreno Gil').length).toBeGreaterThan(0);
-    expect(screen.getByText('Profesorado')).toBeVisible();
+    expect(screen.getByText('Administración')).toBeVisible();
     expect(screen.getByText('Hola, Lucía')).toBeVisible();
   });
 
@@ -160,5 +160,30 @@ describe('cambio de contraseña obligatorio', () => {
       '/panel/usuarios',
     );
     expect(screen.getByText('Superadministración')).toBeInTheDocument();
+  });
+});
+
+describe('profesorado', () => {
+  it('shows only the teacher menu and sends club sections back to their classes', async () => {
+    mockApi({ 'GET /api/auth/me': [200, { user: TEACHER }] });
+    renderApp('/panel/cobros');
+
+    expect(await screen.findByRole('heading', { name: 'Mis clases' })).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Secciones' });
+    expect(within(nav).getByRole('link', { name: /Mis clases/ })).toHaveAttribute('href', '/panel');
+    for (const name of [/Resumen/, /Alumnos$/, /Cobros/, /Profesores/, /Contabilidad/]) {
+      expect(within(nav).queryByRole('link', { name })).not.toBeInTheDocument();
+    }
+    const mobile = screen.getByRole('navigation', { name: 'Secciones móvil' });
+    expect(within(mobile).queryByRole('link', { name: /Cobrar/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/no está vinculada/)).not.toBeInTheDocument();
+  });
+
+  it('tells an unlinked teacher account to ask administration', async () => {
+    mockApi({ 'GET /api/auth/me': [200, { user: { ...TEACHER, teacherId: null } }] });
+    renderApp('/panel');
+    expect(
+      await screen.findByText('Tu cuenta aún no está vinculada a ningún profesor.'),
+    ).toBeInTheDocument();
   });
 });

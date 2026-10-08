@@ -11,6 +11,8 @@ import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 
+import { TeacherLinkSelect } from './TeacherLinkSelect';
+
 const ROLES = (Object.keys(ROLE_LABEL) as Role[]).map((r) => ({ value: r, label: ROLE_LABEL[r] }));
 
 export function NewUserDialog({
@@ -23,13 +25,20 @@ export function NewUserDialog({
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<Role>('administrator');
+  const [teacherId, setTeacherId] = useState<string | null>(null);
   const create = useUserMutation(createUser);
   const ready = email.trim() !== '' && fullName.trim() !== '';
 
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!ready) return;
-    void create.mutateAsync({ email: email.trim(), fullName: fullName.trim(), role }).then(
+    const input = {
+      email: email.trim(),
+      fullName: fullName.trim(),
+      role,
+      ...(role === 'teacher' ? { teacherId } : {}),
+    };
+    void create.mutateAsync(input).then(
       (password) => onCreated(fullName.trim(), password),
       () => undefined,
     );
@@ -75,6 +84,15 @@ export function NewUserDialog({
             value={role}
             onChange={(value) => setRole(value as Role)}
           />
+          {role === 'teacher' && (
+            <label className="flex flex-col gap-1.5 text-sm font-medium">
+              Profesor
+              <TeacherLinkSelect label="Profesor" value={teacherId} onChange={setTeacherId} />
+              <span className="text-[13px] font-normal text-ink-muted">
+                Verá solo sus clases, sus alumnos y sus pagos
+              </span>
+            </label>
+          )}
           <p className="text-[13px] text-ink-muted">
             Se creará con una contraseña temporal que verás una sola vez; tendrá que cambiarla al
             entrar.
