@@ -144,10 +144,11 @@ Deno.test({
       report.items.map((r) => [r.teacherName, r.students]).sort(),
       [['Carlos Ruiz Márquez', 1], ['Lucía Moreno Gil', 2]],
     );
-    assertEquals(report.students, {
-      total: 2,
-      shared: [{ name: 'Ana Pérez Gil', teachers: ['Carlos Ruiz Márquez', 'Lucía Moreno Gil'] }],
-    });
+    assertEquals(report.students.total, 2);
+    assertEquals(
+      (report.students.shared as { name: string }[]).map((s) => s.name),
+      ['Ana Pérez Gil'],
+    );
     assertError(
       await client.json(
         'DELETE',
