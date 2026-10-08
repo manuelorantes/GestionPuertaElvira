@@ -1,8 +1,9 @@
-# Apunta cada noche las horas automáticas de las clases y turnos del día en producción (ver
-# specs/features/profesorado/spec.md): las consultas de la API ya no las apuntan. Se lanza después del
-# cierre del club (21:00 en Madrid): 21:30 UTC son las 22:30 en invierno y las 23:30 en verano. Rellena
-# desde el mes anterior, así que si una noche falla, la siguiente lo recupera.
-name: Horas automáticas
+# Tareas de cada noche en producción, que las consultas de la API ya no hacen: apuntar las horas
+# automáticas de las clases y turnos del día (ver specs/features/profesorado/spec.md) y crear las cuotas
+# que falten del mes (el día 1, las del mes nuevo; ver specs/features/cobros/spec.md). Se lanza después del
+# cierre del club (21:00 en Madrid): 21:30 UTC son las 22:30 en invierno y las 23:30 en verano. Las dos
+# recuperan lo que falte, así que si una noche falla, la siguiente lo arregla.
+name: Horas automáticas y cuotas
 
 on:
   schedule:
@@ -13,7 +14,7 @@ permissions: {}
 
 jobs:
   proponer:
-    name: Apuntar las horas del día
+    name: Apuntar las horas del día y crear las cuotas del mes
     if: vars.SUPABASE_PROJECT_REF != ''
     runs-on: ubuntu-latest
     environment: produccion
@@ -28,5 +29,11 @@ jobs:
         run: |
           docker compose run --rm --no-deps -T -e DATABASE_URL -e DOCUMENT_STORAGE_DIR=/tmp/documentos \
             api deno task console app:payroll:propose-sessions
+        env:
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      - name: app:billing:generate-charges
+        run: |
+          docker compose run --rm --no-deps -T -e DATABASE_URL -e DOCUMENT_STORAGE_DIR=/tmp/documentos \
+            api deno task console app:billing:generate-charges
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}

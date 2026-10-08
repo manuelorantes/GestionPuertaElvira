@@ -133,13 +133,18 @@ descifran con `gpg -d … > copia.dump`, sin `tar`.
 
 Conviene probar la restauración una vez al año contra la base local (`make db-reset` después).
 
-## Horas automáticas
+## Horas automáticas y cuotas
 
-El workflow [Horas automáticas](../.github/workflows/horas-automaticas.yml) apunta cada noche a las 21:30 UTC
-(después del cierre del club) las sesiones de las clases y turnos del día, con
-`deno task console app:payroll:propose-sessions` contra la base de datos de producción. Consultar la API no las
-apunta. Rellena desde el mes anterior, así que si una noche falla, la siguiente lo recupera; también se puede
-lanzar a mano con *Run workflow*. En local: `make console ARGS=app:payroll:propose-sessions`.
+El workflow [Horas automáticas y cuotas](../.github/workflows/horas-automaticas.yml) se ejecuta cada noche a las
+21:30 UTC (después del cierre del club) contra la base de datos de producción:
+
+- `app:payroll:propose-sessions` apunta las sesiones de las clases y turnos del día;
+- `app:billing:generate-charges` crea las cuotas que falten del mes (el día 1, las del mes nuevo).
+
+Consultar la API no escribe nada: las cuotas de un alumno también se crean al momento al darlo de alta o cambiar su
+inscripción o sus datos de cobro. Las dos tareas recuperan lo que falte, así que si una noche falla, la siguiente lo
+arregla; también se lanzan a mano con *Run workflow*. En local:
+`make console ARGS=app:payroll:propose-sessions` y `make console ARGS=app:billing:generate-charges`.
 
 ## Si el despliegue falla por el token
 
