@@ -29,8 +29,9 @@ y `make ci` lanza el conjunto completo.
 - **Hooks locales (Lefthook):** `commit-msg` (commitlint), `pre-commit` (formato) y `pre-push` (tests).
 - **Dependabot:** semanal, contra `staging`.
 - **Despliegue:** el workflow `Despliegue` se ejecuta con cada push a `main` (es decir, con cada release
-  ya validada por CI), `Mantener activo` consulta la API cada tres días y `Copia de seguridad` guarda un
-  `pg_dump` cifrado como artefacto el día 1 de cada mes (ver `docs/despliegue.md`).
+  ya validada por CI), `Mantener activo` consulta la API cada tres días y `Copia de seguridad` guarda
+  cada día el `pg_dump` y los documentos del bucket privado, cifrados, como artefacto (ver
+  `docs/despliegue.md`).
 
 ## Consequences
 
