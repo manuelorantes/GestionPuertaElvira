@@ -340,6 +340,7 @@ export class LinkTeacher {
     private readonly users: UserRepository,
     private readonly teachers: TeacherAccounts,
     private readonly log: SecurityEventLog,
+    private readonly clock: Clock,
   ) {}
 
   async execute(email: string, teacherId: string | null): Promise<void> {
@@ -352,7 +353,7 @@ export class LinkTeacher {
       const linked = await this.teachers.linkedUser(teacher);
       if (linked !== null && !linked.equals(user.id)) throw new TeacherAlreadyLinked();
     }
-    user.linkTeacher(teacher);
+    user.linkTeacher(teacher, this.clock.now());
     await this.users.save(user);
     await this.log.record(
       teacher === null ? 'teacher_unlinked' : 'teacher_linked',

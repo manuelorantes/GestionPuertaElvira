@@ -31,7 +31,7 @@ export function registerUserRoutes(api: ApiApp): void {
   const sessions = (scope: RequestScope) => new SqlSessionRepository(scope.tx);
   const log = (scope: RequestScope) => new AuditedSecurityEventLog(scope.log, scope.tx);
   const linkTeacher = (scope: RequestScope) =>
-    new LinkTeacher(users(scope), new SqlTeacherAccounts(scope.tx), log(scope));
+    new LinkTeacher(users(scope), new SqlTeacherAccounts(scope.tx), log(scope), deps.clock);
   const actor = (scope: RequestScope) => {
     if (scope.user === null) throw httpError(401);
     return scope.user.id;

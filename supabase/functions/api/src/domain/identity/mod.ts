@@ -186,6 +186,7 @@ export class TeacherLink extends Uuid {}
 export class User {
   private events: UserEvent[] = [];
   private teacher: TeacherLink | null = null;
+  private teacherLinkedAt: Date | null = null;
 
   private constructor(
     readonly id: UserId,
@@ -225,6 +226,7 @@ export class User {
     createdAt: Date;
     passwordChangedAt: Date;
     teacher?: TeacherLink | null;
+    teacherLinkedAt?: Date | null;
   }): User {
     const user = new User(
       fields.id,
@@ -238,6 +240,7 @@ export class User {
       fields.passwordChangedAt,
     );
     user.teacher = fields.teacher ?? null;
+    user.teacherLinkedAt = user.teacher === null ? null : (fields.teacherLinkedAt ?? null);
     return user;
   }
 
@@ -272,18 +275,31 @@ export class User {
   /** Al dejar el rol de profesorado se pierde el vínculo con el profesor. */
   changeRole(role: Role): void {
     this.currentRole = role;
-    if (role !== 'teacher') this.teacher = null;
+    if (role !== 'teacher') {
+      this.teacher = null;
+      this.teacherLinkedAt = null;
+    }
   }
 
-  /** Vincula (o desvincula, con null) la cuenta a la ficha de un profesor: solo cuentas de profesorado. */
-  linkTeacher(teacher: TeacherLink | null): void {
+  /**
+   * Vincula (o desvincula, con null) la cuenta a la ficha de un profesor: solo cuentas de profesorado. Recuerda desde
+   * cuándo, porque las listas sin pasar de ese profesor cuentan desde que puede pasarlas.
+   */
+  linkTeacher(teacher: TeacherLink | null, now: Date): void {
     if (teacher !== null && this.currentRole !== 'teacher') {
       throw new InvalidValue(
         'teacherId',
         'Solo una cuenta de profesorado se puede vincular a un profesor.',
       );
     }
+    if (teacher !== null && this.teacher !== null && teacher.equals(this.teacher)) return;
     this.teacher = teacher;
+    this.teacherLinkedAt = teacher === null ? null : now;
+  }
+
+  /** Desde cuándo está vinculada a su profesor, o null. */
+  linkedSince(): Date | null {
+    return this.teacherLinkedAt;
   }
 
   linkedTeacher(): TeacherLink | null {

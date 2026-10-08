@@ -138,18 +138,21 @@ Deno.test('User should not authenticate when disabled and again when enabled; ro
 Deno.test('User should link a teacher only while it has the teacher role', () => {
   const teacher = TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa');
   const user = registeredUser();
-  assertThrows(() => user.linkTeacher(teacher), InvalidValue, 'profesorado');
+  assertThrows(() => user.linkTeacher(teacher, NOW), InvalidValue, 'profesorado');
   user.changeRole('teacher');
-  user.linkTeacher(teacher);
+  user.linkTeacher(teacher, NOW);
   assertEquals(user.linkedTeacher()?.value, teacher.value);
-  user.linkTeacher(null);
-  assertEquals(user.linkedTeacher(), null);
+  assertEquals(user.linkedSince(), NOW);
+  user.linkTeacher(teacher, at(3600));
+  assertEquals(user.linkedSince(), NOW, 'volver a elegir el mismo profesor no cambia la fecha');
+  user.linkTeacher(null, at(7200));
+  assertEquals([user.linkedTeacher(), user.linkedSince()], [null, null]);
 });
 
 Deno.test('User should drop the teacher link when it leaves the teacher role', () => {
   const user = registeredUser();
   user.changeRole('teacher');
-  user.linkTeacher(TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa'));
+  user.linkTeacher(TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa'), NOW);
   user.changeRole('administrator');
   assertEquals(user.linkedTeacher(), null);
 });
