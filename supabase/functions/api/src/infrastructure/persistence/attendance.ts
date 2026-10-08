@@ -4,6 +4,8 @@ import type {
   MissedRollCall,
   MissedRollCallQuery,
   RosterStudent,
+  StudentAttendanceQuery,
+  StudentAttendanceSummary,
   TeacherGroupRoster,
   TeacherRosterQuery,
 } from '../../application/attendance/mod.ts';
@@ -106,5 +108,34 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
       teacherName: r.string('full_name'),
       locked: r.bool('locked'),
     }));
+  }
+}
+
+/** Listas pasadas de los grupos de un alumno los días que le tocaba ir (con su horario especial) y sus faltas. */
+export class SqlStudentAttendanceQuery implements StudentAttendanceQuery {
+  constructor(private readonly sql: Sql) {}
+
+  async summary(
+    studentId: string,
+    from: LocalDate,
+    to: LocalDate,
+  ): Promise<StudentAttendanceSummary> {
+    const [count] = await this.sql`
+      SELECT COUNT(*)::int AS classes
+        FROM attendance_roll_call r
+        JOIN classes_enrolment e ON e.class_group_id = r.group_id AND e.student_id = ${studentId}
+       WHERE r.kind = 'taken' AND r.roll_date BETWEEN ${from.toString()} AND ${to.toString()}
+         AND e.enrolled_on <= r.roll_date AND (e.ends_on IS NULL OR e.ends_on > r.roll_date)
+         AND (e.attendance_days IS NULL
+              OR e.attendance_days::jsonb @> jsonb_build_array(EXTRACT(ISODOW FROM r.roll_date)::int))`;
+    const absences = await this.sql`
+      SELECT a.roll_date::text AS date, g.name
+        FROM attendance_absence a JOIN classes_group g ON g.id = a.group_id
+       WHERE a.student_id = ${studentId} AND a.roll_date BETWEEN ${from.toString()} AND ${to.toString()}
+       ORDER BY a.roll_date DESC`;
+    return {
+      classes: count ? new Row(count).int('classes') : 0,
+      absences: Row.all(absences).map((r) => ({ date: r.string('date'), label: r.string('name') })),
+    };
   }
 }

@@ -4,6 +4,7 @@ import {
   ConfirmWithoutRollCall,
   MissedRollCalls,
   OpenRollCall,
+  StudentAttendance,
   TakeRollCall,
   TeacherClasses,
   TeacherStudents,
@@ -16,6 +17,7 @@ import { JsonBody } from '../http/json-body.ts';
 import {
   SqlClassRoster,
   SqlMissedRollCallQuery,
+  SqlStudentAttendanceQuery,
   SqlTeacherRosterQuery,
 } from '../persistence/attendance.ts';
 import {
@@ -154,6 +156,16 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         scope.user.id,
       );
       return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/students/:id/attendance', access: 'admin' },
+    async (c, scope) => {
+      return c.json(
+        await new StudentAttendance(new SqlStudentAttendanceQuery(scope.tx), api.deps.clock)
+          .execute(param(c, 'id')),
+      );
     },
   );
 }
