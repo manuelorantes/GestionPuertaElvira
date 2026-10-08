@@ -10,11 +10,14 @@ import {
   EmailAlreadyRegistered,
   EnableUser,
   InvalidCredentials,
+  LinkTeacher,
   LogIn,
   LogOut,
   RegisterUser,
   ResetUserPassword,
   SessionNotValid,
+  type TeacherAccounts,
+  TeacherAlreadyLinked,
   TooManyLoginAttempts,
   UserNotFound,
 } from '../../../src/application/identity/mod.ts';
@@ -255,4 +258,47 @@ Deno.test('ResetUserPassword should issue a temporary password and close session
 
   await new ChangeUserRole(fx.users, fx.log).execute(IdentityFixture.EMAIL, 'teacher');
   assertEquals((await fx.users.find(user.id))?.role(), 'teacher');
+});
+
+const LUCIA = '01990000-0000-7000-8000-0000000000aa';
+
+/** Profesores del club y la cuenta vinculada a cada uno, sobre el repositorio de cuentas del fixture. */
+function teacherAccounts(fx: IdentityFixture, teachers: string[]): TeacherAccounts {
+  return {
+    exists: (teacher) => Promise.resolve(teachers.includes(teacher.value)),
+    linkedUser: async (teacher) =>
+      (await fx.users.all()).find((u) => u.linkedTeacher()?.value === teacher.value)?.id ?? null,
+  };
+}
+
+Deno.test('LinkTeacher should link a teacher account to an existing teacher and unlink it', async () => {
+  const fx = new IdentityFixture();
+  const user = await fx.existingUser({ role: 'teacher' });
+  const link = new LinkTeacher(fx.users, teacherAccounts(fx, [LUCIA]), fx.log);
+
+  await link.execute(IdentityFixture.EMAIL, LUCIA);
+  assertEquals((await fx.users.find(user.id))?.linkedTeacher()?.value, LUCIA);
+  assertEquals(fx.log.events.at(-1)?.event, 'teacher_linked');
+
+  await link.execute(IdentityFixture.EMAIL, null);
+  assertEquals((await fx.users.find(user.id))?.linkedTeacher(), null);
+});
+
+Deno.test('LinkTeacher should refuse unknown teachers, teachers with another account and other roles', async () => {
+  const fx = new IdentityFixture();
+  await fx.existingUser({ role: 'teacher' });
+  await fx.existingUser({ email: 'otra@club.es', role: 'teacher' });
+  await fx.existingUser({ email: 'admin@club.es', role: 'administrator' });
+  const free = '01990000-0000-7000-8000-0000000000cc';
+  const link = new LinkTeacher(fx.users, teacherAccounts(fx, [LUCIA, free]), fx.log);
+
+  await assertRejects(
+    () => link.execute(IdentityFixture.EMAIL, '01990000-0000-7000-8000-0000000000bb'),
+    InvalidValue,
+    'Ese profesor no existe.',
+  );
+  await link.execute(IdentityFixture.EMAIL, LUCIA);
+  await assertRejects(() => link.execute('otra@club.es', LUCIA), TeacherAlreadyLinked);
+  await link.execute(IdentityFixture.EMAIL, LUCIA);
+  await assertRejects(() => link.execute('admin@club.es', free), InvalidValue, 'profesorado');
 });

@@ -8,6 +8,7 @@ import {
   Session,
   SessionId,
   SessionPolicy,
+  TeacherLink,
   User,
   UserId,
 } from '../../domain/identity/mod.ts';
@@ -19,6 +20,7 @@ import {
   InvalidCredentials,
   NotImpersonating,
   SessionNotValid,
+  TeacherAlreadyLinked,
   UserNotFound,
 } from './errors.ts';
 import {
@@ -28,6 +30,7 @@ import {
   type SessionRepository,
   SessionToken,
   type SessionTokenGenerator,
+  type TeacherAccounts,
   type TemporaryPasswordGenerator,
   type UserRepository,
 } from './ports.ts';
@@ -42,6 +45,8 @@ export interface AuthenticatedUser {
   email: string;
   role: Role;
   mustChangePassword: boolean;
+  /** Profesor vinculado a una cuenta de profesorado, o null. */
+  teacherId: string | null;
   /** Quien suplanta esta cuenta (superadministración), o null en una sesión normal. */
   impersonatedBy: { id: string; fullName: string } | null;
 }
@@ -57,6 +62,7 @@ export function authenticatedUser(
     fullName: user.fullName.value,
     email: user.email.value,
     role: user.role(),
+    teacherId: user.linkedTeacher()?.value ?? null,
     // Quien suplanta no tiene que cambiar la contraseña temporal de otra persona.
     mustChangePassword: impersonator === null && user.mustChangePassword(),
     impersonatedBy: impersonator === null
@@ -328,6 +334,34 @@ export class ChangeUserRole {
   }
 }
 
+/** Vincula una cuenta de profesorado a la ficha de un profesor (o la desvincula con null). Un profesor, una cuenta. */
+export class LinkTeacher {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly teachers: TeacherAccounts,
+    private readonly log: SecurityEventLog,
+  ) {}
+
+  async execute(email: string, teacherId: string | null): Promise<void> {
+    const user = await lookUp(this.users, email);
+    const teacher = teacherId === null ? null : TeacherLink.fromString(teacherId);
+    if (teacher !== null) {
+      if (!(await this.teachers.exists(teacher))) {
+        throw new InvalidValue('teacherId', 'Ese profesor no existe.');
+      }
+      const linked = await this.teachers.linkedUser(teacher);
+      if (linked !== null && !linked.equals(user.id)) throw new TeacherAlreadyLinked();
+    }
+    user.linkTeacher(teacher);
+    await this.users.save(user);
+    await this.log.record(
+      teacher === null ? 'teacher_unlinked' : 'teacher_linked',
+      'success',
+      user.id,
+    );
+  }
+}
+
 /** Cuenta tal y como se ve en la sección Usuarios (nunca con la contraseña). */
 export interface UserListItem {
   id: string;
@@ -337,6 +371,8 @@ export interface UserListItem {
   status: 'active' | 'disabled';
   mustChangePassword: boolean;
   createdAt: string;
+  /** Profesor vinculado (solo cuentas de profesorado), o null. */
+  teacher: { id: string; name: string } | null;
   /** Último inicio de sesión o actividad, o null si nunca ha entrado. */
   lastSeenAt: string | null;
 }
