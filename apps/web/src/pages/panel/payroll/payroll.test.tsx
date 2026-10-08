@@ -407,6 +407,14 @@ describe('Profesorado', () => {
     expect(within(months).getByRole('row', { name: /Octubre 2026/ })).toHaveTextContent('−90 €');
     const classes = screen.getByRole('table', { name: 'Clases asignadas' });
     expect(within(classes).getByRole('row', { name: /Iniciación A/ })).toHaveTextContent('7 / 10');
+    await userEvent.click(
+      within(classes).getByRole('button', { name: 'Alumnos por día de Iniciación A' }),
+    );
+    const byDay = screen.getByRole('dialog', { name: 'Alumnos por día de Iniciación A' });
+    expect(byDay).toHaveTextContent('Lunes 17:00: 6 / 10');
+    expect(byDay).toHaveTextContent('Miércoles 17:00: 4 / 10');
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: /Alumnos por día/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ana Pérez' })).toHaveAttribute(
       'href',
       '/panel/alumnos/s1',
