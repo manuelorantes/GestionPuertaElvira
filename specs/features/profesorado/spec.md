@@ -105,12 +105,12 @@ con los totales del mes y ordenable por margen, € por hora u ocupación.
 - Ocupación: plazas ocupadas de todas sus clases frente a las totales, contando cada día de clase.
 - Alumnos: los inscritos ese mes en los grupos de los que es titular (las clases que da como sustituto no cuentan). En
   los totales, cada alumno MUST contar una sola vez aunque vaya con varios profesores; si hay alguno así, un asterisco
-  junto al total abre quiénes son y con qué profesores van.
+  junto al total abre la lista de esos alumnos, y cada nombre lleva a su ficha.
 
 #### Scenario: Alumnos compartidos en los totales
 - **WHEN** Lucía tiene 10 alumnos, Carlos 6 y Ana va con los dos
-- **THEN** las filas muestran 10 y 6, el total muestra 15 con un asterisco, y al pincharlo sale «Ana Pérez · Carlos Ruiz
-  Márquez y Lucía Moreno Gil»
+- **THEN** las filas muestran 10 y 6, el total muestra 15 con un asterisco, y al pincharlo sale «Ana Pérez», que lleva a
+  su ficha
 
 #### Scenario: Alumno con dos profesores
 - **WHEN** un alumno que paga 70 € va 2 horas semanales con una profesora y 1,5 con otro
