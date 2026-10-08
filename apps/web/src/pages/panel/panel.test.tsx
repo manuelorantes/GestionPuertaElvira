@@ -187,3 +187,30 @@ describe('profesorado', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('barra de actualización', () => {
+  it('shows while club data loads and goes away when it arrives', async () => {
+    const spy = mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      'GET /api/teacher/students': [200, { items: [] }],
+    });
+    // La respuesta de los alumnos se retiene hasta que el test la suelta.
+    const reply = spy.getMockImplementation();
+    let release: () => void = () => undefined;
+    spy.mockImplementation((input, init) =>
+      String(input) === '/api/teacher/students'
+        ? new Promise((resolve) => {
+            release = () => resolve(reply?.(input, init) as Promise<Response>);
+          })
+        : (reply?.(input, init) as Promise<Response>),
+    );
+    renderApp('/panel/mis-alumnos');
+
+    expect(await screen.findByRole('progressbar', { name: 'Actualizando datos' })).toBeVisible();
+    release();
+    expect(await screen.findByText('No tienes clases asignadas.')).toBeVisible();
+    expect(
+      screen.queryByRole('progressbar', { name: 'Actualizando datos' }),
+    ).not.toBeInTheDocument();
+  });
+});

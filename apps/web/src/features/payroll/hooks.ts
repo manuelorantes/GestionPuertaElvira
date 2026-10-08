@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query';
 
 import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
@@ -7,6 +7,8 @@ import * as api from './api';
 export function useSessions(month: string, teacherId: string) {
   return useQuery({
     queryKey: ['payroll-sessions', month, teacherId],
+    // Al cambiar de mes se sigue viendo el anterior hasta que llega el nuevo.
+    placeholderData: keepPreviousData,
     queryFn: () => api.fetchSessions(month, teacherId),
   });
 }
@@ -14,6 +16,8 @@ export function useSessions(month: string, teacherId: string) {
 export function useSettlements(month: string) {
   return useQuery({
     queryKey: ['payroll-settlements', month],
+    // Al cambiar de mes se sigue viendo el anterior hasta que llega el nuevo.
+    placeholderData: keepPreviousData,
     queryFn: () => api.fetchSettlements(month),
   });
 }
@@ -35,6 +39,8 @@ export function useTeacherReport(teacherId: string) {
 export function useProfitability(month: string) {
   return useQuery({
     queryKey: ['payroll-profitability', month],
+    // Al cambiar de mes se sigue viendo el anterior hasta que llega el nuevo.
+    placeholderData: keepPreviousData,
     queryFn: () => api.fetchProfitability(month),
   });
 }
@@ -49,6 +55,8 @@ export function useHolidays(season: number) {
 export function useSubstitutions(month: string) {
   return useQuery({
     queryKey: ['payroll-substitutions', month],
+    // Al cambiar de mes se sigue viendo el anterior hasta que llega el nuevo.
+    placeholderData: keepPreviousData,
     queryFn: () => api.fetchSubstitutions(month),
   });
 }
