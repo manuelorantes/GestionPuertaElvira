@@ -25,6 +25,7 @@ export function presentUser(
       fullName: user.fullName,
       email: user.email,
       role: user.role,
+      teacherId: user.teacherId,
       mustChangePassword: user.mustChangePassword,
       impersonatedBy: user.impersonatedBy,
     },
