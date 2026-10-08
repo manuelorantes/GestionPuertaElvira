@@ -4,6 +4,7 @@ import { NavLink, useLocation, type Location } from 'react-router';
 import type { Role } from '@/features/auth/api';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 
+import { MissedRollCallsCount } from './MissedRollCallsCount';
 import { MOBILE_SECTIONS, sectionsFor } from './panelSections';
 
 /**
@@ -56,10 +57,13 @@ export function PanelMobileNav({ role }: { role: Role }) {
             to={path}
             end={path === '/panel'}
             aria-current={isMobileItemActive(path, location) ? 'page' : 'false'}
-            className="flex h-16 flex-col items-center justify-center gap-0.5 border-t-3 border-transparent text-xs font-medium text-ink-muted no-underline aria-[current=page]:border-brand aria-[current=page]:font-semibold aria-[current=page]:text-brand-strong"
+            className="relative flex h-16 flex-col items-center justify-center gap-0.5 border-t-3 border-transparent text-xs font-medium text-ink-muted no-underline aria-[current=page]:border-brand aria-[current=page]:font-semibold aria-[current=page]:text-brand-strong"
           >
             <Icon aria-hidden size={22} className="shrink-0" />
             {label}
+            {id === 'resumen' && (
+              <MissedRollCallsCount role={role} className="absolute top-1.5 left-1/2 ml-2" />
+            )}
           </NavLink>
         ) : (
           <span
