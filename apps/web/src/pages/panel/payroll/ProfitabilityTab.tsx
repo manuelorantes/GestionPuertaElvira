@@ -99,10 +99,10 @@ export function ProfitabilityTab({ month }: { month: string }) {
             <tr>
               {[
                 'Profesor',
-                'Alumnos',
                 'Horas',
                 'Tarifa',
                 'Coste',
+                'Alumnos',
                 'Ingresos',
                 'Margen',
                 '€ por hora',
@@ -146,10 +146,10 @@ export function ProfitabilityTab({ month }: { month: string }) {
                     </span>
                   </span>
                 </td>
-                <td className="px-5 py-3.5">{row.students}</td>
                 <td className="px-5 py-3.5">{hoursLabel(row.minutes)}</td>
                 <td className="px-5 py-3.5">{formatCents(row.rateCents)}/h</td>
                 <td className="px-5 py-3.5">{formatCents(row.costCents)}</td>
+                <td className="px-5 py-3.5">{row.students}</td>
                 <td className="px-5 py-3.5">{formatCents(row.incomeCents)}</td>
                 <td className="px-5 py-3.5">
                   <span className="flex items-center gap-2">
@@ -215,13 +215,13 @@ function MonthTotals({
   const averageRate = perHour(cost);
   const marginPerHour = perHour(margin);
   const stats: { label: string; value: ReactNode; negative?: boolean }[] = [
-    { label: 'Alumnos', value: <StudentsTotal students={students} /> },
     { label: 'Horas', value: hoursLabel(minutes) },
     {
       label: 'Tarifa media',
       value: averageRate === null ? '—' : `${formatCents(averageRate)}/h`,
     },
     { label: 'Coste en profesores', value: formatCents(cost) },
+    { label: 'Alumnos', value: <StudentsTotal students={students} /> },
     { label: 'Ingresos', value: formatCents(income) },
     { label: 'Margen', value: formatCents(margin), negative: margin < 0 },
     {

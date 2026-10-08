@@ -155,7 +155,23 @@ describe('Profesorado', () => {
     expect(within(lucia).getByText('83 %')).toBeInTheDocument();
 
     // Alumnos: los de cada profesor en su fila; en el total, sin repetir a quien va con los dos.
-    expect(within(lucia).getAllByRole('cell')[1]).toHaveTextContent('10');
+    // Entre coste e ingresos.
+    expect(within(lucia).getAllByRole('cell')[4]).toHaveTextContent('10');
+    expect(
+      within(table)
+        .getAllByRole('columnheader')
+        .map((h) => h.textContent),
+    ).toEqual([
+      'Profesor',
+      'Horas',
+      'Tarifa',
+      'Coste',
+      'Alumnos',
+      'Ingresos',
+      'Margen',
+      '€ por hora',
+      'Ocupación',
+    ]);
     const students = within(totals).getByText('Alumnos').nextElementSibling as HTMLElement;
     expect(students).toHaveTextContent('15');
     await userEvent.click(
