@@ -274,7 +274,7 @@ function teacherAccounts(fx: IdentityFixture, teachers: string[]): TeacherAccoun
 Deno.test('LinkTeacher should link a teacher account to an existing teacher and unlink it', async () => {
   const fx = new IdentityFixture();
   const user = await fx.existingUser({ role: 'teacher' });
-  const link = new LinkTeacher(fx.users, teacherAccounts(fx, [LUCIA]), fx.log);
+  const link = new LinkTeacher(fx.users, teacherAccounts(fx, [LUCIA]), fx.log, fx.clock);
 
   await link.execute(IdentityFixture.EMAIL, LUCIA);
   assertEquals((await fx.users.find(user.id))?.linkedTeacher()?.value, LUCIA);
@@ -290,7 +290,7 @@ Deno.test('LinkTeacher should refuse unknown teachers, teachers with another acc
   await fx.existingUser({ email: 'otra@club.es', role: 'teacher' });
   await fx.existingUser({ email: 'admin@club.es', role: 'administrator' });
   const free = '01990000-0000-7000-8000-0000000000cc';
-  const link = new LinkTeacher(fx.users, teacherAccounts(fx, [LUCIA, free]), fx.log);
+  const link = new LinkTeacher(fx.users, teacherAccounts(fx, [LUCIA, free]), fx.log, fx.clock);
 
   await assertRejects(
     () => link.execute(IdentityFixture.EMAIL, '01990000-0000-7000-8000-0000000000bb'),

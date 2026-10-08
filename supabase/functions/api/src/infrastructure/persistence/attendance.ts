@@ -75,7 +75,10 @@ export class SqlTeacherRosterQuery implements TeacherRosterQuery {
   }
 }
 
-/** Clases apuntadas en las horas sin lista ni confirmación (sesiones de grupo frente a `attendance_roll_call`). */
+/**
+ * Clases apuntadas en las horas sin lista ni confirmación (sesiones de grupo frente a `attendance_roll_call`), de
+ * profesores que pueden pasar lista: con su cuenta activa vinculada, y desde el día en que se vinculó.
+ */
 export class SqlMissedRollCallQuery implements MissedRollCallQuery {
   constructor(private readonly sql: Sql) {}
 
@@ -92,11 +95,14 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
              t.full_name, st.teacher_id IS NOT NULL AS locked
         FROM payroll_session s
         JOIN teachers_teacher t ON t.id = s.teacher_id
+        -- Solo profesores que pueden pasar lista: con cuenta activa vinculada, desde el día en que se vinculó.
+        JOIN identity_user u ON u.teacher_id = s.teacher_id AND u.status = 'active'
         LEFT JOIN classes_group g ON g.id = s.group_id
         LEFT JOIN payroll_settlement st
                ON st.teacher_id = s.teacher_id AND st.month = to_char(s.session_date, 'YYYY-MM')
        WHERE s.group_id IS NOT NULL
          AND s.session_date BETWEEN ${from.toString()} AND ${until.toString()}
+         AND s.session_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
          AND NOT EXISTS (SELECT 1 FROM attendance_roll_call r
                           WHERE r.group_id = s.group_id AND r.roll_date = s.session_date)
        ORDER BY s.session_date, s.start_minutes NULLS LAST, label`;

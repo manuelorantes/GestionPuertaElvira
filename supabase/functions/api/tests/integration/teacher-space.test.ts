@@ -208,7 +208,7 @@ Deno.test('a teacher should take the roll call of their class, all present by de
 });
 
 Deno.test('administration should see the classes without a roll call once the deadline is over, and settle them', async () => {
-  const { admin, teacher, lucia, carlos, luciaGroup, carlosGroup } = await atTime(
+  const { admin, teacher, lucia, carlos, ana, luciaGroup, carlosGroup, anaGroup } = await atTime(
     TUESDAY_EVENING,
     async () => {
       await resetDatabase();
@@ -232,11 +232,24 @@ Deno.test('administration should see the classes without a roll call once the de
         end: '20:00',
         classroom: 'caballo',
       });
-      await createUser('profe@club.es', 'teacher');
-      await db()`UPDATE identity_user SET teacher_id = ${lucia} WHERE email = 'profe@club.es'`;
+      // Ana no tiene cuenta: no puede pasar lista y sus clases no avisan.
+      const ana = await newTeacher(admin, 'Ana Belén Torres');
+      const anaGroup = await newGroup(admin, ana, {
+        name: 'Martes 16:00',
+        days: ['tue'],
+        start: '16:00',
+        end: '17:00',
+        classroom: 'peon',
+      });
+      // Las cuentas de Lucía y Carlos están vinculadas desde el día 1.
+      for (const [email, teacherId] of [['profe@club.es', lucia], ['carlos@club.es', carlos]]) {
+        await createUser(email ?? '', 'teacher');
+        await db()`UPDATE identity_user SET teacher_id = ${teacherId ?? ''},
+                     teacher_linked_at = '2026-10-01T00:00:00+02:00' WHERE email = ${email ?? ''}`;
+      }
       const teacher = new ApiClient();
       await teacher.logIn('profe@club.es');
-      return { admin, teacher, lucia, carlos, luciaGroup, carlosGroup };
+      return { admin, teacher, lucia, carlos, ana, luciaGroup, carlosGroup, anaGroup };
     },
   );
   const record = async (teacherId: string, groupId: string, date: string) => {
@@ -254,6 +267,7 @@ Deno.test('administration should see the classes without a roll call once the de
     await record(lucia, luciaGroup, '2026-10-13');
     await record(carlos, carlosGroup, '2026-10-13');
     await record(carlos, carlosGroup, '2026-10-06');
+    await record(ana, anaGroup, '2026-10-13');
     // Lucía pasa su lista; Carlos no pasa ninguna.
     const taken = await teacher.json('PUT', `/api/teacher/roll-calls/${luciaGroup}/2026-10-13`, {
       absent: [],
