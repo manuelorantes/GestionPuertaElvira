@@ -109,7 +109,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
         // Ana va con los dos: 10 + 6 en las filas, 15 alumnos distintos.
         students: {
           total: 15,
-          shared: [{ name: 'Ana Pérez', teachers: ['Carlos Ruiz Márquez', 'Lucía Moreno Gil'] }],
+          shared: [{ id: 's7', name: 'Ana Pérez' }],
         },
       },
     ],
@@ -177,9 +177,13 @@ describe('Profesorado', () => {
     await userEvent.click(
       within(students).getByRole('button', { name: 'Alumnos con más de un profesor' }),
     );
-    expect(
-      screen.getByRole('dialog', { name: 'Alumnos con más de un profesor' }),
-    ).toHaveTextContent('Ana Pérez · Carlos Ruiz Márquez y Lucía Moreno Gil');
+    const shared = screen.getByRole('dialog', { name: 'Alumnos con más de un profesor' });
+    expect(within(shared).getByRole('link', { name: 'Ana Pérez' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s7',
+    );
+    expect(shared).not.toHaveTextContent('Carlos');
+    expect(within(lucia).getByText('Más rentable')).toHaveClass('whitespace-nowrap');
   });
 
   it('records hours for another activity', async () => {
