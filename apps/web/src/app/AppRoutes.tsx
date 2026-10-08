@@ -17,6 +17,7 @@ import { PanelLayout } from '@/pages/panel/PanelLayout';
 import { StudentPanel } from '@/pages/panel/students/StudentPanel';
 import { StudentsPage } from '@/pages/panel/students/StudentsPage';
 import { RollCallPage } from '@/pages/panel/teacher/RollCallPage';
+import { TeacherPayPage } from '@/pages/panel/teacher/TeacherPayPage';
 import { TeacherStudentsPage } from '@/pages/panel/teacher/TeacherStudentsPage';
 import { PendingDataPage } from '@/pages/panel/students/PendingDataPage';
 
@@ -29,6 +30,7 @@ export function AppRoutes() {
         <Route element={<PanelLayout />}>
           <Route index element={<PanelHomePage />} />
           <Route path="mis-alumnos" element={<TeacherStudentsPage />} />
+          <Route path="mis-pagos" element={<TeacherPayPage />} />
           <Route path="lista/:groupId/:date" element={<RollCallPage />} />
           <Route element={<RequireStaff />}>
             <Route path="clases" element={<ClassesPage />} />
