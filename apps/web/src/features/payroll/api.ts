@@ -47,6 +47,14 @@ export interface ProfitabilityRow {
   incomePerHourCents: number | null;
   occupied: number;
   capacity: number;
+  /** Alumnos de sus grupos ese mes (sin las clases que da como sustituto). */
+  students: number;
+}
+
+/** Filas del mes y alumnos sin repetir (los que van con varios profesores cuentan en la fila de cada uno). */
+export interface ProfitabilityReport {
+  items: ProfitabilityRow[];
+  students: { total: number; shared: { name: string; teachers: string[] }[] };
 }
 
 export interface SessionPayload {
@@ -72,9 +80,8 @@ export function fetchSettlementSheet(teacherId: string, month: string): Promise<
   return apiGet(`${BASE}/settlements/${teacherId}/${month}`);
 }
 
-export async function fetchProfitability(month: string): Promise<ProfitabilityRow[]> {
-  return (await apiGet<{ items: ProfitabilityRow[] }>(`${BASE}/profitability?month=${month}`))
-    .items;
+export function fetchProfitability(month: string): Promise<ProfitabilityReport> {
+  return apiGet<ProfitabilityReport>(`${BASE}/profitability?month=${month}`);
 }
 
 export async function recordSession(payload: SessionPayload): Promise<string> {

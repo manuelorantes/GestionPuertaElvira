@@ -88,6 +88,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             occupied: 10,
             occupancyByDay: {},
             capacity: 12,
+            students: 10,
           },
           {
             teacherId: 't2',
@@ -102,8 +103,14 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             occupied: 6,
             occupancyByDay: {},
             capacity: 12,
+            students: 6,
           },
         ],
+        // Ana va con los dos: 10 + 6 en las filas, 15 alumnos distintos.
+        students: {
+          total: 15,
+          shared: [{ name: 'Ana Pérez', teachers: ['Carlos Ruiz Márquez', 'Lucía Moreno Gil'] }],
+        },
       },
     ],
     'GET /api/admin/payroll/sessions?month=2026-09': [
@@ -146,6 +153,17 @@ describe('Profesorado', () => {
     expect(within(totals).getByText('Ganancia por hora')).toBeInTheDocument();
     expect(within(lucia).getByText('322 €')).toBeInTheDocument();
     expect(within(lucia).getByText('83 %')).toBeInTheDocument();
+
+    // Alumnos: los de cada profesor en su fila; en el total, sin repetir a quien va con los dos.
+    expect(within(lucia).getAllByRole('cell')[1]).toHaveTextContent('10');
+    const students = within(totals).getByText('Alumnos').nextElementSibling as HTMLElement;
+    expect(students).toHaveTextContent('15');
+    await userEvent.click(
+      within(students).getByRole('button', { name: 'Alumnos con más de un profesor' }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Alumnos con más de un profesor' }),
+    ).toHaveTextContent('Ana Pérez · Carlos Ruiz Márquez y Lucía Moreno Gil');
   });
 
   it('records hours for another activity', async () => {

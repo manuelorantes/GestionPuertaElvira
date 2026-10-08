@@ -94,7 +94,7 @@ Se paga a mes vencido: por defecto se muestra el mes anterior. Se puede imprimir
 - **THEN** sus horas, tarifa e importe quedan congelados aunque después cambie la tarifa, y las sesiones de ese profesor y mes ya no se pueden cambiar
 
 ### Requirement: Rentabilidad
-Para cada mes, el sistema MUST mostrar por profesor: horas, tarifa, coste, ingresos atribuidos, margen, € por hora y ocupación de sus grupos,
+Para cada mes, el sistema MUST mostrar por profesor: alumnos, horas, tarifa, coste, ingresos atribuidos, margen, € por hora y ocupación de sus grupos,
 con los totales del mes y ordenable por margen, € por hora u ocupación.
 - Horas y coste: en el mes en curso y los futuros, las horas esperadas según el horario (todas sus clases y turnos salvo
   festivos, aunque aún no se hayan dado; sin tener en cuenta sustituciones ni contar dos veces lo que se solapa) por su
@@ -103,6 +103,14 @@ con los totales del mes y ordenable por margen, € por hora u ocupación.
   cobradas o por cobrar y, en meses futuros, las previstas; sin cuotas de socio. Si un alumno va con varios profesores,
   su cuota se reparte según las horas semanales con cada uno.
 - Ocupación: plazas ocupadas de todas sus clases frente a las totales, contando cada día de clase.
+- Alumnos: los inscritos ese mes en los grupos de los que es titular (las clases que da como sustituto no cuentan). En
+  los totales, cada alumno MUST contar una sola vez aunque vaya con varios profesores; si hay alguno así, un asterisco
+  junto al total abre quiénes son y con qué profesores van.
+
+#### Scenario: Alumnos compartidos en los totales
+- **WHEN** Lucía tiene 10 alumnos, Carlos 6 y Ana va con los dos
+- **THEN** las filas muestran 10 y 6, el total muestra 15 con un asterisco, y al pincharlo sale «Ana Pérez · Carlos Ruiz
+  Márquez y Lucía Moreno Gil»
 
 #### Scenario: Alumno con dos profesores
 - **WHEN** un alumno que paga 70 € va 2 horas semanales con una profesora y 1,5 con otro
