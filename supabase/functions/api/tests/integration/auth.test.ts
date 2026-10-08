@@ -26,6 +26,7 @@ Deno.test('login should start a session cookie and return the user when credenti
       fullName: 'Lucía Moreno Gil',
       email: 'junta@club.es',
       role: 'administrator',
+      teacherId: null,
       mustChangePassword: false,
       impersonatedBy: null,
     },

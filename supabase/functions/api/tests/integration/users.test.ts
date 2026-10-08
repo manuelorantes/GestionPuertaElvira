@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertMatch } from '@std/assert';
 
+import { newTeacher } from '../support/classes-http.ts';
 import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
 
 interface UserRow {
@@ -9,6 +10,7 @@ interface UserRow {
   role: string;
   status: string;
   mustChangePassword: boolean;
+  teacher: { id: string; name: string } | null;
   lastSeenAt: string | null;
 }
 
@@ -152,4 +154,71 @@ Deno.test('superadministrators can act as another account and come back, signing
     'cannot_impersonate',
   );
   assertError(await client.json('POST', '/api/auth/impersonation/stop'), 409, 'not_impersonating');
+});
+
+Deno.test('teacher accounts should be linked to one teacher each and see only teacher routes', async () => {
+  const { client } = await superadmin();
+  const lucia = await newTeacher(client, 'Lucía Moreno Gil');
+  const created = await client.json('POST', '/api/admin/users', {
+    email: 'lucia@club.es',
+    fullName: 'Lucía Moreno Gil',
+    role: 'teacher',
+    teacherId: lucia,
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const listed = items((await client.get('/api/admin/users')).body);
+  assertEquals(listed.find((u) => u.email === 'lucia@club.es')?.teacher, {
+    id: lucia,
+    name: 'Lucía Moreno Gil',
+  });
+
+  // Un profesor, una cuenta; solo las cuentas de profesorado se vinculan.
+  const other = await createUser('otra@club.es', 'teacher');
+  assertError(
+    await client.json('PUT', `/api/admin/users/${other.id.value}/teacher`, { teacherId: lucia }),
+    409,
+    'teacher_already_linked',
+  );
+  const admin = await createUser('junta@club.es');
+  assertError(
+    await client.json('PUT', `/api/admin/users/${admin.id.value}/teacher`, {
+      teacherId: await newTeacher(client, 'Carlos Ruiz Márquez'),
+    }),
+    422,
+    'unprocessable',
+  );
+
+  // Una cuenta de profesorado sin vincular no tiene profesor; al vincularla (libre ya el de Lucía), lo tiene.
+  const teacher = new ApiClient();
+  const profe = await createUser('profe@club.es', 'teacher');
+  await teacher.logIn('profe@club.es');
+  const linkedTo = async () =>
+    ((await teacher.get('/api/auth/me')).body as { user: { teacherId: string | null } }).user
+      .teacherId;
+  assertEquals(await linkedTo(), null);
+  const luciaAccount = (created.body as { id: string }).id;
+  assertEquals(
+    (await client.json('PUT', `/api/admin/users/${luciaAccount}/teacher`, { teacherId: null }))
+      .status,
+    204,
+  );
+  assertEquals(
+    (await client.json('PUT', `/api/admin/users/${profe.id.value}/teacher`, { teacherId: lucia }))
+      .status,
+    204,
+  );
+  assertEquals(await linkedTo(), lucia);
+  assertError(await teacher.get('/api/admin/students'), 403, 'forbidden');
+
+  // Pasar a otro rol quita el vínculo.
+  assertEquals(
+    (await client.json('PUT', `/api/admin/users/${profe.id.value}/role`, { role: 'administrator' }))
+      .status,
+    204,
+  );
+  assertEquals(
+    items((await client.get('/api/admin/users')).body).find((u) => u.email === 'profe@club.es')
+      ?.teacher,
+    null,
+  );
 });
