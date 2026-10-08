@@ -30,3 +30,7 @@ export function useSaveRollCall(groupId: string, date: string) {
     },
   });
 }
+
+export function useTeacherPay() {
+  return useQuery({ queryKey: ['teacher-pay'], queryFn: api.fetchPay });
+}

@@ -52,3 +52,23 @@ export function fetchRollCall(groupId: string, date: string): Promise<RollCall> 
 export function saveRollCall(groupId: string, date: string, absent: string[]): Promise<void> {
   return apiSend('PUT', `${BASE}/roll-calls/${groupId}/${date}`, { absent });
 }
+
+export interface TeacherPayMonth {
+  month: string;
+  minutes: number;
+  amountCents: number;
+  advancesCents: number;
+  toPayCents: number;
+  status: 'paid' | 'pending' | 'none';
+  paidOn: string | null;
+}
+
+export interface TeacherPayStatus {
+  season: number;
+  months: TeacherPayMonth[];
+  totals: { minutes: number; amountCents: number; receivedCents: number; owedCents: number };
+}
+
+export function fetchPay(): Promise<TeacherPayStatus> {
+  return apiGet<TeacherPayStatus>(`${BASE}/pay`);
+}

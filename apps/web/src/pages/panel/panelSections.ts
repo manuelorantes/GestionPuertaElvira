@@ -40,7 +40,13 @@ const TEACHER_SECTIONS: PanelSection[] = [
     path: '/panel/mis-alumnos',
     roles: ['teacher'],
   },
-  { id: 'mis-pagos', label: 'Mis pagos', icon: Wallet, path: null, roles: ['teacher'] },
+  {
+    id: 'mis-pagos',
+    label: 'Mis pagos',
+    icon: Wallet,
+    path: '/panel/mis-pagos',
+    roles: ['teacher'],
+  },
 ];
 
 /** Secciones del panel según el diseño. `path: null` = «Próximamente». */
