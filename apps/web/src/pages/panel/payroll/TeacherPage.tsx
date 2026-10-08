@@ -1,5 +1,5 @@
 import { ArrowLeft, CalendarClock, Plus, Trash2 } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -309,6 +309,7 @@ function GroupsSection({ groups }: { groups: TeacherGroup[] }) {
                 <td className={TD}>{classroomLabel(g.classroom)}</td>
                 <td className={TD}>
                   {g.students} / {g.capacity}
+                  <StudentsByDay group={g} />
                 </td>
                 <td className={TD}>{groupOccupancy(g)}</td>
               </tr>
@@ -317,6 +318,70 @@ function GroupsSection({ groups }: { groups: TeacherGroup[] }) {
         </table>
       )}
     </Section>
+  );
+}
+
+/**
+ * Asterisco junto a los alumnos cuando no todos vienen todos los días (horario especial): el total puede pasar de
+ * las plazas sin que ningún día esté lleno. Al pincharlo se ven los alumnos de cada día.
+ */
+function StudentsByDay({ group }: { group: TeacherGroup }) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const counts = WEEKDAYS.filter((d) => group.days.includes(d.id)).map((d) => ({
+    day: d.long,
+    count: group.occupancyByDay[d.id] ?? 0,
+  }));
+  const differs = counts.some((c) => c.count !== group.students);
+
+  useEffect(() => {
+    if (!anchor) return;
+    const close = () => setAnchor(null);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close();
+    const onPointer = (e: PointerEvent) => {
+      if (!(e.target instanceof Element) || !e.target.closest('[data-students-by-day]')) close();
+    };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onPointer);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [anchor]);
+
+  if (counts.length < 2 || !differs) return null;
+  return (
+    <span data-students-by-day>
+      <button
+        type="button"
+        aria-label={`Alumnos por día de ${group.name}`}
+        aria-expanded={anchor !== null}
+        onClick={(e) => setAnchor(anchor ? null : e.currentTarget.getBoundingClientRect())}
+        className="ml-1 cursor-pointer rounded-sm px-1 font-semibold text-brand hover:bg-surface-muted"
+      >
+        *
+      </button>
+      {anchor && (
+        <span
+          role="dialog"
+          aria-label={`Alumnos por día de ${group.name}`}
+          style={{ top: anchor.bottom + 4, left: anchor.left }}
+          className="fixed z-20 block rounded-sm border border-line-strong bg-surface-raised px-3 py-2 text-[13px] whitespace-nowrap shadow-overlay"
+        >
+          {counts.map((c) => (
+            <span key={c.day} className="block">
+              {c.day} {group.start}: {c.count} / {group.capacity}
+            </span>
+          ))}
+          <span className="mt-1 block text-[12px] text-ink-muted">
+            Hay alumnos que solo vienen algún día.
+          </span>
+        </span>
+      )}
+    </span>
   );
 }
 
