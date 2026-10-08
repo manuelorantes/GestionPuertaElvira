@@ -1,3 +1,5 @@
+import { Link } from 'react-router';
+
 import { classroomLabel } from '@/features/classes/classrooms';
 import type { TeacherClass } from '@/features/teacher-space/api';
 import { Badge } from '@/shared/ui/Badge';
@@ -18,12 +20,25 @@ export function ClassCard({ item }: { item: TeacherClass }) {
             ? 'Turno'
             : `${item.classroom ? classroomLabel(item.classroom) : ''} · ${item.students} ${item.students === 1 ? 'alumno' : 'alumnos'}`}
         </p>
-        {item.substitution && (
-          <span className="mt-1.5 inline-block">
-            <Badge>Sustitución</Badge>
-          </span>
-        )}
+        <span className="mt-1.5 flex flex-wrap gap-1.5 empty:hidden">
+          {item.substitution && <Badge>Sustitución</Badge>}
+          {item.rollCall === 'taken' && <Badge tone="success">Lista pasada</Badge>}
+          {item.rollCall === 'missed' && <Badge tone="warning">Sin lista</Badge>}
+        </span>
       </div>
+      {item.groupId !== null && (item.rollCall === 'open' || item.rollCall === 'taken') && (
+        <Link
+          to={`/panel/lista/${item.groupId}/${item.date}`}
+          aria-label={`${item.rollCall === 'open' ? 'Pasar lista' : 'Corregir la lista'} de ${item.label}`}
+          className={`flex h-11 shrink-0 items-center rounded-sm px-3 text-sm font-semibold no-underline ${
+            item.rollCall === 'open'
+              ? 'bg-brand text-surface-raised hover:bg-brand-strong'
+              : 'border border-line-strong text-ink hover:bg-surface-muted'
+          }`}
+        >
+          {item.rollCall === 'open' ? 'Pasar lista' : 'Corregir'}
+        </Link>
+      )}
     </Card>
   );
 }
