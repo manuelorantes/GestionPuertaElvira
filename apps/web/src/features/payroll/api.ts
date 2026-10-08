@@ -20,6 +20,10 @@ export interface Settlement {
   minutes: number;
   rateCents: number;
   amountCents: number;
+  /** Anticipos de ese mes, que se descuentan de lo que hay que pagarle. */
+  advancesCents: number;
+  /** Importe menos anticipos. */
+  toPayCents: number;
   lines: { label: string; minutes: number; amountCents: number }[];
   status: 'pending' | 'paid';
   paidOn: string | null;
@@ -187,4 +191,89 @@ export function paySettlement(teacherId: string, month: string): Promise<void> {
 
 export async function payAllSettlements(month: string): Promise<number> {
   return (await apiSend<{ paid: number }>('POST', `${BASE}/settlements/${month}/payment`)).paid;
+}
+
+// ---- Ficha del profesor ----------------------------------------------------------------------
+
+export interface TeacherMonth {
+  month: string;
+  minutes: number;
+  amountCents: number;
+  advancesCents: number;
+  toPayCents: number;
+  /** `none`: sin horas ni anticipos. */
+  status: 'paid' | 'pending' | 'none';
+  paidOn: string | null;
+  incomeCents: number;
+  marginCents: number;
+}
+
+export interface TeacherPayment {
+  /** Id del anticipo (null en las liquidaciones). */
+  id: string | null;
+  date: string;
+  kind: 'settlement' | 'advance';
+  month: string;
+  amountCents: number;
+  note: string | null;
+}
+
+export interface TeacherGroup {
+  id: string;
+  name: string;
+  days: string[];
+  start: string;
+  end: string;
+  classroom: string;
+  capacity: number;
+  occupancyByDay: Record<string, number>;
+  students: number;
+}
+
+export interface TeacherReport {
+  teacher: { id: string; name: string; rateCents: number; active: boolean };
+  season: number;
+  months: TeacherMonth[];
+  /** Lo que le debemos hoy (positivo) o lo pagado de más (negativo). */
+  balanceCents: number;
+  payments: TeacherPayment[];
+  groups: TeacherGroup[];
+  occupancy: { occupied: number; capacity: number };
+  students: { id: string; name: string; groups: string[]; weeklyMinutes: number }[];
+  substitutions: {
+    date: string;
+    label: string;
+    role: 'gave' | 'received';
+    otherName: string;
+    reason: string | null;
+  }[];
+  duties: { weekday: number; start: string; end: string; label: string }[];
+}
+
+export function fetchTeacherReport(teacherId: string): Promise<TeacherReport> {
+  return apiGet<TeacherReport>(`${BASE}/teachers/${teacherId}/report`);
+}
+
+export async function recordAdvance(input: {
+  teacherId: string;
+  month: string;
+  amount: string;
+  date: string;
+  note: string | null;
+}): Promise<string> {
+  return (await apiSend<{ id: string }>('POST', `${BASE}/advances`, input)).id;
+}
+
+export function deleteAdvance(id: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/advances/${id}`, {});
+}
+
+export function changeSettlementPaymentDate(input: {
+  teacherId: string;
+  month: string;
+  date: string;
+}): Promise<void> {
+  return apiSend('PUT', `${BASE}/settlements/${input.teacherId}/${input.month}/payment`, {
+    date: input.date,
+  });
 }

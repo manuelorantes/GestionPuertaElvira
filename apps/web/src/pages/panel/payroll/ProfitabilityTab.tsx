@@ -7,6 +7,8 @@ import { hoursLabel } from '@/features/payroll/hours';
 import { Card } from '@/shared/ui/Card';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
+import { TeacherLink } from './TeacherLink';
+
 const ORDERS: { id: string; label: string; value: (r: ProfitabilityRow) => number }[] = [
   { id: 'margin', label: 'Margen', value: (r) => r.marginCents },
   { id: 'perHour', label: '€ por hora', value: (r) => r.incomePerHourCents ?? -Infinity },
@@ -126,7 +128,7 @@ export function ProfitabilityTab({ month }: { month: string }) {
                     </span>
                     <span>
                       <span className="flex items-center gap-2 font-medium">
-                        {row.teacherName}
+                        <TeacherLink id={row.teacherId} name={row.teacherName} />
                         {row === top && (
                           <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-surface-raised">
                             Más rentable

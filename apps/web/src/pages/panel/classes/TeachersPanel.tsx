@@ -11,6 +11,8 @@ import { Card } from '@/shared/ui/Card';
 import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 
+import { TeacherLink } from '../payroll/TeacherLink';
+
 /** «16.00» → «16»; «17.50» → «17,5». */
 function rateLabel(rate: string): string {
   return String(Number(rate)).replace('.', ',');
@@ -92,7 +94,9 @@ function TeacherRow({ teacher }: { teacher: Teacher }) {
 
   return (
     <li className="flex items-center gap-3 border-b border-line px-4 py-3 last:border-b-0">
-      <span className="flex-1 font-medium">{teacher.fullName}</span>
+      <span className="flex-1">
+        <TeacherLink id={teacher.id} name={teacher.fullName} />
+      </span>
       <span className="text-sm text-ink-soft">{rateLabel(teacher.hourlyRate)} €/h</span>
       <span className="text-sm text-ink-muted">
         {teacher.groupCount} {teacher.groupCount === 1 ? 'grupo' : 'grupos'}

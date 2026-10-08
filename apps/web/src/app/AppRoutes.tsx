@@ -10,6 +10,7 @@ import { ChangePasswordPage } from '@/pages/panel/ChangePasswordPage';
 import { ImportPage } from '@/pages/panel/import/ImportPage';
 import { ClassesPage } from '@/pages/panel/classes/ClassesPage';
 import { PanelHomePage } from '@/pages/panel/PanelHomePage';
+import { TeacherPage } from '@/pages/panel/payroll/TeacherPage';
 import { TeachersPayPage } from '@/pages/panel/payroll/TeachersPayPage';
 import { PanelLayout } from '@/pages/panel/PanelLayout';
 import { StudentPanel } from '@/pages/panel/students/StudentPanel';
@@ -27,6 +28,7 @@ export function AppRoutes() {
           <Route path="clases" element={<ClassesPage />} />
           <Route path="cobros" element={<BillingPage />} />
           <Route path="profesores" element={<TeachersPayPage />} />
+          <Route path="profesores/:id" element={<TeacherPage />} />
           <Route path="contabilidad" element={<AccountingPage />} />
           <Route path="historial" element={<AuditPage />} />
           <Route path="usuarios" element={<UsersPage />} />
