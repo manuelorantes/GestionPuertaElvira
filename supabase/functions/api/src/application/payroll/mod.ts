@@ -60,6 +60,8 @@ export interface TimesheetRepository {
 /** Festivos del calendario oficial (España, Andalucía y Granada capital): no se apuntan horas solas. */
 export interface HolidayCalendar {
   isHoliday(date: LocalDate): Promise<boolean>;
+  /** Los festivos de un periodo de una vez («AAAA-MM-DD»). */
+  holidaysBetween(from: LocalDate, to: LocalDate): Promise<Set<string>>;
   add(date: LocalDate, name: string): Promise<void>;
   remove(date: LocalDate): Promise<void>;
 }
@@ -541,10 +543,7 @@ export class Profitability {
   async execute(month: string): Promise<ProfitabilityRow[]> {
     const period = YearMonth.fromString(month);
     const past = period.isBefore(YearMonth.of(LocalDate.fromInstant(this.clock.now())));
-    const holidays = new Set<string>();
-    for (let day = period.firstDay(); !period.lastDay().isBefore(day); day = day.plusDays(1)) {
-      if (await this.holidays.isHoliday(day)) holidays.add(day.toString());
-    }
+    const holidays = await this.holidays.holidaysBetween(period.firstDay(), period.lastDay());
     const expected = new ExpectedHours().ofMonth(
       period,
       await this.schedule.groups(),
@@ -1270,9 +1269,10 @@ export class TeacherAgenda {
     }
     const groups = await this.schedule.groups();
     const duties = await this.duties.all();
+    const holidays = await this.holidays.holidaysBetween(first, last);
     const items: AgendaItem[] = [];
     for (let date = first; !last.isBefore(date); date = date.plusDays(1)) {
-      if (await this.holidays.isHoliday(date)) continue;
+      if (holidays.has(date.toString())) continue;
       const substitutions = await this.substitutions.onDate(date);
       for (const planned of new DailyPlanner().plan(date, groups, duties, substitutions, null)) {
         if (!planned.teacher.equals(teacher)) continue;
