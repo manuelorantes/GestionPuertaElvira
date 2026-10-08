@@ -39,7 +39,7 @@ services:
       - vite
 
   vite:
-    image: node:24-alpine
+    image: node:26-alpine
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /app/apps/web
     command: sh -c "npm install --no-audit --no-fund && npm run dev -- --host 0.0.0.0 --port 5173"
