@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { currentMonth, formatCents, monthLabel } from '@/features/billing/money';
-import type { ProfitabilityRow } from '@/features/payroll/api';
+import type { ProfitabilityReport, ProfitabilityRow } from '@/features/payroll/api';
 import { useProfitability } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
+import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Card } from '@/shared/ui/Card';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
@@ -30,7 +31,7 @@ function initials(name: string): string {
 export function ProfitabilityTab({ month }: { month: string }) {
   const profitability = useProfitability(month);
   const [order, setOrder] = useState('margin');
-  const rows = profitability.data ?? [];
+  const rows = profitability.data?.items ?? [];
   // En un mes ya pasado cuentan las horas realmente imputadas; en el actual y los futuros, las esperadas.
   const past = month < currentMonth();
 
@@ -98,6 +99,7 @@ export function ProfitabilityTab({ month }: { month: string }) {
             <tr>
               {[
                 'Profesor',
+                'Alumnos',
                 'Horas',
                 'Tarifa',
                 'Coste',
@@ -144,6 +146,7 @@ export function ProfitabilityTab({ month }: { month: string }) {
                     </span>
                   </span>
                 </td>
+                <td className="px-5 py-3.5">{row.students}</td>
                 <td className="px-5 py-3.5">{hoursLabel(row.minutes)}</td>
                 <td className="px-5 py-3.5">{formatCents(row.rateCents)}/h</td>
                 <td className="px-5 py-3.5">{formatCents(row.costCents)}</td>
@@ -176,7 +179,7 @@ export function ProfitabilityTab({ month }: { month: string }) {
             ))}
           </tbody>
         </table>
-        <MonthTotals rows={rows} />
+        <MonthTotals rows={rows} students={profitability.data?.students ?? null} />
         <p className="px-5 py-3 text-[13px] text-ink-muted">
           {past
             ? 'Mes cerrado: coste = horas realmente imputadas (su liquidación).'
@@ -195,7 +198,13 @@ export function ProfitabilityTab({ month }: { month: string }) {
  * Totales del mes: horas, tarifa media (ponderada por las horas de cada profesor), coste, ingresos, margen, ganancia o
  * pérdida por hora y ocupación de todas las clases.
  */
-function MonthTotals({ rows }: { rows: ProfitabilityRow[] }) {
+function MonthTotals({
+  rows,
+  students,
+}: {
+  rows: ProfitabilityRow[];
+  students: ProfitabilityReport['students'] | null;
+}) {
   const minutes = rows.reduce((sum, r) => sum + r.minutes, 0);
   const cost = rows.reduce((sum, r) => sum + r.costCents, 0);
   const income = rows.reduce((sum, r) => sum + r.incomeCents, 0);
@@ -205,7 +214,8 @@ function MonthTotals({ rows }: { rows: ProfitabilityRow[] }) {
   const perHour = (cents: number) => (minutes > 0 ? Math.round((cents * 60) / minutes) : null);
   const averageRate = perHour(cost);
   const marginPerHour = perHour(margin);
-  const stats = [
+  const stats: { label: string; value: ReactNode; negative?: boolean }[] = [
+    { label: 'Alumnos', value: <StudentsTotal students={students} /> },
     { label: 'Horas', value: hoursLabel(minutes) },
     {
       label: 'Tarifa media',
@@ -232,7 +242,7 @@ function MonthTotals({ rows }: { rows: ProfitabilityRow[] }) {
       <h3 className="mb-3 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
         Totales del mes
       </h3>
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:grid-cols-7">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:grid-cols-8">
         {stats.map((stat) => (
           <div key={stat.label}>
             <dt className="text-[13px] text-ink-muted">{stat.label}</dt>
@@ -243,5 +253,30 @@ function MonthTotals({ rows }: { rows: ProfitabilityRow[] }) {
         ))}
       </dl>
     </section>
+  );
+}
+
+/**
+ * Alumnos del mes sin repetir: quien va con dos profesores cuenta en la fila de cada uno, pero una sola vez aquí. El
+ * asterisco dice quiénes son.
+ */
+function StudentsTotal({ students }: { students: ProfitabilityReport['students'] | null }) {
+  if (students === null) return '—';
+  return (
+    <>
+      {students.total}
+      {students.shared.length > 0 && (
+        <AsteriskNote label="Alumnos con más de un profesor">
+          <span className="mb-1 block text-[12px] text-ink-muted">
+            Van con más de un profesor: cuentan en la fila de cada uno y una sola vez en el total.
+          </span>
+          {students.shared.map((s) => (
+            <span key={s.name} className="block">
+              {s.name} · {s.teachers.join(' y ')}
+            </span>
+          ))}
+        </AsteriskNote>
+      )}
+    </>
   );
 }
