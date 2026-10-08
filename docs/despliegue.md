@@ -133,6 +133,14 @@ descifran con `gpg -d … > copia.dump`, sin `tar`.
 
 Conviene probar la restauración una vez al año contra la base local (`make db-reset` después).
 
+## Horas automáticas
+
+El workflow [Horas automáticas](../.github/workflows/horas-automaticas.yml) apunta cada noche a las 21:30 UTC
+(después del cierre del club) las sesiones de las clases y turnos del día, con
+`deno task console app:payroll:propose-sessions` contra la base de datos de producción. Consultar la API no las
+apunta. Rellena desde el mes anterior, así que si una noche falla, la siguiente lo recupera; también se puede
+lanzar a mano con *Run workflow*. En local: `make console ARGS=app:payroll:propose-sessions`.
+
 ## Si el despliegue falla por el token
 
 Si los pasos «Secretos de la función» o «Subir la web» fallan con `FGA Authentication Error. Unauthorized`
@@ -145,5 +153,7 @@ Las migraciones no dependen del token, así que la base de datos queda al día a
 
 - **Supabase → Edge Functions → Logs** para errores de la API (los logs son JSON con `requestId`).
 - **Copias de seguridad**: el plan gratuito de Supabase no las hace; las hace el workflow de arriba, cada día.
+- **Workflows programados** (copia de seguridad, horas automáticas, mantener activo): GitHub los desactiva en un
+  repositorio público tras 60 días sin actividad. Si eso pasa, se reactivan en *Actions* con *Enable workflow*.
 - **Límites gratuitos** (500 MB de base de datos, 1 GB de Storage, 500 000 invocaciones de funciones al mes):
   muy por encima del uso del club.
