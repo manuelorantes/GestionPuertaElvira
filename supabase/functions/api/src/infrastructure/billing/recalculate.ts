@@ -1,4 +1,4 @@
-import { RecalculateCharges } from '../../application/billing/mod.ts';
+import { GenerateMonthlyCharges, RecalculateCharges } from '../../application/billing/mod.ts';
 import type { Money } from '../../domain/common/mod.ts';
 import type { ApiApp, RequestScope } from '../http/app.ts';
 import {
@@ -7,7 +7,7 @@ import {
   SqlStudentAccountRepository,
   SqlStudentDirectory,
 } from '../persistence/billing.ts';
-import { Row } from '../persistence/sql.ts';
+import { PostgresAdvisoryLocks, Row, SavepointTransactionRunner } from '../persistence/sql.ts';
 
 function recalculator(api: ApiApp, scope: RequestScope): RecalculateCharges {
   return new RecalculateCharges(
@@ -19,9 +19,26 @@ function recalculator(api: ApiApp, scope: RequestScope): RecalculateCharges {
   );
 }
 
+/** Crea en el momento las cuotas que les falten este mes a unos alumnos (sin esperar a la tarea de la noche). */
+export async function generatingCharges(
+  api: ApiApp,
+  scope: RequestScope,
+  studentIds: string[],
+): Promise<void> {
+  await new GenerateMonthlyCharges(
+    new SqlStudentDirectory(scope.tx),
+    new SqlBillingSettingsRepository(scope.tx),
+    new SqlStudentAccountRepository(scope.tx),
+    new SqlChargeRepository(scope.tx),
+    api.deps.clock,
+    new SavepointTransactionRunner(scope.tx),
+    new PostgresAdvisoryLocks(scope.tx),
+  ).forStudents([...new Set(studentIds)]);
+}
+
 /**
  * Aplica un cambio que afecta a la cuota de unos alumnos (grupos, horario especial, familia directa, precio de
- * particulares) y recalcula sus cuotas, en la misma transacción. Guarda antes su cuota para conservar el descuento
+ * particulares) y recalcula sus cuotas, en la misma transacción, creando las que falten. Guarda antes su cuota para conservar el descuento
  * por pago adelantado de las cuotas que no lo tienen apuntado.
  */
 export async function recalculatingFees<T>(
@@ -36,6 +53,8 @@ export async function recalculatingFees<T>(
   for (const id of ids) before.set(id, await recalculate.currentFee(id));
   const result = await change();
   for (const id of ids) await recalculate.execute(id, before.get(id) ?? null);
+  // Y las cuotas que les falten (p. ej. al inscribir en un grupo a quien no tenía), al momento.
+  await generatingCharges(api, scope, ids);
   return result;
 }
 

@@ -68,6 +68,9 @@ el horario del grupo o, si tiene horario especial, solo los días y la franja a 
 ### Requirement: Cuotas del mes
 Cada mes de la temporada (septiembre a junio), cada alumno activo MUST tener una cuota pendiente de ese mes,
 con el importe de un mes y su descuento familiar, salvo que ya la tenga pagada por adelantado.
+Las cuotas de un alumno MUST crearse al momento al darlo de alta, inscribirlo o cambiar sus datos de cobro; las del
+mes nuevo, la noche del día 1, con la tarea de cada noche, que además crea cualquier cuota que falte. Consultar las
+cuotas o el resumen no crea nada.
 Los socios MUST tener una cuota de socio por temporada (50 € por defecto, sin descuentos salvo el especial).
 Cualquier alumno que no haya pagado la cuota de socio de la temporada MUST poder pagarla desde «Registrar cobro»
 (concepto «Cuota de socio»); al pagarla pasa a ser socio.
@@ -83,6 +86,10 @@ permitir ordenar (por alumno, lo pendiente primero o lo cobrado primero) y filtr
 En los meses futuros, además de las cuotas ya cobradas por adelantado, MUST mostrarse como «Prevista» la cuota
 esperada de cada alumno activo ese mes que aún no la tenga (con la tarifa de hoy). Las previstas no se guardan: pasan a
 ser cuotas al cobrarlas o al llegar el mes.
+
+#### Scenario: Alta a mitad de mes
+- **WHEN** administración da de alta el día 15 a una alumna en un grupo
+- **THEN** su cuota de ese mes aparece al momento en «Cuotas», sin esperar a la noche
 
 #### Scenario: Estados según la fecha
 - **WHEN** administración consulta las cuotas del mes

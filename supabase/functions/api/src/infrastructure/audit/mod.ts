@@ -28,8 +28,6 @@ export class AuditLabels {
     'PUT /api/admin/billing/accounts/:id/charges/:month/discount': 'Cambiar descuento de una cuota',
     'POST /api/admin/billing/accounts/:id/charges/:month/reset': 'Volver a la cuota calculada',
     'PUT /api/admin/billing/settings': 'Cambiar tarifas y ajustes',
-    'GET /api/admin/billing/charges': 'Generar cuotas del mes',
-    'GET /api/admin/dashboard': 'Generar cuotas del mes',
     'POST /api/admin/groups': 'Crear grupo',
     'PUT /api/admin/groups/:id': 'Editar grupo',
     'PUT /api/auth/password': 'Cambiar contraseña',
