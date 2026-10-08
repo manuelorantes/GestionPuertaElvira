@@ -6,7 +6,13 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { ROLE_LABEL, type Role } from '@/features/auth/api';
 import { useStartImpersonation } from '@/features/auth/useImpersonation';
 import { useSession } from '@/features/auth/useSession';
-import { changeRole, type ClubUser, resetPassword, setEnabled } from '@/features/users/api';
+import {
+  changeRole,
+  type ClubUser,
+  linkTeacher,
+  resetPassword,
+  setEnabled,
+} from '@/features/users/api';
 import { useUserMutation, useUsers } from '@/features/users/hooks';
 import { madridDateTime } from '@/shared/dateTime';
 import { Alert } from '@/shared/ui/Alert';
@@ -18,6 +24,7 @@ import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
 
 import { NewUserDialog } from './NewUserDialog';
+import { TeacherLinkSelect } from './TeacherLinkSelect';
 import { TemporaryPasswordDialog } from './TemporaryPasswordDialog';
 
 type StatusFilter = 'active' | 'disabled' | 'all';
@@ -84,6 +91,9 @@ export function UsersPage() {
   const role = useUserMutation(({ id, value }: { id: string; value: Role }) =>
     changeRole(id, value),
   );
+  const link = useUserMutation(({ id, teacherId }: { id: string; teacherId: string | null }) =>
+    linkTeacher(id, teacherId),
+  );
 
   if (session && session.role !== 'superadministrator') return <Navigate to="/panel" replace />;
 
@@ -144,9 +154,9 @@ export function UsersPage() {
             </ToggleButton>
           ))}
         </div>
-        {role.isError && (
+        {(role.isError || link.isError) && (
           <div className="px-5 pt-4">
-            <Alert>{apiErrorMessage(role.error)}</Alert>
+            <Alert>{apiErrorMessage(role.isError ? role.error : link.error)}</Alert>
           </div>
         )}
         {users.isPending ? (
@@ -209,6 +219,22 @@ export function UsersPage() {
                               </option>
                             ))}
                           </select>
+                        )}
+                        {user.role === 'teacher' && (
+                          <div className="mt-1.5">
+                            <TeacherLinkSelect
+                              label={`Profesor de ${user.fullName}`}
+                              value={user.teacher?.id ?? null}
+                              disabled={link.isPending}
+                              onChange={(teacherId) =>
+                                void link.mutateAsync({ id: user.id, teacherId }).then(
+                                  () =>
+                                    toast(teacherId ? 'Cuenta vinculada' : 'Cuenta desvinculada'),
+                                  () => undefined,
+                                )
+                              }
+                            />
+                          </div>
                         )}
                       </td>
                       <td className="px-5 py-3">

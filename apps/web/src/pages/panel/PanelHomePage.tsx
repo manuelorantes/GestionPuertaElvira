@@ -13,6 +13,7 @@ import { Avatar } from '@/shared/ui/Avatar';
 import { Card } from '@/shared/ui/Card';
 
 import { MonthlyChart } from './MonthlyChart';
+import { TeacherHomePage } from './teacher/TeacherHomePage';
 
 function Kpi({
   label,
@@ -227,6 +228,12 @@ function seasonLabel(month: string): string {
 }
 
 export function PanelHomePage() {
+  const { data: user } = useSession();
+  if (user?.role === 'teacher') return <TeacherHomePage />;
+  return <ClubSummaryPage />;
+}
+
+function ClubSummaryPage() {
   const { data: user } = useSession();
   const firstName = user?.fullName.split(' ')[0] ?? '';
   const isAdmin = user?.role === 'administrator' || user?.role === 'superadministrator';
