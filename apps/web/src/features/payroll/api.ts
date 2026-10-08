@@ -54,7 +54,7 @@ export interface ProfitabilityRow {
 /** Filas del mes y alumnos sin repetir (los que van con varios profesores cuentan en la fila de cada uno). */
 export interface ProfitabilityReport {
   items: ProfitabilityRow[];
-  students: { total: number; shared: { name: string; teachers: string[] }[] };
+  students: { total: number; shared: { id: string; name: string }[] };
 }
 
 export interface SessionPayload {

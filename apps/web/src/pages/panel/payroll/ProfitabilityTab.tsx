@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 
 import { currentMonth, formatCents, monthLabel } from '@/features/billing/money';
 import type { ProfitabilityReport, ProfitabilityRow } from '@/features/payroll/api';
@@ -132,7 +133,7 @@ export function ProfitabilityTab({ month }: { month: string }) {
                       <span className="flex items-center gap-2 font-medium">
                         <TeacherLink id={row.teacherId} name={row.teacherName} />
                         {row === top && (
-                          <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-surface-raised">
+                          <span className="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-surface-raised">
                             Más rentable
                           </span>
                         )}
@@ -271,9 +272,9 @@ function StudentsTotal({ students }: { students: ProfitabilityReport['students']
             Van con más de un profesor: cuentan en la fila de cada uno y una sola vez en el total.
           </span>
           {students.shared.map((s) => (
-            <span key={s.name} className="block">
-              {s.name} · {s.teachers.join(' y ')}
-            </span>
+            <Link key={s.id} to={`/panel/alumnos/${s.id}`} className="block font-medium text-brand">
+              {s.name}
+            </Link>
           ))}
         </AsteriskNote>
       )}
