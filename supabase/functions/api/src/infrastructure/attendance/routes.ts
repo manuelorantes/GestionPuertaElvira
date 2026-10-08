@@ -1,11 +1,15 @@
 import { LocalDate } from '../../domain/common/mod.ts';
 import {
   type ClassAssignments,
+  OpenRollCall,
+  TakeRollCall,
   TeacherClasses,
   TeacherStudents,
 } from '../../application/attendance/mod.ts';
 import { TeacherAgenda } from '../../application/payroll/mod.ts';
-import { type ApiApp, type RequestScope, sessionTeacher } from '../http/app.ts';
+import { type ApiApp, param, type RequestScope, sessionTeacher } from '../http/app.ts';
+import { registerDomainErrors } from '../http/errors.ts';
+import { JsonBody } from '../http/json-body.ts';
 import { SqlClassRoster, SqlTeacherRosterQuery } from '../persistence/attendance.ts';
 import {
   SqlDutyRepository,
@@ -14,6 +18,7 @@ import {
   SqlSubstitutionRepository,
   SqlTeacherRates,
 } from '../persistence/payroll.ts';
+import { SqlRollCallRepository } from '../persistence/rollcalls.ts';
 import type { Sql } from '../persistence/sql.ts';
 
 /** La agenda de nómina (horario, sustituciones y festivos) es quien sabe qué clase da cada profesor cada día. */
@@ -32,11 +37,22 @@ class PayrollClassAssignments implements ClassAssignments {
 
 /** Espacio del profesorado: /api/teacher/* (el profesor sale siempre de la sesión, nunca de la URL). */
 export function registerAttendanceRoutes(api: ApiApp): void {
+  registerDomainErrors({
+    ClassNotGiven: [404, 'not_found'],
+    RollCallNotOpenYet: [409, 'roll_call_not_open'],
+    RollCallClosed: [409, 'roll_call_closed'],
+  });
   const teacher = (method: 'GET' | 'PUT', path: string) =>
     ({ method, path, access: 'teacher' }) as const;
   const today = () => LocalDate.fromInstant(api.deps.clock.now()).toString();
-  const classes = (scope: RequestScope) =>
-    new TeacherClasses(new PayrollClassAssignments(scope.tx), new SqlClassRoster(scope.tx));
+  /** Los casos de uso del profesorado comparten agenda, lista de alumnos del día, listas y reloj. */
+  const ports = (scope: RequestScope) =>
+    [
+      new PayrollClassAssignments(scope.tx),
+      new SqlClassRoster(scope.tx),
+      new SqlRollCallRepository(scope.tx),
+      api.deps.clock,
+    ] as const;
 
   api.defineRoute(teacher('GET', '/api/teacher/me'), async (c, scope) => {
     const id = sessionTeacher(scope);
@@ -47,7 +63,9 @@ export function registerAttendanceRoutes(api: ApiApp): void {
   api.defineRoute(teacher('GET', '/api/teacher/classes'), async (c, scope) => {
     const from = c.req.query('from') ?? today();
     const to = c.req.query('to') ?? from;
-    return c.json({ items: await classes(scope).execute(sessionTeacher(scope), from, to) });
+    return c.json({
+      items: await new TeacherClasses(...ports(scope)).execute(sessionTeacher(scope), from, to),
+    });
   });
 
   api.defineRoute(teacher('GET', '/api/teacher/students'), async (c, scope) => {
@@ -56,5 +74,26 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         sessionTeacher(scope),
       ),
     });
+  });
+
+  api.defineRoute(teacher('GET', '/api/teacher/roll-calls/:groupId/:date'), async (c, scope) => {
+    return c.json(
+      await new OpenRollCall(...ports(scope)).execute(
+        sessionTeacher(scope),
+        param(c, 'groupId'),
+        param(c, 'date'),
+      ),
+    );
+  });
+
+  api.defineRoute(teacher('PUT', '/api/teacher/roll-calls/:groupId/:date'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await new TakeRollCall(...ports(scope)).execute(
+      sessionTeacher(scope),
+      param(c, 'groupId'),
+      param(c, 'date'),
+      body.stringList('absent'),
+    );
+    return c.body(null, 204);
   });
 }

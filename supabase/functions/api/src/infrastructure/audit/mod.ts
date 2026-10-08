@@ -51,10 +51,6 @@ export class AuditLabels {
       'Cambiar la fecha de pago de una liquidación',
     'POST /api/admin/payroll/advances': 'Apuntar un anticipo a un profesor',
     'DELETE /api/admin/payroll/advances/:id': 'Quitar un anticipo',
-    'GET /api/admin/payroll/teachers/:id/report': 'Apuntar horas automáticas',
-    'GET /api/admin/payroll/sessions': 'Apuntar horas automáticas',
-    'GET /api/admin/payroll/settlements': 'Apuntar horas automáticas',
-    'GET /api/admin/payroll/profitability': 'Apuntar horas automáticas',
     'POST /api/admin/students/:id/enrolments': 'Inscribir en grupo',
     'DELETE /api/admin/students/:id/enrolments/:groupId': 'Quitar de grupo',
     'POST /api/admin/students/:id/enrolments/:groupId/move': 'Mover de grupo',
@@ -72,6 +68,10 @@ export class AuditLabels {
     'POST /api/admin/users/:id/disable': 'Desactivar cuenta',
     'POST /api/admin/users/:id/enable': 'Reactivar cuenta',
     'PUT /api/admin/users/:id/role': 'Cambiar rol de cuenta',
+    'PUT /api/admin/users/:id/teacher': 'Vincular cuenta a un profesor',
+    'PUT /api/teacher/roll-calls/:groupId/:date': 'Pasar lista',
+    'POST /api/admin/attendance/pending/:groupId/:date/confirm':
+      'Dar por buena una clase sin lista',
     'POST /api/admin/import/rows': 'Importar fila de la hoja',
   };
 
@@ -79,6 +79,8 @@ export class AuditLabels {
     accounting_closing: 'Cierre de temporada',
     accounting_entry: 'Movimiento manual',
     accounting_invoice: 'Factura de proveedor',
+    attendance_absence: 'Falta a clase',
+    attendance_roll_call: 'Lista de clase',
     billing_account: 'Datos de cobro del alumno',
     billing_charge: 'Cuota',
     billing_document_sequence: 'Numeración de documentos',
