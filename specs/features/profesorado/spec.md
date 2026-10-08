@@ -111,7 +111,8 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
 - saldo a día de hoy: lo que le debemos (liquidaciones pendientes hasta hoy menos anticipos) o lo pagado de más;
 - mes a mes de la temporada hasta hoy: horas, importe, anticipos, a pagar, estado (pagada y cuándo, pendiente o en
   curso), ingresos atribuidos y margen;
-- clases dadas en el mes que se elija (fecha, clase o actividad, horas y coste);
+- clases dadas en el mes que se elija (fecha, clase o actividad, horas y coste); las que dio sustituyendo a otro
+  profesor llevan delante «(Sustitución)»;
 - sus clases asignadas con días, horario, aula, alumnos y ocupación, y la ocupación total de sus clases; cuando hay
   alumnos que no vienen todos los días de la clase, un asterisco junto a los alumnos abre los alumnos de cada día
   frente a las plazas;

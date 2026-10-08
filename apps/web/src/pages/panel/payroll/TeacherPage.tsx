@@ -269,7 +269,7 @@ function SessionsSection({ teacherId }: { teacherId: string }) {
             {items.map((s) => (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <td className={TD}>{formatDate(s.date)}</td>
-                <td className={TD}>{s.label}</td>
+                <td className={TD}>{s.substitution ? `(Sustitución) ${s.label}` : s.label}</td>
                 <td className={TD}>{hoursLabel(s.minutes)}</td>
                 <td className={TD}>{formatCents(s.costCents)}</td>
               </tr>

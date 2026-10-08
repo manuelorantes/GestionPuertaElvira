@@ -11,6 +11,8 @@ export interface Session {
   costCents: number;
   fromSchedule: boolean;
   locked: boolean;
+  /** La dio en lugar de su profesor (sustitución de esa clase o turno ese día). */
+  substitution: boolean;
 }
 
 export interface Settlement {
