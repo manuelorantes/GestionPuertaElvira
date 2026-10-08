@@ -113,12 +113,41 @@ Deno.test({
   ignore: outsideSeason,
   async fn() {
     const { client } = await fixture();
-    const row = body<{ items: Record<string, unknown>[] }>(
-      await client.get(`/api/admin/payroll/profitability?month=${month}`),
-    ).items[0];
-    assertEquals(row?.teacherName, 'Lucía Moreno Gil');
+    // Ana va con Lucía y con Carlos; Pablo, solo con Lucía.
+    const lucias = body<{ items: { id: string }[] }>(await client.get('/api/admin/groups')).items;
+    const carlos = await newTeacher(client, 'Carlos Ruiz Márquez');
+    const carlosGroup = await newGroup(client, carlos, {
+      days: ['mon'],
+      start: '19:00',
+      end: '20:00',
+      classroom: 'caballo',
+    });
+    for (
+      const [fullName, groupIds] of [
+        ['Ana Pérez Gil', [lucias[0]?.id, carlosGroup]],
+        ['Pablo Ruiz Sanz', [lucias[0]?.id]],
+      ] as const
+    ) {
+      assertEquals(
+        (await client.json('POST', '/api/admin/students', { fullName, groupIds })).status,
+        201,
+      );
+    }
+    const report = body<{
+      items: Record<string, unknown>[];
+      students: { total: number; shared: unknown[] };
+    }>(await client.get(`/api/admin/payroll/profitability?month=${month}`));
+    const row = report.items.find((r) => r.teacherName === 'Lucía Moreno Gil');
     assertEquals(row?.groups, ['Iniciación A']);
     assertEquals(row?.capacity, 60, '12 plazas × 5 días de clase');
+    assertEquals(
+      report.items.map((r) => [r.teacherName, r.students]).sort(),
+      [['Carlos Ruiz Márquez', 1], ['Lucía Moreno Gil', 2]],
+    );
+    assertEquals(report.students, {
+      total: 2,
+      shared: [{ name: 'Ana Pérez Gil', teachers: ['Carlos Ruiz Márquez', 'Lucía Moreno Gil'] }],
+    });
     assertError(
       await client.json(
         'DELETE',

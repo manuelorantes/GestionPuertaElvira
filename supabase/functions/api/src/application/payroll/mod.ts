@@ -137,6 +137,8 @@ export interface ClassLoad {
   teachers: Map<string, TeacherSeats>;
   /** Minutos semanales de cada alumno con cada profesor durante el mes (claves: alumno → profesor). */
   students: Map<string, Map<string, number>>;
+  /** Nombre de cada alumno de `students`. */
+  studentNames: Map<string, string>;
 }
 
 /** Carga de clases del mes para la rentabilidad. */
@@ -520,6 +522,19 @@ export interface ProfitabilityRow {
   incomePerHourCents: number | null;
   occupied: number;
   capacity: number;
+  /** Alumnos de sus grupos ese mes (sin las clases que da como sustituto). */
+  students: number;
+}
+
+/** Alumnos del mes sin repetir, y los que van con más de un profesor (cuentan en la fila de cada uno). */
+export interface ProfitabilityStudents {
+  total: number;
+  shared: { name: string; teachers: string[] }[];
+}
+
+export interface ProfitabilityReport {
+  items: ProfitabilityRow[];
+  students: ProfitabilityStudents;
 }
 
 /**
@@ -541,6 +556,11 @@ export class Profitability {
 
   /** Ordenadas por margen, de mayor a menor. */
   async execute(month: string): Promise<ProfitabilityRow[]> {
+    return (await this.report(month)).items;
+  }
+
+  /** Las filas y el resumen de alumnos del mes (cada alumno una vez aunque vaya con varios profesores). */
+  async report(month: string): Promise<ProfitabilityReport> {
     const period = YearMonth.fromString(month);
     const past = period.isBefore(YearMonth.of(LocalDate.fromInstant(this.clock.now())));
     const holidays = await this.holidays.holidaysBetween(period.firstDay(), period.lastDay());
@@ -584,9 +604,24 @@ export class Profitability {
         incomePerHourCents: minutes > 0 ? Math.round((earned * 60) / minutes) : null,
         occupied: seats?.occupied ?? 0,
         capacity: seats?.capacity ?? 0,
+        students: [...load.students.values()].filter((shares) => shares.has(teacher.id)).length,
       });
     }
-    return rows.sort((a, b) => b.marginCents - a.marginCents);
+    const names = new Map(rows.map((r) => [r.teacherId, r.teacherName]));
+    const shared = [...load.students]
+      .filter(([, shares]) => shares.size > 1)
+      .map(([student, shares]) => ({
+        name: load.studentNames.get(student) ?? '',
+        teachers: [...shares.keys()]
+          .map((t) => names.get(t) ?? '')
+          .filter((n) => n !== '')
+          .sort((a, b) => a.localeCompare(b, 'es')),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es'));
+    return {
+      items: rows.sort((a, b) => b.marginCents - a.marginCents),
+      students: { total: load.students.size, shared },
+    };
   }
 }
 
