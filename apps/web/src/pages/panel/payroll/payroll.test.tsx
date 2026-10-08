@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { currentMonth } from '@/features/billing/money';
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
 const TEACHERS = [
@@ -36,6 +37,7 @@ const session = (overrides: Record<string, unknown>) => ({
   costCents: 1600,
   fromSchedule: true,
   locked: false,
+  substitution: false,
   ...overrides,
 });
 const SETTLEMENTS = [
@@ -397,6 +399,10 @@ describe('Profesorado', () => {
         },
       ],
       'PUT /api/admin/payroll/settlements/t1/2026-09/payment': [204],
+      [`GET /api/admin/payroll/sessions?month=${currentMonth()}&teacherId=t1`]: [
+        200,
+        { items: [session({ label: 'Martes y jueves 17:00', substitution: true })] },
+      ],
     });
     renderApp('/panel/profesores/t1');
 
@@ -405,6 +411,7 @@ describe('Profesorado', () => {
     expect(screen.getByText('Ocupación de sus clases').parentElement).toHaveTextContent('50 %');
     const months = screen.getByRole('table', { name: 'Mes a mes de Lucía Moreno Gil' });
     expect(within(months).getByRole('row', { name: /Octubre 2026/ })).toHaveTextContent('−90 €');
+    expect(await screen.findByText('(Sustitución) Martes y jueves 17:00')).toBeInTheDocument();
     const classes = screen.getByRole('table', { name: 'Clases asignadas' });
     expect(within(classes).getByRole('row', { name: /Iniciación A/ })).toHaveTextContent('7 / 10');
     await userEvent.click(
