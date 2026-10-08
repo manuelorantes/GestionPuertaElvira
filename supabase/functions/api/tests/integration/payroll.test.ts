@@ -2,7 +2,9 @@ import { assert, assertEquals } from '@std/assert';
 
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
-import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
+import { ApiClient, assertError, createUser, db, resetDatabase } from '../support/http.ts';
+import { inTransaction } from '../../src/infrastructure/persistence/sql.ts';
+import { runCommand } from '../../scripts/console.ts';
 
 const today = LocalDate.fromInstant(new Date()).toString();
 const month = today.slice(0, 7);
@@ -28,14 +30,23 @@ async function fixture(): Promise<{ client: ApiClient; teacher: string }> {
 
 const body = <T>(response: { body: unknown }) => response.body as T;
 
+/** La tarea de cada noche: apunta las horas automáticas que falten. */
+const proposeSessions = () =>
+  inTransaction(db(), (tx) => runCommand(tx, 4, ['app:payroll:propose-sessions']));
+
 Deno.test({
   name: 'payroll should propose, edit and settle the sessions of the month',
   ignore: outsideSeason,
   async fn() {
     const { client, teacher } = await fixture();
-    const sessions = body<{ items: Record<string, unknown>[] }>(
-      await client.get(`/api/admin/payroll/sessions?month=${month}`),
-    ).items;
+    const list = async () =>
+      body<{ items: Record<string, unknown>[] }>(
+        await client.get(`/api/admin/payroll/sessions?month=${month}`),
+      ).items;
+    // Consultar no apunta nada: las horas automáticas las apunta la tarea de cada noche.
+    assertEquals(await list(), []);
+    assertEquals(await proposeSessions(), 0);
+    const sessions = await list();
     assert(sessions.length > 0);
     assertEquals(sessions[0]?.label, 'Iniciación A');
     assertEquals(sessions[0]?.costCents, 1600);
