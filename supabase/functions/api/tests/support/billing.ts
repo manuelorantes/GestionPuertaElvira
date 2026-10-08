@@ -99,6 +99,11 @@ export class BillingFixture
     return Promise.resolve(this.accounts.get(student.value) ?? null);
   }
 
+  accountsOf(students: StudentRef[]): Promise<Map<string, StudentAccount>> {
+    const ids = new Set(students.map((s) => s.value));
+    return Promise.resolve(new Map([...this.accounts].filter(([id]) => ids.has(id))));
+  }
+
   saveAccount(account: StudentAccount): Promise<void> {
     this.accounts.set(account.student.value, account);
     return Promise.resolve();
@@ -113,6 +118,16 @@ export class BillingFixture
       [...this.charges.values()].find((c) =>
         c.student.equals(student) && c.kind === kind && c.period.equals(period)
       ) ?? null,
+    );
+  }
+
+  chargedStudents(kind: ChargeKind, period: YearMonth): Promise<Set<string>> {
+    return Promise.resolve(
+      new Set(
+        [...this.charges.values()]
+          .filter((c) => c.kind === kind && c.period.equals(period))
+          .map((c) => c.student.value),
+      ),
     );
   }
 

@@ -119,21 +119,30 @@ export class SqlBillingSettingsRepository implements BillingSettingsRepository {
   }
 }
 
+function toAccount(row: Row): StudentAccount {
+  const rate = row.nullableInt('private_rate_cents');
+  return StudentAccount.restore(
+    StudentRef.fromString(row.string('student_id')),
+    preferredPlanFromName(row.string('preferred_plan')),
+    row.bool('member'),
+    rate === null ? null : Money.cents(rate),
+    row.int('points'),
+  );
+}
+
 export class SqlStudentAccountRepository implements StudentAccountRepository {
   constructor(private readonly sql: Sql) {}
 
   async account(student: StudentRef): Promise<StudentAccount | null> {
     const rows = await this.sql`SELECT * FROM billing_account WHERE student_id = ${student.value}`;
-    if (!rows[0]) return null;
-    const row = new Row(rows[0]);
-    const rate = row.nullableInt('private_rate_cents');
-    return StudentAccount.restore(
-      StudentRef.fromString(row.string('student_id')),
-      preferredPlanFromName(row.string('preferred_plan')),
-      row.bool('member'),
-      rate === null ? null : Money.cents(rate),
-      row.int('points'),
-    );
+    return rows[0] ? toAccount(new Row(rows[0])) : null;
+  }
+
+  async accountsOf(students: StudentRef[]): Promise<Map<string, StudentAccount>> {
+    if (students.length === 0) return new Map();
+    const rows = await this.sql`SELECT * FROM billing_account
+      WHERE student_id::text = ANY(${students.map((s) => s.value)})`;
+    return new Map(Row.all(rows).map((row) => [row.string('student_id'), toAccount(row)]));
   }
 
   async saveAccount(account: StudentAccount): Promise<void> {
@@ -198,6 +207,12 @@ export class SqlChargeRepository implements ChargeRepository {
     const rows = await this.sql`SELECT * FROM billing_charge
       WHERE student_id = ${student.value} AND kind = ${kind} AND period = ${period.toString()}`;
     return rows[0] ? toCharge(new Row(rows[0])) : null;
+  }
+
+  async chargedStudents(kind: ChargeKind, period: YearMonth): Promise<Set<string>> {
+    const rows = await this.sql`SELECT DISTINCT student_id FROM billing_charge
+      WHERE kind = ${kind} AND period = ${period.toString()}`;
+    return new Set(Row.all(rows).map((r) => r.string('student_id')));
   }
 
   async allFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]> {

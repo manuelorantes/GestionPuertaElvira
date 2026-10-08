@@ -78,12 +78,16 @@ export interface BillingSettingsRepository {
 
 export interface StudentAccountRepository {
   account(student: StudentRef): Promise<StudentAccount | null>;
+  /** Las cuentas de varios alumnos de una vez, por id (los que no tienen cuenta no aparecen). */
+  accountsOf(students: StudentRef[]): Promise<Map<string, StudentAccount>>;
   saveAccount(account: StudentAccount): Promise<void>;
 }
 
 export interface ChargeRepository {
   charge(id: ChargeId): Promise<Charge | null>;
   chargeFor(student: StudentRef, kind: ChargeKind, period: YearMonth): Promise<Charge | null>;
+  /** Ids de los alumnos que ya tienen una cuota de ese tipo y periodo. */
+  chargedStudents(kind: ChargeKind, period: YearMonth): Promise<Set<string>>;
   /** Todas las cuotas de un tipo del alumno, de la más antigua a la más reciente. */
   allFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]>;
   /** Lo que cubren todos los cobros de ese tipo del alumno (en importes de cuota, antes de descuentos). */
@@ -225,17 +229,33 @@ export class GenerateMonthlyCharges {
     private readonly locks: Locks,
   ) {}
 
+  /** Crea las cuotas que falten del mes (lo lanza cada noche una tarea y el día 1 crea las del mes). */
   async execute(month: string): Promise<void> {
-    const period = YearMonth.fromString(month);
+    await this.generateFor(YearMonth.fromString(month), null);
+  }
+
+  /**
+   * Crea en el momento las cuotas que les falten este mes a unos alumnos (al darlos de alta, inscribirlos o cambiar
+   * sus datos de cobro), sin esperar a la tarea de la noche.
+   */
+  async forStudents(studentIds: string[]): Promise<void> {
+    if (studentIds.length === 0) return;
+    await this.generateFor(
+      YearMonth.of(LocalDate.fromInstant(this.clock.now())),
+      new Set(studentIds),
+    );
+  }
+
+  private async generateFor(period: YearMonth, only: Set<string> | null): Promise<void> {
     const season = Season.teachingSeason(period);
     // Los meses futuros no se generan: solo existen si se pagan por adelantado.
     if (season === null || YearMonth.of(LocalDate.fromInstant(this.clock.now())).isBefore(period)) {
       return;
     }
     await this.transactions.run(async () => {
-      // Dos pantallas que abren el mismo mes a la vez no deben crear la misma cuota dos veces.
+      // Dos peticiones que generan el mismo mes a la vez no deben crear la misma cuota dos veces.
       await this.locks.acquire(`billing:charges:${period.toString()}`);
-      await this.generate(period, season);
+      await this.generate(period, season, only);
     });
   }
 
@@ -249,27 +269,42 @@ export class GenerateMonthlyCharges {
     if (Season.teachingSeason(period) === null || !current.isBefore(period)) return [];
     const settings = await this.settings.get();
     const calculator = new FeeCalculator();
+    const students = await this.directory.activeIn(period);
+    const accounts = await this.accounts.accountsOf(
+      students.map((s) => StudentRef.fromString(s.id)),
+    );
+    const charged = await this.charges.chargedStudents('monthly', period);
     const result: { student: BillingStudent; amount: Money }[] = [];
-    for (const student of await this.directory.activeIn(period)) {
-      const ref = StudentRef.fromString(student.id);
-      if ((await this.charges.chargeFor(ref, 'monthly', period)) !== null) continue;
-      const amount = calculator.quote(
-        feeProfileOf(student, await this.accounts.account(ref), settings),
-        settings,
-        1,
-      ).total;
+    for (const student of students) {
+      if (charged.has(student.id)) continue;
+      const account = accounts.get(student.id) ?? null;
+      const amount = calculator.quote(feeProfileOf(student, account, settings), settings, 1).total;
       if (amount.cents > 0) result.push({ student, amount });
     }
     return result;
   }
 
-  private async generate(period: YearMonth, season: Season): Promise<void> {
+  /** Con todo leído de una vez (alumnos, cuentas y cuotas ya creadas): solo se escriben las que faltan. */
+  private async generate(
+    period: YearMonth,
+    season: Season,
+    only: Set<string> | null,
+  ): Promise<void> {
     const settings = await this.settings.get();
     const calculator = new FeeCalculator();
-    for (const student of await this.directory.activeIn(period)) {
+    const students = (await this.directory.activeIn(period)).filter((s) =>
+      only === null || only.has(s.id)
+    );
+    if (students.length === 0) return;
+    const accounts = await this.accounts.accountsOf(
+      students.map((s) => StudentRef.fromString(s.id)),
+    );
+    const monthly = await this.charges.chargedStudents('monthly', period);
+    const membership = await this.charges.chargedStudents('membership', season.firstMonth());
+    for (const student of students) {
       const ref = StudentRef.fromString(student.id);
-      const account = await this.accounts.account(ref);
-      if ((await this.charges.chargeFor(ref, 'monthly', period)) === null) {
+      const account = accounts.get(student.id) ?? null;
+      if (!monthly.has(student.id)) {
         const amount =
           calculator.quote(feeProfileOf(student, account, settings), settings, 1).total;
         if (amount.cents > 0) {
@@ -278,10 +313,7 @@ export class GenerateMonthlyCharges {
           );
         }
       }
-      if (
-        account?.isMember() &&
-        (await this.charges.chargeFor(ref, 'membership', season.firstMonth())) === null
-      ) {
+      if (account?.isMember() && !membership.has(student.id)) {
         await this.charges.saveCharge(
           Charge.create(
             ChargeId.generate(),
@@ -305,7 +337,10 @@ export interface MonthlyCharges {
   overdueCount: number;
 }
 
-/** Genera las cuotas que falten del mes y las devuelve con su estado y totales. */
+/**
+ * Las cuotas del mes con su estado y totales (y, en meses futuros, las previstas). Solo lee: las cuotas se crean al
+ * dar de alta o cambiar a un alumno y cada noche.
+ */
 export class ListMonthlyCharges {
   constructor(
     private readonly generate: GenerateMonthlyCharges,
@@ -327,7 +362,6 @@ export class ListMonthlyCharges {
       : YearMonth.fromString(month);
     // Las cuotas de socio cuelgan del primer mes de la temporada.
     const period = kind === 'membership' ? Season.containing(requested).firstMonth() : requested;
-    await this.generate.execute(period.toString());
     const all = await this.query.charges(period, today);
     const stored = kind === 'all' ? all : all.filter((c) => c.kind === kind);
     // En los meses futuros, además de lo cobrado por adelantado, lo previsto de quien aún no lo ha pagado.
