@@ -6,12 +6,14 @@ import {
   Session,
   SessionId,
   SessionTokenHash,
+  TeacherLink,
   User,
   UserId,
 } from '../../domain/identity/mod.ts';
 import {
   type LoginAttemptLimiter,
   type SessionRepository,
+  type TeacherAccounts,
   TooManyLoginAttempts,
   type UserDirectory,
   type UserListItem,
@@ -31,6 +33,9 @@ function toUser(row: Row): User {
     mustChangePassword: row.bool('must_change_password'),
     createdAt: row.date('created_at'),
     passwordChangedAt: row.date('password_changed_at'),
+    teacher: row.nullableString('teacher_id') === null
+      ? null
+      : TeacherLink.fromString(row.string('teacher_id')),
   });
 }
 
@@ -59,6 +64,7 @@ export class SqlUserRepository implements UserRepository {
       must_change_password: user.mustChangePassword(),
       created_at: user.createdAt,
       password_changed_at: user.passwordChangedAt(),
+      teacher_id: user.linkedTeacher()?.value ?? null,
     };
     await this.sql`
       INSERT INTO identity_user ${this.sql(record)}
@@ -72,6 +78,7 @@ export class SqlUserRepository implements UserRepository {
         'status',
         'must_change_password',
         'password_changed_at',
+        'teacher_id',
       )
     }`;
   }
@@ -194,13 +201,15 @@ export class SqlUserDirectory implements UserDirectory {
 
   async list(): Promise<UserListItem[]> {
     const rows = await this.sql`
-      SELECT u.id, u.email, u.full_name, u.role, u.status, u.must_change_password, u.created_at,
+      SELECT u.id, u.email, u.full_name, u.role, u.status, u.must_change_password, u.created_at, u.teacher_id,
+             t.full_name AS teacher_name,
              GREATEST(
                (SELECT max(s.last_activity_at) FROM identity_session s WHERE s.user_id = u.id),
                (SELECT max(a.occurred_at) FROM audit_action a
                  WHERE a.kind = 'security' AND a.user_id = u.id AND a.label = ${LOGIN_LABEL})
              ) AS last_seen_at
-        FROM identity_user u ORDER BY u.full_name, u.email`;
+        FROM identity_user u LEFT JOIN teachers_teacher t ON t.id = u.teacher_id
+       ORDER BY u.full_name, u.email`;
     return Row.all(rows).map((r) => ({
       id: r.string('id'),
       email: r.string('email'),
@@ -209,6 +218,9 @@ export class SqlUserDirectory implements UserDirectory {
       status: r.string('status') === 'disabled' ? 'disabled' : 'active',
       mustChangePassword: r.bool('must_change_password'),
       createdAt: r.date('created_at').toISOString(),
+      teacher: r.nullableString('teacher_id') === null
+        ? null
+        : { id: r.string('teacher_id'), name: r.string('teacher_name') },
       lastSeenAt: r.json('last_seen_at') === null ? null : r.date('last_seen_at').toISOString(),
     }));
   }
@@ -220,3 +232,18 @@ export class SqlUserDirectory implements UserDirectory {
 }
 
 const LOGIN_LABEL = AuditLabels.security('login', 'success');
+
+/** Fichas de profesores y la cuenta vinculada a cada una (tablas `teachers_teacher` e `identity_user`). */
+export class SqlTeacherAccounts implements TeacherAccounts {
+  constructor(private readonly sql: Sql) {}
+
+  async exists(teacher: TeacherLink): Promise<boolean> {
+    const rows = await this.sql`SELECT 1 FROM teachers_teacher WHERE id = ${teacher.value}`;
+    return rows.length > 0;
+  }
+
+  async linkedUser(teacher: TeacherLink): Promise<UserId | null> {
+    const rows = await this.sql`SELECT id FROM identity_user WHERE teacher_id = ${teacher.value}`;
+    return rows[0] ? UserId.fromString(new Row(rows[0]).string('id')) : null;
+  }
+}

@@ -48,7 +48,8 @@ export type Api = Hono<Env>;
 export type ApiContext = Context<Env>;
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-export type Access = 'public' | 'user' | 'admin' | 'superadmin';
+/** `teacher`: cuenta de profesorado vinculada a un profesor (las rutas toman el profesor de la sesión). */
+export type Access = 'public' | 'user' | 'admin' | 'superadmin' | 'teacher';
 
 export interface RouteOptions {
   method: Method;
@@ -199,8 +200,16 @@ function enforceAccess(user: AuthenticatedUser | null, options: RouteOptions): v
   if (user === null) throw httpError(401);
   const allowed = options.access === 'user' ||
     (options.access === 'admin' && ADMIN_ROLES.has(user.role)) ||
-    (options.access === 'superadmin' && user.role === 'superadministrator');
+    (options.access === 'superadmin' && user.role === 'superadministrator') ||
+    (options.access === 'teacher' && user.role === 'teacher');
   if (!allowed) throw httpError(403);
+  if (options.access === 'teacher' && user.teacherId === null) {
+    throw new ApiProblem(
+      403,
+      'teacher_not_linked',
+      'Tu cuenta aún no está vinculada a ningún profesor. Pídeselo a administración.',
+    );
+  }
   if (user.mustChangePassword && !options.allowWithTemporaryPassword) {
     throw new ApiProblem(
       403,
@@ -208,6 +217,13 @@ function enforceAccess(user: AuthenticatedUser | null, options: RouteOptions): v
       'Tienes que cambiar tu contraseña temporal antes de continuar.',
     );
   }
+}
+
+/** Profesor de la sesión en una ruta con acceso `teacher` (nunca llega por parámetro). */
+export function sessionTeacher(scope: RequestScope): string {
+  const teacher = scope.user?.teacherId ?? null;
+  if (teacher === null) throw httpError(403);
+  return teacher;
 }
 
 /** Parámetro de la ruta (`:id`); Hono lo tipa como opcional en rutas registradas por texto. */

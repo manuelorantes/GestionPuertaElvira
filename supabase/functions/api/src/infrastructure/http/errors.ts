@@ -42,6 +42,7 @@ const DOMAIN_ERRORS = new Map<string, [number, string]>([
   ['CurrentPasswordMismatch', [422, 'current_password_mismatch']],
   ['WeakPassword', [422, 'weak_password']],
   ['EmailAlreadyRegistered', [409, 'email_already_registered']],
+  ['TeacherAlreadyLinked', [409, 'teacher_already_linked']],
   ['CannotChangeOwnAccount', [409, 'own_account']],
   ['CannotImpersonate', [409, 'cannot_impersonate']],
   ['NotImpersonating', [409, 'not_impersonating']],
