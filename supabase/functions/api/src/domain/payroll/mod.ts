@@ -308,6 +308,26 @@ export class MonthlySettlement {
   ) {}
 }
 
+/**
+ * Anticipo: dinero pagado a un profesor a cuenta de la liquidación de un mes (o pagado de más, que se descuenta de un
+ * mes posterior). Se descuenta de lo que hay que pagarle ese mes.
+ */
+export class Advance {
+  constructor(
+    readonly id: string,
+    readonly teacher: TeacherRef,
+    readonly month: YearMonth,
+    readonly amount: Money,
+    readonly paidOn: LocalDate,
+    readonly note: string | null,
+  ) {
+    if (amount.cents <= 0) throw new InvalidValue('amount', 'El anticipo debe ser mayor que 0 €.');
+    if (note !== null && note.length > 200) {
+      throw new InvalidValue('note', 'La nota no puede pasar de 200 caracteres.');
+    }
+  }
+}
+
 /** Tramo de una sesión para contar solapes: día, minuto de inicio (null si no se sabe) y duración. */
 interface Span {
   day: string;

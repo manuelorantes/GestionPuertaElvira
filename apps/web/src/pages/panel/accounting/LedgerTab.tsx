@@ -42,6 +42,12 @@ function origin(item: LedgerItem): { to: string; label: string; hint: string } |
         label: 'Ir a la liquidación',
         hint: 'Viene de Profesores → Liquidación: se gestiona allí',
       };
+    case 'advance':
+      return {
+        to: `/panel/profesores/${item.sourceId.split('/')[0] ?? ''}`,
+        label: 'Ir al profesor',
+        hint: 'Anticipo a un profesor: se gestiona en su ficha',
+      };
     case 'invoice':
       return {
         to: '/panel/contabilidad?pestana=facturas',
