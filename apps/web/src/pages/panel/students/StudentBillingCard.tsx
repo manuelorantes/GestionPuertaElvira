@@ -1,21 +1,15 @@
-import { Minus, Pencil, Plus, Printer, Wallet } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Pencil, Printer, Wallet } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import {
-  adjustPoints,
-  updateAccount,
-  type Account,
-  type AccountCharge,
-} from '@/features/billing/api';
+import { updateAccount, type Account, type AccountCharge } from '@/features/billing/api';
 import { useAccount, useBillingMutation, usePayments } from '@/features/billing/hooks';
 import { formatCents, monthLabel } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
-import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import { Card } from '@/shared/ui/Card';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
@@ -102,33 +96,8 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
       privateRate: rate.trim() || null,
     }),
   );
-  const queryClient = useQueryClient();
-  const refresh = useRefreshClubData();
-  // Los puntos cambian al instante en pantalla (actualización optimista); la API se llama en segundo
-  // plano y, si fallara, se vuelve al valor anterior. Al recargar se obtiene el valor real.
-  const accountKey = ['account', studentId];
-  const points = useMutation({
-    mutationFn: (delta: number) => adjustPoints(studentId, delta),
-    onMutate: async (delta: number) => {
-      await queryClient.cancelQueries({ queryKey: accountKey });
-      const previous = queryClient.getQueryData<Account>(accountKey);
-      queryClient.setQueryData<Account>(accountKey, (old) =>
-        old ? { ...old, points: Math.max(0, old.points + delta) } : old,
-      );
-      return { previous };
-    },
-    onError: (_error, _delta, context) => {
-      if (context?.previous) queryClient.setQueryData(accountKey, context.previous);
-    },
-    onSuccess: (total) => {
-      queryClient.setQueryData<Account>(accountKey, (old) =>
-        old ? { ...old, points: total } : old,
-      );
-      refresh();
-    },
-  });
   const toast = useToast();
-  const error = save.error ?? points.error;
+  const error = save.error;
 
   return (
     <div className="flex flex-col">
@@ -174,31 +143,17 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
       <SeasonCharges studentId={studentId} account={account} />
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-line-soft pt-3 text-sm">
         <span>
-          Puntos: <strong>{account.points}</strong>
+          Puntos de este mes: <strong>{account.points}</strong>
           <span className="block text-[12px] text-ink-muted">
-            Con 5 puntos se descuenta un 5 % de una cuota mensual al cobrar; los puntos tendrán más
-            usos.
+            Valen solo este mes; con 5 se descuenta un 5 % de una cuota al cobrar.
           </span>
         </span>
-        <span className="flex gap-2">
-          <button
-            type="button"
-            aria-label="Restar un punto"
-            disabled={account.points === 0}
-            onClick={() => points.mutate(-1)}
-            className="flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Minus aria-hidden size={16} />
-          </button>
-          <button
-            type="button"
-            aria-label="Sumar un punto"
-            onClick={() => points.mutate(1)}
-            className="flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted"
-          >
-            <Plus aria-hidden size={16} />
-          </button>
-        </span>
+        <Link
+          to={`/panel/puntos?alumno=${studentId}`}
+          className="shrink-0 text-[13px] font-semibold text-brand"
+        >
+          Ver en Puntos
+        </Link>
       </div>
     </div>
   );
