@@ -182,7 +182,7 @@ La ficha del alumno MUST mostrar:
 - sus horas semanales de clase y la cuota mensual que le corresponde hoy;
 - si se le aplica el descuento familiar;
 - si la cuota de socio de la temporada está pagada o pendiente (y su importe);
-- sus puntos, que se suman y restan a mano, nunca bajan de 0 y se canjean al cobrar;
+- sus puntos del mes (se gestionan en la sección Puntos; aquí solo se ven y se canjean al cobrar);
 - si tiene particulares, el precio por hora pactado, que MUST poder cambiarse.
 
 Los meses a cobrar (1, 3, 6 o resto de temporada) se eligen en cada cobro; no hay forma de pago preferida.

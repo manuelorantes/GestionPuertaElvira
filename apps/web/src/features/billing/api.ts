@@ -203,12 +203,6 @@ export function updateAccount(
   return apiSend('PUT', `${BASE}/accounts/${studentId}`, account);
 }
 
-export async function adjustPoints(studentId: string, delta: number): Promise<number> {
-  return (
-    await apiSend<{ points: number }>('POST', `${BASE}/accounts/${studentId}/points`, { delta })
-  ).points;
-}
-
 export function fetchSettings(): Promise<BillingSettings> {
   return apiGet(`${BASE}/settings`);
 }

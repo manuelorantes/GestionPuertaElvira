@@ -208,7 +208,6 @@ describe('Alumnos', () => {
   });
 
   it('should show what the student pays and why, the points and the history on the card', async () => {
-    const user = userEvent.setup();
     const account = {
       preferredPlan: 'monthly',
       member: false,
@@ -250,7 +249,6 @@ describe('Alumnos', () => {
           ],
         },
       ],
-      'POST /api/admin/billing/accounts/s1/points': [200, { points: 3 }],
     });
     renderApp('/panel/alumnos/s1');
 
@@ -262,11 +260,14 @@ describe('Alumnos', () => {
     expect(screen.getByText('Pendiente · 50 €')).toBeInTheDocument();
     expect(screen.queryByLabelText('Forma de pago preferida')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Socio del club' })).not.toBeInTheDocument();
-    expect(screen.getByText('Puntos:')).toHaveTextContent('Puntos: 2');
-
-    await user.click(screen.getByRole('button', { name: 'Sumar un punto' }));
-    expect(postBody(spy, '/api/admin/billing/accounts/s1/points')).toEqual({ delta: 1 });
-    expect(await screen.findByText('Puntos:')).toHaveTextContent('Puntos: 3');
+    // Los puntos solo se ven (se gestionan en la sección Puntos).
+    expect(screen.getByText(/Puntos de este mes/)).toHaveTextContent('Puntos de este mes: 2');
+    expect(screen.queryByRole('button', { name: 'Sumar un punto' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ver en Puntos' })).toHaveAttribute(
+      'href',
+      '/panel/puntos?alumno=s1',
+    );
+    expect(spy).toHaveBeenCalled();
   });
 
   it('lists the season charges and fixes one by hand for this and the following months', async () => {

@@ -1,6 +1,7 @@
 import {
   Activity,
   BookOpen,
+  Star,
   CalendarDays,
   Clock,
   GraduationCap,
@@ -69,6 +70,7 @@ export const PANEL_SECTIONS: PanelSection[] = [
     path: '/panel/cobros',
     roles: STAFF_ROLES,
   },
+  { id: 'puntos', label: 'Puntos', icon: Star, path: '/panel/puntos', roles: STAFF_ROLES },
   {
     id: 'contabilidad',
     label: 'Contabilidad',
