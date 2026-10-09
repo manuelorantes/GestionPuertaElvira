@@ -506,15 +506,18 @@ describe('Profesorado', () => {
     );
   });
 
-  it('creates a club duty shift', async () => {
+  it('creates the Friday club activity', async () => {
     const fetch = api({
       'GET /api/admin/payroll/duties': [200, { items: [] }],
       'POST /api/admin/payroll/duties': [201, { id: 'd1' }],
     });
     renderApp('/panel/profesores?pestana=encargado');
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Nuevo turno' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Nuevo turno' });
+    expect(await screen.findByRole('tab', { name: 'Actividades del club' })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva actividad' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Nueva actividad' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Tipo'), 'fridays');
+    expect(within(dialog).getByLabelText('Actividad')).toHaveValue('Viernes');
     await userEvent.selectOptions(within(dialog).getByLabelText('Profesor'), 't2');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
     await waitFor(() => {
@@ -526,7 +529,8 @@ describe('Profesorado', () => {
         weekday: 5,
         start: '17:00',
         end: '20:00',
-        label: 'Encargado del club',
+        label: 'Viernes',
+        kind: 'fridays',
       });
     });
   });

@@ -1,11 +1,63 @@
 import { Link } from 'react-router';
 
+import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { classroomLabel } from '@/features/classes/classrooms';
 import type { TeacherClass } from '@/features/teacher-space/api';
+import { useShiftDone } from '@/features/teacher-space/hooks';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 
-/** Una clase de la agenda: hora, nombre, aula y alumnos de ese día. */
+const ACTION =
+  'flex h-11 shrink-0 cursor-pointer items-center rounded-sm px-3 text-sm font-semibold no-underline';
+const PRIMARY = `${ACTION} bg-brand text-surface-raised hover:bg-brand-strong`;
+const SECONDARY = `${ACTION} border border-line-strong text-ink hover:bg-surface-muted`;
+
+function subtitle(item: TeacherClass): string {
+  if (item.activity === 'fridays') return 'Actividad del club · asistencia de los viernes';
+  if (item.activity === 'shift') return 'Actividad del club';
+  return `${item.classroom ? classroomLabel(item.classroom) : ''} · ${item.students} ${item.students === 1 ? 'alumno' : 'alumnos'}`;
+}
+
+/** Lo que se hace con cada cosa de la agenda: pasar lista (clases y viernes) o confirmar el turno. */
+function Action({ item }: { item: TeacherClass }) {
+  const done = useShiftDone();
+  if (item.rollCall !== 'open' && item.rollCall !== 'taken') return null;
+  if (item.activity === 'shift') {
+    if (item.rollCall === 'taken' || item.dutyId === null) return null;
+    const dutyId = item.dutyId;
+    return (
+      <span className="flex flex-col items-end gap-1">
+        <button
+          type="button"
+          className={PRIMARY}
+          disabled={done.isPending}
+          onClick={() => done.mutate({ dutyId, date: item.date })}
+          aria-label={`Turno hecho: ${item.label}`}
+        >
+          Turno hecho
+        </button>
+        {done.isError && (
+          <span className="text-[12px] text-danger-fg">{apiErrorMessage(done.error)}</span>
+        )}
+      </span>
+    );
+  }
+  const to =
+    item.activity === 'fridays'
+      ? `/panel/viernes/${item.dutyId}/${item.date}`
+      : `/panel/lista/${item.groupId}/${item.date}`;
+  return (
+    <Link
+      to={to}
+      aria-label={`${item.rollCall === 'open' ? 'Pasar lista' : 'Corregir la lista'} de ${item.label}`}
+      className={item.rollCall === 'open' ? PRIMARY : SECONDARY}
+    >
+      {item.rollCall === 'open' ? 'Pasar lista' : 'Corregir'}
+    </Link>
+  );
+}
+
+/** Una clase o actividad de la agenda: hora, nombre, aula y alumnos de ese día, y qué hacer con ella. */
 export function ClassCard({ item }: { item: TeacherClass }) {
   return (
     <Card className="flex items-start gap-4 px-4 py-3.5">
@@ -15,30 +67,22 @@ export function ClassCard({ item }: { item: TeacherClass }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{item.label}</p>
-        <p className="mt-0.5 text-sm text-ink-muted">
-          {item.groupId === null
-            ? 'Turno'
-            : `${item.classroom ? classroomLabel(item.classroom) : ''} · ${item.students} ${item.students === 1 ? 'alumno' : 'alumnos'}`}
-        </p>
+        <p className="mt-0.5 text-sm text-ink-muted">{subtitle(item)}</p>
         <span className="mt-1.5 flex flex-wrap gap-1.5 empty:hidden">
           {item.substitution && <Badge>Sustitución</Badge>}
-          {item.rollCall === 'taken' && <Badge tone="success">Lista pasada</Badge>}
-          {item.rollCall === 'missed' && <Badge tone="warning">Sin lista</Badge>}
+          {item.rollCall === 'taken' && (
+            <Badge tone="success">
+              {item.activity === 'shift' ? 'Turno hecho' : 'Lista pasada'}
+            </Badge>
+          )}
+          {item.rollCall === 'missed' && (
+            <Badge tone="warning">
+              {item.activity === 'shift' ? 'Sin confirmar' : 'Sin lista'}
+            </Badge>
+          )}
         </span>
       </div>
-      {item.groupId !== null && (item.rollCall === 'open' || item.rollCall === 'taken') && (
-        <Link
-          to={`/panel/lista/${item.groupId}/${item.date}`}
-          aria-label={`${item.rollCall === 'open' ? 'Pasar lista' : 'Corregir la lista'} de ${item.label}`}
-          className={`flex h-11 shrink-0 items-center rounded-sm px-3 text-sm font-semibold no-underline ${
-            item.rollCall === 'open'
-              ? 'bg-brand text-surface-raised hover:bg-brand-strong'
-              : 'border border-line-strong text-ink hover:bg-surface-muted'
-          }`}
-        >
-          {item.rollCall === 'open' ? 'Pasar lista' : 'Corregir'}
-        </Link>
-      )}
+      <Action item={item} />
     </Card>
   );
 }

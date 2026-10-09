@@ -14,6 +14,8 @@ export interface TeacherClass {
   minutes: number;
   /** La da sustituyendo a su titular. */
   substitution: boolean;
+  /** Actividad del club: turno normal o la de los viernes (null en las clases). */
+  activity: 'shift' | 'fridays' | null;
   classroom: string | null;
   students: number;
   /** null en los turnos, que no tienen lista. */
@@ -71,4 +73,28 @@ export interface TeacherPayStatus {
 
 export function fetchPay(): Promise<TeacherPayStatus> {
   return apiGet<TeacherPayStatus>(`${BASE}/pay`);
+}
+
+/** El encargado de un turno confirma que lo hizo. */
+export function markShiftDone(dutyId: string, date: string): Promise<void> {
+  return apiSend('POST', `${BASE}/activities/${dutyId}/${date}/done`);
+}
+
+/** La lista de los viernes del encargado: propuestos (marcados si ya vinieron) y todos para el buscador. */
+export interface FridayList extends TeacherClass {
+  list: { id: string; name: string; present: boolean }[];
+  everyone: { id: string; name: string }[];
+}
+
+export function fetchFridayList(dutyId: string, date: string): Promise<FridayList> {
+  return apiGet<FridayList>(`${BASE}/fridays/${dutyId}/${date}`);
+}
+
+export function markFriday(
+  dutyId: string,
+  date: string,
+  studentId: string,
+  present: boolean,
+): Promise<void> {
+  return apiSend('PUT', `${BASE}/fridays/${dutyId}/${date}/students/${studentId}`, { present });
 }
