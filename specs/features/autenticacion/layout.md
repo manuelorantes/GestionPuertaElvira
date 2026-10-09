@@ -28,8 +28,10 @@ RequireSession (protege /panel/*)
     ├── Escritorio: PanelSidebar
     │   ├── Marca: logo (enlace «Ir al inicio» → /panel: el resumen, o «Mis clases» en profesorado) + «Puerta Elvira» / «Gestión»
     │   ├── Navegación (6 secciones, deshabilitadas, etiqueta «Próximamente» salvo Resumen)
-    │   └── Pie: nombre de la persona · rol, temporada, botón «Cerrar sesión»
-    ├── Móvil: PanelMobileHeader (logo, que lleva al inicio; título de la pantalla, botón icono «Cerrar sesión»)
+    │   └── Pie: nombre de la persona · rol (o «Profesorado» en su espacio de profesor), botón «Cambiar a profesor» /
+    │       «Cambiar a administración» (solo administración vinculada a un profesor), temporada, botón «Cerrar sesión»
+    ├── Móvil: PanelMobileHeader (logo, que lleva al inicio; título de la pantalla, botón icono para cambiar de espacio
+    │   si lo hay, botón icono «Cerrar sesión»)
     ├── Contenido (Outlet)
     │   └── PanelHomePage: antetítulo «Octubre 2026 · temporada 2026/27», título «Resumen del club»,
     │       saludo «Hola, <nombre>» y aviso «Las secciones de gestión llegarán en las próximas entregas.»

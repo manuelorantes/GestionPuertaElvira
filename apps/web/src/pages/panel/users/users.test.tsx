@@ -48,6 +48,17 @@ const USERS = [
     teacher: { id: 't1', name: 'Lucía Moreno Gil' },
     lastSeenAt: null,
   },
+  {
+    id: 'u5',
+    email: 'asistente@club.es',
+    fullName: 'Asistente IA',
+    role: 'assistant',
+    status: 'active',
+    mustChangePassword: false,
+    createdAt: '2026-10-08T08:00:00.000Z',
+    teacher: null,
+    lastSeenAt: null,
+  },
 ];
 
 const TEACHERS = [
@@ -214,7 +225,6 @@ describe('Usuarios', () => {
     const dialog = await screen.findByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText('Email'), 'carlos@club.es');
     await userEvent.type(within(dialog).getByLabelText(/Nombre/), 'Carlos Ruiz Márquez');
-    expect(within(dialog).queryByRole('combobox', { name: 'Profesor' })).not.toBeInTheDocument();
     await userEvent.selectOptions(
       within(dialog).getByRole('combobox', { name: 'Rol' }),
       'Profesorado',
@@ -232,6 +242,43 @@ describe('Usuarios', () => {
         teacherId: 't2',
       }),
     );
+  });
+});
+
+describe('administración que también da clases', () => {
+  it('links administration (even the own account) to a teacher, but never the assistant', async () => {
+    const spy = api({ 'PUT /api/admin/users/u0/teacher': [204] });
+    renderApp('/panel/usuarios');
+
+    const table = await screen.findByRole('table', { name: 'Cuentas de usuario' });
+    expect(
+      within(table).getByRole('combobox', { name: 'Profesor de Club Ajedrez' }),
+    ).toBeInTheDocument();
+    expect(
+      within(table).queryByRole('combobox', { name: 'Profesor de Asistente IA' }),
+    ).not.toBeInTheDocument();
+    const own = within(table).getByRole('combobox', { name: 'Profesor de Administración Pruebas' });
+    await waitFor(() =>
+      expect(within(own).getByRole('option', { name: 'Carlos Ruiz Márquez' })).toBeInTheDocument(),
+    );
+    await userEvent.selectOptions(own, 'Carlos Ruiz Márquez');
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/users/u0/teacher')).toEqual({ teacherId: 't2' }),
+    );
+  });
+
+  it('offers the teacher when creating an administration account', async () => {
+    api();
+    renderApp('/panel/usuarios');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Nueva cuenta' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('combobox', { name: 'Profesor' })).toBeInTheDocument();
+    await userEvent.selectOptions(
+      within(dialog).getByRole('combobox', { name: 'Rol' }),
+      'Asistente',
+    );
+    expect(within(dialog).queryByRole('combobox', { name: 'Profesor' })).not.toBeInTheDocument();
   });
 });
 

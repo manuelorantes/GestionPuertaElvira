@@ -6,6 +6,7 @@ import { ClubLogo } from '@/shared/ui/ClubLogo';
 
 import { MissedRollCallsCount } from './MissedRollCallsCount';
 import { MOBILE_SECTIONS, sectionsFor } from './panelSections';
+import { type ViewSwitch, ViewSwitchButton } from './ViewSwitchButton';
 
 /**
  * Un acceso con parámetros (p. ej. «Horas» → Profesores, pestaña de horas) solo se marca si la URL los tiene:
@@ -21,7 +22,13 @@ function isMobileItemActive(path: string, location: Location): boolean {
   );
 }
 
-export function PanelMobileHeader({ title, onLogout }: { title: string; onLogout: () => void }) {
+interface PanelMobileHeaderProps {
+  title: string;
+  viewSwitch: ViewSwitch | null;
+  onLogout: () => void;
+}
+
+export function PanelMobileHeader({ title, viewSwitch, onLogout }: PanelMobileHeaderProps) {
   return (
     <header className="flex items-center gap-3 border-b border-line-soft bg-surface-raised px-4 py-3 md:hidden">
       <Link to="/panel" aria-label="Ir al inicio" className="shrink-0 rounded-full">
@@ -30,6 +37,7 @@ export function PanelMobileHeader({ title, onLogout }: { title: string; onLogout
       <p className="flex-1 font-display text-[22px] font-bold tracking-[0.04em] uppercase">
         {title}
       </p>
+      {viewSwitch && <ViewSwitchButton viewSwitch={viewSwitch} compact />}
       <button
         type="button"
         onClick={onLogout}

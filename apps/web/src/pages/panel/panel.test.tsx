@@ -214,3 +214,66 @@ describe('barra de actualización', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe('administración que también da clases', () => {
+  const LINKED_ADMIN = { ...ADMIN, teacherId: 't1' };
+  /** El botón de la barra lateral (el del móvil es el segundo). */
+  const sidebarButton = (name: string) => {
+    const [button] = screen.getAllByRole('button', { name });
+    if (!button) throw new Error(`Falta el botón «${name}»`);
+    return button;
+  };
+
+  it('should switch to the teacher space and back from the sidebar', async () => {
+    const user = userEvent.setup();
+    mockApi({ 'GET /api/auth/me': [200, { user: LINKED_ADMIN }] });
+    renderApp('/panel/alumnos');
+
+    const nav = await screen.findByRole('navigation', { name: 'Secciones' });
+    await user.click(sidebarButton('Cambiar a profesor'));
+
+    expect(await screen.findByRole('heading', { name: 'Mis clases' })).toBeVisible();
+    expect(within(nav).getByRole('link', { name: /Mis alumnos/ })).toBeVisible();
+    expect(within(nav).queryByRole('link', { name: /Cobros y cuotas/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Profesorado')).toBeVisible();
+
+    await user.click(sidebarButton('Cambiar a administración'));
+
+    expect(await screen.findByRole('heading', { name: /resumen del club/i })).toBeVisible();
+    expect(within(nav).getByRole('link', { name: /Cobros y cuotas/ })).toBeVisible();
+  });
+
+  it('should keep the teacher space on reload and send it back to its classes from administration', async () => {
+    sessionStorage.setItem('panel-view', 'teacher');
+    mockApi({ 'GET /api/auth/me': [200, { user: LINKED_ADMIN }] });
+
+    renderApp('/panel/cobros');
+
+    expect(await screen.findByRole('heading', { name: 'Mis clases' })).toBeVisible();
+  });
+
+  it('should not offer the switch to administration that is not linked to a teacher', async () => {
+    mockApi({ 'GET /api/auth/me': [200, { user: SUPERADMIN }] });
+    renderApp('/panel');
+
+    await screen.findByRole('heading', { name: /resumen del club/i });
+    expect(screen.queryByRole('button', { name: 'Cambiar a profesor' })).not.toBeInTheDocument();
+  });
+
+  it('should always start in administration after logging in', async () => {
+    sessionStorage.setItem('panel-view', 'teacher');
+    const user = userEvent.setup();
+    mockApi({
+      'GET /api/health': [200, {}],
+      'GET /api/auth/me': [NO_SESSION, [200, { user: LINKED_ADMIN }]],
+      'POST /api/auth/login': [200, { user: LINKED_ADMIN }],
+    });
+    renderApp('/?acceso=1');
+
+    await user.type(await screen.findByLabelText('Email'), 'junta@club.es');
+    await user.type(screen.getByLabelText('Contraseña'), 'torre-de-marfil');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByRole('heading', { name: /resumen del club/i })).toBeVisible();
+  });
+});
