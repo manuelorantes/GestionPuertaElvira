@@ -178,6 +178,11 @@ describe('Alumnos', () => {
       'href',
       'tel:612481930',
     );
+    // Contacto y familia directa, en secciones distintas.
+    expect(within(card).getByRole('heading', { name: 'Contacto' })).toBeInTheDocument();
+    expect(
+      within(card).getByRole('heading', { name: 'Familia directa en el club' }),
+    ).toBeInTheDocument();
     expect(within(card).getByText('Pablo López Herrera')).toBeVisible();
     expect(within(card).getByText('Aula Alfil · Lucía Moreno Gil')).toBeVisible();
   });
