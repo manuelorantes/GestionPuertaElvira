@@ -1,6 +1,7 @@
-import { Outlet, useLocation } from 'react-router';
+import { Outlet, useLocation, useNavigate } from 'react-router';
 
 import { ROLE_LABEL } from '@/features/auth/api';
+import { type PanelView, usePanelView } from '@/features/auth/panelView';
 import { useStopImpersonation } from '@/features/auth/useImpersonation';
 import { useLogout } from '@/features/auth/useLogout';
 import { useSession } from '@/features/auth/useSession';
@@ -9,15 +10,19 @@ import { FetchingBar } from './FetchingBar';
 import { PanelMobileHeader, PanelMobileNav } from './PanelMobileBars';
 import { PanelSidebar } from './PanelSidebar';
 import { PANEL_SECTIONS, sectionsFor } from './panelSections';
+import type { ViewSwitch } from './ViewSwitchButton';
 
 export function PanelLayout() {
   const { data: user } = useSession();
   const logout = useLogout();
   const stop = useStopImpersonation();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { view, canSwitch, switchTo } = usePanelView(user);
   if (!user) return null;
 
-  const sections = sectionsFor(PANEL_SECTIONS, user.role);
+  const role = view === 'teacher' ? 'teacher' : user.role;
+  const sections = sectionsFor(PANEL_SECTIONS, role);
   const title =
     sections
       .filter((section) => section.path && section.path !== '/panel')
@@ -26,6 +31,16 @@ export function PanelLayout() {
     'Resumen';
 
   const handleLogout = () => logout.mutate();
+  const otherView: PanelView = view === 'teacher' ? 'staff' : 'teacher';
+  const viewSwitch: ViewSwitch | null = canSwitch
+    ? {
+        target: otherView,
+        onSwitch: () => {
+          switchTo(otherView);
+          void navigate('/panel');
+        },
+      }
+    : null;
 
   return (
     <div className="flex h-screen flex-col">
@@ -51,12 +66,12 @@ export function PanelLayout() {
         </div>
       )}
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <PanelSidebar user={user} onLogout={handleLogout} />
-        <PanelMobileHeader title={title} onLogout={handleLogout} />
+        <PanelSidebar user={user} role={role} viewSwitch={viewSwitch} onLogout={handleLogout} />
+        <PanelMobileHeader title={title} viewSwitch={viewSwitch} onLogout={handleLogout} />
         <div className="min-h-0 min-w-0 flex-1 overflow-auto">
           <Outlet />
         </div>
-        <PanelMobileNav role={user.role} />
+        <PanelMobileNav role={role} />
       </div>
     </div>
   );

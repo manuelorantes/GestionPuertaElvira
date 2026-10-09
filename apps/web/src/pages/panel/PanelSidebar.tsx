@@ -4,18 +4,22 @@ import { Link, NavLink } from 'react-router';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { currentMonth } from '@/features/billing/money';
 
-import { ROLE_LABEL, type SessionUser } from '@/features/auth/api';
+import { ROLE_LABEL, type Role, type SessionUser } from '@/features/auth/api';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 
 import { MissedRollCallsCount } from './MissedRollCallsCount';
 import { PANEL_SECTIONS, sectionsFor } from './panelSections';
+import { type ViewSwitch, ViewSwitchButton } from './ViewSwitchButton';
 
 interface PanelSidebarProps {
   user: SessionUser;
+  /** Rol con el que se ve el panel (profesorado en el espacio de profesor). */
+  role: Role;
+  viewSwitch: ViewSwitch | null;
   onLogout: () => void;
 }
 
-export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
+export function PanelSidebar({ user, role, viewSwitch, onLogout }: PanelSidebarProps) {
   return (
     <aside className="hidden w-62 shrink-0 flex-col border-r border-line-soft bg-surface-raised px-4 py-6 md:flex">
       <div className="flex items-center gap-3 px-2 pb-6">
@@ -29,7 +33,7 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
         </p>
       </div>
       <nav aria-label="Secciones" className="flex flex-col gap-1">
-        {sectionsFor(PANEL_SECTIONS, user.role).map(({ id, label, icon: Icon, path }) =>
+        {sectionsFor(PANEL_SECTIONS, role).map(({ id, label, icon: Icon, path }) =>
           path ? (
             <NavLink
               key={id}
@@ -39,7 +43,7 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
             >
               <Icon aria-hidden size={18} className="shrink-0" />
               {label}
-              {id === 'resumen' && <MissedRollCallsCount role={user.role} className="ml-auto" />}
+              {id === 'resumen' && <MissedRollCallsCount role={role} className="ml-auto" />}
             </NavLink>
           ) : (
             <span
@@ -62,8 +66,9 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
       <div className="flex flex-col gap-3 border-t border-line-soft px-2 pt-4">
         <div className="text-sm">
           <p className="font-semibold text-ink-strong">{user.fullName}</p>
-          <p className="text-xs text-ink-muted">{ROLE_LABEL[user.role]}</p>
+          <p className="text-xs text-ink-muted">{ROLE_LABEL[role]}</p>
         </div>
+        {viewSwitch && <ViewSwitchButton viewSwitch={viewSwitch} />}
         <p className="text-xs text-ink-muted">
           Temporada{' '}
           <strong className="text-ink-strong">

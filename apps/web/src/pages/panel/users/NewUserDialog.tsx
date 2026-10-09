@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { ROLE_LABEL, type Role } from '@/features/auth/api';
+import { canTeach, ROLE_LABEL, type Role } from '@/features/auth/api';
 import { createUser } from '@/features/users/api';
 import { useUserMutation } from '@/features/users/hooks';
 import { Alert } from '@/shared/ui/Alert';
@@ -36,7 +36,7 @@ export function NewUserDialog({
       email: email.trim(),
       fullName: fullName.trim(),
       role,
-      ...(role === 'teacher' ? { teacherId } : {}),
+      ...(canTeach(role) && teacherId ? { teacherId } : {}),
     };
     void create.mutateAsync(input).then(
       (password) => onCreated(fullName.trim(), password),
@@ -84,12 +84,14 @@ export function NewUserDialog({
             value={role}
             onChange={(value) => setRole(value as Role)}
           />
-          {role === 'teacher' && (
+          {canTeach(role) && (
             <label className="flex flex-col gap-1.5 text-sm font-medium">
               Profesor
               <TeacherLinkSelect label="Profesor" value={teacherId} onChange={setTeacherId} />
               <span className="text-[13px] font-normal text-ink-muted">
-                Verá solo sus clases, sus alumnos y sus pagos
+                {role === 'teacher'
+                  ? 'Verá solo sus clases, sus alumnos y sus pagos'
+                  : 'Opcional: si también da clases, podrá cambiar a su espacio de profesor'}
               </span>
             </label>
           )}

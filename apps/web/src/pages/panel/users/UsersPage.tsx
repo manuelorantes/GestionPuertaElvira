@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { ROLE_LABEL, type Role } from '@/features/auth/api';
+import { canTeach, ROLE_LABEL, type Role } from '@/features/auth/api';
 import { useStartImpersonation } from '@/features/auth/useImpersonation';
 import { useSession } from '@/features/auth/useSession';
 import {
@@ -220,7 +220,7 @@ export function UsersPage() {
                             ))}
                           </select>
                         )}
-                        {user.role === 'teacher' && (
+                        {canTeach(user.role) && (
                           <div className="mt-1.5">
                             <TeacherLinkSelect
                               label={`Profesor de ${user.fullName}`}

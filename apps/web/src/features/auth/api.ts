@@ -50,6 +50,11 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
   return apiSend('PUT', '/api/auth/password', { currentPassword, newPassword });
 }
 
+/** Roles que se vinculan a un profesor: el profesorado y la administración que también da clases. */
+export function canTeach(role: Role): boolean {
+  return role !== 'assistant';
+}
+
 export const ROLE_LABEL: Record<Role, string> = {
   superadministrator: 'Superadministración',
   administrator: 'Administración',
