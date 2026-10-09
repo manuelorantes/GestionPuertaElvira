@@ -3,7 +3,10 @@ import { apiGet, apiSend } from '@/shared/api/client';
 /** Clase apuntada en las horas cuyo plazo para pasar lista acabó sin lista. */
 export interface MissedRollCall {
   sessionId: string;
-  groupId: string;
+  /** La clase, o null si es una actividad del club. */
+  groupId: string | null;
+  /** La actividad del club, o null si es una clase. */
+  dutyId: string | null;
   date: string;
   label: string;
   teacherName: string;
@@ -15,9 +18,14 @@ export async function fetchMissedRollCalls(): Promise<MissedRollCall[]> {
   return (await apiGet<{ items: MissedRollCall[] }>('/api/admin/attendance/pending')).items;
 }
 
-/** La clase se dio: cuenta y deja de salir en el aviso. */
-export function confirmWithoutRollCall(groupId: string, date: string): Promise<void> {
-  return apiSend('POST', `/api/admin/attendance/pending/${groupId}/${date}/confirm`);
+/** La clase o actividad se dio: cuenta y deja de salir en el aviso. */
+export function confirmWithoutRollCall(item: MissedRollCall): Promise<void> {
+  return item.dutyId !== null
+    ? apiSend(
+        'POST',
+        `/api/admin/attendance/pending/activities/${item.dutyId}/${item.date}/confirm`,
+      )
+    : apiSend('POST', `/api/admin/attendance/pending/${item.groupId}/${item.date}/confirm`);
 }
 
 /** Asistencia de un alumno en la temporada: clases con lista en las que estaba, a cuántas vino y sus faltas. */

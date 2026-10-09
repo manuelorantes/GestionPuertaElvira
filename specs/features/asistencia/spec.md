@@ -8,8 +8,7 @@ Quien da una clase un día (su titular o quien le sustituye) MUST poder pasar su
 empiece la clase (para ir marcando a quien llega) hasta el final del día siguiente. La lista son los alumnos que van
 ese día (con su horario especial), sin marcar al abrirla; se marca a quien ha venido y se guarda (quien queda sin marcar,
 falta). Dentro del plazo se puede corregir, y una lista ya pasada se abre con lo que se guardó. Solo se pueden marcar
-ausentes alumnos de la lista de ese día. Los turnos (encargado del club) y los festivos no tienen lista. Cada lista queda en el
-historial.
+ausentes alumnos de la lista de ese día. Los festivos no tienen lista. Cada lista queda en el historial.
 
 #### Scenario: Al acabar la clase
 - **WHEN** Lucía abre la lista de su clase del martes a las 18:00, marca a todos menos a Pablo y la guarda
@@ -27,8 +26,26 @@ historial.
 - **WHEN** Lucía intenta pasar la lista de una clase que ese día da otro profesor
 - **THEN** el sistema lo rechaza
 
+### Requirement: Actividades del club
+El encargado de una actividad del club MUST confirmarla desde su espacio en el plazo de las listas (desde 15 minutos
+antes hasta el final del día siguiente):
+- un **turno**, pulsando «Turno hecho»;
+- la actividad de los **viernes**, marcando quién viene: le salen propuestos, sin marcar, los alumnos que vinieron algún
+  viernes de ese mes o del anterior, y con un buscador añade a cualquier alumno de alta. Cada marca se guarda al momento
+  y es la asistencia (y el punto) de los viernes de Puntos. La actividad queda confirmada si el encargado marca al
+  menos a un alumno; las marcas que haga administración desde Puntos no la confirman.
+
+#### Scenario: El encargado de los viernes
+- **WHEN** Ángel, encargado de los viernes, abre su lista del viernes 16 y busca y marca a Pablo, que no estaba propuesto
+- **THEN** Pablo gana su punto del viernes 16 y la actividad de Ángel queda confirmada
+
+#### Scenario: Solo marca administración
+- **WHEN** administración marca en Puntos a Ana el viernes 9 y Ángel no marca a nadie ese día
+- **THEN** Ana gana su punto, pero la actividad de Ángel del viernes 9 sale en «Listas sin pasar»
+
 ### Requirement: Listas sin pasar
-Una clase apuntada en las horas (sesión de un grupo) cuya lista no se pasó cuando acaba su plazo MUST aparecer en el
+Una clase apuntada en las horas (sesión de un grupo) cuya lista no se pasó, o una actividad del club que su encargado no
+confirmó, cuando acaba su plazo MUST aparecer en el
 bloque «Listas sin pasar» del resumen, con fecha, clase y profesor, y en un contador junto a «Resumen» en el menú.
 Solo cuentan las clases de profesores que pueden pasar lista (con su cuenta de profesorado activa y vinculada), desde
 el día en que se vinculó su cuenta y nunca antes del día en que se activó la asistencia. Para cada una, administración

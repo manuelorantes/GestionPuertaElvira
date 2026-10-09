@@ -171,6 +171,8 @@ export interface Duty {
   start: string;
   end: string;
   label: string;
+  /** Turno normal («Turno hecho») o la actividad de los viernes (asistencia de los viernes de los puntos). */
+  kind: 'shift' | 'fridays';
 }
 
 export interface DutyPayload {
@@ -179,6 +181,7 @@ export interface DutyPayload {
   start: string;
   end: string;
   label: string | null;
+  kind: 'shift' | 'fridays';
 }
 
 export async function fetchDuties(): Promise<Duty[]> {

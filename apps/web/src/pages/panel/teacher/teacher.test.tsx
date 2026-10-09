@@ -204,3 +204,85 @@ describe('Mis pagos', () => {
     expect(months).toHaveTextContent('Anticipos−50 €');
   });
 });
+
+describe('Actividades del club', () => {
+  const activity = (overrides: Record<string, unknown>) => ({
+    ...CLASS,
+    groupId: null,
+    classroom: null,
+    students: 0,
+    rollCall: 'open',
+    ...overrides,
+  });
+
+  it('confirms a shift with «Turno hecho» and opens the Friday list of the Friday activity', async () => {
+    const spy = mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      [`GET /api/teacher/classes?from=${today}&to=${today}`]: [
+        200,
+        {
+          items: [
+            activity({ dutyId: 'd1', label: 'Viernes', activity: 'fridays', start: '17:00' }),
+            activity({
+              dutyId: 'd2',
+              label: 'Encargado del club',
+              activity: 'shift',
+              start: '20:00',
+            }),
+          ],
+        },
+      ],
+      [`POST /api/teacher/activities/d2/${today}/done`]: [204],
+    });
+    renderApp('/panel');
+
+    expect(await screen.findByRole('link', { name: 'Pasar lista de Viernes' })).toHaveAttribute(
+      'href',
+      `/panel/viernes/d1/${today}`,
+    );
+    expect(screen.getByText('Actividad del club · asistencia de los viernes')).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Turno hecho: Encargado del club' }));
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.some(
+          ([u, init]) =>
+            u === `/api/teacher/activities/d2/${today}/done` && init?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('proposes who came lately, unticked, and adds anyone else by name', async () => {
+    const spy = mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      'GET /api/teacher/fridays/d1/2026-10-16': [
+        200,
+        {
+          ...activity({ dutyId: 'd1', label: 'Viernes', activity: 'fridays', date: '2026-10-16' }),
+          list: [{ id: 's1', name: 'Natan Rodriguez Raposo', present: false }],
+          everyone: [
+            { id: 's1', name: 'Natan Rodriguez Raposo' },
+            { id: 's2', name: 'Pablo Gil Ruiz' },
+          ],
+        },
+      ],
+      'PUT /api/teacher/fridays/d1/2026-10-16/students/s2': [204],
+    });
+    renderApp('/panel/viernes/d1/2026-10-16');
+
+    const natan = await screen.findByRole('checkbox', { name: /Natan Rodriguez Raposo/ });
+    expect(natan).not.toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /Pablo Gil Ruiz/ })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole('combobox', { name: 'Añadir alumno' }), 'pablo');
+    await userEvent.click(await screen.findByRole('option', { name: 'Pablo Gil Ruiz' }));
+    expect(await screen.findByRole('checkbox', { name: /Pablo Gil Ruiz/ })).toBeChecked();
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.find(
+          ([u, init]) =>
+            u === '/api/teacher/fridays/d1/2026-10-16/students/s2' && init?.method === 'PUT',
+        )?.[1]?.body,
+      ).toBe(JSON.stringify({ present: true })),
+    );
+  });
+});

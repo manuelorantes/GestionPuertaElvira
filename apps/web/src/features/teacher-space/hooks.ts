@@ -34,3 +34,19 @@ export function useSaveRollCall(groupId: string, date: string) {
 export function useTeacherPay() {
   return useQuery({ queryKey: ['teacher-pay'], queryFn: api.fetchPay });
 }
+
+export function useFridayList(dutyId: string, date: string) {
+  return useQuery({
+    queryKey: ['teacher-friday-list', dutyId, date],
+    queryFn: () => api.fetchFridayList(dutyId, date),
+  });
+}
+
+export function useShiftDone() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { dutyId: string; date: string }) =>
+      api.markShiftDone(input.dutyId, input.date),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['teacher-classes'] }),
+  });
+}

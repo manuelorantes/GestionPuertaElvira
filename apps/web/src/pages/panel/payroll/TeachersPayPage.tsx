@@ -21,7 +21,7 @@ const TABS = [
   { id: 'horas', label: 'Registro de horas' },
   { id: 'liquidacion', label: 'Liquidación mensual' },
   { id: 'sustituciones', label: 'Sustituciones y festivos' },
-  { id: 'encargado', label: 'Encargado del club' },
+  { id: 'encargado', label: 'Actividades del club' },
   { id: 'equipo', label: 'Equipo' },
 ];
 

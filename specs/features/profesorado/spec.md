@@ -72,10 +72,15 @@ es un caso especial: MUST indicarse el motivo y no suma horas dobles.
 - **WHEN** se intenta que un profesor sustituya una clase a la misma hora que la suya sin indicar motivo
 - **THEN** se pide el motivo (y al sustituir a un profesor no se planifica ninguna de sus clases hasta indicarlo); con motivo, se planifica y sus horas de esa franja cuentan una sola vez
 
-### Requirement: Encargado del club
-Administración MUST poder definir turnos fijos semanales (por defecto «Encargado del club»: día, franja y profesor),
-cambiarlos y quitarlos. Cada semana cuentan como horas de quien los tiene. Las horas que se solapan el mismo día
-(una clase durante el turno) MUST contar una sola vez.
+### Requirement: Actividades del club
+Administración MUST poder definir actividades del club con un encargado fijo semanal (nombre, día, franja, encargado y
+tipo), cambiarlas y quitarlas, en la pestaña «Actividades del club». Cada semana cuentan como horas de su encargado. Las
+horas que se solapan el mismo día (una clase durante la actividad) MUST contar una sola vez. Hay dos tipos:
+- **Turno** (por defecto «Encargado del club»): su encargado confirma «Turno hecho» desde su espacio.
+- **Viernes**: su encargado pasa la lista de los viernes de los puntos (ver la spec de asistencia); la asistencia que
+  marca es la misma que la de la pestaña Viernes de Puntos.
+Una actividad que su encargado no confirma en el plazo de las listas sale en «Listas sin pasar» (ver la spec de
+asistencia).
 
 #### Scenario: Encargado con clase
 - **WHEN** un profesor es encargado de 17:00 a 20:00 y tiene clase de 18:00 a 19:30

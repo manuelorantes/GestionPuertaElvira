@@ -7,17 +7,20 @@ const MISSED = [
   {
     sessionId: 'p1',
     groupId: 'g2',
+    dutyId: null,
     date: '2026-10-06',
     label: 'Martes 19:00',
     teacherName: 'Carlos Ruiz Márquez',
     locked: false,
   },
+  // Una actividad del club que su encargado no confirmó.
   {
     sessionId: 'p2',
-    groupId: 'g2',
-    date: '2026-10-13',
-    label: 'Martes 19:00',
-    teacherName: 'Carlos Ruiz Márquez',
+    groupId: null,
+    dutyId: 'd1',
+    date: '2026-10-16',
+    label: 'Viernes',
+    teacherName: 'Ángel Castillo Rodriguez',
     locked: false,
   },
 ];
@@ -32,7 +35,7 @@ describe('Listas sin pasar', () => {
         [200, { items: [] }],
       ],
       'DELETE /api/admin/payroll/sessions/p1': [204],
-      'POST /api/admin/attendance/pending/g2/2026-10-13/confirm': [204],
+      'POST /api/admin/attendance/pending/activities/d1/2026-10-16/confirm': [204],
     });
     renderApp('/panel');
 
@@ -58,7 +61,7 @@ describe('Listas sin pasar', () => {
     expect(await within(nav).findByLabelText('1 lista sin pasar')).toBeVisible();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Dar por buena la clase del 13/10/2026 de Martes 19:00' }),
+      screen.getByRole('button', { name: 'Dar por buena la clase del 16/10/2026 de Viernes' }),
     );
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Listas sin pasar' })).not.toBeInTheDocument(),

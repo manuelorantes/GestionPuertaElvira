@@ -19,7 +19,7 @@ export function useSettleMissedRollCall() {
   const refresh = useRefreshClubData();
   return useMutation({
     mutationFn: ({ item, given }: { item: MissedRollCall; given: boolean }) =>
-      given ? confirmWithoutRollCall(item.groupId, item.date) : deleteSession(item.sessionId),
+      given ? confirmWithoutRollCall(item) : deleteSession(item.sessionId),
     onSuccess: refresh,
   });
 }
