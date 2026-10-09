@@ -119,6 +119,9 @@ export class Substitution {
 }
 
 /** Sesión que se apunta sola al acabar una clase o un turno. */
+/** Lo que se añade al nombre de una clase o actividad que se da sustituyendo a otro. */
+export const SUBSTITUTION_SUFFIX = ' (sustitución)';
+
 export class PlannedSession {
   constructor(
     readonly teacher: TeacherRef,
@@ -159,7 +162,7 @@ export class DailyPlanner {
           substitution?.teacher ?? group.teacher,
           group.id,
           date,
-          substitution ? `${group.name} (sustitución)` : group.name,
+          substitution ? `${group.name}${SUBSTITUTION_SUFFIX}` : group.name,
           group.start,
           SessionMinutes.fromMinutes(group.minutes),
           `group:${group.id.value}`,
@@ -176,7 +179,7 @@ export class DailyPlanner {
           substitution?.teacher ?? duty.teacher,
           null,
           date,
-          substitution ? `${duty.label} (sustitución)` : duty.label,
+          substitution ? `${duty.label}${SUBSTITUTION_SUFFIX}` : duty.label,
           duty.start,
           SessionMinutes.fromMinutes(duty.minutes()),
           `duty:${duty.id.value}`,
@@ -293,6 +296,7 @@ export class SettlementCalculator {
       day: e.date.toString(),
       start: e.start,
       minutes: e.minutes().minutes,
+      substitution: e.label.endsWith(SUBSTITUTION_SUFFIX),
     }));
     for (const [entry, minutes] of spans) {
       byLabel.set(entry.label, (byLabel.get(entry.label) ?? 0) + minutes);
@@ -348,37 +352,62 @@ interface Span {
   day: string;
   start: number | null;
   minutes: number;
+  /** La da sustituyendo a otro: si empata con una suya, cuenta la suya. */
+  substitution?: boolean;
 }
 
-/** Minutos que aporta cada sesión sin contar dos veces lo que se solapa el mismo día. */
-function effectiveMinutes<T>(items: readonly T[], span: (item: T) => Span): [T, number][] {
-  const result: [T, number][] = [];
-  const timed = new Map<string, { item: T; span: Span }[]>();
-  for (const item of items) {
+/** Lo que cuenta una sesión y las sesiones del mismo día que se quedan con parte de sus minutos. */
+export interface OverlapShare<T> {
+  item: T;
+  minutes: number;
+  overlappedBy: T[];
+}
+
+/**
+ * Minutos que aporta cada sesión sin contar dos veces lo que se solapa el mismo día. La más corta cuenta entera y las
+ * más largas se quedan con lo que les sobra; si duran lo mismo, primero la suya (no la sustitución) y después la que
+ * va antes. Devuelve las sesiones en ese orden por día.
+ */
+export function overlapShares<T>(items: readonly T[], span: (item: T) => Span): OverlapShare<T>[] {
+  const result: OverlapShare<T>[] = [];
+  const timed = new Map<string, { item: T; span: Span; index: number }[]>();
+  items.forEach((item, index) => {
     const s = span(item);
     if (s.start === null) {
-      result.push([item, s.minutes]);
-      continue;
+      result.push({ item, minutes: s.minutes, overlappedBy: [] });
+      return;
     }
-    timed.set(s.day, [...(timed.get(s.day) ?? []), { item, span: s }]);
-  }
+    timed.set(s.day, [...(timed.get(s.day) ?? []), { item, span: s, index }]);
+  });
   for (const day of timed.values()) {
-    // La más corta primero: cuenta entera y las más largas se quedan con lo que les sobra.
     const ordered = [...day].sort((a, b) =>
-      a.span.minutes - b.span.minutes || (a.span.start ?? 0) - (b.span.start ?? 0)
+      a.span.minutes - b.span.minutes ||
+      Number(a.span.substitution ?? false) - Number(b.span.substitution ?? false) ||
+      (a.span.start ?? 0) - (b.span.start ?? 0) ||
+      a.index - b.index
     );
     // Tramos ya contados, fusionados (sin solapes entre sí).
     let taken: [number, number][] = [];
+    const counted: { item: T; from: number; to: number }[] = [];
     for (const { item, span: s } of ordered) {
       const from = s.start ?? 0;
       const to = from + s.minutes;
       let free = to - from;
       for (const [a, b] of taken) free -= Math.max(0, Math.min(to, b) - Math.max(from, a));
-      result.push([item, Math.max(0, free)]);
+      result.push({
+        item,
+        minutes: Math.max(0, free),
+        overlappedBy: counted.filter((c) => c.from < to && from < c.to).map((c) => c.item),
+      });
       taken = merge([...taken, [from, to]]);
+      counted.push({ item, from, to });
     }
   }
   return result;
+}
+
+function effectiveMinutes<T>(items: readonly T[], span: (item: T) => Span): [T, number][] {
+  return overlapShares(items, span).map((s) => [s.item, s.minutes]);
 }
 
 /**
