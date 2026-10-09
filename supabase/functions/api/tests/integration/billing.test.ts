@@ -136,13 +136,14 @@ Deno.test({
       })).status,
       204,
     );
+    // Los puntos se gestionan en la sección Puntos; la cuenta muestra los de este mes.
     assertEquals(
-      body<{ points: number }>(
-        await fx.client.json('POST', `/api/admin/billing/accounts/${fx.student}/points`, {
-          delta: 4,
-        }),
-      ).points,
-      4,
+      (await fx.client.json('POST', '/api/admin/points/adjustments', {
+        studentId: fx.student,
+        delta: 4,
+        note: 'Ganador del torneo interno',
+      })).status,
+      204,
     );
     const account = body<Record<string, unknown>>(
       await fx.client.get(`/api/admin/billing/accounts/${fx.student}`),
@@ -154,11 +155,20 @@ Deno.test({
     assert(Number.isInteger(account.suggestedMonths));
     assert(Number.isInteger(account.remainingMonths));
     assertError(
-      await fx.client.json('POST', `/api/admin/billing/accounts/${fx.student}/points`, {
+      await fx.client.json('POST', '/api/admin/points/adjustments', {
+        studentId: fx.student,
         delta: -5,
+        note: 'Demasiados',
       }),
-      422,
-      'unprocessable',
+      409,
+      'points_already_spent',
+    );
+    assertError(
+      await fx.client.json('POST', `/api/admin/billing/accounts/${fx.student}/points`, {
+        delta: 1,
+      }),
+      404,
+      'not_found',
     );
     assertError(
       await fx.client.get('/api/admin/billing/accounts/01990000-0000-7000-8000-000000000000'),

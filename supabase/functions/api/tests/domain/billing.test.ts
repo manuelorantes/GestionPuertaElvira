@@ -145,10 +145,6 @@ Deno.test('StudentAccount should open monthly, update preferences and keep point
   assertEquals(monthsWithin('rest_of_season', 4), 4);
   assert(account.isMember());
   assertEquals(account.privateRate()?.cents, 3500);
-  account.adjustPoints(3);
-  account.adjustPoints(-1);
-  assertEquals(account.points(), 2);
-  assertThrows(() => account.adjustPoints(-3), InvalidValue);
 });
 
 Deno.test('Charge should derive its status from the date and how much of it is covered', () => {

@@ -126,7 +126,6 @@ function toAccount(row: Row): StudentAccount {
     preferredPlanFromName(row.string('preferred_plan')),
     row.bool('member'),
     rate === null ? null : Money.cents(rate),
-    row.int('points'),
   );
 }
 
@@ -151,11 +150,10 @@ export class SqlStudentAccountRepository implements StudentAccountRepository {
       preferred_plan: account.preferredPlan(),
       member: account.isMember(),
       private_rate_cents: account.privateRate()?.cents ?? null,
-      points: account.points(),
     };
     await this.sql`INSERT INTO billing_account ${this.sql(record)}
       ON CONFLICT (student_id) DO UPDATE SET ${
-      this.sql(record, 'preferred_plan', 'member', 'private_rate_cents', 'points')
+      this.sql(record, 'preferred_plan', 'member', 'private_rate_cents')
     }`;
   }
 }
