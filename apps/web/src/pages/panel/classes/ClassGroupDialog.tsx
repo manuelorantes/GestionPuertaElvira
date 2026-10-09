@@ -96,7 +96,7 @@ function GroupForm({
                 error={form.fieldErrors.teacherId}
               />
             ) : (
-              <Alert tone="info">Añade antes un profesor en la pestaña Profesores.</Alert>
+              <Alert tone="info">Añade antes un profesor en Profesores → Equipo.</Alert>
             )}
           </div>
           <fieldset className="flex flex-col gap-1.5">

@@ -27,7 +27,7 @@ Un profesor con grupos asignados MUST NOT poder desactivarse.
 La lista MUST mostrar cada profesor ordenado por nombre, con su tarifa por hora, su estado y su número de grupos.
 
 #### Scenario: Consultar la lista
-- **WHEN** administración abre la pestaña «Profesores» de Clases
+- **WHEN** administración abre la pestaña «Equipo» de Profesores
 - **THEN** ve todos los profesores con su estado y su número de grupos
 
 ### Requirement: Tarifa por hora

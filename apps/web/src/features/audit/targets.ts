@@ -12,7 +12,7 @@ export function targetLink(target: AuditTarget): { to: string; label: string } {
     case 'group':
       return { to: `/panel/clases?grupo=${target.id}`, label: 'Ir al grupo' };
     case 'teacher':
-      return { to: '/panel/clases?pestana=profesores', label: 'Ir a profesores' };
+      return { to: '/panel/profesores?pestana=equipo', label: 'Ir a profesores' };
     case 'charges':
       return {
         to: `/panel/cobros?mes=${target.month}`,

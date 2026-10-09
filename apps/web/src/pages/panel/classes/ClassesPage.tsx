@@ -8,16 +8,16 @@ import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
 import { useToast } from '@/shared/ui/Toast';
 
+import { AttendanceTab } from './AttendanceTab';
 import { ClassGroupDialog } from './ClassGroupDialog';
 import { ClassGroupPanel } from './ClassGroupPanel';
 import { GroupsTable } from './GroupsTable';
-import { TeachersPanel } from './TeachersPanel';
 import { WeeklySchedule } from './WeeklySchedule';
 
 const TABS = [
   { id: 'horario', label: 'Horario semanal' },
   { id: 'grupos', label: 'Grupos' },
-  { id: 'profesores', label: 'Profesores' },
+  { id: 'asistencia', label: 'Asistencia' },
 ];
 
 type DialogState = { group: ClassGroup | null } | null;
@@ -36,7 +36,6 @@ export function ClassesPage() {
   const groupList = groups.data ?? [];
 
   function renderTab() {
-    if (tab === 'profesores') return <TeachersPanel teachers={teachers.data ?? []} />;
     if (groups.isPending) return <p className="text-ink-muted">Cargando grupos…</p>;
     if (groupList.length === 0)
       return (
@@ -44,6 +43,7 @@ export function ClassesPage() {
       );
     const edit = (group: ClassGroup) => setDialog({ group });
     const open = (group: ClassGroup) => setOpenGroupId(group.id);
+    if (tab === 'asistencia') return <AttendanceTab groups={groupList} />;
     return tab === 'grupos' ? (
       <GroupsTable groups={groupList} onEdit={edit} onOpen={open} />
     ) : (

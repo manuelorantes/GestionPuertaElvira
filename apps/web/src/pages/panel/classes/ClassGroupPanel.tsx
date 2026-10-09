@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
 import { classroomLabel } from '@/features/classes/classrooms';
 import type { ClassGroup } from '@/features/classes/api';
 import { useGroup } from '@/features/classes/hooks';
@@ -16,7 +17,9 @@ import { Card } from '@/shared/ui/Card';
 import { Combobox } from '@/shared/ui/Combobox';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
+import { GroupAttendanceTable } from './GroupAttendanceTable';
 import { OccupancyByDay } from './OccupancyByDay';
+import { MonthNav } from '@/shared/ui/MonthNav';
 import { SidePanel } from '@/shared/ui/SidePanel';
 import { useToast } from '@/shared/ui/Toast';
 
@@ -28,6 +31,7 @@ interface ClassGroupPanelProps {
 
 export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelProps) {
   const group = useGroup(groupId);
+  const [attendanceMonth, setAttendanceMonth] = useState(currentMonth());
   const candidates = useStudents('active', '');
   const navigate = useNavigate();
   const toast = useToast();
@@ -157,6 +161,19 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
           >
             Inscribir
           </Button>
+        </Card>
+        <Card className="p-4">
+          <h3 className="mb-2 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+            Asistencia
+          </h3>
+          <div className="mb-3">
+            <MonthNav
+              label={monthLabel(attendanceMonth)}
+              onPrevious={() => setAttendanceMonth(shiftMonth(attendanceMonth, -1))}
+              onNext={() => setAttendanceMonth(shiftMonth(attendanceMonth, 1))}
+            />
+          </div>
+          <GroupAttendanceTable groupId={groupId} month={attendanceMonth} />
         </Card>
       </div>
       {overCapacity.message && (
