@@ -1,7 +1,12 @@
 import { assertEquals, assertThrows } from '@std/assert';
 
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
-import { RollCall, RollCallClosed, RollCallNotOpenYet } from '../../src/domain/attendance/mod.ts';
+import {
+  ActivityCheck,
+  RollCall,
+  RollCallClosed,
+  RollCallNotOpenYet,
+} from '../../src/domain/attendance/mod.ts';
 
 const TUESDAY = LocalDate.fromString('2026-10-13');
 const ROSTER = ['s1', 's2', 's3'];
@@ -38,4 +43,29 @@ Deno.test('RollCall can be confirmed by administration without a list', () => {
   const roll = RollCall.confirm('g1', TUESDAY, 'u1', at('2026-10-16T09:00:00'));
   assertEquals(roll.kind(), 'confirmed');
   assertEquals(roll.absent(), []);
+});
+
+Deno.test('ActivityCheck should be done by its manager in the same window as the roll calls', () => {
+  const friday = LocalDate.fromString('2026-10-16');
+  const start = 17 * 60;
+  assertThrows(
+    () => ActivityCheck.done('d1', friday, start, 't1', at('2026-10-16T16:44:00')),
+    RollCallNotOpenYet,
+  );
+  assertEquals(
+    ActivityCheck.done('d1', friday, start, 't1', at('2026-10-16T16:45:00')).kind,
+    'done',
+  );
+  assertEquals(
+    ActivityCheck.done('d1', friday, start, 't1', at('2026-10-17T23:00:00')).by.teacher,
+    't1',
+  );
+  assertThrows(
+    () => ActivityCheck.done('d1', friday, start, 't1', at('2026-10-18T09:00:00')),
+    RollCallClosed,
+  );
+  assertEquals(
+    ActivityCheck.confirm('d1', friday, 'u1', at('2026-10-19T09:00:00')).kind,
+    'confirmed',
+  );
 });

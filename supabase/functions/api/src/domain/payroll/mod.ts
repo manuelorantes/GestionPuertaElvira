@@ -54,6 +54,20 @@ export class ScheduledGroup {
 }
 
 /** Turno fijo semanal (p. ej. «Encargado del club» los viernes de 17:00 a 20:00) que cuenta como horas. */
+/**
+ * Tipo de actividad del club: un turno normal (el encargado confirma «Turno hecho») o la de los viernes, cuya asistencia
+ * es la de los viernes de los puntos (el encargado marca quién viene).
+ */
+export type DutyKind = 'shift' | 'fridays';
+
+export function dutyKindFromName(name: string): DutyKind {
+  if (name !== 'shift' && name !== 'fridays') {
+    throw new InvalidValue('kind', 'Tipo de actividad desconocido: usa shift o fridays.');
+  }
+  return name;
+}
+
+/** Actividad del club con un encargado fijo semanal (p. ej. «Viernes», de 17:00 a 20:00): cuenta como horas. */
 export class ClubDuty {
   constructor(
     readonly id: DutyRef,
@@ -62,6 +76,7 @@ export class ClubDuty {
     readonly start: number,
     readonly end: number,
     readonly label: string,
+    readonly kind: DutyKind = 'shift',
   ) {
     if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) {
       throw new InvalidValue('weekday', 'Día de la semana no válido.');
