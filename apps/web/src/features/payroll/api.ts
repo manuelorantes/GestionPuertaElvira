@@ -7,7 +7,13 @@ export interface Session {
   teacherName: string;
   groupId: string | null;
   label: string;
+  /** Duración de la sesión. */
   minutes: number;
+  /** Lo que cuenta: menos si se pisa con otra sesión suya del mismo día, que se queda con esas horas. */
+  countedMinutes: number;
+  /** Sesiones del mismo día que se quedan con sus horas solapadas (vacío si cuenta entera). */
+  overlapsWith: string[];
+  /** Coste de lo que cuenta. */
   costCents: number;
   fromSchedule: boolean;
   locked: boolean;

@@ -95,11 +95,24 @@ asistencia).
 ### Requirement: Registro de horas
 Administración MUST poder añadir sesiones de un grupo u otras actividades (con descripción), cambiar su profesor y sus horas
 (de 0,5 a 12, en medias horas) y quitarlas (por ejemplo, un cambio de última hora o una falta), viendo el coste de cada una.
+El registro MUST ir de lo más reciente a lo más antiguo y mostrar en cada sesión las horas que cuentan de verdad y su
+coste (ver los solapes en la liquidación): si otra sesión del mismo día se queda con parte de sus horas, un asterisco
+explica cuántas eran y con qué se pisa. El total de arriba suma lo que cuenta.
+
+#### Scenario: Una clase dentro de la actividad de los viernes
+- **WHEN** Ángel tiene «Viernes» de 17:00 a 20:00 y clase de 17:00 a 18:30
+- **THEN** el registro muestra la clase con 1,5 h y «Viernes» con 1,5 h*, con su coste de 1,5 h, y el asterisco dice
+  que eran 3 h pero se pisa con la clase
+
+#### Scenario: Dos clases a la vez
+- **WHEN** un profesor tiene el mismo día y a la misma hora su clase y una que da sustituyendo a otro
+- **THEN** su clase cuenta entera y la sustitución sale con 0 h* y 0 €
 
 ### Requirement: Liquidación mensual
 La liquidación de cada profesor y mes MUST ser horas × tarifa, redondeada a céntimos, con el detalle por grupo o
 actividad. Las horas que se solapan el mismo día cuentan una sola vez y van a la sesión más corta: esta cuenta entera y
-la más larga se queda con lo que le sobra.
+la más larga se queda con lo que le sobra. Si duran lo mismo, van a su clase antes que a una sustitución (y, si las dos
+son iguales en eso, a la que va antes).
 
 #### Scenario: Clase durante la actividad de los viernes
 - **WHEN** Ángel tiene clase de 16:30 a 18:00 y la actividad «Viernes» de 17:00 a 20:00
