@@ -74,6 +74,15 @@ Deno.test('the Friday activity manager takes the Friday attendance and other act
       204,
     );
     assertEquals(await classes(), [['Viernes', 'fridays', 'taken']]);
+    // Su primera marca apunta ya las 3 horas de la actividad.
+    const sessions = body<{ items: { date: string; label: string; minutes: number }[] }>(
+      await fx.admin.get(`/api/admin/payroll/sessions?month=2026-10&teacherId=${fx.angel}`),
+    ).items;
+    assertEquals(sessions.map((s) => [s.date, s.label, s.minutes]), [[
+      '2026-10-16',
+      'Viernes',
+      180,
+    ]]);
     const grid = body<{ students: { name: string; present: string[] }[] }>(
       await fx.admin.get('/api/admin/points/fridays?month=2026-10'),
     );
@@ -94,6 +103,12 @@ Deno.test('the Friday activity manager takes the Friday attendance and other act
     const items =
       body<{ items: { rollCall: string }[] }>(await lucia.get('/api/teacher/classes')).items;
     assertEquals(items.map((c) => c.rollCall), ['taken']);
+    // «Turno hecho» apunta ya la hora del turno.
+    await fx.admin.logIn('junta@club.es');
+    const sessions = body<{ items: { date: string; minutes: number }[] }>(
+      await fx.admin.get(`/api/admin/payroll/sessions?month=2026-10&teacherId=${fx.lucia}`),
+    ).items;
+    assertEquals(sessions.map((s) => [s.date, s.minutes]), [['2026-10-16', 60]]);
   });
 });
 

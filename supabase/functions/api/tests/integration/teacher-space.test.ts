@@ -170,7 +170,15 @@ Deno.test('a teacher should take the roll call of their class, all present by de
     // Sin pasar, nadie está marcado.
     assertEquals(await list(), [['Martina López Herrera', false], ['Pablo Gil Ruiz', false]]);
 
+    // Antes de pasarla no hay horas; al pasarla se apuntan ya (sin esperar a la noche), una sola vez.
+    const hours = async () =>
+      body<{ items: { date: string; minutes: number }[] }>(
+        await admin.get('/api/admin/payroll/sessions?month=2026-10'),
+      ).items.map((s) => [s.date, s.minutes]);
+    assertEquals(await hours(), []);
     assertEquals((await teacher.json('PUT', url, { absent: [pablo] })).status, 204);
+    assertEquals((await teacher.json('PUT', url, { absent: [pablo] })).status, 204);
+    assertEquals(await hours(), [['2026-10-13', 60]]);
     assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', false]]);
     // En la ficha de Pablo: una clase con lista, y la faltó.
     assertEquals(body(await admin.get(`/api/admin/students/${pablo}/attendance`)), {
