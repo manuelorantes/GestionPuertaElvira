@@ -14,6 +14,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
+    // Con cobertura y toda la suite a la vez, los tests de formularios largos pasan de los 5 s por defecto.
+    testTimeout: 15_000,
     include: ['src/**/*.test.{ts,tsx}'],
     restoreMocks: true,
     coverage: {
