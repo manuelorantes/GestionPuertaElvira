@@ -34,6 +34,8 @@ const session = (overrides: Record<string, unknown>) => ({
   groupId: 'g1',
   label: 'Iniciación A',
   minutes: 60,
+  countedMinutes: 60,
+  overlapsWith: [],
   costCents: 1600,
   fromSchedule: true,
   locked: false,
@@ -249,6 +251,43 @@ describe('Profesorado', () => {
         expect.objectContaining({ method: 'DELETE' }),
       ),
     );
+  });
+
+  it('counts once the hours that overlap, explaining it with an asterisk', async () => {
+    api({
+      'GET /api/admin/payroll/sessions?month=2026-09': [
+        200,
+        {
+          month: '2026-09',
+          items: [
+            session({
+              id: 's3',
+              label: 'Viernes',
+              minutes: 180,
+              countedMinutes: 90,
+              costCents: 2400,
+              overlapsWith: ['Viernes 17:00'],
+            }),
+            session({
+              id: 's4',
+              label: 'Viernes 17:00',
+              minutes: 90,
+              countedMinutes: 90,
+              costCents: 2400,
+            }),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=horas');
+
+    const table = await screen.findByRole('table', { name: 'Sesiones de septiembre 2026' });
+    const friday = within(table).getByRole('row', { name: /Viernes 1,5 h/ });
+    expect(friday).toHaveTextContent('24 €');
+    await userEvent.click(within(friday).getByRole('button', { name: 'Por qué cuenta 1,5 h' }));
+    expect(await screen.findByText(/Eran 3 h, pero se pisa con Viernes 17:00/)).toBeInTheDocument();
+    // El total, con lo que cuenta: 3 h, no 4,5.
+    expect(screen.getByText('2 sesiones · 3 h · 48 €')).toBeInTheDocument();
   });
 
   it('marks a holiday removing its sessions', async () => {
