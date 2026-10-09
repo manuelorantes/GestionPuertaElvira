@@ -380,3 +380,32 @@ Table points_photo {
 Ref: points_movement.student_id > students_student.id [delete: cascade]
 Ref: points_movement.created_by > identity_user.id [delete: set null]
 Ref: points_photo.student_id > students_student.id [delete: cascade]
+
+// ---- Actividades del club ----------------------------------------------------------------------
+
+Table payroll_duty {
+  id uuid [pk]
+  teacher_id uuid [not null, note: 'encargado']
+  weekday smallint [not null, note: '1 = lunes … 7 = domingo']
+  start_minutes integer [not null]
+  end_minutes integer [not null]
+  label varchar(60) [not null, note: 'p. ej. «Viernes» o «Encargado del club»']
+  kind varchar(20) [not null, default: 'shift', note: 'shift («Turno hecho») | fridays (lista de los viernes de puntos)']
+}
+
+Table attendance_activity_check {
+  duty_id uuid [not null]
+  check_date date [not null]
+  kind varchar(20) [not null, note: 'done («Turno hecho» del encargado) | confirmed («Se dio» de administración)']
+  taken_by_teacher uuid
+  taken_by_user uuid
+  taken_at timestamptz [not null]
+
+  indexes {
+    (duty_id, check_date) [pk]
+  }
+  Note: 'La actividad de los viernes se confirma también con alguna marca de su encargado en points_movement.'
+}
+
+Ref: payroll_duty.teacher_id > teachers_teacher.id
+Ref: attendance_activity_check.duty_id > payroll_duty.id [delete: cascade]

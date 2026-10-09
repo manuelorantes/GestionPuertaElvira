@@ -21,7 +21,8 @@ temporada para elegir y estas pestañas:
   temporada; se ordena por nombre, número de socio o puntos y se busca por nombre. Al pinchar un alumno se ve su
   historial de la temporada. En el mes en curso, «Ajustar» suma o resta puntos con un motivo obligatorio.
 - **Viernes**: los viernes del mes en columnas y todos los alumnos de alta (socios con o sin clase) en filas; marcar una
-  casilla es un punto de ese mes y desmarcarla lo quita. Los viernes que aún no han llegado y los festivos no se pueden
+  casilla es un punto de ese mes y desmarcarla lo quita. El encargado de la actividad de los viernes marca la misma
+  asistencia desde su espacio (ver la spec de asistencia). Los viernes que aún no han llegado y los festivos no se pueden
   marcar. Se busca por nombre y se puede ver solo a los que vinieron.
 - **Fotos de torneo**: la galería de las fotos del mes con la equipación oficial en los torneos (alumno, fecha y, si se
   indica, el torneo). «Añadir foto» busca al alumno por su nombre y le adjunta la foto (imagen JPEG, PNG o WebP de

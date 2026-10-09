@@ -36,8 +36,9 @@ export function MissedRollCalls() {
             Listas sin pasar ({items.length})
           </h2>
           <p className="mt-0.5 text-sm text-ink-muted">
-            Clases apuntadas en las horas que acabaron el plazo sin lista. Si no se dio, quita la
-            sesión; si se dio, dala por buena.
+            Clases sin lista y actividades del club que su encargado no confirmó (en la de los
+            viernes, sin marcar a nadie), con el plazo acabado. Si no se dio, quita la sesión; si se
+            dio, dala por buena.
           </p>
         </div>
         {settle.isError && !removing && (
@@ -48,7 +49,7 @@ export function MissedRollCalls() {
         <ul>
           {items.map((item) => (
             <li
-              key={`${item.groupId}-${item.date}`}
+              key={`${item.groupId ?? item.dutyId}-${item.date}`}
               className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line-soft px-5 py-3 last:border-b-0"
             >
               <div className="min-w-0 flex-1 text-sm">
