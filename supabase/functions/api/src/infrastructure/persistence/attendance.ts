@@ -1,5 +1,7 @@
-import { LocalDate } from '../../domain/common/mod.ts';
+import { LocalDate, YearMonth } from '../../domain/common/mod.ts';
+import { ActivityCheck, type ActivityCheckKind } from '../../domain/attendance/mod.ts';
 import type {
+  ActivityCheckRepository,
   ClassRoster,
   MissedRollCall,
   MissedRollCallQuery,
@@ -90,25 +92,34 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
   }
 
   async missed(from: LocalDate, until: LocalDate): Promise<MissedRollCall[]> {
+    // Clases sin lista y actividades sin confirmar (un turno sin «Turno hecho»; los viernes, sin ninguna marca del
+    // encargado), de profesores con la cuenta activa vinculada y desde el día en que se vinculó.
     const rows = await this.sql`
-      SELECT s.id, s.group_id, s.session_date::text AS date, COALESCE(g.name, s.label) AS label,
-             t.full_name, st.teacher_id IS NOT NULL AS locked
+      SELECT s.id, s.group_id, d.id AS duty_id, s.session_date::text AS date,
+             COALESCE(g.name, d.label, s.label) AS label, t.full_name, st.teacher_id IS NOT NULL AS locked
         FROM payroll_session s
         JOIN teachers_teacher t ON t.id = s.teacher_id
-        -- Solo profesores que pueden pasar lista: con cuenta activa vinculada, desde el día en que se vinculó.
         JOIN identity_user u ON u.teacher_id = s.teacher_id AND u.status = 'active'
         LEFT JOIN classes_group g ON g.id = s.group_id
+        LEFT JOIN payroll_duty d ON s.group_id IS NULL AND s.source = 'duty:' || d.id
         LEFT JOIN payroll_settlement st
                ON st.teacher_id = s.teacher_id AND st.month = to_char(s.session_date, 'YYYY-MM')
-       WHERE s.group_id IS NOT NULL
+       WHERE (s.group_id IS NOT NULL OR d.id IS NOT NULL)
          AND s.session_date BETWEEN ${from.toString()} AND ${until.toString()}
          AND s.session_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
          AND NOT EXISTS (SELECT 1 FROM attendance_roll_call r
                           WHERE r.group_id = s.group_id AND r.roll_date = s.session_date)
+         AND NOT EXISTS (SELECT 1 FROM attendance_activity_check c
+                          WHERE c.duty_id = d.id AND c.check_date = s.session_date)
+         AND NOT (COALESCE(d.kind, '') = 'fridays' AND EXISTS (
+               SELECT 1 FROM points_movement m JOIN identity_user mu ON mu.id = m.created_by
+                WHERE m.kind = 'friday' AND m.reference = s.session_date::text
+                  AND mu.teacher_id = s.teacher_id))
        ORDER BY s.session_date, s.start_minutes NULLS LAST, label`;
     return Row.all(rows).map((r) => ({
       sessionId: r.string('id'),
-      groupId: r.string('group_id'),
+      groupId: r.nullableString('group_id'),
+      dutyId: r.nullableString('duty_id'),
       date: r.string('date'),
       label: r.string('label'),
       teacherName: r.string('full_name'),
@@ -143,5 +154,74 @@ export class SqlStudentAttendanceQuery implements StudentAttendanceQuery {
       classes: count ? new Row(count).int('classes') : 0,
       absences: Row.all(absences).map((r) => ({ date: r.string('date'), label: r.string('name') })),
     };
+  }
+}
+
+/** Confirmaciones de las actividades del club (tabla `attendance_activity_check`). */
+export class SqlActivityCheckRepository implements ActivityCheckRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async find(duty: string, date: LocalDate): Promise<ActivityCheck | null> {
+    const rows = await this.sql`SELECT * FROM attendance_activity_check
+      WHERE duty_id::text = ${duty} AND check_date = ${date.toString()}`;
+    if (!rows[0]) return null;
+    const r = new Row(rows[0]);
+    return ActivityCheck.restore({
+      duty,
+      date,
+      kind: r.string('kind') as ActivityCheckKind,
+      teacher: r.nullableString('taken_by_teacher'),
+      user: r.nullableString('taken_by_user'),
+      at: r.date('taken_at'),
+    });
+  }
+
+  async save(check: ActivityCheck): Promise<void> {
+    const record = {
+      duty_id: check.duty,
+      check_date: check.date.toString(),
+      kind: check.kind,
+      taken_by_teacher: check.by.teacher,
+      taken_by_user: check.by.user,
+      taken_at: check.at,
+    };
+    await this.sql`INSERT INTO attendance_activity_check ${this.sql(record)}
+      ON CONFLICT (duty_id, check_date) DO NOTHING`;
+  }
+}
+
+/** La asistencia de los viernes de los puntos (tabla `points_movement`), para la actividad de los viernes. */
+export class SqlFridayRoster {
+  constructor(private readonly sql: Sql) {}
+
+  async markedByTeacher(teacherId: string, date: LocalDate): Promise<number> {
+    const [row] = await this.sql`
+      SELECT COUNT(*)::int AS n FROM points_movement m JOIN identity_user u ON u.id = m.created_by
+       WHERE m.kind = 'friday' AND m.reference = ${date.toString()} AND u.teacher_id::text = ${teacherId}`;
+    return row ? new Row(row).int('n') : 0;
+  }
+
+  async proposed(date: LocalDate): Promise<RosterStudent[]> {
+    const month = YearMonth.of(date);
+    const rows = await this.sql`
+      SELECT DISTINCT s.id, s.full_name, s.search_name
+        FROM points_movement m JOIN students_student s ON s.id = m.student_id
+       WHERE m.kind = 'friday'
+         AND m.movement_date BETWEEN ${month.previous().firstDay().toString()} AND ${month.lastDay().toString()}
+       ORDER BY s.search_name`;
+    return Row.all(rows).map((r) => ({ id: r.string('id'), name: r.string('full_name') }));
+  }
+
+  async presentOn(date: LocalDate): Promise<string[]> {
+    const rows = await this.sql`SELECT student_id FROM points_movement
+      WHERE kind = 'friday' AND reference = ${date.toString()}`;
+    return Row.all(rows).map((r) => r.string('student_id'));
+  }
+
+  async everyone(date: LocalDate): Promise<RosterStudent[]> {
+    const day = date.toString();
+    const rows = await this.sql`SELECT id, full_name FROM students_student
+      WHERE joined_on <= ${day} AND (withdrawn_on IS NULL OR withdrawn_on > ${day}) ORDER BY search_name`;
+    return Row.all(rows).map((r) => ({ id: r.string('id'), name: r.string('full_name') }));
   }
 }

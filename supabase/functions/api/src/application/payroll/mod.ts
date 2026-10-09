@@ -11,6 +11,7 @@ import {
   Advance,
   ClubDuty,
   DailyPlanner,
+  type DutyKind,
   DutyRef,
   ExpectedHours,
   GroupRef,
@@ -894,6 +895,8 @@ export interface DutyInput {
   start: string;
   end: string;
   label: string | null;
+  /** Por defecto, un turno normal. */
+  kind?: DutyKind;
 }
 
 function minutesOf(time: string, field: string): number {
@@ -921,7 +924,8 @@ export class SaveDuty {
         input.weekday,
         minutesOf(input.start, 'start'),
         minutesOf(input.end, 'end'),
-        input.label?.trim() || 'Encargado del club',
+        input.label?.trim() || (input.kind === 'fridays' ? 'Viernes' : 'Encargado del club'),
+        input.kind ?? 'shift',
       ),
     );
     return ref.value;
@@ -1273,6 +1277,8 @@ export interface AgendaItem {
   minutes: number;
   /** La da sustituyendo a su titular. */
   substitution: boolean;
+  /** Tipo de actividad (null en las clases). */
+  activity: DutyKind | null;
 }
 
 /** Como mucho dos meses de agenda de una vez. */
@@ -1321,6 +1327,7 @@ export class TeacherAgenda {
           end: clockTime(planned.start + planned.minutes.minutes),
           minutes: planned.minutes.minutes,
           substitution: substitutions.some((s) => s.source === planned.source),
+          activity: duty?.kind ?? null,
         });
       }
     }
