@@ -167,7 +167,8 @@ Deno.test('a teacher should take the roll call of their class, all present by de
       await teacher.get('/api/teacher/classes'),
     );
     assertEquals(today.items.map((c) => c.rollCall), ['open']);
-    assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', true]]);
+    // Sin pasar, nadie está marcado.
+    assertEquals(await list(), [['Martina López Herrera', false], ['Pablo Gil Ruiz', false]]);
 
     assertEquals((await teacher.json('PUT', url, { absent: [pablo] })).status, 204);
     assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', false]]);

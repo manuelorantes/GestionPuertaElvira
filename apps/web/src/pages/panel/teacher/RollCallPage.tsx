@@ -12,7 +12,7 @@ import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { useToast } from '@/shared/ui/Toast';
 
-/** Pasar lista de una clase: todos presentes por defecto; se desmarca a quien falta y se guarda. */
+/** Pasar lista de una clase: nadie marcado al abrirla; se marca a quien ha venido y se guarda (el resto, falta). */
 export function RollCallPage() {
   const { groupId = '', date = '' } = useParams();
   const rollCall = useRollCall(groupId, date);
@@ -88,8 +88,8 @@ function RollCallForm({ data }: { data: RollCall }) {
       {save.isError && <Alert>{apiErrorMessage(save.error)}</Alert>}
       <Card className="overflow-hidden">
         <p className="border-b border-line px-4 py-3 text-sm text-ink-muted">
-          {present} de {data.list.length} {data.list.length === 1 ? 'alumno' : 'alumnos'} · desmarca
-          a quien no ha venido
+          {present} de {data.list.length} {data.list.length === 1 ? 'alumno' : 'alumnos'} · marca a
+          quien ha venido
         </p>
         {data.list.length === 0 ? (
           <p className="px-4 py-6 text-center text-ink-muted">No hay alumnos ese día.</p>
