@@ -10,6 +10,7 @@ import { hoursLabel } from '@/features/payroll/hours';
 import { formatDate } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Select } from '@/shared/ui/Select';
@@ -80,7 +81,15 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
                   <TeacherLink id={s.teacherId} name={s.teacherName} />
                 </td>
                 <td className="px-5 py-2.5">{s.label}</td>
-                <td className="px-5 py-2.5">{hoursLabel(s.minutes)}</td>
+                <td className="px-5 py-2.5 whitespace-nowrap">
+                  {hoursLabel(s.countedMinutes)}
+                  {s.overlapsWith.length > 0 && (
+                    <AsteriskNote label={`Por qué cuenta ${hoursLabel(s.countedMinutes)}`}>
+                      Eran {hoursLabel(s.minutes)}, pero se pisa con {s.overlapsWith.join(' y ')},
+                      que se queda con esas horas: las que se solapan solo se pagan una vez.
+                    </AsteriskNote>
+                  )}
+                </td>
                 <td className="px-5 py-2.5 text-right font-medium">{formatCents(s.costCents)}</td>
                 <td className="px-5 py-2.5">
                   {s.locked ? (
@@ -117,7 +126,7 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
     );
   }
 
-  const totalMinutes = items.reduce((sum, s) => sum + s.minutes, 0);
+  const totalMinutes = items.reduce((sum, s) => sum + s.countedMinutes, 0);
   const totalCost = items.reduce((sum, s) => sum + s.costCents, 0);
 
   return (
