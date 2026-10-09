@@ -79,8 +79,10 @@ describe('Sistema', () => {
       'https://github.com/x/actions/runs/1',
     );
     // El resto, en el historial (hasta 15).
-    await userEvent.click(within(hours).getByRole('button', { name: 'Ver historial (2 últimos)' }));
-    expect(within(hours).getByRole('list', { name: /^Historial/ })).toHaveTextContent('No se hizo');
+    await userEvent.click(within(hours).getByRole('button', { name: 'Ver historial' }));
+    const history = within(hours).getByRole('list', { name: /^Historial/ });
+    expect(within(history).getAllByRole('listitem')).toHaveLength(2);
+    expect(history).toHaveTextContent('No se hizo');
 
     const ping = screen.getByRole('region', { name: 'Mantener activo' });
     expect(ping).toHaveTextContent('Cada 3 días a las 08:17');

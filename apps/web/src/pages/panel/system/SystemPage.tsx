@@ -83,37 +83,44 @@ function SlotRow({ slot }: { slot: TaskSlot }) {
   );
 }
 
-/** El último turno a la vista y, al abrir el historial, los 15 últimos con su estado. */
+/** El último turno a la vista y, al abrir el historial, los 15 últimos (el último incluido) con su estado. */
 function SlotHistory({ task }: { task: ScheduledTask }) {
   const [open, setOpen] = useState(false);
-  const [latest, ...older] = task.slots;
+  const latest = task.slots[0];
   return (
     <>
       <ul aria-label={`Último turno de ${task.name}`}>{latest && <SlotRow slot={latest} />}</ul>
-      {older.length > 0 && (
-        <div className="border-t border-line-soft">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={() => setOpen(!open)}
-            className="flex w-full cursor-pointer items-center gap-1.5 px-5 py-2.5 text-left text-[13px] font-semibold text-brand hover:bg-surface-muted"
-          >
-            <ChevronDown
-              aria-hidden
-              size={15}
-              className={`transition-transform ${open ? 'rotate-180' : ''}`}
-            />
-            {open ? 'Ocultar historial' : `Ver historial (${task.slots.length} últimos)`}
-          </button>
-          {open && (
+      <div className="border-t border-line-soft">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen(!open)}
+          className="flex w-full cursor-pointer items-center gap-1.5 px-5 py-2.5 text-left text-[13px] font-semibold text-brand hover:bg-surface-muted"
+        >
+          <ChevronDown
+            aria-hidden
+            size={15}
+            className={`transition-transform ${open ? 'rotate-180' : ''}`}
+          />
+          {open ? 'Ocultar historial' : 'Ver historial'}
+        </button>
+        {open && (
+          <>
             <ul aria-label={`Historial de ${task.name}`} className="border-t border-line-soft">
-              {older.map((slot) => (
+              {task.slots.map((slot) => (
                 <SlotRow key={slot.slot} slot={slot} />
               ))}
             </ul>
-          )}
-        </div>
-      )}
+            {task.slots.length < 15 && (
+              <p className="border-t border-line-soft px-5 py-2.5 text-[13px] text-ink-muted">
+                {task.slots.length === 1
+                  ? 'Es el único turno desde que se vigila esta tarea.'
+                  : `Son todos los turnos desde que se vigila esta tarea (se guardan los 15 últimos).`}
+              </p>
+            )}
+          </>
+        )}
+      </div>
     </>
   );
 }
