@@ -50,7 +50,8 @@ La ficha MUST mostrar:
 - autorización de imagen;
 - fechas de alta y de baja;
 - familia directa en el club;
-- todos sus grupos con horario, aula y profesor.
+- todos sus grupos con horario, aula y profesor;
+- abajo del todo, los comentarios sobre él en sus clases (ver la spec de asistencia).
 
 #### Scenario: Consultar una ficha
 - **WHEN** administración abre un alumno

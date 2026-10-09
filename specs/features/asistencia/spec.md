@@ -42,6 +42,35 @@ vino y un asterisco que explica que no es de ese grupo).
 - **THEN** la asistencia de octubre del grupo de Lucía tiene una fila para Lola con ✓* el martes y su asterisco, y la
   ficha de Lola dice que vino ese día a esa clase, sin contar en su porcentaje
 
+### Requirement: Comentarios de las clases
+Al pasar lista, quien da la clase MUST poder añadir, de forma opcional, comentarios sobre cada alumno de la lista y sobre
+los de asistencia especial ya guardados («ha roto un reloj», «ha llegado a mitad de clase»), con un botón junto a cada
+uno, y comentarios sobre la clase en sí («hoy hemos dado mates de torres»). Se puede comentar desde que se abre la lista
+(15 minutos antes de la clase), también en una clase pasada sin confirmar nada (no cambia la asistencia). Cada
+comentario (hasta 1000 caracteres) se guarda al momento, aparte de la lista, con el día de la clase y quién lo escribió.
+En la lista se ven todos los comentarios de esa clase ese día; el profesor solo cambia o quita los suyos.
+Administración MUST verlos, añadirlos (de una clase que ya se dio: día, toda la clase o un alumno, y texto), cambiarlos y
+quitarlos:
+- en la asistencia del grupo (pestaña «Asistencia» de Clases y hoja del grupo), debajo de la tabla, los del mes que se
+  muestra: primero los de la clase (día, comentario y quién lo escribió) y debajo los de los alumnos, con un selector
+  por los alumnos de la tabla (los del grupo y los que vinieron en asistencia especial; por defecto, todos);
+- en la ficha del alumno, abajo del todo, en «Comentarios de las clases»: día, clase, comentario y quién lo escribió,
+  del más reciente al más antiguo.
+Quien lo escribió es el profesor (desde su espacio) o, si lo escribió administración, el nombre de su cuenta. Cada
+cambio queda en el historial.
+
+#### Scenario: Un comentario sobre un alumno
+- **WHEN** Lucía pasa la lista del martes y pulsa «Comentar sobre Pablo Gil Ruiz», escribe «Ha roto un reloj» y lo guarda
+- **THEN** el comentario queda guardado al momento, y en la ficha de Pablo sale con el martes, la clase y «Lucía Moreno Gil»
+
+#### Scenario: Comentarios en la asistencia del grupo
+- **WHEN** administración abre la asistencia de octubre del grupo de Lucía y elige a Pablo en el selector de alumnos
+- **THEN** ve debajo de la tabla los comentarios de la clase del mes y, debajo, solo los de Pablo
+
+#### Scenario: El comentario de otro
+- **WHEN** Lucía intenta cambiar un comentario que escribió administración en su clase
+- **THEN** el sistema lo rechaza; en la lista lo ve, pero sin «Editar» ni «Quitar»
+
 ### Requirement: Actividades del club
 El encargado de una actividad del club MUST confirmarla desde su espacio en el plazo de las listas (desde 15 minutos
 antes hasta el final del día siguiente):

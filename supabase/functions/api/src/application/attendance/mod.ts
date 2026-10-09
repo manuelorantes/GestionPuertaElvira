@@ -1,13 +1,16 @@
 import {
   ActivityCheck,
   assertWithinWindow,
+  ClassComment,
   OPENS_BEFORE_MINUTES,
   RollCall,
   RollCallClosed,
   type RollCallMarks,
+  RollCallNotOpenYet,
 } from '../../domain/attendance/mod.ts';
 import {
   type Clock,
+  generateUuidV7,
   InvalidValue,
   LocalDate,
   minutesOfDayInMadrid,
@@ -663,5 +666,197 @@ export class GroupAttendance {
         .filter((s) => s.marks.some((m) => m !== null))
         .sort((a, b) => a.name.localeCompare(b.name, 'es')),
     };
+  }
+}
+
+// ---- Comentarios de las clases ----------------------------------------------------------------
+
+export interface ClassCommentRepository {
+  find(id: string): Promise<ClassComment | null>;
+  save(comment: ClassComment): Promise<void>;
+  remove(id: string): Promise<void>;
+}
+
+/** Un comentario nuevo: de un alumno de la clase o, con `studentId` null, de la clase en sí. */
+export interface NewClassComment {
+  studentId: string | null;
+  text: string;
+}
+
+export class ClassCommentNotFound extends Error {
+  constructor() {
+    super('Ese comentario no existe.');
+    this.name = 'ClassCommentNotFound';
+  }
+}
+
+export class NotYourComment extends Error {
+  constructor() {
+    super('Solo puedes cambiar los comentarios que has escrito tú.');
+    this.name = 'NotYourComment';
+  }
+}
+
+/**
+ * Comentar una clase de un día: quien la da (desde que se puede pasar su lista, también si ya es pasada: no cambia la
+ * asistencia) o administración (una clase que ya se dio). Los de un alumno, solo de los de la lista de ese día o los que
+ * vinieron de otra clase (asistencia especial).
+ */
+export class CommentClass {
+  constructor(
+    private readonly assignments: ClassAssignments,
+    private readonly roster: ClassRoster,
+    private readonly rollCalls: RollCallRepository,
+    private readonly comments: ClassCommentRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async asTeacher(
+    teacherId: string,
+    userId: string | null,
+    groupId: string,
+    date: string,
+    input: NewClassComment,
+  ): Promise<string> {
+    const day = LocalDate.fromString(date);
+    const item = await givenClass(this.assignments, teacherId, groupId, day);
+    if (periodOf(item, this.clock.now()) === 'upcoming') throw new RollCallNotOpenYet();
+    return await this.write(groupId, day, input, { teacher: teacherId, user: userId });
+  }
+
+  async asStaff(
+    userId: string,
+    groupId: string,
+    date: string,
+    input: NewClassComment,
+  ): Promise<string> {
+    const day = LocalDate.fromString(date);
+    if ((await this.roster.classroomOf(groupId)) === null) throw new AttendanceGroupNotFound();
+    if (LocalDate.fromInstant(this.clock.now()).isBefore(day)) {
+      throw new InvalidValue('date', 'No se puede comentar una clase que aún no se ha dado.');
+    }
+    return await this.write(groupId, day, input, { teacher: null, user: userId });
+  }
+
+  private async write(
+    groupId: string,
+    day: LocalDate,
+    input: NewClassComment,
+    author: { teacher: string | null; user: string | null },
+  ): Promise<string> {
+    if (input.studentId !== null && !(await this.inClass(groupId, day, input.studentId))) {
+      throw new InvalidValue('studentId', 'Elige uno de los alumnos de esa clase ese día.');
+    }
+    const comment = ClassComment.write(
+      generateUuidV7(),
+      groupId,
+      day,
+      input.studentId,
+      input.text,
+      author,
+      this.clock.now(),
+    );
+    await this.comments.save(comment);
+    return comment.id;
+  }
+
+  private async inClass(groupId: string, day: LocalDate, studentId: string): Promise<boolean> {
+    const students = (await this.roster.studentsOn(groupId, day)).map((s) => s.id);
+    const guests = (await this.rollCalls.find(groupId, day))?.guests() ?? [];
+    return [...students, ...guests].includes(studentId);
+  }
+}
+
+/** Quien cambia un comentario: un profesor (solo los suyos) o administración (cualquiera). */
+export type CommentEditor = { teacher: string } | 'staff';
+
+export class EditClassComment {
+  constructor(
+    private readonly comments: ClassCommentRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async rewrite(id: string, text: string, editor: CommentEditor): Promise<void> {
+    const comment = await this.editable(id, editor);
+    comment.rewrite(text, this.clock.now());
+    await this.comments.save(comment);
+  }
+
+  async remove(id: string, editor: CommentEditor): Promise<void> {
+    await this.editable(id, editor);
+    await this.comments.remove(id);
+  }
+
+  private async editable(id: string, editor: CommentEditor): Promise<ClassComment> {
+    const comment = await this.comments.find(id);
+    if (comment === null) throw new ClassCommentNotFound();
+    if (editor !== 'staff' && !comment.isWrittenByTeacher(editor.teacher)) {
+      throw new NotYourComment();
+    }
+    return comment;
+  }
+}
+
+/** Un comentario tal y como se lee: con la clase, el alumno (o null si es de la clase) y quien lo escribió. */
+export interface ClassCommentView {
+  id: string;
+  groupId: string;
+  groupName: string;
+  date: string;
+  studentId: string | null;
+  studentName: string | null;
+  text: string;
+  /** Nombre del profesor que lo escribió o, si fue administración, de su cuenta. */
+  author: string;
+  authorTeacherId: string | null;
+  writtenAt: string;
+}
+
+export interface ClassCommentQuery {
+  /** Los de una clase un día, en el orden en que se escribieron. */
+  ofClass(groupId: string, date: LocalDate): Promise<ClassCommentView[]>;
+  /** Los de un grupo entre dos fechas, por día y en el orden en que se escribieron. */
+  ofGroup(groupId: string, from: LocalDate, to: LocalDate): Promise<ClassCommentView[]>;
+  /** Los de un alumno, del más reciente al más antiguo. */
+  ofStudent(studentId: string): Promise<ClassCommentView[]>;
+}
+
+/** Los comentarios de la clase que da el profesor ese día, marcando los que puede cambiar (los suyos). */
+export class RollCallComments {
+  constructor(
+    private readonly assignments: ClassAssignments,
+    private readonly comments: ClassCommentQuery,
+  ) {}
+
+  async execute(
+    teacherId: string,
+    groupId: string,
+    date: string,
+  ): Promise<(ClassCommentView & { editable: boolean })[]> {
+    const day = LocalDate.fromString(date);
+    await givenClass(this.assignments, teacherId, groupId, day);
+    return (await this.comments.ofClass(groupId, day)).map((c) => ({
+      ...c,
+      editable: c.authorTeacherId === teacherId,
+    }));
+  }
+}
+
+/** Los comentarios de un grupo en un mes (para su asistencia). */
+export class GroupClassComments {
+  constructor(private readonly comments: ClassCommentQuery) {}
+
+  execute(groupId: string, month: string): Promise<ClassCommentView[]> {
+    const ym = YearMonth.fromString(month);
+    return this.comments.ofGroup(groupId, ym.firstDay(), ym.lastDay());
+  }
+}
+
+/** Los comentarios sobre un alumno en sus clases (para su ficha). */
+export class StudentClassComments {
+  constructor(private readonly comments: ClassCommentQuery) {}
+
+  execute(studentId: string): Promise<ClassCommentView[]> {
+    return this.comments.ofStudent(studentId);
   }
 }
