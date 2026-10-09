@@ -1,6 +1,6 @@
 # Puntos
 
-Los alumnos ganan puntos viniendo los viernes y mandando una foto con la equipación oficial en los torneos, y los
+Los alumnos ganan puntos viniendo los viernes y con las fotos con la equipación oficial en los torneos, y los
 canjean al cobrar. Administración y superadministración los gestionan en la sección «Puntos».
 
 ### Requirement: Los puntos valen solo en su mes
@@ -23,9 +23,10 @@ temporada para elegir y estas pestañas:
 - **Viernes**: los viernes del mes en columnas y todos los alumnos de alta (socios con o sin clase) en filas; marcar una
   casilla es un punto de ese mes y desmarcarla lo quita. Los viernes que aún no han llegado y los festivos no se pueden
   marcar. Se busca por nombre y se puede ver solo a los que vinieron.
-- **Torneos**: los torneos de la temporada (nombre, fecha y puntos por foto, de 1 a 20, 1 por defecto); en cada uno se
-  marca quién mandó la foto con la equipación oficial y gana sus puntos, que cuentan en el mes del torneo. Un torneo se
-  puede editar y, si no tiene fotos, borrar.
+- **Fotos de torneo**: la galería de las fotos del mes con la equipación oficial en los torneos (alumno, fecha y, si se
+  indica, el torneo). «Añadir foto» busca al alumno por su nombre y le adjunta la foto (imagen JPEG, PNG o WebP de
+  hasta 5 MB; el navegador la reduce antes de subirla); cada foto es 1 punto en el mes de la foto, que no puede ser
+  de un día que aún no ha llegado. Una foto se puede quitar, y con ella su punto si no se ha gastado.
 - **Movimientos**: todo lo del mes, filtrable por tipo (viernes, torneo, ajuste o canje).
 - **Canjes**: lo que se puede conseguir con puntos (por ahora, 5 puntos = 5 % de una cuota mensual al cobrar) y los
   canjes del mes.
@@ -33,6 +34,10 @@ temporada para elegir y estas pestañas:
 #### Scenario: Asistencia de un viernes
 - **WHEN** administración marca que Natan vino el viernes 4 de septiembre
 - **THEN** Natan gana 1 punto de septiembre, que sale en sus movimientos como «Viernes 04/09»
+
+#### Scenario: Una foto de torneo
+- **WHEN** administración busca a Alberto, le adjunta su foto del Open de Granada del 4 de octubre y la guarda
+- **THEN** Alberto gana 1 punto de octubre y la foto sale en la galería de octubre
 
 #### Scenario: Un viernes que ya se gastó
 - **WHEN** administración desmarca un viernes de un alumno que ya gastó esos puntos ese mes

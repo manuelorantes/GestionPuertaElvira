@@ -7,20 +7,20 @@ import { Tabs } from '@/shared/ui/Tabs';
 
 import { FridaysTab } from './FridaysTab';
 import { MovementsTab } from './MovementsTab';
+import { PhotosTab } from './PhotosTab';
 import { RedemptionsTab } from './RedemptionsTab';
 import { StudentsTab } from './StudentsTab';
-import { TournamentsTab } from './TournamentsTab';
 
 const TABS = [
   { id: 'alumnos', label: 'Alumnos' },
   { id: 'viernes', label: 'Viernes' },
-  { id: 'torneos', label: 'Torneos' },
+  { id: 'fotos', label: 'Fotos de torneo' },
   { id: 'movimientos', label: 'Movimientos' },
   { id: 'canjes', label: 'Canjes' },
 ];
 
 /**
- * Puntos: se ganan viniendo los viernes y mandando la foto con la equipación oficial en los torneos, se ajustan a mano
+ * Puntos: se ganan viniendo los viernes y con las fotos con la equipación oficial en los torneos, se ajustan a mano
  * con un motivo y se canjean al cobrar. Valen solo en el mes en que se ganan.
  */
 export function PointsPage() {
@@ -44,7 +44,7 @@ export function PointsPage() {
 
   return (
     <main className="mx-auto flex max-w-[1280px] flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
-      <SectionHeader eyebrow="Viernes, torneos y canjes" title="Puntos" />
+      <SectionHeader eyebrow="Viernes, fotos de torneo y canjes" title="Puntos" />
       <SeasonMonths
         month={month}
         selected={month}
@@ -61,7 +61,7 @@ export function PointsPage() {
           <StudentsTab month={month} focus={focus} onFocus={(id) => update({ alumno: id })} />
         )}
         {tab === 'viernes' && <FridaysTab month={month} />}
-        {tab === 'torneos' && <TournamentsTab month={month} />}
+        {tab === 'fotos' && <PhotosTab month={month} />}
         {tab === 'movimientos' && <MovementsTab month={month} />}
         {tab === 'canjes' && <RedemptionsTab month={month} />}
       </Tabs>
