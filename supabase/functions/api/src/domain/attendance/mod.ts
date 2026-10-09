@@ -22,6 +22,22 @@ export class RollCallClosed extends Error {
 export type RollCallKind = 'taken' | 'confirmed';
 
 /**
+ * El plazo de una lista (o de confirmar una actividad): desde 15 minutos antes de que empiece hasta el final del día
+ * siguiente.
+ * @throws RollCallNotOpenYet | RollCallClosed
+ */
+export function assertWithinWindow(date: LocalDate, start: number, now: Date): void {
+  const today = LocalDate.fromInstant(now);
+  if (
+    today.isBefore(date) ||
+    (today.equals(date) && minutesOfDayInMadrid(now) < start - OPENS_BEFORE_MINUTES)
+  ) {
+    throw new RollCallNotOpenYet();
+  }
+  if (date.plusDays(1).isBefore(today)) throw new RollCallClosed();
+}
+
+/**
  * Lista de una clase un día (identidad: grupo + fecha). La pasa quien da la clase ese día, desde 15 minutos antes de que
  * empiece hasta el final del día siguiente, marcando ausentes a alumnos de la lista de ese día; o administración la da
  * por buena sin lista cuando el plazo acabó sin pasarla.
@@ -81,14 +97,7 @@ export class RollCall {
     absent: readonly string[],
     now: Date,
   ): void {
-    const today = LocalDate.fromInstant(now);
-    if (
-      today.isBefore(this.date) ||
-      (today.equals(this.date) && minutesOfDayInMadrid(now) < start - OPENS_BEFORE_MINUTES)
-    ) {
-      throw new RollCallNotOpenYet();
-    }
-    if (this.date.plusDays(1).isBefore(today)) throw new RollCallClosed();
+    assertWithinWindow(this.date, start, now);
     const unknown = absent.filter((id) => !roster.includes(id));
     if (unknown.length > 0) {
       throw new InvalidValue(
@@ -121,5 +130,53 @@ export class RollCall {
 
   takenAt(): Date {
     return this.at;
+  }
+}
+
+export type ActivityCheckKind = 'done' | 'confirmed';
+
+/**
+ * Confirmación de una actividad del club un día (identidad: actividad + fecha): su encargado pulsa «Turno hecho» en el
+ * plazo de las listas, o administración la da por buena («Se dio») cuando el plazo acabó sin confirmarla.
+ */
+export class ActivityCheck {
+  private constructor(
+    readonly duty: string,
+    readonly date: LocalDate,
+    readonly kind: ActivityCheckKind,
+    readonly by: { teacher: string | null; user: string | null },
+    readonly at: Date,
+  ) {}
+
+  static done(
+    duty: string,
+    date: LocalDate,
+    start: number,
+    teacher: string,
+    now: Date,
+  ): ActivityCheck {
+    assertWithinWindow(date, start, now);
+    return new ActivityCheck(duty, date, 'done', { teacher, user: null }, now);
+  }
+
+  static confirm(duty: string, date: LocalDate, user: string, now: Date): ActivityCheck {
+    return new ActivityCheck(duty, date, 'confirmed', { teacher: null, user }, now);
+  }
+
+  static restore(fields: {
+    duty: string;
+    date: LocalDate;
+    kind: ActivityCheckKind;
+    teacher: string | null;
+    user: string | null;
+    at: Date;
+  }): ActivityCheck {
+    return new ActivityCheck(
+      fields.duty,
+      fields.date,
+      fields.kind,
+      { teacher: fields.teacher, user: fields.user },
+      fields.at,
+    );
   }
 }
