@@ -2,7 +2,7 @@ import type { PointsKind } from '@/features/points/api';
 
 export const KIND_LABEL: Record<PointsKind, string> = {
   friday: 'Viernes',
-  tournament: 'Torneo',
+  tournament: 'Foto de torneo',
   manual: 'Ajuste',
   redemption: 'Canje',
 };

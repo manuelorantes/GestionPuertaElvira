@@ -28,18 +28,11 @@ export function useFridays(month: string) {
   });
 }
 
-export function useTournaments(month: string) {
+export function usePhotos(month: string) {
   return useQuery({
-    queryKey: ['points-tournaments', month],
-    queryFn: () => api.fetchTournaments(month),
-  });
-}
-
-export function useTournament(id: string | null) {
-  return useQuery({
-    queryKey: ['points-tournament', id],
-    queryFn: () => api.fetchTournament(id ?? ''),
-    enabled: id !== null,
+    queryKey: ['points-photos', month],
+    queryFn: () => api.fetchPhotos(month),
+    placeholderData: keepPreviousData,
   });
 }
 
