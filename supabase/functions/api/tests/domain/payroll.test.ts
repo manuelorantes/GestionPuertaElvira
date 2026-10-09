@@ -116,23 +116,24 @@ Deno.test('SettlementCalculator should settle hours by rate with a breakdown per
   ], ['Torneo escolar', 150, 4125]]);
 });
 
-Deno.test('SettlementCalculator should not count twice the hours that overlap on the same day', () => {
-  // Encargado de 17:00 a 20:00 y clase de 18:00 a 19:30: 3 horas, no 4,5.
+Deno.test('SettlementCalculator should count the overlap once, giving it to the shortest session', () => {
+  // Clase de 16:30 a 18:00 y actividad «Viernes» de 17:00 a 20:00: 3,5 horas, no 4,5. La clase (la más corta) cuenta
+  // entera, 1,5 h, y la actividad se queda con lo que le sobra, 2 h. Otro viernes, solo la clase.
   const angel = TeacherRef.generate();
   const settlement = new SettlementCalculator().settle(
     [
-      entry(angel, '2026-10-09', null, 'Encargado del club', 3, 17 * 60),
-      entry(angel, '2026-10-09', GroupRef.generate(), 'Competición', 1.5, 18 * 60),
-      entry(angel, '2026-10-16', GroupRef.generate(), 'Competición', 1.5, 18 * 60),
+      entry(angel, '2026-10-09', null, 'Viernes', 3, 17 * 60),
+      entry(angel, '2026-10-09', GroupRef.generate(), 'Competición', 1.5, 16 * 60 + 30),
+      entry(angel, '2026-10-16', GroupRef.generate(), 'Competición', 1.5, 16 * 60 + 30),
     ],
     Money.cents(1500),
   );
-  assertEquals(settlement.minutes, 180 + 90);
+  assertEquals(settlement.minutes, 90 + 120 + 90);
   assertEquals(settlement.lines.map((l) => [l.label, l.minutes]), [
-    ['Encargado del club', 180],
-    ['Competición', 90],
+    ['Competición', 180],
+    ['Viernes', 120],
   ]);
-  assertEquals(settlement.amount.cents, 6750);
+  assertEquals(settlement.amount.cents, 7500);
 });
 
 Deno.test('SettlementCalculator should count once a stretch covered by several overlapping sessions', () => {
