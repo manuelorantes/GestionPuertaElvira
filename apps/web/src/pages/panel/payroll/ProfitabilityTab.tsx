@@ -179,8 +179,8 @@ export function ProfitabilityTab({ month }: { month: string }) {
               </tr>
             ))}
           </tbody>
+          <MonthTotals rows={rows} students={profitability.data?.students ?? null} />
         </table>
-        <MonthTotals rows={rows} students={profitability.data?.students ?? null} />
         <p className="px-5 py-3 text-[13px] text-ink-muted">
           {past
             ? 'Mes cerrado: coste = horas realmente imputadas (su liquidación).'
@@ -196,8 +196,8 @@ export function ProfitabilityTab({ month }: { month: string }) {
 }
 
 /**
- * Totales del mes: horas, tarifa media (ponderada por las horas de cada profesor), coste, ingresos, margen, ganancia o
- * pérdida por hora y ocupación de todas las clases.
+ * Totales del mes, al pie de la tabla y cada uno bajo su columna: horas, tarifa media (ponderada por las horas de cada
+ * profesor), coste, alumnos sin repetir, ingresos, margen, ganancia o pérdida por hora y ocupación de todas las clases.
  */
 function MonthTotals({
   rows,
@@ -215,45 +215,39 @@ function MonthTotals({
   const perHour = (cents: number) => (minutes > 0 ? Math.round((cents * 60) / minutes) : null);
   const averageRate = perHour(cost);
   const marginPerHour = perHour(margin);
-  const stats: { label: string; value: ReactNode; negative?: boolean }[] = [
-    { label: 'Horas', value: hoursLabel(minutes) },
-    {
-      label: 'Tarifa media',
-      value: averageRate === null ? '—' : `${formatCents(averageRate)}/h`,
-    },
-    { label: 'Coste en profesores', value: formatCents(cost) },
-    { label: 'Alumnos', value: <StudentsTotal students={students} /> },
-    { label: 'Ingresos', value: formatCents(income) },
-    { label: 'Margen', value: formatCents(margin), negative: margin < 0 },
-    {
-      label: margin < 0 ? 'Pérdida por hora' : 'Ganancia por hora',
-      value: marginPerHour === null ? '—' : formatCents(marginPerHour),
-      negative: margin < 0,
-    },
-    {
-      label: 'Ocupación media',
-      value: capacity > 0 ? `${Math.round((occupied / capacity) * 100)} %` : '—',
-    },
-  ];
+  const negative = margin < 0 ? 'text-danger-fg' : '';
+  const cell = (label: string, value: ReactNode, className = '') => (
+    <td className={`px-5 py-3.5 ${className}`}>
+      <span className="block text-[11px] font-normal tracking-normal text-ink-muted normal-case">
+        {label}
+      </span>
+      <span className="text-base font-semibold">{value}</span>
+    </td>
+  );
   return (
-    <section
-      aria-label="Totales del mes"
-      className="border-t border-line bg-surface-muted/60 px-5 py-4"
-    >
-      <h3 className="mb-3 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-        Totales del mes
-      </h3>
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:grid-cols-8">
-        {stats.map((stat) => (
-          <div key={stat.label}>
-            <dt className="text-[13px] text-ink-muted">{stat.label}</dt>
-            <dd className={`text-lg font-semibold ${stat.negative ? 'text-danger-fg' : ''}`}>
-              {stat.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+    <tfoot className="border-t border-line bg-surface-muted/60">
+      <tr>
+        <th
+          scope="row"
+          className="px-5 py-3.5 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase"
+        >
+          Totales del mes
+        </th>
+        {cell('total', hoursLabel(minutes))}
+        {cell('media', averageRate === null ? '—' : `${formatCents(averageRate)}/h`)}
+        {cell('en profesores', formatCents(cost))}
+        {cell('sin repetir', <StudentsTotal students={students} />)}
+        {cell('total', formatCents(income))}
+        {cell('total', <span className={negative}>{formatCents(margin)}</span>, 'text-right')}
+        {cell(
+          margin < 0 ? 'pérdida' : 'ganancia',
+          <span className={negative}>
+            {marginPerHour === null ? '—' : formatCents(marginPerHour)}
+          </span>,
+        )}
+        {cell('media', capacity > 0 ? `${Math.round((occupied / capacity) * 100)} %` : '—')}
+      </tr>
+    </tfoot>
   );
 }
 

@@ -145,12 +145,27 @@ describe('Profesorado', () => {
     const table = await screen.findByRole('table', { name: 'Rentabilidad de septiembre 2026' });
     const lucia = within(table).getByRole('row', { name: /Lucía/ });
     expect(within(lucia).getByText('Más rentable')).toBeInTheDocument();
-    const totals = screen.getByRole('region', { name: 'Totales del mes' });
+    // Los totales, al pie de la tabla y cada uno bajo su columna.
+    const totals = within(table).getByRole('row', { name: /Totales del mes/ });
     // 14 h; 236 € de coste (16,86 €/h de media); 650 € de ingresos; 414 € de margen (29,57 €/h); 16 de 24 plazas.
     for (const text of ['14 h', '16,86 €/h', '236 €', '650 €', '414 €', '29,57 €', '67 %']) {
       expect(within(totals).getByText(text)).toBeInTheDocument();
     }
-    expect(within(totals).getByText('Ganancia por hora')).toBeInTheDocument();
+    expect(within(totals).getByText('ganancia')).toBeInTheDocument();
+    expect(
+      within(totals)
+        .getAllByRole('cell')
+        .map((c) => c.textContent),
+    ).toEqual([
+      'total14 h',
+      'media16,86 €/h',
+      'en profesores236 €',
+      'sin repetir15*',
+      'total650 €',
+      'total414 €',
+      'ganancia29,57 €',
+      'media67 %',
+    ]);
     expect(within(lucia).getByText('322 €')).toBeInTheDocument();
     expect(within(lucia).getByText('83 %')).toBeInTheDocument();
 
@@ -172,7 +187,7 @@ describe('Profesorado', () => {
       '€ por hora',
       'Ocupación',
     ]);
-    const students = within(totals).getByText('Alumnos').nextElementSibling as HTMLElement;
+    const students = within(totals).getAllByRole('cell')[3] as HTMLElement;
     expect(students).toHaveTextContent('15');
     await userEvent.click(
       within(students).getByRole('button', { name: 'Alumnos con más de un profesor' }),
