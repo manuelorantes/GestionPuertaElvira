@@ -15,7 +15,7 @@ const START = 17 * 60;
 const at = (iso: string) => new Date(`${iso}+02:00`);
 
 const take = (now: Date, absent: string[] = ['s2']) =>
-  RollCall.take('g1', TUESDAY, START, 't1', ROSTER, absent, now);
+  RollCall.take('g1', TUESDAY, START, 't1', ROSTER, { absent }, now);
 
 Deno.test('RollCall should be taken from 15 minutes before the class until the end of the next day', () => {
   // Se abre 15 minutos antes de que empiece la clase (a las 16:45 para la de las 17:00).
@@ -31,12 +31,50 @@ Deno.test('RollCall should only mark students of that day as absent and can be c
   assertThrows(() => take(at('2026-10-13T18:00:00'), ['s9']), InvalidValue, 'lista');
   const roll = take(at('2026-10-13T18:00:00'));
   assertEquals(roll.kind(), 'taken');
-  roll.correct(START, 't1', ROSTER, [], at('2026-10-14T10:00:00'));
+  roll.correct(START, 't1', ROSTER, { absent: [] }, at('2026-10-14T10:00:00'));
   assertEquals(roll.absent(), []);
   assertThrows(
-    () => roll.correct(START, 't1', ROSTER, ['s1'], at('2026-10-15T09:00:00')),
+    () => roll.correct(START, 't1', ROSTER, { absent: ['s1'] }, at('2026-10-15T09:00:00')),
     RollCallClosed,
   );
+  // Pasado el plazo, se cambia confirmando que es una lista pasada (pero no antes de que se abra).
+  roll.correct(START, 't1', ROSTER, { absent: ['s1'] }, at('2026-11-20T09:00:00'), true);
+  assertEquals(roll.absent(), ['s1']);
+  assertThrows(
+    () =>
+      RollCall.take(
+        'g1',
+        TUESDAY,
+        START,
+        't1',
+        ROSTER,
+        { absent: [] },
+        at('2026-10-12T09:00:00'),
+        true,
+      ),
+    RollCallNotOpenYet,
+  );
+});
+
+Deno.test('RollCall should keep the students from other classes who came (special attendance)', () => {
+  const roll = RollCall.take(
+    'g1',
+    TUESDAY,
+    START,
+    't1',
+    ROSTER,
+    { absent: [], guests: ['s9', 's9'] },
+    at('2026-10-13T18:00:00'),
+  );
+  assertEquals(roll.guests(), ['s9']);
+  assertThrows(
+    () =>
+      roll.correct(START, 't1', ROSTER, { absent: [], guests: ['s1'] }, at('2026-10-13T18:05:00')),
+    InvalidValue,
+    'ya está en la lista',
+  );
+  // Una lista dada por buena sin lista no tiene a nadie.
+  assertEquals(RollCall.confirm('g1', TUESDAY, 'u1', at('2026-10-16T09:00:00')).guests(), []);
 });
 
 Deno.test('RollCall can be confirmed by administration without a list', () => {

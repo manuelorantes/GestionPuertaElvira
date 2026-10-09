@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from '@std/assert';
 
-import { LocalDate } from '../../src/domain/common/mod.ts';
+import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
 import { type RollCall, RollCallClosed } from '../../src/domain/attendance/mod.ts';
 import {
   AttendanceGroupNotFound,
@@ -65,6 +65,16 @@ const roster: ClassRoster = {
         : [{ id: 's1', name: 'Ana Pérez' }],
     ),
   classroomOf: (groupId: string) => Promise.resolve(groupId === 'g1' ? 'alfil' : null),
+  clubStudentsOn: () =>
+    Promise.resolve([
+      { id: 's1', name: 'Ana Pérez' },
+      { id: 's2', name: 'Pablo Gil' },
+      { id: 's3', name: 'Lola Ruiz' },
+    ]),
+  namesOf: (ids) =>
+    Promise.resolve(
+      [{ id: 's3', name: 'Lola Ruiz' }].filter((s) => ids.includes(s.id)),
+    ),
 };
 
 Deno.test('TeacherClasses should add the classroom, the students of that day and the roll call status', async () => {
@@ -79,7 +89,7 @@ Deno.test('TeacherClasses should add the classroom, the students of that day and
     class_({ groupId: null, dutyId: 'd1', label: 'Encargado del club' }),
   ]);
   await new TakeRollCall(agenda, roster, rolls, new FrozenClock('2026-10-13T18:00:00+02:00'))
-    .execute('t1', 'g1', '2026-10-13', []);
+    .execute('t1', 'g1', '2026-10-13', { absent: [] });
 
   const classes = await new TeacherClasses(agenda, roster, rolls, clock).execute(
     't1',
@@ -102,8 +112,11 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, n
   const agenda = assignments([class_({})]);
   const open = () =>
     new OpenRollCall(agenda, roster, rolls, clock).execute('t1', 'g1', '2026-10-13');
-  const take = (absent: string[]) =>
-    new TakeRollCall(agenda, roster, rolls, clock).execute('t1', 'g1', '2026-10-13', absent);
+  const take = (absent: string[], guests: string[] = []) =>
+    new TakeRollCall(agenda, roster, rolls, clock).execute('t1', 'g1', '2026-10-13', {
+      absent,
+      guests,
+    });
 
   // Sin pasar, nadie está marcado: el profesor marca a quien viene.
   assertEquals((await open()).list, [
@@ -116,16 +129,41 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, n
   assertEquals((await open()).rollCall, 'taken');
   await take([]);
   assertEquals((await open()).list.map((s) => s.present), [true, true], 'se corrige en plazo');
+  // Asistencia especial: Lola no es de la clase; solo se puede elegir a alumnos del club.
+  assertEquals((await open()).others, [{ id: 's3', name: 'Lola Ruiz' }]);
+  await take([], ['s3']);
+  const withGuest = await open();
+  assertEquals([withGuest.guests, withGuest.others, withGuest.period], [
+    [{ id: 's3', name: 'Lola Ruiz' }],
+    [],
+    'open',
+  ]);
+  await assertRejects(() => take([], ['s9']), InvalidValue, 'alta en el club');
 
   await assertRejects(
     () => new OpenRollCall(agenda, roster, rolls, clock).execute('t1', 'g1', '2026-10-14'),
     ClassNotGiven,
   );
+  // Pasada: se cambia solo confirmándolo, y no apunta horas.
   const late = new FrozenClock('2026-10-15T09:00:00+02:00');
-  await assertRejects(
-    () => new TakeRollCall(agenda, roster, rolls, late).execute('t1', 'g1', '2026-10-13', []),
-    RollCallClosed,
+  const recorded: string[] = [];
+  const recorder = { record: (item: ClassOnDay) => Promise.resolve(void recorded.push(item.date)) };
+  const lateTake = (past: boolean) =>
+    new TakeRollCall(agenda, roster, rolls, late, recorder).execute(
+      't1',
+      'g1',
+      '2026-10-13',
+      { absent: ['s1'], guests: ['s3'] },
+      past,
+    );
+  await assertRejects(() => lateTake(false), RollCallClosed);
+  assertEquals(
+    (await new OpenRollCall(agenda, roster, rolls, late).execute('t1', 'g1', '2026-10-13')).period,
+    'past',
   );
+  await lateTake(true);
+  assertEquals((await rolls.find('g1', LocalDate.fromString('2026-10-13')))?.absent(), ['s1']);
+  assertEquals(recorded, []);
 });
 
 const MISSED = {
@@ -174,6 +212,7 @@ Deno.test('StudentAttendance should summarise the season so far', async () => {
         return Promise.resolve({
           classes: 6,
           absences: [{ date: '2026-10-06', label: 'Martes 19:00' }],
+          specials: [],
         });
       },
     },
@@ -197,6 +236,11 @@ Deno.test('GroupAttendance should show each class day of the month until today a
       { studentId: 'luis', name: 'Luis', from: '2026-10-10', until: null, days: null },
     ],
     absences: [{ date: '2026-10-06', studentId: 'ana' }],
+    // Sara no es del grupo y vino el martes 6; Pablo (solo jueves) vino también ese martes.
+    guests: [
+      { date: '2026-10-06', studentId: 'sara', name: 'Sara' },
+      { date: '2026-10-06', studentId: 'pablo', name: 'Pablo' },
+    ],
   };
   const query: GroupAttendanceQuery = {
     between: (id) => Promise.resolve(id === 'g1' ? data : null),
@@ -210,10 +254,11 @@ Deno.test('GroupAttendance should show each class day of the month until today a
     { date: '2026-10-13', status: 'confirmed' },
     { date: '2026-10-15', status: 'pending' },
   ]);
-  assertEquals(view.students.map((s) => [s.name, s.marks, s.attended, s.classes]), [
-    ['Ana', ['unknown', 'absent', null, 'unknown', 'unknown'], 0, 1],
-    ['Pablo', ['unknown', null, null, null, null], 0, 0],
-    ['Luis', [null, null, null, 'unknown', 'unknown'], 0, 0],
+  assertEquals(view.students.map((s) => [s.name, s.marks, s.attended, s.classes, s.member]), [
+    ['Ana', ['unknown', 'absent', null, 'unknown', 'unknown'], 0, 1, true],
+    ['Luis', [null, null, null, 'unknown', 'unknown'], 0, 0, true],
+    ['Pablo', ['unknown', 'special', null, null, null], 0, 0, true],
+    ['Sara', [null, 'special', null, null, null], 0, 0, false],
   ]);
   await assertRejects(
     () =>
