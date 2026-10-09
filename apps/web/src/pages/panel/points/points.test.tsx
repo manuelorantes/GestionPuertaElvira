@@ -56,10 +56,14 @@ describe('Puntos', () => {
         .slice(1)
         .map((r) => (r as HTMLTableRowElement).cells[1]?.textContent);
     expect(names()).toEqual(['Alberto Rodriguez Garcia', 'Natan Rodriguez Raposo']);
-    await userEvent.click(screen.getByRole('button', { name: 'Puntos' }));
-    expect(names()).toEqual(['Alberto Rodriguez Garcia', 'Natan Rodriguez Raposo']);
-    await userEvent.click(screen.getByRole('button', { name: 'Nº de socio' }));
+    // Se ordena pinchando la cabecera, como en Alumnos; otra vez invierte el orden.
+    expect(screen.queryByRole('group', { name: 'Ordenar por' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por número de socio' }));
     expect(names()).toEqual(['Natan Rodriguez Raposo', 'Alberto Rodriguez Garcia']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por puntos' }));
+    expect(names()).toEqual(['Natan Rodriguez Raposo', 'Alberto Rodriguez Garcia']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por puntos' }));
+    expect(names()).toEqual(['Alberto Rodriguez Garcia', 'Natan Rodriguez Raposo']);
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar alumno' }), 'natan');
     expect(names()).toEqual(['Natan Rodriguez Raposo']);
 

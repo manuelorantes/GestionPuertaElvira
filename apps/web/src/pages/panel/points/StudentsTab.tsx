@@ -11,18 +11,16 @@ import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Dialog } from '@/shared/ui/Dialog';
 import { TextField } from '@/shared/ui/TextField';
-import { ToggleButton } from '@/shared/ui/ToggleButton';
+import { SortHeader } from '@/shared/ui/SortHeader';
 import { useToast } from '@/shared/ui/Toast';
 
 import { KIND_LABEL, signed } from './labels';
 
-type Order = 'name' | 'member' | 'points';
-
-const ORDERS: { id: Order; label: string }[] = [
-  { id: 'name', label: 'Nombre' },
-  { id: 'member', label: 'Nº de socio' },
-  { id: 'points', label: 'Puntos' },
-];
+type SortKey = 'member' | 'name' | 'points' | 'earned' | 'redeemed';
+interface Sort {
+  key: SortKey;
+  descending: boolean;
+}
 
 const normalise = (text: string) =>
   text
@@ -30,14 +28,22 @@ const normalise = (text: string) =>
     .normalize('NFD')
     .replace(/\p{M}+/gu, '');
 
-function sorted(items: StudentPoints[], order: Order): StudentPoints[] {
-  return [...items].sort((a, b) => {
-    if (order === 'points') return b.points - a.points || a.name.localeCompare(b.name, 'es');
-    if (order === 'member') {
-      return (a.memberNumber ?? Infinity) - (b.memberNumber ?? Infinity);
-    }
-    return a.name.localeCompare(b.name, 'es');
-  });
+const collator = new Intl.Collator('es', { sensitivity: 'base' });
+
+const VALUE: Record<Exclude<SortKey, 'name'>, (s: StudentPoints) => number> = {
+  member: (s) => s.memberNumber ?? Infinity,
+  points: (s) => s.points,
+  earned: (s) => s.seasonEarned,
+  redeemed: (s) => s.seasonRedeemed,
+};
+
+/** Como en Alumnos: de menor a mayor (o de la A a la Z); a igualdad, por nombre. */
+function sorted(items: StudentPoints[], sort: Sort): StudentPoints[] {
+  const byName = (a: StudentPoints, b: StudentPoints) => collator.compare(a.name, b.name);
+  const result = [...items].sort((a, b) =>
+    sort.key === 'name' ? byName(a, b) : VALUE[sort.key](a) - VALUE[sort.key](b) || byName(a, b),
+  );
+  return sort.descending ? result.reverse() : result;
 }
 
 /** Alumnos con sus puntos del mes, lo ganado y canjeado en la temporada, ajuste a mano e historial. */
@@ -52,13 +58,27 @@ export function StudentsTab({
   onFocus: (id: string | null) => void;
 }) {
   const students = useStudentPoints(month);
-  const [order, setOrder] = useState<Order>('name');
+  const [sort, setSort] = useState<Sort>({ key: 'name', descending: false });
   const [search, setSearch] = useState('');
   const [adjusting, setAdjusting] = useState<StudentPoints | null>(null);
   const all = students.data ?? [];
   const shown = sorted(
     all.filter((s) => normalise(s.name).includes(normalise(search.trim()))),
-    order,
+    sort,
+  );
+  const header = (label: string, name: string, key: SortKey) => (
+    <SortHeader
+      label={label}
+      name={name}
+      active={sort.key === key}
+      descending={sort.descending}
+      onSort={() =>
+        setSort((current) => ({
+          key,
+          descending: current.key === key ? !current.descending : false,
+        }))
+      }
+    />
   );
   const focused = all.find((s) => s.id === focus) ?? null;
 
@@ -76,41 +96,34 @@ export function StudentsTab({
           onChange={(e) => setSearch(e.target.value)}
           className="h-10 w-full max-w-72 rounded-sm border border-line-strong bg-surface px-3 text-sm"
         />
-        <div
-          role="group"
-          aria-label="Ordenar por"
-          className="flex items-center gap-2 text-[13px] text-ink-muted"
-        >
-          Ordenar por
-          {ORDERS.map((o) => (
-            <ToggleButton
-              key={o.id}
-              pressed={order === o.id}
-              onClick={() => setOrder(o.id)}
-              className="h-9 font-medium"
-            >
-              {o.label}
-            </ToggleButton>
-          ))}
-        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-left text-sm">
           <caption className="sr-only">Puntos de {monthLabel(month).toLowerCase()}</caption>
           <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
             <tr>
-              {[
-                'Nº',
-                'Alumno',
-                `Puntos de ${monthLabel(month).split(' ')[0]?.toLowerCase()}`,
-                'Ganados en la temporada',
-                'Canjeados',
-                '',
-              ].map((h) => (
-                <th key={h} scope="col" className="px-5 py-3 font-semibold">
-                  {h}
-                </th>
-              ))}
+              <th scope="col" className="px-5 py-3 font-semibold">
+                {header('Nº', 'número de socio', 'member')}
+              </th>
+              <th scope="col" className="px-5 py-3 font-semibold">
+                {header('Alumno', 'nombre', 'name')}
+              </th>
+              <th scope="col" className="px-5 py-3 font-semibold">
+                {header(
+                  `Puntos de ${monthLabel(month).split(' ')[0]?.toLowerCase() ?? ''}`,
+                  'puntos',
+                  'points',
+                )}
+              </th>
+              <th scope="col" className="px-5 py-3 font-semibold">
+                {header('Ganados', 'ganados en la temporada', 'earned')}
+              </th>
+              <th scope="col" className="px-5 py-3 font-semibold">
+                {header('Canjeados', 'canjeados en la temporada', 'redeemed')}
+              </th>
+              <th scope="col">
+                <span className="sr-only">Acciones</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -151,7 +164,8 @@ export function StudentsTab({
       )}
       <p className="px-5 py-3 text-[13px] text-ink-muted">
         Los puntos valen solo en el mes en que se ganan: si no se gastan, el mes siguiente se
-        empieza de cero. Los ajustes cuentan en el mes de hoy.
+        empieza de cero. Ganados y canjeados son de toda la temporada. Los ajustes cuentan en el mes
+        de hoy.
       </p>
       {adjusting && <AdjustDialog student={adjusting} onClose={() => setAdjusting(null)} />}
       {focus && (

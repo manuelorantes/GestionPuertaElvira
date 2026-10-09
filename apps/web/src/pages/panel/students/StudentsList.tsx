@@ -1,39 +1,8 @@
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
-
 import type { StudentSummary } from '@/features/students/api';
 import type { SortKey, StudentSort } from '@/features/students/sorting';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
-
-function SortHeader({
-  label,
-  name,
-  column,
-  sort,
-  onSort,
-}: {
-  label: string;
-  name: string;
-  column: SortKey;
-  sort: StudentSort;
-  onSort: (key: SortKey) => void;
-}) {
-  const active = sort.key === column;
-  const Icon = !active ? ArrowUpDown : sort.descending ? ArrowDown : ArrowUp;
-  return (
-    <button
-      type="button"
-      onClick={() => onSort(column)}
-      aria-label={`Ordenar por ${name}`}
-      aria-pressed={active}
-      title={`Ordenar por ${name}`}
-      className={`inline-flex cursor-pointer items-center gap-1 uppercase hover:text-ink ${active ? 'text-ink' : ''}`}
-    >
-      {label}
-      <Icon aria-hidden size={13} className={active ? '' : 'opacity-50'} />
-    </button>
-  );
-}
+import { SortHeader } from '@/shared/ui/SortHeader';
 
 export function StudentsList({
   students,
@@ -49,8 +18,20 @@ export function StudentsList({
   return (
     <ul aria-label="Alumnos">
       <li className="grid grid-cols-[3rem_1fr] gap-2 border-b border-line px-5 py-3 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase md:grid-cols-[3.5rem_2fr_2fr_1fr] md:gap-4">
-        <SortHeader label="Nº" name="número" column="number" sort={sort} onSort={onSort} />
-        <SortHeader label="Alumno" name="nombre" column="name" sort={sort} onSort={onSort} />
+        <SortHeader
+          label="Nº"
+          name="número"
+          active={sort.key === 'number'}
+          descending={sort.descending}
+          onSort={() => onSort('number')}
+        />
+        <SortHeader
+          label="Alumno"
+          name="nombre"
+          active={sort.key === 'name'}
+          descending={sort.descending}
+          onSort={() => onSort('name')}
+        />
         <span aria-hidden className="hidden md:block">
           Grupos
         </span>
