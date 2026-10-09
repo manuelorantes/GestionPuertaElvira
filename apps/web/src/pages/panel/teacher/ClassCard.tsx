@@ -21,7 +21,9 @@ function subtitle(item: TeacherClass): string {
 /** Lo que se hace con cada cosa de la agenda: pasar lista (clases y viernes) o confirmar el turno. */
 function Action({ item }: { item: TeacherClass }) {
   const done = useShiftDone();
-  if (item.rollCall !== 'open' && item.rollCall !== 'taken') return null;
+  // Una clase pasada sin lista también se puede pasar (confirmándolo al guardar).
+  const pastClass = item.rollCall === 'missed' && item.groupId !== null;
+  if (item.rollCall !== 'open' && item.rollCall !== 'taken' && !pastClass) return null;
   if (item.activity === 'shift') {
     if (item.rollCall === 'taken' || item.dutyId === null) return null;
     const dutyId = item.dutyId;
@@ -49,10 +51,10 @@ function Action({ item }: { item: TeacherClass }) {
   return (
     <Link
       to={to}
-      aria-label={`${item.rollCall === 'open' ? 'Pasar lista' : 'Corregir la lista'} de ${item.label}`}
+      aria-label={`${item.rollCall === 'taken' ? 'Corregir la lista' : 'Pasar lista'} de ${item.label}`}
       className={item.rollCall === 'open' ? PRIMARY : SECONDARY}
     >
-      {item.rollCall === 'open' ? 'Pasar lista' : 'Corregir'}
+      {item.rollCall === 'taken' ? 'Corregir' : 'Pasar lista'}
     </Link>
   );
 }

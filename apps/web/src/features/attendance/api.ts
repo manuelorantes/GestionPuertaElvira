@@ -34,14 +34,19 @@ export interface StudentAttendance {
   classes: number;
   attended: number;
   absences: { date: string; label: string }[];
+  /** Clases de otros grupos a las que vino (asistencia especial; no cuentan en el porcentaje). */
+  specials: { date: string; label: string }[];
 }
 
 export function fetchStudentAttendance(studentId: string): Promise<StudentAttendance> {
   return apiGet<StudentAttendance>(`/api/admin/students/${studentId}/attendance`);
 }
 
-/** Un alumno un día: vino, faltó, sin saber (no hay lista) o null si ese día no le tocaba. */
-export type AttendanceMark = 'present' | 'absent' | 'unknown' | null;
+/**
+ * Un alumno un día: vino, faltó, sin saber (no hay lista), vino sin tocarle (asistencia especial) o null si ese día no
+ * le tocaba.
+ */
+export type AttendanceMark = 'present' | 'absent' | 'unknown' | 'special' | null;
 
 /** Asistencia de un grupo en un mes: los días de clase hasta hoy y, por alumno, si vino a cada uno. */
 export interface GroupAttendance {
@@ -55,6 +60,8 @@ export interface GroupAttendance {
     marks: AttendanceMark[];
     attended: number;
     classes: number;
+    /** Estuvo inscrito algún día del mes (si no, solo vino en asistencia especial). */
+    member: boolean;
   }[];
 }
 

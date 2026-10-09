@@ -9,6 +9,10 @@ empiece la clase (para ir marcando a quien llega) hasta el final del día siguie
 ese día (con su horario especial), sin marcar al abrirla; se marca a quien ha venido y se guarda (quien queda sin marcar,
 falta). Dentro del plazo se puede corregir, y una lista ya pasada se abre con lo que se guardó. Solo se pueden marcar
 ausentes alumnos de la lista de ese día. Los festivos no tienen lista. Cada lista queda en el historial.
+Pasado el plazo, el profesor MUST poder ver y cambiar la lista de sus clases pasadas (en «Mis clases → Pasadas», mes a
+mes y de la más reciente a la más antigua), pero al guardar MUST confirmar «¿Seguro que quieres cambiar la asistencia
+de una clase pasada?». Cambiar una lista pasada no apunta horas (administración ya decidió sobre ellas en «Listas sin
+pasar»).
 
 #### Scenario: Al acabar la clase
 - **WHEN** Lucía abre la lista de su clase del martes a las 18:00, marca a todos menos a Pablo y la guarda
@@ -18,13 +22,25 @@ ausentes alumnos de la lista de ese día. Los festivos no tienen lista. Cada lis
 - **WHEN** Lucía abre la lista de su clase de las 17:00 a las 16:45
 - **THEN** ya puede pasarla; a las 16:44 todavía no
 
-#### Scenario: Fuera de plazo
-- **WHEN** Lucía intenta corregir el jueves la lista del martes
-- **THEN** el sistema se lo impide: el plazo acabó al final del miércoles
+#### Scenario: Una lista pasada
+- **WHEN** Lucía corrige el jueves la lista del martes
+- **THEN** se le pide que confirme que cambia la asistencia de una clase pasada; si confirma, se guarda, y si no, no
 
 #### Scenario: Una clase que no es suya
 - **WHEN** Lucía intenta pasar la lista de una clase que ese día da otro profesor
 - **THEN** el sistema lo rechaza
+
+### Requirement: Asistencia especial
+Junto a la lista de cada clase, quien la pasa MUST poder marcar, en «Asistencia especial», a alumnos de alta en el club
+que no son de esa clase ese día y han venido (a recuperar o por otro motivo), buscándolos por nombre; y quitarlos. Esa
+asistencia MUST salir indicada aparte, con asterisco, en la ficha del alumno (las clases de otros grupos a las que vino,
+que no cuentan en su porcentaje) y en la asistencia del grupo (una fila para ese alumno en ese mes, con ✓* los días que
+vino y un asterisco que explica que no es de ese grupo).
+
+#### Scenario: Recuperar una clase
+- **WHEN** Lola, del grupo de Carlos, viene el martes a la clase de Lucía y Lucía la añade en «Asistencia especial»
+- **THEN** la asistencia de octubre del grupo de Lucía tiene una fila para Lola con ✓* el martes y su asterisco, y la
+  ficha de Lola dice que vino ese día a esa clase, sin contar en su porcentaje
 
 ### Requirement: Actividades del club
 El encargado de una actividad del club MUST confirmarla desde su espacio en el plazo de las listas (desde 15 minutos
