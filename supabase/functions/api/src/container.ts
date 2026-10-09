@@ -112,6 +112,6 @@ export function buildApp(
   registerDashboardRoutes(api);
   registerAttendanceRoutes(api);
   registerSystemRoutes(api);
-  registerPointsRoutes(api);
+  registerPointsRoutes(api, storage);
   return api;
 }

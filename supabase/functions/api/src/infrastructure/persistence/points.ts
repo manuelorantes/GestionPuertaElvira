@@ -1,15 +1,14 @@
 import { LocalDate, type YearMonth } from '../../domain/common/mod.ts';
-import { PointMovement, type PointsKind, Tournament } from '../../domain/points/mod.ts';
+import { PointMovement, type PointsKind, TournamentPhoto } from '../../domain/points/mod.ts';
 import type {
   FridayGrid,
+  PhotoView,
   PointMovementRepository,
   PointMovementView,
   PointsQuery,
   PointsStudents,
   StudentPointsView,
-  TournamentDetailView,
-  TournamentRepository,
-  TournamentView,
+  TournamentPhotoRepository,
 } from '../../application/points/mod.ts';
 import { Row, type Sql } from './sql.ts';
 
@@ -65,42 +64,41 @@ export class SqlPointMovementRepository implements PointMovementRepository {
   }
 }
 
-/** Torneos (tabla `points_tournament`). */
-export class SqlTournamentRepository implements TournamentRepository {
+/** Fotos de torneo (tabla `points_photo`; la imagen, en el almacén de documentos). */
+export class SqlTournamentPhotoRepository implements TournamentPhotoRepository {
   constructor(private readonly sql: Sql) {}
 
-  async find(id: string): Promise<Tournament | null> {
-    const rows = await this.sql`SELECT id, name, held_on::text AS held_on, points_per_photo
-      FROM points_tournament WHERE id::text = ${id}`;
+  async find(id: string): Promise<TournamentPhoto | null> {
+    const rows = await this
+      .sql`SELECT id, student_id, taken_on::text AS taken_on, note, document_key, mime_type
+      FROM points_photo WHERE id::text = ${id}`;
     if (!rows[0]) return null;
     const r = new Row(rows[0]);
-    return Tournament.restore(
-      r.string('id'),
-      r.string('name'),
-      LocalDate.fromString(r.string('held_on')),
-      r.int('points_per_photo'),
-    );
+    return TournamentPhoto.restore({
+      id: r.string('id'),
+      student: r.string('student_id'),
+      date: LocalDate.fromString(r.string('taken_on')),
+      note: r.nullableString('note'),
+      documentKey: r.string('document_key'),
+      mimeType: r.string('mime_type'),
+    });
   }
 
-  async save(t: Tournament): Promise<void> {
-    const record = {
-      id: t.id,
-      name: t.name,
-      held_on: t.date.toString(),
-      points_per_photo: t.pointsPerPhoto,
-    };
-    await this.sql`INSERT INTO points_tournament ${this.sql(record)}
-      ON CONFLICT (id) DO UPDATE SET ${this.sql(record, 'name', 'held_on', 'points_per_photo')}`;
+  async save(photo: TournamentPhoto): Promise<void> {
+    await this.sql`INSERT INTO points_photo ${
+      this.sql({
+        id: photo.id,
+        student_id: photo.student,
+        taken_on: photo.date.toString(),
+        note: photo.note,
+        document_key: photo.documentKey,
+        mime_type: photo.mimeType,
+      })
+    }`;
   }
 
   async delete(id: string): Promise<void> {
-    await this.sql`DELETE FROM points_tournament WHERE id::text = ${id}`;
-  }
-
-  async photos(id: string): Promise<number> {
-    const [row] = await this.sql`SELECT COUNT(*)::int AS n FROM points_movement
-      WHERE kind = 'tournament' AND reference = ${id}`;
-    return row ? new Row(row).int('n') : 0;
+    await this.sql`DELETE FROM points_photo WHERE id::text = ${id}`;
   }
 }
 
@@ -155,10 +153,10 @@ export class SqlPointsQuery implements PointsQuery {
   ): Promise<PointMovementView[]> {
     const rows = await this.sql`
       SELECT m.id, m.student_id, s.full_name, m.movement_date::text AS date, m.delta, m.kind, m.reference, m.note,
-             t.name AS tournament, u.full_name AS by_name
+             p.note AS photo_note, u.full_name AS by_name
         FROM points_movement m
         JOIN students_student s ON s.id = m.student_id
-        LEFT JOIN points_tournament t ON m.kind = 'tournament' AND t.id::text = m.reference
+        LEFT JOIN points_photo p ON m.kind = 'tournament' AND p.id::text = m.reference
         LEFT JOIN identity_user u ON u.id = m.created_by
        WHERE m.movement_date BETWEEN ${from.toString()} AND ${to.toString()}
          AND (${filter.kind}::text IS NULL OR m.kind = ${filter.kind})
@@ -169,7 +167,7 @@ export class SqlPointsQuery implements PointsQuery {
       const concept = kind === 'friday'
         ? `Viernes ${DAY_LABEL(r.string('date'))}`
         : kind === 'tournament'
-        ? `Foto en ${r.nullableString('tournament') ?? 'un torneo'}`
+        ? `Foto de torneo${r.nullableString('photo_note') ? ` · ${r.string('photo_note')}` : ''}`
         : r.nullableString('note') ?? '';
       return {
         id: r.string('id'),
@@ -214,50 +212,22 @@ export class SqlPointsQuery implements PointsQuery {
     };
   }
 
-  async tournaments(from: LocalDate, to: LocalDate): Promise<TournamentView[]> {
+  /** Las fotos de un periodo, de la más reciente a la más antigua. */
+  async photos(from: LocalDate, to: LocalDate): Promise<PhotoView[]> {
     const rows = await this.sql`
-      SELECT t.id, t.name, t.held_on::text AS held_on, t.points_per_photo,
-             (SELECT COUNT(*) FROM points_movement m WHERE m.kind = 'tournament' AND m.reference = t.id::text)::int AS photos
-        FROM points_tournament t
-       WHERE t.held_on BETWEEN ${from.toString()} AND ${to.toString()}
-       ORDER BY t.held_on DESC, t.name`;
-    return Row.all(rows).map(toTournamentView);
+      SELECT p.id, p.student_id, s.full_name, p.taken_on::text AS taken_on, p.note,
+             COALESCE((SELECT m.delta FROM points_movement m WHERE m.kind = 'tournament'
+                        AND m.reference = p.id::text), 0) AS points
+        FROM points_photo p JOIN students_student s ON s.id = p.student_id
+       WHERE p.taken_on BETWEEN ${from.toString()} AND ${to.toString()}
+       ORDER BY p.taken_on DESC, p.created_at DESC, p.id DESC`;
+    return Row.all(rows).map((r) => ({
+      id: r.string('id'),
+      studentId: r.string('student_id'),
+      studentName: r.string('full_name'),
+      date: r.string('taken_on'),
+      note: r.nullableString('note'),
+      points: r.int('points'),
+    }));
   }
-
-  async tournament(id: string): Promise<TournamentDetailView | null> {
-    const [found] = await this.sql`
-      SELECT t.id, t.name, t.held_on::text AS held_on, t.points_per_photo,
-             (SELECT COUNT(*) FROM points_movement m WHERE m.kind = 'tournament' AND m.reference = t.id::text)::int AS photos
-        FROM points_tournament t WHERE t.id::text = ${id}`;
-    if (!found) return null;
-    const view = toTournamentView(new Row(found));
-    const rows = await this.sql`
-      SELECT s.id, s.full_name, s.member_number,
-             EXISTS (SELECT 1 FROM points_movement m WHERE m.student_id = s.id AND m.kind = 'tournament'
-                       AND m.reference = ${id}) AS sent
-        FROM students_student s
-       WHERE (s.joined_on <= ${view.date} AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${view.date}))
-          OR EXISTS (SELECT 1 FROM points_movement m WHERE m.student_id = s.id AND m.kind = 'tournament'
-                       AND m.reference = ${id})
-       ORDER BY s.search_name`;
-    return {
-      ...view,
-      students: Row.all(rows).map((r) => ({
-        id: r.string('id'),
-        name: r.string('full_name'),
-        memberNumber: r.nullableInt('member_number'),
-        sent: r.bool('sent'),
-      })),
-    };
-  }
-}
-
-function toTournamentView(r: Row): TournamentView {
-  return {
-    id: r.string('id'),
-    name: r.string('name'),
-    date: r.string('held_on'),
-    pointsPerPhoto: r.int('points_per_photo'),
-    photos: r.int('photos'),
-  };
 }

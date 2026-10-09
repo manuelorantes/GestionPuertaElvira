@@ -5,62 +5,57 @@ import {
   PointMovement,
   PointsAlreadySpent,
   type PointsKind,
-  Tournament,
+  type TournamentPhoto,
 } from '../../src/domain/points/mod.ts';
 import {
+  AddTournamentPhoto,
   AdjustPointsByHand,
-  DeleteTournament,
+  DeleteTournamentPhoto,
   MarkFriday,
-  MarkTournamentPhoto,
+  type PhotoStorage,
   type PointMovementRepository,
   PointsStudentNotFound,
   PointsWalletService,
-  SaveTournament,
-  TournamentHasPhotos,
-  type TournamentRepository,
+  type TournamentPhotoRepository,
 } from '../../src/application/points/mod.ts';
 import { FrozenClock } from '../support/identity.ts';
 
-class InMemoryPoints implements PointMovementRepository, TournamentRepository {
+class InMemoryPoints implements PointMovementRepository, PhotoStorage {
   readonly movements = new Map<string, PointMovement>();
-  readonly tournaments = new Map<string, Tournament>();
+  readonly photos = new Map<string, TournamentPhoto>();
+  readonly files = new Map<string, Uint8Array>();
+  readonly photoRepository: TournamentPhotoRepository = {
+    find: (id) => Promise.resolve(this.photos.get(id) ?? null),
+    save: (p) => Promise.resolve(void this.photos.set(p.id, p)),
+    delete: (id) => Promise.resolve(void this.photos.delete(id)),
+  };
 
   forStudent(student: string) {
     return Promise.resolve([...this.movements.values()].filter((m) => m.student === student));
   }
-  find(student: string, kind: PointsKind, reference: string): Promise<PointMovement | null>;
-  find(id: string): Promise<Tournament | null>;
-  find(
-    a: string,
-    kind?: PointsKind,
-    reference?: string,
-  ): Promise<PointMovement | Tournament | null> {
-    if (kind === undefined) return Promise.resolve(this.tournaments.get(a) ?? null);
+  find(student: string, kind: PointsKind, reference: string) {
     return Promise.resolve(
       [...this.movements.values()].find((m) =>
-        m.student === a && m.kind === kind && m.reference === reference
-      ) ??
-        null,
+        m.student === student && m.kind === kind && m.reference === reference
+      ) ?? null,
     );
   }
   add(m: PointMovement) {
     this.movements.set(m.id, m);
     return Promise.resolve();
   }
-  remove(id: string) {
-    this.movements.delete(id);
+  /** Quita un movimiento (por id) o un fichero (por clave). */
+  remove(idOrKey: string) {
+    this.movements.delete(idOrKey);
+    this.files.delete(idOrKey);
     return Promise.resolve();
   }
-  save(t: Tournament) {
-    this.tournaments.set(t.id, t);
+  put(key: string, contents: Uint8Array) {
+    this.files.set(key, contents);
     return Promise.resolve();
   }
-  delete(id: string) {
-    this.tournaments.delete(id);
-    return Promise.resolve();
-  }
-  photos(id: string) {
-    return Promise.resolve([...this.movements.values()].filter((m) => m.reference === id).length);
+  read(key: string) {
+    return Promise.resolve(this.files.get(key) ?? new Uint8Array());
   }
 }
 
@@ -93,21 +88,37 @@ Deno.test('Fridays should give a point each, only on past Fridays, and come off 
   assertEquals(await wallet.available('s1', YearMonth.fromString('2026-10')), 1);
 });
 
-Deno.test('tournament photos should give their points in the month of the tournament', async () => {
+Deno.test('a tournament photo should store the image and give a point in the month of the photo', async () => {
   const db = new InMemoryPoints();
-  const id = await new SaveTournament(db).execute(null, {
-    name: 'Open de Granada',
-    date: '2026-10-17',
-    pointsPerPhoto: 2,
-  });
-  const photo = new MarkTournamentPhoto(db, db, ACTIVE);
-  await photo.execute(id, 's1', true, 'u1');
+  const image = { contents: new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3]), mimeType: 'image/jpeg' };
+  const id = await new AddTournamentPhoto(db.photoRepository, db, ACTIVE, db, clock).execute(
+    's1',
+    '2026-10-04',
+    'Open de Granada',
+    image,
+    'u1',
+  );
+  const photo = db.photos.get(id);
+  assertEquals(db.files.get(photo?.documentKey ?? ''), image.contents);
   const wallet = new PointsWalletService(db);
-  assertEquals(await wallet.available('s1', YearMonth.fromString('2026-10')), 2);
-  await assertRejects(() => new DeleteTournament(db).execute(id), TournamentHasPhotos);
-  await photo.execute(id, 's1', false, 'u1');
-  await new DeleteTournament(db).execute(id);
-  assertEquals(db.tournaments.size, 0);
+  assertEquals(await wallet.available('s1', YearMonth.fromString('2026-10')), 1);
+  await assertRejects(
+    () =>
+      new AddTournamentPhoto(db.photoRepository, db, ACTIVE, db, clock).execute(
+        'baja',
+        '2026-10-04',
+        null,
+        image,
+        'u1',
+      ),
+    PointsStudentNotFound,
+  );
+
+  await new DeleteTournamentPhoto(db.photoRepository, db, db).execute(id);
+  assertEquals([db.photos.size, await wallet.available('s1', YearMonth.fromString('2026-10'))], [
+    0,
+    0,
+  ]);
 });
 
 Deno.test('a payment should redeem points of its month only', async () => {
