@@ -57,10 +57,9 @@ y los registros internos de esa petición MUST llevar el mismo identificador.
 Superadministración MUST tener una sección «Sistema», que nadie más ve, con las tareas programadas que se vigilan (las
 horas automáticas y cuotas, la copia de seguridad y la consulta que mantiene activo el proyecto; no la integración
 continua, el despliegue ni las actualizaciones de dependencias). De cada una MUST mostrar qué hace, su horario, el
-siguiente turno (fecha, hora y cuánto falta), la última ejecución (programada o a mano) y el estado de sus últimos
-turnos, que se actualiza solo:
-- **Hecha**: se ejecutó bien a su hora o hasta 30 minutos después;
-- **Con retraso**: se ejecutó bien, pero arrancó más tarde (con cuánto retraso);
+siguiente turno (fecha, hora y cuánto falta), la última ejecución (programada o a mano) y el estado de su último turno,
+con un historial desplegable de los 15 últimos; se actualiza solo:
+- **Hecha**: se ejecutó bien, aunque GitHub la lanzara tarde (si arrancó más de 30 minutos tarde, se indica cuánto);
 - **Falló**: se ejecutó con error;
 - **Pendiente**: aún no se ha ejecutado, pero puede llegar (hasta 12 horas después, sin pasar del turno siguiente);
 - **No se hizo**: pasó ese plazo sin ejecutarse.
@@ -69,7 +68,7 @@ apunta su ejecución al terminar, también si falla. Las horas se muestran en ho
 
 #### Scenario: Una tarea que GitHub retrasa
 - **WHEN** la tarea de horas y cuotas de las 23:30 arranca a las 03:20
-- **THEN** ese turno sale «Con retraso», con 3 h 51 min de retraso
+- **THEN** ese turno sale «Hecha», indicando que GitHub la lanzó 3 h 51 min tarde
 
 #### Scenario: Una tarea que no llega
 - **WHEN** la copia de seguridad de las 06:23 no se ha ejecutado a las 18:23

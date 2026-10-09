@@ -1,4 +1,5 @@
 import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { ADMIN, SUPERADMIN, mockApi, renderApp } from '@/test/render';
 
@@ -13,11 +14,19 @@ const TASKS = [
     slots: [
       {
         slot: '2026-10-08T21:30:00.000Z',
-        status: 'late',
+        status: 'done',
         delayMinutes: 231,
         startedAt: '2026-10-09T01:20:54.000Z',
         finishedAt: '2026-10-09T01:21:26.000Z',
         url: 'https://github.com/x/actions/runs/1',
+      },
+      {
+        slot: '2026-10-07T21:30:00.000Z',
+        status: 'missed',
+        delayMinutes: null,
+        startedAt: null,
+        finishedAt: null,
+        url: null,
       },
     ],
     lastRun: {
@@ -48,7 +57,7 @@ const TASKS = [
 ];
 
 describe('Sistema', () => {
-  it('shows each scheduled task with its slots, schedule and next run, in Madrid time', async () => {
+  it('shows each scheduled task with its last slot, its history, schedule and next run', async () => {
     mockApi({
       'GET /api/auth/me': [200, { user: SUPERADMIN }],
       'GET /api/admin/system/tasks': [200, { items: TASKS }],
@@ -58,14 +67,20 @@ describe('Sistema', () => {
     const hours = await screen.findByRole('region', { name: 'Horas automáticas y cuotas' });
     expect(hours).toHaveTextContent('Cada día a las 23:30');
     expect(hours).toHaveTextContent('Siguiente09/10/2026 23:30');
-    const slot = within(within(hours).getByRole('list', { name: /Turnos/ })).getByRole('listitem');
+    // Tarde pero bien: «Hecha».
+    const slot = within(within(hours).getByRole('list', { name: /^Último turno/ })).getByRole(
+      'listitem',
+    );
     expect(slot).toHaveTextContent('08/10/2026 23:30');
-    expect(slot).toHaveTextContent('Con retraso');
-    expect(slot).toHaveTextContent('Arrancó con 3 h 51 min de retraso');
+    expect(slot).toHaveTextContent('Hecha');
+    expect(slot).toHaveTextContent('Arrancó a las 03:20 (GitHub la lanzó 3 h 51 min tarde)');
     expect(within(slot).getByRole('link', { name: /Ver en GitHub/ })).toHaveAttribute(
       'href',
       'https://github.com/x/actions/runs/1',
     );
+    // El resto, en el historial (hasta 15).
+    await userEvent.click(within(hours).getByRole('button', { name: 'Ver historial (2 últimos)' }));
+    expect(within(hours).getByRole('list', { name: /^Historial/ })).toHaveTextContent('No se hizo');
 
     const ping = screen.getByRole('region', { name: 'Mantener activo' });
     expect(ping).toHaveTextContent('Cada 3 días a las 08:17');
