@@ -10,7 +10,7 @@ const fromIso = (iso: string) => {
 const toIso = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-function addDays(iso: string, days: number): string {
+export function addDays(iso: string, days: number): string {
   const date = fromIso(iso);
   date.setDate(date.getDate() + days);
   return toIso(date);

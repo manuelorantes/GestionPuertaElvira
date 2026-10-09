@@ -22,8 +22,26 @@ export interface TeacherClass {
   rollCall: RollCallStatus | null;
 }
 
+export interface RosterStudent {
+  id: string;
+  name: string;
+}
+
 export interface RollCall extends TeacherClass {
+  /** Aún no se puede pasar, está en plazo o es una lista pasada (se cambia confirmándolo). */
+  period: 'upcoming' | 'open' | 'past';
   list: { id: string; name: string; present: boolean }[];
+  /** Alumnos de fuera de la clase que vinieron (asistencia especial). */
+  guests: RosterStudent[];
+  /** Alumnos del club que se pueden añadir como asistencia especial. */
+  others: RosterStudent[];
+}
+
+/** Quién falta de la lista, quién vino de fuera y, en una lista pasada, la confirmación de cambiarla. */
+export interface RollCallChanges {
+  absent: string[];
+  guests: string[];
+  past: boolean;
 }
 
 export interface TeacherGroupRoster {
@@ -50,9 +68,13 @@ export function fetchRollCall(groupId: string, date: string): Promise<RollCall> 
   return apiGet<RollCall>(`${BASE}/roll-calls/${groupId}/${date}`);
 }
 
-/** Guarda la lista: los ausentes (el resto vino). */
-export function saveRollCall(groupId: string, date: string, absent: string[]): Promise<void> {
-  return apiSend('PUT', `${BASE}/roll-calls/${groupId}/${date}`, { absent });
+/** Guarda la lista: los ausentes (el resto vino) y la asistencia especial. */
+export function saveRollCall(
+  groupId: string,
+  date: string,
+  changes: RollCallChanges,
+): Promise<void> {
+  return apiSend('PUT', `${BASE}/roll-calls/${groupId}/${date}`, changes);
 }
 
 export interface TeacherPayMonth {

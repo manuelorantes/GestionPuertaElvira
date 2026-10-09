@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import type { AttendanceMark, GroupAttendance } from '@/features/attendance/api';
 import { useGroupAttendance } from '@/features/attendance/hooks';
 import { monthLabel } from '@/features/billing/money';
+import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { SortHeader } from '@/shared/ui/SortHeader';
 
 const WEEKDAYS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
@@ -24,10 +25,22 @@ const MARK: Record<
   present: { symbol: '✓', label: 'vino', className: 'font-semibold text-success-fg' },
   absent: { symbol: '✗', label: 'faltó', className: 'font-semibold text-danger-fg' },
   unknown: { symbol: '?', label: 'sin lista', className: 'text-ink-muted' },
+  special: {
+    symbol: '✓*',
+    label: 'vino en asistencia especial',
+    className: 'font-semibold text-brand',
+  },
 };
 
 type Student = GroupAttendance['students'][number];
 type SortKey = 'name' | 'percent';
+
+/** Días («13/10») en que un alumno vino en asistencia especial. */
+const specialDays = (s: Student, days: GroupAttendance['days']) =>
+  s.marks.flatMap((m, i) => {
+    const day = days[i];
+    return m === 'special' && day ? [dayMonth(day.date)] : [];
+  });
 
 const percent = (s: Student) =>
   s.classes === 0 ? null : Math.round((s.attended / s.classes) * 100);
@@ -119,6 +132,12 @@ export function GroupAttendanceTable({ groupId, month }: { groupId: string; mont
                   <Link to={`/panel/alumnos/${s.id}`} className="hover:underline">
                     {s.name}
                   </Link>
+                  {specialDays(s, data.days).length > 0 && (
+                    <AsteriskNote label={`Asistencia especial de ${s.name}`}>
+                      {s.member ? 'Además de sus clases, vino' : 'No es de este grupo: vino'} en
+                      asistencia especial el {specialDays(s, data.days).join(', ')}.
+                    </AsteriskNote>
+                  )}
                 </th>
                 {s.marks.map((m, i) => {
                   const day = data.days[i];
@@ -150,8 +169,9 @@ export function GroupAttendanceTable({ groupId, month }: { groupId: string; mont
         </tbody>
       </table>
       <p className="mt-3 text-[13px] text-ink-muted">
-        ✓ vino · ✗ faltó · ? sin lista pasada · en blanco, ese día no le tocaba. El porcentaje
-        cuenta solo las clases con lista; por debajo del 75 % sale en rojo.
+        ✓ vino · ✗ faltó · ? sin lista pasada · ✓* vino en asistencia especial (no es su clase) · en
+        blanco, ese día no le tocaba. El porcentaje cuenta solo sus clases con lista; por debajo del
+        75 % sale en rojo.
       </p>
     </div>
   );

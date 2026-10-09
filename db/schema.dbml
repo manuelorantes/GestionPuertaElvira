@@ -326,6 +326,21 @@ Ref: attendance_roll_call.taken_by_user > identity_user.id [delete: set null]
 Ref: attendance_absence.(group_id, roll_date) > attendance_roll_call.(group_id, roll_date) [delete: cascade]
 Ref: attendance_absence.student_id > students_student.id [delete: cascade]
 
+Table attendance_guest {
+  group_id uuid [not null]
+  roll_date date [not null]
+  student_id uuid [not null]
+
+  indexes {
+    (group_id, roll_date, student_id) [pk]
+    student_id
+  }
+  Note: 'Asistencia especial: alumnos de fuera de la clase que vinieron ese día (a recuperar, por ejemplo).'
+}
+
+Ref: attendance_guest.(group_id, roll_date) > attendance_roll_call.(group_id, roll_date) [delete: cascade]
+Ref: attendance_guest.student_id > students_student.id [delete: cascade]
+
 // ---- Sistema -----------------------------------------------------------------------------------
 
 Table system_task_run {

@@ -1,18 +1,23 @@
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { classroomLabel } from '@/features/classes/classrooms';
-import type { RollCall } from '@/features/teacher-space/api';
+import type { RollCall, RosterStudent } from '@/features/teacher-space/api';
 import { dayLabel } from '@/features/teacher-space/dates';
 import { useRollCall, useSaveRollCall } from '@/features/teacher-space/hooks';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { Combobox } from '@/shared/ui/Combobox';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { useToast } from '@/shared/ui/Toast';
 
-/** Pasar lista de una clase: nadie marcado al abrirla; se marca a quien ha venido y se guarda (el resto, falta). */
+/**
+ * Pasar lista de una clase: nadie marcado al abrirla; se marca a quien ha venido y se guarda (el resto, falta). Abajo, la
+ * asistencia especial: alumnos de otras clases que han venido. Una lista pasada se cambia confirmándolo.
+ */
 export function RollCallPage() {
   const { groupId = '', date = '' } = useParams();
   const rollCall = useRollCall(groupId, date);
@@ -31,7 +36,10 @@ export function RollCallPage() {
         <Alert>{apiErrorMessage(rollCall.error)}</Alert>
       ) : (
         <RollCallForm
-          key={rollCall.data.list.map((s) => `${s.id}${s.present}`).join()}
+          key={[
+            ...rollCall.data.list.map((s) => `${s.id}${s.present}`),
+            ...rollCall.data.guests.map((g) => g.id),
+          ].join()}
           data={rollCall.data}
         />
       )}
@@ -43,11 +51,16 @@ function RollCallForm({ data }: { data: RollCall }) {
   const [absent, setAbsent] = useState(
     () => new Set(data.list.filter((s) => !s.present).map((s) => s.id)),
   );
+  const [guests, setGuests] = useState<RosterStudent[]>(data.guests);
+  const [picked, setPicked] = useState('');
+  const [confirming, setConfirming] = useState(false);
   const save = useSaveRollCall(data.groupId ?? '', data.date);
   const navigate = useNavigate();
   const toast = useToast();
-  const editable = data.rollCall === 'open' || data.rollCall === 'taken';
+  const editable = data.period !== 'upcoming';
+  const past = data.period === 'past';
   const present = data.list.length - absent.size;
+  const chosen = new Set(guests.map((g) => g.id));
 
   function toggle(id: string) {
     setAbsent((current) => {
@@ -59,12 +72,12 @@ function RollCallForm({ data }: { data: RollCall }) {
   }
 
   function submit() {
-    void save.mutateAsync([...absent]).then(
+    void save.mutateAsync({ absent: [...absent], guests: [...chosen], past }).then(
       () => {
         toast('Lista guardada');
         void navigate('/panel');
       },
-      () => undefined,
+      () => setConfirming(false),
     );
   }
 
@@ -79,11 +92,14 @@ function RollCallForm({ data }: { data: RollCall }) {
           {data.label}
         </h1>
       </div>
-      {data.rollCall === 'upcoming' && (
+      {data.period === 'upcoming' && (
         <Alert>La lista se puede pasar desde 15 minutos antes de que empiece la clase.</Alert>
       )}
-      {data.rollCall === 'missed' && (
-        <Alert>El plazo para pasar esta lista acabó al final del día siguiente a la clase.</Alert>
+      {past && (
+        <Alert tone="info">
+          Es una clase pasada: puedes cambiar su lista, pero al guardar te pediremos que lo
+          confirmes.
+        </Alert>
       )}
       {save.isError && <Alert>{apiErrorMessage(save.error)}</Alert>}
       <Card className="overflow-hidden">
@@ -126,12 +142,77 @@ function RollCallForm({ data }: { data: RollCall }) {
           </ul>
         )}
       </Card>
+      <Card className="flex flex-col gap-3 p-4">
+        <div>
+          <h2 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+            Asistencia especial
+          </h2>
+          <p className="mt-1 text-[13px] text-ink-muted">
+            Alumnos que no son de esta clase y han venido (a recuperar, por ejemplo).
+          </p>
+        </div>
+        {guests.length > 0 && (
+          <ul aria-label="Asistencia especial" className="divide-y divide-line-soft">
+            {guests.map((g) => (
+              <li key={g.id} className="flex min-h-12 items-center gap-3">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border-2 border-brand bg-brand text-surface-raised">
+                  <Check aria-hidden size={18} strokeWidth={3} />
+                </span>
+                <span className="flex-1">
+                  {g.name} <span className="font-semibold text-brand">*</span>
+                </span>
+                {editable && (
+                  <button
+                    type="button"
+                    aria-label={`Quitar a ${g.name} de la asistencia especial`}
+                    onClick={() => setGuests((current) => current.filter((c) => c.id !== g.id))}
+                    className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                  >
+                    <X aria-hidden size={16} />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        {editable && (
+          <Combobox
+            label="Añadir alumno de otra clase"
+            placeholder="Escribe para buscar…"
+            emptyText="Ningún alumno coincide"
+            options={data.others
+              .filter((s) => !chosen.has(s.id))
+              .map((s) => ({ value: s.id, label: s.name }))}
+            value={picked}
+            onChange={(id) => {
+              const student = data.others.find((s) => s.id === id);
+              if (student) setGuests((current) => [...current, student]);
+              setPicked('');
+            }}
+          />
+        )}
+      </Card>
       {editable && (
         <div className="sticky bottom-0 -mx-4 bg-paper px-4 py-3 md:static md:mx-0 md:p-0">
-          <Button className="w-full" onClick={submit} busy={save.isPending} busyLabel="Guardando…">
+          <Button
+            className="w-full"
+            onClick={() => (past ? setConfirming(true) : submit())}
+            busy={save.isPending && !confirming}
+            busyLabel="Guardando…"
+          >
             Guardar lista
           </Button>
         </div>
+      )}
+      {confirming && (
+        <ConfirmDialog
+          title="Cambiar una lista pasada"
+          message={`¿Seguro que quieres cambiar la asistencia de una clase pasada (${dayLabel(data.date).toLowerCase()})?`}
+          confirmLabel="Sí, cambiarla"
+          busy={save.isPending}
+          onCancel={() => setConfirming(false)}
+          onConfirm={submit}
+        />
       )}
     </>
   );
