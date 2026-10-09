@@ -17,7 +17,7 @@ Table identity_user {
   must_change_password boolean [not null, note: 'true tras alta o restablecimiento']
   created_at timestamptz [not null]
   password_changed_at timestamptz [not null]
-  teacher_id uuid [unique, note: 'profesor de una cuenta de profesorado (solo rol teacher); uno por cuenta']
+  teacher_id uuid [unique, note: 'profesor de la cuenta (roles teacher, administrator y superadministrator; nunca assistant); una cuenta por profesor']
 }
 
 Ref: identity_user.teacher_id - teachers_teacher.id [delete: set null]

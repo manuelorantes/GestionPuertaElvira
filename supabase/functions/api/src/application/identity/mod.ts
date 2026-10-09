@@ -45,7 +45,7 @@ export interface AuthenticatedUser {
   email: string;
   role: Role;
   mustChangePassword: boolean;
-  /** Profesor vinculado a una cuenta de profesorado, o null. */
+  /** Profesor vinculado (profesorado o administración que da clases), o null. */
   teacherId: string | null;
   /** Quien suplanta esta cuenta (superadministración), o null en una sesión normal. */
   impersonatedBy: { id: string; fullName: string } | null;
@@ -334,7 +334,7 @@ export class ChangeUserRole {
   }
 }
 
-/** Vincula una cuenta de profesorado a la ficha de un profesor (o la desvincula con null). Un profesor, una cuenta. */
+/** Vincula una cuenta a la ficha de un profesor (o la desvincula con null). Un profesor, una cuenta. */
 export class LinkTeacher {
   constructor(
     private readonly users: UserRepository,
@@ -372,7 +372,7 @@ export interface UserListItem {
   status: 'active' | 'disabled';
   mustChangePassword: boolean;
   createdAt: string;
-  /** Profesor vinculado (solo cuentas de profesorado), o null. */
+  /** Profesor vinculado, o null. */
   teacher: { id: string; name: string } | null;
   /** Último inicio de sesión o actividad, o null si nunca ha entrado. */
   lastSeenAt: string | null;

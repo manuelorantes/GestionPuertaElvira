@@ -135,10 +135,11 @@ Deno.test('User should not authenticate when disabled and again when enabled; ro
   assertEquals(user.role(), 'teacher');
 });
 
-Deno.test('User should link a teacher only while it has the teacher role', () => {
+Deno.test('User should link a teacher only while it has a role that teaches', () => {
   const teacher = TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa');
   const user = registeredUser();
-  assertThrows(() => user.linkTeacher(teacher, NOW), InvalidValue, 'profesorado');
+  user.changeRole('assistant');
+  assertThrows(() => user.linkTeacher(teacher, NOW), InvalidValue, 'asistente');
   user.changeRole('teacher');
   user.linkTeacher(teacher, NOW);
   assertEquals(user.linkedTeacher()?.value, teacher.value);
@@ -149,10 +150,22 @@ Deno.test('User should link a teacher only while it has the teacher role', () =>
   assertEquals([user.linkedTeacher(), user.linkedSince()], [null, null]);
 });
 
-Deno.test('User should drop the teacher link when it leaves the teacher role', () => {
+Deno.test('User should let administration be linked to a teacher too', () => {
+  const teacher = TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa');
+  for (const role of ['administrator', 'superadministrator'] as const) {
+    const user = registeredUser();
+    user.changeRole(role);
+    user.linkTeacher(teacher, NOW);
+    assertEquals(user.linkedTeacher()?.value, teacher.value);
+  }
+});
+
+Deno.test('User should keep the teacher link between roles that teach and drop it for the assistant', () => {
   const user = registeredUser();
   user.changeRole('teacher');
   user.linkTeacher(TeacherLink.fromString('01990000-0000-7000-8000-0000000000aa'), NOW);
   user.changeRole('administrator');
+  assertEquals(user.linkedSince(), NOW);
+  user.changeRole('assistant');
   assertEquals(user.linkedTeacher(), null);
 });

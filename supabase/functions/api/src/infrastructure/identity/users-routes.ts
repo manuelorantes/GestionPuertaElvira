@@ -56,7 +56,7 @@ export function registerUserRoutes(api: ApiApp): void {
       log(scope),
       deps.clock,
     ).execute(email, body.requiredString('fullName'), body.requiredString('role'));
-    // Una cuenta de profesorado puede nacer ya vinculada a su profesor.
+    // Una cuenta de profesorado (o de administración que da clases) puede nacer ya vinculada a su profesor.
     const teacherId = body.optionalString('teacherId');
     if (teacherId) await linkTeacher(scope).execute(email, teacherId);
     const id = (await users(scope).findByEmail(EmailAddress.fromString(email)))?.id.value ?? null;

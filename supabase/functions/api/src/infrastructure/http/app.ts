@@ -48,7 +48,10 @@ export type Api = Hono<Env>;
 export type ApiContext = Context<Env>;
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-/** `teacher`: cuenta de profesorado vinculada a un profesor (las rutas toman el profesor de la sesión). */
+/**
+ * `teacher`: cuenta vinculada a un profesor, de profesorado o de administración que también da clases (las rutas
+ * toman el profesor de la sesión).
+ */
 export type Access = 'public' | 'user' | 'admin' | 'superadmin' | 'teacher';
 
 export interface RouteOptions {
@@ -195,13 +198,21 @@ const ADMIN_ROLES: ReadonlySet<string> = new Set([
   'assistant',
 ]);
 
+/**
+ * El profesorado (vinculado o no, para avisarle si no lo está) y cualquier otra cuenta vinculada a un profesor
+ * (solo se vinculan los roles que dan clases).
+ */
+function canUseTeacherSpace(user: AuthenticatedUser): boolean {
+  return user.role === 'teacher' || user.teacherId !== null;
+}
+
 function enforceAccess(user: AuthenticatedUser | null, options: RouteOptions): void {
   if (options.access === 'public') return;
   if (user === null) throw httpError(401);
   const allowed = options.access === 'user' ||
     (options.access === 'admin' && ADMIN_ROLES.has(user.role)) ||
     (options.access === 'superadmin' && user.role === 'superadministrator') ||
-    (options.access === 'teacher' && user.role === 'teacher');
+    (options.access === 'teacher' && canUseTeacherSpace(user));
   if (!allowed) throw httpError(403);
   if (options.access === 'teacher' && user.teacherId === null) {
     throw new ApiProblem(

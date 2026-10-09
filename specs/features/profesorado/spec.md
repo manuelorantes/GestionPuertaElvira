@@ -176,7 +176,8 @@ Contabilidad al pagarla). Administración MUST poder corregir el día en que se 
 - **THEN** su liquidación de octubre muestra −90 € de anticipo y lo que queda por pagar
 
 ### Requirement: Espacio del profesorado
-Una cuenta de profesorado vinculada a un profesor (ver la spec de autenticación) MUST ver, pensado para el móvil, solo
+Una cuenta de profesorado vinculada a un profesor (o la administración vinculada, en su espacio de profesor; ver la spec
+de autenticación) MUST ver, pensado para el móvil, solo
 lo suyo:
 - **Mis clases**: las de hoy y las de la semana, día a día, según el horario: las suyas salvo las que le sustituyen,
   más las que da sustituyendo a otro (marcadas «Sustitución»), sin festivos; con hora, aula, alumnos que van ese día y
