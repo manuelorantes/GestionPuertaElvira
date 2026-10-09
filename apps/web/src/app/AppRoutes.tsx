@@ -6,6 +6,7 @@ import { HomePage } from '@/pages/home/HomePage';
 import { AccountingPage } from '@/pages/panel/accounting/AccountingPage';
 import { AuditPage } from '@/pages/panel/audit/AuditPage';
 import { UsersPage } from '@/pages/panel/users/UsersPage';
+import { SystemPage } from '@/pages/panel/system/SystemPage';
 import { BillingPage } from '@/pages/panel/billing/BillingPage';
 import { ChangePasswordPage } from '@/pages/panel/ChangePasswordPage';
 import { ImportPage } from '@/pages/panel/import/ImportPage';
@@ -40,6 +41,7 @@ export function AppRoutes() {
             <Route path="contabilidad" element={<AccountingPage />} />
             <Route path="historial" element={<AuditPage />} />
             <Route path="usuarios" element={<UsersPage />} />
+            <Route path="sistema" element={<SystemPage />} />
             <Route path="importar" element={<ImportPage />} />
             <Route path="alumnos/pendientes" element={<PendingDataPage />} />
             <Route path="alumnos" element={<StudentsPage />}>
