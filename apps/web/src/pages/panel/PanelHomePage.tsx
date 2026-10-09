@@ -3,6 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
+import { usePanelRole } from '@/features/auth/panelView';
 import { useSession } from '@/features/auth/useSession';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { formatCents, monthLabel, monthName } from '@/features/billing/money';
@@ -230,7 +231,7 @@ function seasonLabel(month: string): string {
 
 export function PanelHomePage() {
   const { data: user } = useSession();
-  if (user?.role === 'teacher') return <TeacherHomePage />;
+  if (usePanelRole(user) === 'teacher') return <TeacherHomePage />;
   return <ClubSummaryPage />;
 }
 

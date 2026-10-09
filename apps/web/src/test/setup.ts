@@ -7,4 +7,6 @@ configure({ asyncUtilTimeout: 4000 });
 
 afterEach(() => {
   cleanup();
+  // El espacio elegido (administración o profesor) dura lo que la pestaña: cada test empieza de cero.
+  sessionStorage.clear();
 });

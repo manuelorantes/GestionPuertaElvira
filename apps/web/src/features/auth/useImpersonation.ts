@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { SESSION_QUERY_KEY } from '@/app/queryClient';
 
 import { impersonate, type SessionUser, stopImpersonation } from './api';
+import { resetPanelView } from './panelView';
 
 /**
  * Cambia de cuenta (entrar como otra o volver a la propia): se descarta todo lo cargado, porque era de la otra
@@ -15,6 +16,7 @@ function useSwitchAccount<TInput>(action: (input: TInput) => Promise<SessionUser
   return useMutation({
     mutationFn: action,
     onSuccess: (user) => {
+      resetPanelView();
       queryClient.clear();
       queryClient.setQueryData(SESSION_QUERY_KEY, user);
       void navigate('/panel', { replace: true });
