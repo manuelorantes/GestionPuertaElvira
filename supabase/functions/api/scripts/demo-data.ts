@@ -322,7 +322,7 @@ const INVOICES: [number, number, string, string, string, string, string, boolean
 /** Tablas que se vacían con `--reset` (en orden seguro para las claves ajenas). */
 const RESET_TABLES = [
   'points_movement',
-  'points_tournament',
+  'points_photo',
   'attendance_absence',
   'attendance_roll_call',
   'accounting_entry',

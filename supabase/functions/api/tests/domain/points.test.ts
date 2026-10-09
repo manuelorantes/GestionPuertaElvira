@@ -5,7 +5,7 @@ import {
   monthBalance,
   PointMovement,
   PointsAlreadySpent,
-  Tournament,
+  TournamentPhoto,
 } from '../../src/domain/points/mod.ts';
 
 const day = (iso: string) => LocalDate.fromString(iso);
@@ -52,10 +52,38 @@ Deno.test('points should only count in the month they were earned and never go b
   );
 });
 
-Deno.test('Tournament should give between 1 and 20 points per photo', () => {
-  const t = Tournament.create('t1', 'Open de Granada', day('2026-10-17'), 1);
-  assertEquals(t.photo('s1', 'u1').delta, 1);
-  assertEquals(t.photo('s1', 'u1').date.toString(), '2026-10-17');
-  assertThrows(() => Tournament.create('t2', ' ', day('2026-10-17'), 1), InvalidValue);
-  assertThrows(() => Tournament.create('t2', 'Torneo', day('2026-10-17'), 0), InvalidValue);
+Deno.test('TournamentPhoto should accept images up to 5 MB of past days and give a point that day', () => {
+  const today = day('2026-10-09');
+  const photo = TournamentPhoto.take(
+    's1',
+    day('2026-10-04'),
+    ' Open de Granada ',
+    'image/jpeg',
+    300_000,
+    today,
+  );
+  assertEquals(photo.note, 'Open de Granada');
+  assertEquals(photo.documentKey.startsWith(`photos/${photo.id}/`), true);
+  assertEquals(photo.documentKey.endsWith('.jpg'), true);
+  const movement = photo.movement('u1');
+  assertEquals([movement.delta, movement.kind, movement.reference, movement.date.toString()], [
+    1,
+    'tournament',
+    photo.id,
+    '2026-10-04',
+  ]);
+  assertThrows(
+    () => TournamentPhoto.take('s1', today, null, 'application/pdf', 10, today),
+    InvalidValue,
+    'imagen',
+  );
+  assertThrows(
+    () => TournamentPhoto.take('s1', today, null, 'image/png', 6_000_000, today),
+    InvalidValue,
+    '5 MB',
+  );
+  assertThrows(
+    () => TournamentPhoto.take('s1', day('2026-10-10'), null, 'image/png', 10, today),
+    InvalidValue,
+  );
 });

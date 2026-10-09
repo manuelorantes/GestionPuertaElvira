@@ -24,7 +24,7 @@ async function fixture() {
   return { client, ana: ids[0] ?? '', pablo: ids[1] ?? '' };
 }
 
-Deno.test('Friday attendance, tournament photos and adjustments should make the points of the month', async () => {
+Deno.test('Friday attendance and tournament photos should make the points of the month', async () => {
   await atTime(FRIDAY_EVENING, async () => {
     const { client, ana, pablo } = await fixture();
     const friday = (date: string, student: string, present: boolean) =>
@@ -48,51 +48,63 @@ Deno.test('Friday attendance, tournament photos and adjustments should make the 
     assertError(await friday('2026-10-16', ana, true), 422, 'unprocessable');
     assertError(await friday('2026-10-08', ana, true), 422, 'unprocessable');
 
-    const tournament = body<{ id: string }>(
-      await client.json('POST', '/api/admin/points/tournaments', {
-        name: 'Open de Granada',
-        date: '2026-10-09',
-        pointsPerPhoto: 2,
-      }),
-    ).id;
-    assertEquals(
-      (await client.json('PUT', `/api/admin/points/tournaments/${tournament}/students/${ana}`, {
-        sent: true,
-      }))
-        .status,
-      204,
-    );
-    const detail = body<{ photos: number; students: { name: string; sent: boolean }[] }>(
-      await client.get(`/api/admin/points/tournaments/${tournament}`),
-    );
-    assertEquals(detail.photos, 1);
-    assertEquals(detail.students.map((s) => [s.name, s.sent]), [['Ana Pérez Gil', true], [
-      'Pablo Ruiz Sanz',
-      false,
-    ]]);
+    // La foto de Ana con la equipación oficial en un torneo: 1 punto en el mes de la foto.
+    const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70]);
+    const photoForm = (student: string, file: Uint8Array) => {
+      const form = new FormData();
+      form.append('studentId', student);
+      form.append('date', '2026-10-09');
+      form.append('note', 'Open de Granada');
+      form.append(
+        'file',
+        new File([file as unknown as ArrayBuffer], 'foto.jpg', { type: 'image/jpeg' }),
+      );
+      return form;
+    };
+    const uploaded = await client.request('POST', '/api/admin/points/photos', {
+      body: photoForm(ana, JPEG),
+      headers: { 'X-Requested-With': 'fetch' },
+    });
+    assertEquals(uploaded.status, 201, JSON.stringify(uploaded.body));
+    const photoId = body<{ id: string }>(uploaded).id;
     assertError(
-      await client.json('DELETE', `/api/admin/points/tournaments/${tournament}`, {}),
-      409,
-      'tournament_has_photos',
+      await client.request('POST', '/api/admin/points/photos', {
+        body: photoForm(ana, new TextEncoder().encode('%PDF-1.4 no es una foto')),
+        headers: { 'X-Requested-With': 'fetch' },
+      }),
+      422,
+      'unprocessable',
     );
+    const gallery =
+      body<{ items: { id: string; studentName: string; note: string; points: number }[] }>(
+        await client.get('/api/admin/points/photos?month=2026-10'),
+      ).items;
+    assertEquals(gallery.map((p) => [p.studentName, p.note, p.points]), [[
+      'Ana Pérez Gil',
+      'Open de Granada',
+      1,
+    ]]);
+    const file = await client.raw('GET', `/api/admin/points/photos/${photoId}/file`);
+    assertEquals([file.status, file.headers.get('content-type')], [200, 'image/jpeg']);
+    assertEquals(new Uint8Array(await file.arrayBuffer()), JPEG);
 
     const points = async () =>
       body<{ items: { name: string; points: number; seasonEarned: number }[] }>(
         await client.get('/api/admin/points/students?month=2026-10'),
       ).items.map((s) => [s.name, s.points, s.seasonEarned]);
-    assertEquals(await points(), [['Ana Pérez Gil', 3, 3], ['Pablo Ruiz Sanz', 1, 1]]);
+    assertEquals(await points(), [['Ana Pérez Gil', 2, 2], ['Pablo Ruiz Sanz', 1, 1]]);
 
     // En la cuenta de cobro se ven los puntos del mes y se canjean al cobrar.
     assertEquals(
       body<{ points: number }>(await client.get(`/api/admin/billing/accounts/${ana}`)).points,
-      3,
+      2,
     );
     const movements = body<{ items: { concept: string; delta: number; by: string | null }[] }>(
       await client.get(`/api/admin/points/movements?student=${ana}`),
     ).items;
     // Lo más reciente primero.
     assertEquals(movements.map((m) => [m.concept, m.delta]), [
-      ['Foto en Open de Granada', 2],
+      ['Foto de torneo · Open de Granada', 1],
       ['Viernes 09/10', 1],
     ]);
     assertEquals(movements[0]?.by, 'Lucía Moreno Gil');
