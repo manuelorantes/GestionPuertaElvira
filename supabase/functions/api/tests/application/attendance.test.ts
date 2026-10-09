@@ -3,11 +3,15 @@ import { assertEquals, assertRejects } from '@std/assert';
 import { LocalDate } from '../../src/domain/common/mod.ts';
 import { type RollCall, RollCallClosed } from '../../src/domain/attendance/mod.ts';
 import {
+  AttendanceGroupNotFound,
   type ClassAssignments,
   ClassNotGiven,
   type ClassOnDay,
   type ClassRoster,
   ConfirmWithoutRollCall,
+  GroupAttendance,
+  type GroupAttendanceData,
+  type GroupAttendanceQuery,
   type MissedRollCallQuery,
   MissedRollCalls,
   OpenRollCall,
@@ -177,4 +181,43 @@ Deno.test('StudentAttendance should summarise the season so far', async () => {
   ).execute('s1');
   assertEquals(asked, ['2026-09-01…2026-10-16']);
   assertEquals([view.season, view.classes, view.attended], [2026, 6, 5]);
+});
+
+Deno.test('GroupAttendance should show each class day of the month until today and who came', async () => {
+  // Grupo de martes y jueves. Octubre de 2026, hoy jueves 15: jueves 1, martes 6, jueves 8, martes 13 y jueves 15.
+  const data: GroupAttendanceData = {
+    name: 'Iniciación A',
+    weekdays: [2, 4],
+    holidays: new Set(['2026-10-08']),
+    rollCalls: [{ date: '2026-10-06', kind: 'taken' }, { date: '2026-10-13', kind: 'confirmed' }],
+    enrolments: [
+      { studentId: 'ana', name: 'Ana', from: '2026-09-01', until: null, days: null },
+      // Pablo solo los jueves y se fue el 14; Luis entró el 10.
+      { studentId: 'pablo', name: 'Pablo', from: '2026-09-01', until: '2026-10-14', days: [4] },
+      { studentId: 'luis', name: 'Luis', from: '2026-10-10', until: null, days: null },
+    ],
+    absences: [{ date: '2026-10-06', studentId: 'ana' }],
+  };
+  const query: GroupAttendanceQuery = {
+    between: (id) => Promise.resolve(id === 'g1' ? data : null),
+  };
+  const view = await new GroupAttendance(query, new FrozenClock('2026-10-15T10:00:00Z'))
+    .execute('g1', '2026-10');
+  assertEquals(view.days, [
+    { date: '2026-10-01', status: 'pending' },
+    { date: '2026-10-06', status: 'taken' },
+    { date: '2026-10-08', status: 'holiday' },
+    { date: '2026-10-13', status: 'confirmed' },
+    { date: '2026-10-15', status: 'pending' },
+  ]);
+  assertEquals(view.students.map((s) => [s.name, s.marks, s.attended, s.classes]), [
+    ['Ana', ['unknown', 'absent', null, 'unknown', 'unknown'], 0, 1],
+    ['Pablo', ['unknown', null, null, null, null], 0, 0],
+    ['Luis', [null, null, null, 'unknown', 'unknown'], 0, 0],
+  ]);
+  await assertRejects(
+    () =>
+      new GroupAttendance(query, new FrozenClock('2026-10-15T10:00:00Z')).execute('x', '2026-10'),
+    AttendanceGroupNotFound,
+  );
 });

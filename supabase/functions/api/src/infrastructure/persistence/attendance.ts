@@ -3,6 +3,8 @@ import { ActivityCheck, type ActivityCheckKind } from '../../domain/attendance/m
 import type {
   ActivityCheckRepository,
   ClassRoster,
+  GroupAttendanceData,
+  GroupAttendanceQuery,
   MissedRollCall,
   MissedRollCallQuery,
   RosterStudent,
@@ -223,5 +225,54 @@ export class SqlFridayRoster {
     const rows = await this.sql`SELECT id, full_name FROM students_student
       WHERE joined_on <= ${day} AND (withdrawn_on IS NULL OR withdrawn_on > ${day}) ORDER BY search_name`;
     return Row.all(rows).map((r) => ({ id: r.string('id'), name: r.string('full_name') }));
+  }
+}
+
+/** Horario, festivos, listas, inscripciones y faltas de un grupo en un periodo. */
+export class SqlGroupAttendanceQuery implements GroupAttendanceQuery {
+  constructor(private readonly sql: Sql) {}
+
+  async between(
+    groupId: string,
+    from: LocalDate,
+    to: LocalDate,
+  ): Promise<GroupAttendanceData | null> {
+    const [group] = await this.sql`SELECT name, days FROM classes_group WHERE id = ${groupId}`;
+    if (!group) return null;
+    const [first, last] = [from.toString(), to.toString()];
+    const holidays = await this.sql`SELECT holiday_date::text AS day FROM payroll_holiday
+      WHERE holiday_date BETWEEN ${first} AND ${last}`;
+    const rollCalls = await this.sql`SELECT roll_date::text AS date, kind FROM attendance_roll_call
+      WHERE group_id = ${groupId} AND roll_date BETWEEN ${first} AND ${last}`;
+    const enrolments = await this.sql`
+      SELECT s.id, s.full_name, e.enrolled_on::text AS enrolled_on, e.ends_on::text AS ends_on, e.attendance_days
+        FROM classes_enrolment e JOIN students_student s ON s.id = e.student_id
+       WHERE e.class_group_id = ${groupId}
+         AND e.enrolled_on <= ${last} AND (e.ends_on IS NULL OR e.ends_on > ${first})
+       ORDER BY s.search_name, e.enrolled_on`;
+    const absences = await this
+      .sql`SELECT roll_date::text AS date, student_id FROM attendance_absence
+      WHERE group_id = ${groupId} AND roll_date BETWEEN ${first} AND ${last}`;
+    const g = new Row(group);
+    return {
+      name: g.string('name'),
+      weekdays: g.intList('days'),
+      holidays: new Set(Row.all(holidays).map((r) => r.string('day'))),
+      rollCalls: Row.all(rollCalls).map((r) => ({
+        date: r.string('date'),
+        kind: r.string('kind') === 'confirmed' ? 'confirmed' : 'taken',
+      })),
+      enrolments: Row.all(enrolments).map((r) => ({
+        studentId: r.string('id'),
+        name: r.string('full_name'),
+        from: r.string('enrolled_on'),
+        until: r.nullableString('ends_on'),
+        days: r.json('attendance_days') === null ? null : r.intList('attendance_days'),
+      })),
+      absences: Row.all(absences).map((r) => ({
+        date: r.string('date'),
+        studentId: r.string('student_id'),
+      })),
+    };
   }
 }
