@@ -1,15 +1,9 @@
-import {
-  type Clock,
-  generateUuidV7,
-  InvalidValue,
-  LocalDate,
-  type YearMonth,
-} from '../../domain/common/mod.ts';
+import { type Clock, InvalidValue, LocalDate, type YearMonth } from '../../domain/common/mod.ts';
 import {
   monthBalance,
   PointMovement,
   type PointsKind,
-  Tournament,
+  TournamentPhoto,
 } from '../../domain/points/mod.ts';
 
 export interface PointMovementRepository {
@@ -21,12 +15,17 @@ export interface PointMovementRepository {
   remove(id: string): Promise<void>;
 }
 
-export interface TournamentRepository {
-  find(id: string): Promise<Tournament | null>;
-  save(tournament: Tournament): Promise<void>;
+export interface TournamentPhotoRepository {
+  find(id: string): Promise<TournamentPhoto | null>;
+  save(photo: TournamentPhoto): Promise<void>;
   delete(id: string): Promise<void>;
-  /** Cuántos alumnos mandaron foto. */
-  photos(id: string): Promise<number>;
+}
+
+/** Dónde se guardan las imágenes (el almacén de documentos). */
+export interface PhotoStorage {
+  put(key: string, contents: Uint8Array): Promise<void>;
+  read(key: string): Promise<Uint8Array>;
+  remove(key: string): Promise<void>;
 }
 
 /** Alumnos activos (los únicos que ganan puntos). */
@@ -41,17 +40,10 @@ export class PointsStudentNotFound extends Error {
   }
 }
 
-export class TournamentNotFound extends Error {
+export class PhotoNotFound extends Error {
   constructor() {
-    super('Ese torneo no existe.');
-    this.name = 'TournamentNotFound';
-  }
-}
-
-export class TournamentHasPhotos extends Error {
-  constructor() {
-    super('No se puede borrar un torneo con fotos marcadas: quítalas antes.');
-    this.name = 'TournamentHasPhotos';
+    super('Esa foto no existe.');
+    this.name = 'PhotoNotFound';
   }
 }
 
@@ -115,65 +107,60 @@ export class AdjustPointsByHand {
   }
 }
 
-export interface TournamentInput {
-  name: string;
-  date: string;
-  pointsPerPhoto: number;
+export interface PhotoUpload {
+  contents: Uint8Array;
+  mimeType: string;
 }
 
-/** Crea o cambia un torneo (cambiar su fecha o sus puntos no cambia las fotos ya marcadas). */
-export class SaveTournament {
-  constructor(private readonly tournaments: TournamentRepository) {}
-
-  async execute(id: string | null, input: TournamentInput): Promise<string> {
-    const date = LocalDate.fromString(input.date);
-    if (id === null) {
-      const created = Tournament.create(generateUuidV7(), input.name, date, input.pointsPerPhoto);
-      await this.tournaments.save(created);
-      return created.id;
-    }
-    const tournament = await this.tournaments.find(id);
-    if (tournament === null) throw new TournamentNotFound();
-    tournament.update(input.name, date, input.pointsPerPhoto);
-    await this.tournaments.save(tournament);
-    return id;
-  }
-}
-
-export class DeleteTournament {
-  constructor(private readonly tournaments: TournamentRepository) {}
-
-  async execute(id: string): Promise<void> {
-    if ((await this.tournaments.find(id)) === null) throw new TournamentNotFound();
-    if ((await this.tournaments.photos(id)) > 0) throw new TournamentHasPhotos();
-    await this.tournaments.delete(id);
-  }
-}
-
-/** Marca (o desmarca) que un alumno mandó su foto con la equipación oficial en un torneo. */
-export class MarkTournamentPhoto {
+/** Adjunta la foto de un alumno con la equipación oficial en un torneo: le da sus puntos en el mes de la foto. */
+export class AddTournamentPhoto {
   constructor(
-    private readonly tournaments: TournamentRepository,
+    private readonly photos: TournamentPhotoRepository,
     private readonly movements: PointMovementRepository,
     private readonly students: PointsStudents,
+    private readonly storage: PhotoStorage,
+    private readonly clock: Clock,
   ) {}
 
   async execute(
-    tournamentId: string,
     student: string,
-    sent: boolean,
+    date: string,
+    note: string | null,
+    upload: PhotoUpload,
     by: string | null,
-  ): Promise<void> {
-    const tournament = await this.tournaments.find(tournamentId);
-    if (tournament === null) throw new TournamentNotFound();
-    const existing = await this.movements.find(student, 'tournament', tournamentId);
-    if (sent) {
-      if (existing !== null) return;
-      await ensureActive(this.students, student, tournament.date);
-      await this.movements.add(tournament.photo(student, by));
-    } else if (existing !== null) {
-      await removeMovement(this.movements, existing);
-    }
+  ): Promise<string> {
+    const day = LocalDate.fromString(date);
+    const photo = TournamentPhoto.take(
+      student,
+      day,
+      note,
+      upload.mimeType,
+      upload.contents.length,
+      LocalDate.fromInstant(this.clock.now()),
+    );
+    await ensureActive(this.students, student, day);
+    await this.storage.put(photo.documentKey, upload.contents);
+    await this.photos.save(photo);
+    await this.movements.add(photo.movement(by));
+    return photo.id;
+  }
+}
+
+/** Quita una foto y sus puntos (si no se han gastado ya ese mes). */
+export class DeleteTournamentPhoto {
+  constructor(
+    private readonly photos: TournamentPhotoRepository,
+    private readonly movements: PointMovementRepository,
+    private readonly storage: PhotoStorage,
+  ) {}
+
+  async execute(id: string): Promise<void> {
+    const photo = await this.photos.find(id);
+    if (photo === null) throw new PhotoNotFound();
+    const movement = await this.movements.find(photo.student, 'tournament', photo.id);
+    if (movement !== null) await removeMovement(this.movements, movement);
+    await this.photos.delete(id);
+    await this.storage.remove(photo.documentKey);
   }
 }
 
@@ -219,7 +206,7 @@ export interface PointMovementView {
   date: string;
   delta: number;
   kind: PointsKind;
-  /** Qué es: «Viernes 04/09», el torneo, el motivo del ajuste o el recibo del canje. */
+  /** Qué es: «Viernes 04/09», la foto de torneo, el motivo del ajuste o el recibo del canje. */
   concept: string;
   by: string | null;
 }
@@ -229,16 +216,14 @@ export interface FridayGrid {
   students: { id: string; name: string; memberNumber: number | null; present: string[] }[];
 }
 
-export interface TournamentView {
+/** Una foto de la galería de un mes. */
+export interface PhotoView {
   id: string;
-  name: string;
+  studentId: string;
+  studentName: string;
   date: string;
-  pointsPerPhoto: number;
-  photos: number;
-}
-
-export interface TournamentDetailView extends TournamentView {
-  students: { id: string; name: string; memberNumber: number | null; sent: boolean }[];
+  note: string | null;
+  points: number;
 }
 
 export interface PointsQuery {
@@ -249,8 +234,7 @@ export interface PointsQuery {
     filter: { kind: PointsKind | null; student: string | null },
   ): Promise<PointMovementView[]>;
   fridays(month: YearMonth, fridays: LocalDate[]): Promise<FridayGrid>;
-  tournaments(from: LocalDate, to: LocalDate): Promise<TournamentView[]>;
-  tournament(id: string): Promise<TournamentDetailView | null>;
+  photos(from: LocalDate, to: LocalDate): Promise<PhotoView[]>;
 }
 
 /** Los viernes de un mes. */

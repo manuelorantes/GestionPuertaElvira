@@ -109,7 +109,7 @@ export class PointMovement {
     );
   }
 
-  /** @internal Lo crea un torneo. */
+  /** @internal Lo crea una foto de torneo. */
   static tournamentPhoto(
     student: string,
     date: LocalDate,
@@ -165,49 +165,83 @@ export function monthBalance(movements: readonly PointMovement[], day: LocalDate
     .reduce((sum, m) => sum + m.delta, 0);
 }
 
-/** Torneo: quien manda una foto con la equipación oficial gana sus puntos, que cuentan en el mes del torneo. */
-export class Tournament {
+/** Lo que vale cada foto con la equipación oficial en un torneo. */
+export const PHOTO_POINTS = 1;
+
+/** Formatos de imagen que se aceptan (el navegador las convierte a JPEG antes de subirlas). */
+const PHOTO_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+};
+/** Como mucho 5 MB por foto. */
+export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Foto de un alumno con la equipación oficial en un torneo: da sus puntos en el mes de la fecha de la foto. La imagen
+ * se guarda aparte (en el almacén de documentos) con una clave generada por la aplicación.
+ */
+export class TournamentPhoto {
   private constructor(
     readonly id: string,
-    private currentName: string,
-    private currentDate: LocalDate,
-    private perPhoto: number,
+    readonly student: string,
+    readonly date: LocalDate,
+    /** El torneo u otra nota (opcional). */
+    readonly note: string | null,
+    readonly documentKey: string,
+    readonly mimeType: string,
   ) {}
 
-  static create(id: string, name: string, date: LocalDate, pointsPerPhoto: number): Tournament {
-    const t = new Tournament(id, '', date, 1);
-    t.update(name, date, pointsPerPhoto);
-    return t;
-  }
-
-  static restore(id: string, name: string, date: LocalDate, pointsPerPhoto: number): Tournament {
-    return new Tournament(id, name, date, pointsPerPhoto);
-  }
-
-  update(name: string, date: LocalDate, pointsPerPhoto: number): void {
-    if (name.trim() === '') throw new InvalidValue('name', 'Indica el nombre del torneo.');
-    if (!Number.isInteger(pointsPerPhoto) || pointsPerPhoto < 1 || pointsPerPhoto > 20) {
-      throw new InvalidValue('points', 'Los puntos por foto van de 1 a 20.');
+  static take(
+    student: string,
+    date: LocalDate,
+    note: string | null,
+    mimeType: string,
+    size: number,
+    today: LocalDate,
+  ): TournamentPhoto {
+    const extension = PHOTO_TYPES[mimeType];
+    if (extension === undefined) {
+      throw new InvalidValue('file', 'La foto tiene que ser una imagen JPEG, PNG o WebP.');
     }
-    this.currentName = name.trim();
-    this.currentDate = date;
-    this.perPhoto = pointsPerPhoto;
+    if (size === 0 || size > MAX_PHOTO_BYTES) {
+      throw new InvalidValue('file', 'La foto no puede pasar de 5 MB.');
+    }
+    if (today.isBefore(date)) {
+      throw new InvalidValue('date', 'La foto no puede ser de un día que aún no ha llegado.');
+    }
+    const id = generateUuidV7();
+    const clean = note?.trim() ? note.trim().slice(0, 120) : null;
+    return new TournamentPhoto(
+      id,
+      student,
+      date,
+      clean,
+      `photos/${id}/${generateUuidV7()}.${extension}`,
+      mimeType,
+    );
   }
 
-  /** Los puntos de la foto de un alumno. */
-  photo(student: string, by: string | null): PointMovement {
-    return PointMovement.tournamentPhoto(student, this.currentDate, this.perPhoto, this.id, by);
+  static restore(fields: {
+    id: string;
+    student: string;
+    date: LocalDate;
+    note: string | null;
+    documentKey: string;
+    mimeType: string;
+  }): TournamentPhoto {
+    return new TournamentPhoto(
+      fields.id,
+      fields.student,
+      fields.date,
+      fields.note,
+      fields.documentKey,
+      fields.mimeType,
+    );
   }
 
-  get name(): string {
-    return this.currentName;
-  }
-
-  get date(): LocalDate {
-    return this.currentDate;
-  }
-
-  get pointsPerPhoto(): number {
-    return this.perPhoto;
+  /** Los puntos de la foto (un movimiento de tipo torneo que apunta a la foto). */
+  movement(by: string | null): PointMovement {
+    return PointMovement.tournamentPhoto(this.student, this.date, PHOTO_POINTS, this.id, by);
   }
 }

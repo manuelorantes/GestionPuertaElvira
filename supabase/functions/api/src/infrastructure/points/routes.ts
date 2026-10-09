@@ -1,14 +1,15 @@
 import { InvalidValue, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import type { PointsKind } from '../../domain/points/mod.ts';
 import {
+  AddTournamentPhoto,
   AdjustPointsByHand,
-  DeleteTournament,
+  DeleteTournamentPhoto,
   fridaysOf,
   MarkFriday,
-  MarkTournamentPhoto,
-  SaveTournament,
-  TournamentNotFound,
+  PhotoNotFound,
+  type PhotoStorage,
 } from '../../application/points/mod.ts';
+import { sniffMimeType } from '../accounting/routes.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
@@ -16,26 +17,25 @@ import {
   SqlPointMovementRepository,
   SqlPointsQuery,
   SqlPointsStudents,
-  SqlTournamentRepository,
+  SqlTournamentPhotoRepository,
 } from '../persistence/points.ts';
 
 const KINDS: readonly PointsKind[] = ['friday', 'tournament', 'manual', 'redemption'];
 
 /** Sección Puntos (administración): /api/admin/points/* */
-export function registerPointsRoutes(api: ApiApp): void {
+export function registerPointsRoutes(api: ApiApp, storage: PhotoStorage): void {
   registerDomainErrors({
     PointsAlreadySpent: [409, 'points_already_spent'],
     PointsStudentNotFound: [404, 'not_found'],
-    TournamentNotFound: [404, 'not_found'],
-    TournamentHasPhotos: [409, 'tournament_has_photos'],
+    PhotoNotFound: [404, 'not_found'],
   });
-  const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string) =>
-    ({ method, path, access: 'admin' }) as const;
+  const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, upload = false) =>
+    ({ method, path, access: 'admin', upload }) as const;
   const { clock } = api.deps;
   const today = () => LocalDate.fromInstant(clock.now());
   const movements = (scope: RequestScope) => new SqlPointMovementRepository(scope.tx);
   const students = (scope: RequestScope) => new SqlPointsStudents(scope.tx);
-  const tournaments = (scope: RequestScope) => new SqlTournamentRepository(scope.tx);
+  const photos = (scope: RequestScope) => new SqlTournamentPhotoRepository(scope.tx);
   const query = (scope: RequestScope) => new SqlPointsQuery(scope.tx, today);
   const by = (scope: RequestScope) => scope.user?.id ?? null;
   const monthOf = (value: string | undefined) =>
@@ -107,57 +107,56 @@ export function registerPointsRoutes(api: ApiApp): void {
     },
   );
 
-  api.defineRoute(admin('GET', '/api/admin/points/tournaments'), async (c, scope) => {
-    const season = seasonOf(monthOf(c.req.query('month')));
+  // ---- Fotos de torneo ---------------------------------------------------------------------------
+  api.defineRoute(admin('GET', '/api/admin/points/photos'), async (c, scope) => {
+    const month = monthOf(c.req.query('month'));
     return c.json({
-      items: await query(scope).tournaments(
-        season.firstMonth().firstDay(),
-        season.lastMonth().lastDay(),
-      ),
+      month: month.toString(),
+      items: await query(scope).photos(month.firstDay(), month.lastDay()),
     });
   });
 
-  const tournamentInput = async (c: Parameters<Parameters<ApiApp['defineRoute']>[1]>[0]) => {
-    const body = await JsonBody.from(c.req.raw);
-    return {
-      name: body.requiredString('name'),
-      date: body.requiredString('date'),
-      pointsPerPhoto: body.optionalInt('pointsPerPhoto') ?? 1,
+  api.defineRoute(admin('POST', '/api/admin/points/photos', true), async (c, scope) => {
+    const form = await c.req.raw.formData();
+    const file = form.get('file');
+    if (!(file instanceof File)) throw new InvalidValue('file', 'Adjunta la foto.');
+    const text = (name: string) => {
+      const value = form.get(name);
+      return typeof value === 'string' ? value : '';
     };
-  };
-
-  api.defineRoute(admin('POST', '/api/admin/points/tournaments'), async (c, scope) => {
-    const id = await new SaveTournament(tournaments(scope)).execute(null, await tournamentInput(c));
+    const contents = new Uint8Array(await file.arrayBuffer());
+    const id = await new AddTournamentPhoto(
+      photos(scope),
+      movements(scope),
+      students(scope),
+      storage,
+      clock,
+    )
+      .execute(
+        text('studentId'),
+        text('date') || today().toString(),
+        text('note') || null,
+        { contents, mimeType: sniffMimeType(contents) },
+        by(scope),
+      );
     return c.json({ id }, 201);
   });
 
-  api.defineRoute(admin('PUT', '/api/admin/points/tournaments/:id'), async (c, scope) => {
-    await new SaveTournament(tournaments(scope)).execute(param(c, 'id'), await tournamentInput(c));
+  api.defineRoute(admin('GET', '/api/admin/points/photos/:id/file'), async (c, scope) => {
+    const photo = await photos(scope).find(param(c, 'id'));
+    if (photo === null) throw new PhotoNotFound();
+    const contents = await storage.read(photo.documentKey);
+    return c.body(contents as unknown as ArrayBuffer, 200, {
+      'Content-Type': photo.mimeType,
+      'Cache-Control': 'private, max-age=86400',
+      'X-Content-Type-Options': 'nosniff',
+    });
+  });
+
+  api.defineRoute(admin('DELETE', '/api/admin/points/photos/:id'), async (c, scope) => {
+    await new DeleteTournamentPhoto(photos(scope), movements(scope), storage).execute(
+      param(c, 'id'),
+    );
     return c.body(null, 204);
   });
-
-  api.defineRoute(admin('DELETE', '/api/admin/points/tournaments/:id'), async (c, scope) => {
-    await new DeleteTournament(tournaments(scope)).execute(param(c, 'id'));
-    return c.body(null, 204);
-  });
-
-  api.defineRoute(admin('GET', '/api/admin/points/tournaments/:id'), async (c, scope) => {
-    const found = await query(scope).tournament(param(c, 'id'));
-    if (found === null) throw new TournamentNotFound();
-    return c.json(found);
-  });
-
-  api.defineRoute(
-    admin('PUT', '/api/admin/points/tournaments/:id/students/:studentId'),
-    async (c, scope) => {
-      const body = await JsonBody.from(c.req.raw);
-      await new MarkTournamentPhoto(tournaments(scope), movements(scope), students(scope)).execute(
-        param(c, 'id'),
-        param(c, 'studentId'),
-        body.bool('sent'),
-        by(scope),
-      );
-      return c.body(null, 204);
-    },
-  );
 }
