@@ -121,7 +121,7 @@ Deno.test('an unlinked teacher account is told to ask administration', async () 
 const TUESDAY_EVENING = '2026-10-13T18:00:00+02:00';
 
 Deno.test('a teacher should take the roll call of their class, all present by default, until the next day', async () => {
-  const { admin, teacher, group, other, pablo } = await atTime(TUESDAY_EVENING, async () => {
+  const { admin, teacher, group, other, ids, pablo } = await atTime(TUESDAY_EVENING, async () => {
     await resetDatabase();
     await createUser('junta@club.es');
     const admin = new ApiClient();
@@ -154,7 +154,7 @@ Deno.test('a teacher should take the roll call of their class, all present by de
     await db()`UPDATE identity_user SET teacher_id = ${lucia} WHERE email = 'profe@club.es'`;
     const teacher = new ApiClient();
     await teacher.logIn('profe@club.es');
-    return { admin, teacher, group, other, pablo: ids[1] ?? '' };
+    return { admin, teacher, group, other, ids, pablo: ids[1] ?? '' };
   });
   const url = `/api/teacher/roll-calls/${group}/2026-10-13`;
 
@@ -213,6 +213,36 @@ Deno.test('a teacher should take the roll call of their class, all present by de
     await teacher.logIn('profe@club.es');
     assertError(await teacher.json('PUT', url, { absent: [pablo] }), 409, 'roll_call_closed');
     assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', true]]);
+    // Administración ve la asistencia del grupo en el mes: martes 6 sin lista (aún no estaban) y martes 13.
+    await admin.logIn('junta@club.es');
+    assertEquals(body(await admin.get(`/api/admin/attendance/groups/${group}?month=2026-10`)), {
+      groupId: group,
+      name: 'Martes 17:00',
+      month: '2026-10',
+      days: [{ date: '2026-10-06', status: 'pending' }, { date: '2026-10-13', status: 'taken' }],
+      students: [
+        {
+          id: ids[0],
+          name: 'Martina López Herrera',
+          marks: [null, 'present'],
+          attended: 1,
+          classes: 1,
+        },
+        { id: pablo, name: 'Pablo Gil Ruiz', marks: [null, 'present'], attended: 1, classes: 1 },
+      ],
+    });
+    assertError(
+      await admin.get(
+        '/api/admin/attendance/groups/01990000-0000-7000-8000-000000000000?month=2026-10',
+      ),
+      404,
+      'not_found',
+    );
+    assertError(
+      await teacher.get(`/api/admin/attendance/groups/${group}?month=2026-10`),
+      403,
+      'forbidden',
+    );
   });
 });
 
