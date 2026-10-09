@@ -81,6 +81,7 @@ export class AuditLabels {
     accounting_entry: 'Movimiento manual',
     accounting_invoice: 'Factura de proveedor',
     attendance_absence: 'Falta a clase',
+    attendance_activity_check: 'Confirmación de actividad',
     attendance_roll_call: 'Lista de clase',
     points_movement: 'Movimiento de puntos',
     points_photo: 'Foto de torneo',

@@ -28,6 +28,7 @@ const class_ = (overrides: Partial<ClassOnDay>): ClassOnDay => ({
   end: '18:30',
   minutes: 90,
   substitution: false,
+  activity: null,
   ...overrides,
 });
 
@@ -126,6 +127,7 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, n
 const MISSED = {
   sessionId: 'p1',
   groupId: 'g1',
+  dutyId: null,
   date: '2026-10-13',
   label: 'Martes y jueves 17:00 · Intermedio · Alfil',
   teacherName: 'Lucía Moreno Gil',

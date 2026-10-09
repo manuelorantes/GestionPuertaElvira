@@ -1,4 +1,9 @@
-import { OPENS_BEFORE_MINUTES, RollCall } from '../../domain/attendance/mod.ts';
+import {
+  ActivityCheck,
+  assertWithinWindow,
+  OPENS_BEFORE_MINUTES,
+  RollCall,
+} from '../../domain/attendance/mod.ts';
 import {
   type Clock,
   LocalDate,
@@ -18,6 +23,8 @@ export interface ClassOnDay {
   minutes: number;
   /** La da sustituyendo a su titular. */
   substitution: boolean;
+  /** Actividad del club: turno normal o la de los viernes (null en las clases). */
+  activity: 'shift' | 'fridays' | null;
 }
 
 /** Quién da cada clase cada día (la agenda de nómina). */
@@ -77,8 +84,8 @@ const minutesOf = (hhmm: string) => {
   return (h ?? 0) * 60 + (m ?? 0);
 };
 
-function statusOf(item: ClassOnDay, roll: RollCall | null, now: Date): RollCallStatus {
-  if (roll !== null) return 'taken';
+function statusOf(item: ClassOnDay, done: boolean, now: Date): RollCallStatus {
+  if (done) return 'taken';
   const date = LocalDate.fromString(item.date);
   const today = LocalDate.fromInstant(now);
   if (
@@ -95,7 +102,7 @@ function statusOf(item: ClassOnDay, roll: RollCall | null, now: Date): RollCallS
 export interface TeacherClassView extends ClassOnDay {
   classroom: string | null;
   students: number;
-  /** null en los turnos, que no tienen lista. */
+  /** Estado de su lista (o, en una actividad, de su confirmación); null si no tiene. */
   rollCall: RollCallStatus | null;
 }
 
@@ -106,6 +113,7 @@ export class TeacherClasses {
     private readonly roster: ClassRoster,
     private readonly rollCalls: RollCallRepository,
     private readonly clock: Clock,
+    private readonly activities: ActivityProgress | null = null,
   ) {}
 
   async execute(teacherId: string, from: string, to: string): Promise<TeacherClassView[]> {
@@ -114,7 +122,16 @@ export class TeacherClasses {
     const views: TeacherClassView[] = [];
     for (const item of classes) {
       if (item.groupId === null) {
-        views.push({ ...item, classroom: null, students: 0, rollCall: null });
+        const done = item.dutyId !== null && this.activities !== null &&
+          (await this.activities.isDone(item, teacherId));
+        views.push({
+          ...item,
+          classroom: null,
+          students: 0,
+          rollCall: item.dutyId === null || this.activities === null
+            ? null
+            : statusOf(item, done, now),
+        });
         continue;
       }
       const date = LocalDate.fromString(item.date);
@@ -122,7 +139,7 @@ export class TeacherClasses {
         ...item,
         classroom: await this.roster.classroomOf(item.groupId),
         students: (await this.roster.studentsOn(item.groupId, date)).length,
-        rollCall: statusOf(item, await this.rollCalls.find(item.groupId, date), now),
+        rollCall: statusOf(item, (await this.rollCalls.find(item.groupId, date)) !== null, now),
       });
     }
     return views;
@@ -180,7 +197,7 @@ export class OpenRollCall {
       ...item,
       classroom: await this.roster.classroomOf(groupId),
       students: students.length,
-      rollCall: statusOf(item, roll, this.clock.now()),
+      rollCall: statusOf(item, roll !== null, this.clock.now()),
       list: students.map((s) => ({ ...s, present: !absent.includes(s.id) })),
     };
   }
@@ -208,11 +225,17 @@ export class TakeRollCall {
   }
 }
 
-/** Clase apuntada en las horas (sesión de un grupo) sin lista y con el plazo acabado. */
+/**
+ * Clase o actividad apuntada en las horas sin confirmar y con el plazo acabado: una clase sin lista, un turno sin
+ * «Turno hecho» o unos viernes en los que el encargado no marcó a nadie.
+ */
 export interface MissedRollCall {
   /** Sesión de horas de esa clase, para quitarla si no se dio. */
   sessionId: string;
-  groupId: string;
+  /** La clase (o, en una actividad del club, null). */
+  groupId: string | null;
+  /** La actividad del club (o, en una clase, null). */
+  dutyId: string | null;
   date: string;
   label: string;
   teacherName: string;
@@ -302,5 +325,144 @@ export class StudentAttendance {
       ...summary,
       attended: summary.classes - summary.absences.length,
     };
+  }
+}
+
+// ---- Actividades del club --------------------------------------------------------------------
+
+/** Confirmaciones de las actividades (tabla de «Turno hecho» y «Se dio»). */
+export interface ActivityCheckRepository {
+  find(duty: string, date: LocalDate): Promise<ActivityCheck | null>;
+  save(check: ActivityCheck): Promise<void>;
+}
+
+/** La asistencia de los viernes de los puntos, vista desde la actividad de los viernes. */
+export interface FridayAttendance {
+  /** Cuántas asistencias de ese viernes marcó el propio profesor (desde su cuenta). */
+  markedByTeacher(teacherId: string, date: LocalDate): Promise<number>;
+  /** Los que vinieron algún viernes de ese mes o del anterior, y los que ya están marcados ese día. */
+  proposed(date: LocalDate): Promise<RosterStudent[]>;
+  /** Quiénes están marcados ese viernes (por quien sea). */
+  presentOn(date: LocalDate): Promise<string[]>;
+  /** Todos los alumnos de alta ese día, para el buscador. */
+  everyone(date: LocalDate): Promise<RosterStudent[]>;
+  /** Marca o desmarca la asistencia (y su punto) firmada por la cuenta que lo hace. */
+  mark(student: string, date: LocalDate, present: boolean, user: string | null): Promise<void>;
+}
+
+/** Si una actividad de la agenda ya está hecha ese día: con «Turno hecho» o, la de los viernes, con alguna marca suya. */
+export class ActivityProgress {
+  constructor(
+    private readonly checks: ActivityCheckRepository,
+    private readonly fridays: FridayAttendance,
+  ) {}
+
+  async isDone(item: ClassOnDay, teacherId: string): Promise<boolean> {
+    if (item.dutyId === null) return false;
+    const date = LocalDate.fromString(item.date);
+    if ((await this.checks.find(item.dutyId, date)) !== null) return true;
+    return item.activity === 'fridays' && (await this.fridays.markedByTeacher(teacherId, date)) > 0;
+  }
+}
+
+/** La actividad de esa agenda que da el profesor ese día, del tipo pedido, o ClassNotGiven. */
+async function givenActivity(
+  assignments: ClassAssignments,
+  teacherId: string,
+  dutyId: string,
+  date: LocalDate,
+  kind: 'shift' | 'fridays',
+): Promise<ClassOnDay> {
+  const day = date.toString();
+  const found = (await assignments.agenda(teacherId, day, day)).find((c) =>
+    c.dutyId === dutyId && c.activity === kind
+  );
+  if (!found) throw new ClassNotGiven();
+  return found;
+}
+
+/** El encargado de un turno normal confirma que lo hizo («Turno hecho»), en el plazo de las listas. */
+export class MarkShiftDone {
+  constructor(
+    private readonly assignments: ClassAssignments,
+    private readonly checks: ActivityCheckRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string, dutyId: string, date: string): Promise<void> {
+    const day = LocalDate.fromString(date);
+    const item = await givenActivity(this.assignments, teacherId, dutyId, day, 'shift');
+    if ((await this.checks.find(dutyId, day)) !== null) return;
+    await this.checks.save(
+      ActivityCheck.done(dutyId, day, minutesOf(item.start), teacherId, this.clock.now()),
+    );
+  }
+}
+
+/** La lista de los viernes del encargado: los propuestos (sin marcar si no vinieron) y todos para el buscador. */
+export interface FridayListView extends ClassOnDay {
+  rollCall: RollCallStatus;
+  list: { id: string; name: string; present: boolean }[];
+  everyone: RosterStudent[];
+}
+
+export class OpenFridayList {
+  constructor(
+    private readonly assignments: ClassAssignments,
+    private readonly fridays: FridayAttendance,
+    private readonly progress: ActivityProgress,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string, dutyId: string, date: string): Promise<FridayListView> {
+    const day = LocalDate.fromString(date);
+    const item = await givenActivity(this.assignments, teacherId, dutyId, day, 'fridays');
+    const present = new Set(await this.fridays.presentOn(day));
+    const proposed = await this.fridays.proposed(day);
+    return {
+      ...item,
+      rollCall: statusOf(item, await this.progress.isDone(item, teacherId), this.clock.now()),
+      list: proposed.map((s) => ({ ...s, present: present.has(s.id) })),
+      everyone: await this.fridays.everyone(day),
+    };
+  }
+}
+
+/** El encargado de los viernes marca (o desmarca) que un alumno vino: la misma asistencia y punto que en Puntos. */
+export class MarkFridayAsManager {
+  constructor(
+    private readonly assignments: ClassAssignments,
+    private readonly fridays: FridayAttendance,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(
+    teacherId: string,
+    userId: string | null,
+    dutyId: string,
+    date: string,
+    student: string,
+    present: boolean,
+  ): Promise<void> {
+    const day = LocalDate.fromString(date);
+    const item = await givenActivity(this.assignments, teacherId, dutyId, day, 'fridays');
+    assertWithinWindow(day, minutesOf(item.start), this.clock.now());
+    await this.fridays.mark(student, day, present, userId);
+  }
+}
+
+/** Administración da por buena una actividad que su encargado no confirmó: deja de salir en el aviso. */
+export class ConfirmActivity {
+  constructor(
+    private readonly checks: ActivityCheckRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(dutyId: string, date: string, userId: string): Promise<void> {
+    const day = LocalDate.fromString(date);
+    const now = this.clock.now();
+    if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
+    if ((await this.checks.find(dutyId, day)) !== null) return;
+    await this.checks.save(ActivityCheck.confirm(dutyId, day, userId, now));
   }
 }

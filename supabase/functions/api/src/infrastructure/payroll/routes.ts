@@ -40,6 +40,7 @@ import {
   SqlTimesheetRepository,
 } from '../persistence/payroll.ts';
 import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
+import { dutyKindFromName } from '../../domain/payroll/mod.ts';
 
 /** Casos de uso de nómina montados sobre la transacción de la petición. */
 function payroll(api: ApiApp, scope: RequestScope) {
@@ -288,6 +289,7 @@ export function registerPayrollRoutes(api: ApiApp): void {
     start: b.requiredString('start'),
     end: b.requiredString('end'),
     label: b.optionalString('label'),
+    kind: dutyKindFromName(b.optionalString('kind') ?? 'shift'),
   });
 
   api.defineRoute(admin('GET', '/api/admin/payroll/duties'), async (_c, scope) => {

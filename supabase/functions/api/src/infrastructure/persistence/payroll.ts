@@ -2,6 +2,8 @@ import { LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
 import {
   Advance,
   ClubDuty,
+  type DutyKind,
+  dutyKindFromName,
   DutyRef,
   GroupRef,
   MonthlySettlement,
@@ -301,6 +303,7 @@ export class SqlTeacherReportQuery implements TeacherReportQuery {
       start: hhmm(r.int('start_minutes')),
       end: hhmm(r.int('end_minutes')),
       label: r.string('label'),
+      kind: dutyKindFromName(r.string('kind')),
     }));
   }
 }
@@ -490,10 +493,11 @@ function toDuty(row: Row): ClubDuty {
     row.int('start_minutes'),
     row.int('end_minutes'),
     row.string('label'),
+    dutyKindFromName(row.string('kind')),
   );
 }
 
-/** Turnos fijos (tabla `payroll_duty`). */
+/** Actividades del club con encargado fijo (tabla `payroll_duty`). */
 export class SqlDutyRepository implements DutyRepository {
   constructor(private readonly sql: Sql) {}
 
@@ -516,9 +520,10 @@ export class SqlDutyRepository implements DutyRepository {
       start_minutes: duty.start,
       end_minutes: duty.end,
       label: duty.label,
+      kind: duty.kind,
     };
     await this.sql`INSERT INTO payroll_duty ${this.sql(record)} ON CONFLICT (id) DO UPDATE SET ${
-      this.sql(record, 'teacher_id', 'weekday', 'start_minutes', 'end_minutes', 'label')
+      this.sql(record, 'teacher_id', 'weekday', 'start_minutes', 'end_minutes', 'label', 'kind')
     }`;
   }
 
@@ -608,6 +613,7 @@ export interface DutyView {
   start: string;
   end: string;
   label: string;
+  kind: DutyKind;
 }
 
 const hhmm = (minutes: number) =>
@@ -659,6 +665,7 @@ export class SqlPlanningQuery {
       start: hhmm(r.int('start_minutes')),
       end: hhmm(r.int('end_minutes')),
       label: r.string('label'),
+      kind: dutyKindFromName(r.string('kind')),
     }));
   }
 }
