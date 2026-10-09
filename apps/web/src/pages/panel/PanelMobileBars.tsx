@@ -1,5 +1,5 @@
 import { LogOut } from 'lucide-react';
-import { NavLink, useLocation, type Location } from 'react-router';
+import { Link, NavLink, useLocation, type Location } from 'react-router';
 
 import type { Role } from '@/features/auth/api';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
@@ -24,7 +24,9 @@ function isMobileItemActive(path: string, location: Location): boolean {
 export function PanelMobileHeader({ title, onLogout }: { title: string; onLogout: () => void }) {
   return (
     <header className="flex items-center gap-3 border-b border-line-soft bg-surface-raised px-4 py-3 md:hidden">
-      <ClubLogo size={36} />
+      <Link to="/panel" aria-label="Ir al inicio" className="shrink-0 rounded-full">
+        <ClubLogo size={36} />
+      </Link>
       <p className="flex-1 font-display text-[22px] font-bold tracking-[0.04em] uppercase">
         {title}
       </p>

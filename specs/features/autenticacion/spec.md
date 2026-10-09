@@ -149,7 +149,7 @@ poder entrar o de ser superadministración, la suplantación termina.
 
 #### Scenario: Ver la aplicación como administración
 - **WHEN** superadministración pulsa «Entrar como» en una cuenta de administración y lo confirma
-- **THEN** ve el panel como esa cuenta, con el aviso arriba, y al pulsar «Volver a mi cuenta» vuelve a la suya
+- **THEN** ve el panel como esa cuenta, con el aviso arriba, y al pulsar «Volver a mi cuenta» vuelve a la suya, en el resumen, sea cual sea la sección en la que estuviera
 
 ### Requirement: Gestión técnica de cuentas
 Quien mantiene la aplicación MUST poder, mediante un procedimiento técnico:
