@@ -5,13 +5,14 @@ lista no se pasó y la asistencia de cada alumno.
 
 ### Requirement: Pasar lista
 Quien da una clase un día (su titular o quien le sustituye) MUST poder pasar su lista desde 15 minutos antes de que
-empiece la clase (para ir marcando a quien llega) hasta el final del día siguiente. La lista son los alumnos que van ese día (con su horario especial), todos marcados como
-presentes; se desmarca a quien falta y se guarda. Dentro del plazo se puede corregir. Solo se pueden marcar ausentes
-alumnos de la lista de ese día. Los turnos (encargado del club) y los festivos no tienen lista. Cada lista queda en el
+empiece la clase (para ir marcando a quien llega) hasta el final del día siguiente. La lista son los alumnos que van
+ese día (con su horario especial), sin marcar al abrirla; se marca a quien ha venido y se guarda (quien queda sin marcar,
+falta). Dentro del plazo se puede corregir, y una lista ya pasada se abre con lo que se guardó. Solo se pueden marcar
+ausentes alumnos de la lista de ese día. Los turnos (encargado del club) y los festivos no tienen lista. Cada lista queda en el
 historial.
 
 #### Scenario: Al acabar la clase
-- **WHEN** Lucía abre la lista de su clase del martes a las 18:00 y desmarca a Pablo
+- **WHEN** Lucía abre la lista de su clase del martes a las 18:00, marca a todos menos a Pablo y la guarda
 - **THEN** la lista queda pasada con Pablo ausente y el resto presentes, y su clase sale «Lista pasada»
 
 #### Scenario: Antes de la clase
