@@ -160,7 +160,7 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                 />
               </div>
             </Section>
-            <Section title="Familia y contacto">
+            <Section title="Contacto">
               <div className="grid gap-4 sm:grid-cols-2">
                 <TextField
                   label="Tutor 1"
@@ -196,7 +196,9 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                 onChange={(e) => set('ownPhone', e.target.value)}
                 error={fieldErrors.ownPhone}
               />
-              {!form.isEdit && (
+            </Section>
+            {!form.isEdit && (
+              <Section title="Familia directa en el club">
                 <Select
                   label="Familia directa en el club (opcional)"
                   options={[
@@ -209,8 +211,8 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                   value={values.siblingId}
                   onChange={(value) => set('siblingId', value)}
                 />
-              )}
-            </Section>
+              </Section>
+            )}
             <Section title="Club">
               {!form.isEdit && (
                 <ScheduleEditor

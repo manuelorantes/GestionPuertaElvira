@@ -240,7 +240,10 @@ export function StudentPanel() {
           <Row label="Baja">{formatDate(s.withdrawnOn)}</Row>
         </Card>
         <Card className="p-4">
-          <CardTitle>Familia y contacto</CardTitle>
+          <CardTitle>Contacto</CardTitle>
+          {s.guardians.length === 0 && !s.ownPhone && (
+            <p className="py-1.5 text-sm text-ink-muted">Sin teléfonos de contacto.</p>
+          )}
           {s.guardians.map((g) => (
             <Row key={g.name} label={g.name}>
               {g.phone ? <a href={telHref(g.phone)}>{g.phone}</a> : 'Sin teléfono'}
@@ -251,11 +254,15 @@ export function StudentPanel() {
               <a href={telHref(s.ownPhone)}>{s.ownPhone}</a>
             </Row>
           )}
+        </Card>
+        <Card className="p-4">
+          <CardTitle>Familia directa en el club</CardTitle>
+          {s.siblings.length === 0 && (
+            <p className="py-1.5 text-sm text-ink-muted">No tiene familia directa en el club.</p>
+          )}
           {s.siblings.map((sibling) => (
             <div key={sibling.id} className="flex items-center gap-2 py-1.5 text-sm">
-              <span className="flex-1">
-                Familia directa en el club: <strong>{sibling.fullName}</strong>
-              </span>
+              <span className="flex-1 font-medium">{sibling.fullName}</span>
               <button
                 type="button"
                 onClick={() => void navigate(`/panel/alumnos/${sibling.id}`)}
