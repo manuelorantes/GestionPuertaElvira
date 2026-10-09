@@ -3,9 +3,12 @@ import {
   assertWithinWindow,
   OPENS_BEFORE_MINUTES,
   RollCall,
+  RollCallClosed,
+  type RollCallMarks,
 } from '../../domain/attendance/mod.ts';
 import {
   type Clock,
+  InvalidValue,
   LocalDate,
   minutesOfDayInMadrid,
   Season,
@@ -49,6 +52,10 @@ export interface RosterStudent {
 export interface ClassRoster {
   studentsOn(groupId: string, date: LocalDate): Promise<RosterStudent[]>;
   classroomOf(groupId: string): Promise<string | null>;
+  /** Alumnos de alta en el club ese día (para la asistencia especial), por nombre. */
+  clubStudentsOn(date: LocalDate): Promise<RosterStudent[]>;
+  /** Nombres de unos alumnos (aunque ya no estén de alta). */
+  namesOf(ids: readonly string[]): Promise<RosterStudent[]>;
 }
 
 /** Grupo de un profesor con sus alumnos y los días que viene cada uno. */
@@ -166,11 +173,18 @@ export class TeacherStudents {
   }
 }
 
-/** La lista de una clase tal y como la ve el profesor: alumnos de ese día, sin marcar hasta que la pasa. */
+/**
+ * La lista de una clase tal y como la ve el profesor: alumnos de ese día, sin marcar hasta que la pasa; los de fuera de
+ * la clase que vinieron (asistencia especial) y los alumnos del club que se pueden añadir así. `period`: si la lista aún
+ * no se puede pasar, está en plazo o es pasada (se cambia confirmándolo).
+ */
 export interface RollCallView extends TeacherClassView {
   groupId: string;
   students: number;
+  period: 'upcoming' | 'open' | 'past';
   list: { id: string; name: string; present: boolean }[];
+  guests: RosterStudent[];
+  others: RosterStudent[];
 }
 
 /** La clase de ese grupo que da el profesor ese día, o ClassNotGiven. */
@@ -184,6 +198,17 @@ async function givenClass(
   const found = (await assignments.agenda(teacherId, day, day)).find((c) => c.groupId === groupId);
   if (!found || found.groupId === null) throw new ClassNotGiven();
   return { ...found, groupId: found.groupId };
+}
+
+/** En qué momento está el plazo de una lista: aún no, en plazo o pasada. */
+function periodOf(item: ClassOnDay, now: Date): RollCallView['period'] {
+  try {
+    assertWithinWindow(LocalDate.fromString(item.date), minutesOf(item.start), now);
+    return 'open';
+  } catch (error) {
+    if (error instanceof RollCallClosed) return 'past';
+    return 'upcoming';
+  }
 }
 
 export class OpenRollCall {
@@ -201,17 +226,26 @@ export class OpenRollCall {
     const roll = await this.rollCalls.find(groupId, day);
     // Sin pasar, nadie está marcado (el profesor marca a quien viene); pasada, se ve lo que se guardó.
     const absent = roll?.absent() ?? students.map((s) => s.id);
+    const guestIds = roll?.guests() ?? [];
+    const now = this.clock.now();
+    const inClass = new Set([...students.map((s) => s.id), ...guestIds]);
     return {
       ...item,
       classroom: await this.roster.classroomOf(groupId),
       students: students.length,
-      rollCall: statusOf(item, roll !== null, this.clock.now()),
+      rollCall: statusOf(item, roll !== null, now),
+      period: periodOf(item, now),
       list: students.map((s) => ({ ...s, present: !absent.includes(s.id) })),
+      guests: guestIds.length === 0 ? [] : await this.roster.namesOf(guestIds),
+      others: (await this.roster.clubStudentsOn(day)).filter((s) => !inClass.has(s.id)),
     };
   }
 }
 
-/** El profesor pasa (o corrige) la lista de una clase que da ese día, marcando a quien falta. */
+/**
+ * El profesor pasa (o corrige) la lista de una clase que da ese día, marcando a quien falta y a quien vino de otra
+ * clase. Una lista pasada (fuera de plazo) solo se cambia con `past` (confirmado) y no apunta horas.
+ */
 export class TakeRollCall {
   constructor(
     private readonly assignments: ClassAssignments,
@@ -221,18 +255,33 @@ export class TakeRollCall {
     private readonly sessions: SessionRecorder | null = null,
   ) {}
 
-  async execute(teacherId: string, groupId: string, date: string, absent: string[]): Promise<void> {
+  async execute(
+    teacherId: string,
+    groupId: string,
+    date: string,
+    marks: RollCallMarks,
+    past = false,
+  ): Promise<void> {
     const day = LocalDate.fromString(date);
     const item = await givenClass(this.assignments, teacherId, groupId, day);
     const roster = (await this.roster.studentsOn(groupId, day)).map((s) => s.id);
     const now = this.clock.now();
     const start = minutesOf(item.start);
     const existing = await this.rollCalls.find(groupId, day);
-    const roll = existing ?? RollCall.take(groupId, day, start, teacherId, roster, absent, now);
-    if (existing) existing.correct(start, teacherId, roster, absent, now);
+    // Asistencia especial: alumnos de alta ese día (o que ya estaban en la lista aunque luego se dieran de baja).
+    const allowed = new Set([
+      ...(await this.roster.clubStudentsOn(day)).map((s) => s.id),
+      ...(existing?.guests() ?? []),
+    ]);
+    if ((marks.guests ?? []).some((id) => !allowed.has(id))) {
+      throw new InvalidValue('guests', 'Elige alumnos de alta en el club ese día.');
+    }
+    const roll = existing ??
+      RollCall.take(groupId, day, start, teacherId, roster, marks, now, past);
+    if (existing) existing.correct(start, teacherId, roster, marks, now, past);
     await this.rollCalls.save(roll);
-    // Pasar lista apunta ya las horas de la clase.
-    await this.sessions?.record(item);
+    // Pasar lista en plazo apunta ya las horas de la clase (una lista pasada no: administración ya decidió sobre ellas).
+    if (periodOf(item, now) === 'open') await this.sessions?.record(item);
   }
 }
 
@@ -304,10 +353,14 @@ export class ConfirmWithoutRollCall {
   }
 }
 
-/** Asistencia de un alumno en un periodo: clases con lista pasada en las que estaba y las que faltó. */
+/**
+ * Asistencia de un alumno en un periodo: clases con lista pasada en las que estaba, las que faltó y las clases de otros
+ * grupos a las que vino (asistencia especial; no cuentan en el porcentaje).
+ */
 export interface StudentAttendanceSummary {
   classes: number;
   absences: { date: string; label: string }[];
+  specials: { date: string; label: string }[];
 }
 
 export interface StudentAttendanceQuery {
@@ -501,6 +554,8 @@ export interface GroupAttendanceData {
     days: number[] | null;
   }[];
   absences: { date: string; studentId: string }[];
+  /** Alumnos de fuera del grupo que vinieron (asistencia especial). */
+  guests: { date: string; studentId: string; name: string }[];
 }
 
 export interface GroupAttendanceQuery {
@@ -517,27 +572,34 @@ export class AttendanceGroupNotFound extends Error {
 
 /** Estado de un día de clase: lista pasada, dada por buena sin lista, sin lista (aún) o festivo. */
 export type GroupDayStatus = 'taken' | 'confirmed' | 'pending' | 'holiday';
-/** Un alumno un día: vino, faltó, sin saber (no hay lista) o null si ese día no le tocaba. */
-export type AttendanceMark = 'present' | 'absent' | 'unknown' | null;
+/**
+ * Un alumno un día: vino, faltó, sin saber (no hay lista), vino sin tocarle (asistencia especial) o null si ese día no
+ * le tocaba.
+ */
+export type AttendanceMark = 'present' | 'absent' | 'unknown' | 'special' | null;
 
 export interface GroupAttendanceView {
   groupId: string;
   name: string;
   month: string;
   days: { date: string; status: GroupDayStatus }[];
-  /** `marks` va en el orden de `days`; `classes` = días con lista en que le tocaba venir. */
+  /**
+   * `marks` va en el orden de `days`; `classes` = días con lista en que le tocaba venir (la asistencia especial no
+   * cuenta); `member`: estuvo inscrito algún día del mes (si no, solo vino en asistencia especial).
+   */
   students: {
     id: string;
     name: string;
     marks: AttendanceMark[];
     attended: number;
     classes: number;
+    member: boolean;
   }[];
 }
 
 /**
  * La asistencia de un grupo en un mes, día a día: los días de clase hasta hoy y, por cada alumno que estuvo inscrito,
- * si vino a cada uno de los suyos.
+ * si vino a cada uno de los suyos; más los alumnos de fuera que vinieron algún día (asistencia especial).
  */
 export class GroupAttendance {
   constructor(
@@ -565,14 +627,19 @@ export class GroupAttendance {
       });
     }
     const byStudent = new Map<string, GroupAttendanceView['students'][number]>();
+    const row = (id: string, name: string): GroupAttendanceView['students'][number] => {
+      const found: GroupAttendanceView['students'][number] = byStudent.get(id) ??
+        { id, name, marks: days.map(() => null), attended: 0, classes: 0, member: false };
+      byStudent.set(id, found);
+      return found;
+    };
     for (const e of data.enrolments) {
-      const student = byStudent.get(e.studentId) ??
-        { id: e.studentId, name: e.name, marks: days.map(() => null), attended: 0, classes: 0 };
-      byStudent.set(e.studentId, student);
+      const student = row(e.studentId, e.name);
       days.forEach((day, i) => {
         const enrolled = e.from <= day.date && (e.until === null || day.date < e.until) &&
           (e.days === null || e.days.includes(day.weekday));
         if (!enrolled || day.status === 'holiday') return;
+        student.member = true;
         if (day.status !== 'taken') {
           student.marks[i] = 'unknown';
           return;
@@ -583,12 +650,18 @@ export class GroupAttendance {
         if (mark === 'present') student.attended++;
       });
     }
+    for (const g of data.guests) {
+      const i = days.findIndex((d) => d.date === g.date);
+      if (i >= 0) row(g.studentId, g.name).marks[i] = 'special';
+    }
     return {
       groupId,
       name: data.name,
       month: ym.toString(),
       days: days.map(({ date, status }) => ({ date, status })),
-      students: [...byStudent.values()].filter((s) => s.marks.some((m) => m !== null)),
+      students: [...byStudent.values()]
+        .filter((s) => s.marks.some((m) => m !== null))
+        .sort((a, b) => a.name.localeCompare(b.name, 'es')),
     };
   }
 }
