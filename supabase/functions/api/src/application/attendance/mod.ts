@@ -1,4 +1,4 @@
-import { RollCall } from '../../domain/attendance/mod.ts';
+import { OPENS_BEFORE_MINUTES, RollCall } from '../../domain/attendance/mod.ts';
 import {
   type Clock,
   LocalDate,
@@ -67,8 +67,8 @@ export class ClassNotGiven extends Error {
 }
 
 /**
- * Estado de la lista de una clase: pasada (o dada por buena), abierta (se puede pasar ya), aún no (no ha empezado)
- * o sin pasar (acabó el plazo).
+ * Estado de la lista de una clase: pasada (o dada por buena), abierta (se puede pasar ya), aún no (faltan más de 15
+ * minutos para que empiece) o sin pasar (acabó el plazo).
  */
 export type RollCallStatus = 'taken' | 'open' | 'upcoming' | 'missed';
 
@@ -83,7 +83,8 @@ function statusOf(item: ClassOnDay, roll: RollCall | null, now: Date): RollCallS
   const today = LocalDate.fromInstant(now);
   if (
     today.isBefore(date) ||
-    (today.equals(date) && minutesOfDayInMadrid(now) < minutesOf(item.start))
+    (today.equals(date) &&
+      minutesOfDayInMadrid(now) < minutesOf(item.start) - OPENS_BEFORE_MINUTES)
   ) {
     return 'upcoming';
   }
