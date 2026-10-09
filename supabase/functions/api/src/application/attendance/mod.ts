@@ -482,3 +482,113 @@ export class ConfirmActivity {
     await this.checks.save(ActivityCheck.confirm(dutyId, day, userId, now));
   }
 }
+
+// ---- Asistencia de un grupo ------------------------------------------------------------------
+
+/** Lo que guarda el club de un grupo en un periodo: horario, festivos, listas, inscripciones y faltas. */
+export interface GroupAttendanceData {
+  name: string;
+  /** Días de clase (1 = lunes … 7 = domingo). */
+  weekdays: number[];
+  holidays: Set<string>;
+  rollCalls: { date: string; kind: 'taken' | 'confirmed' }[];
+  /** Inscripciones que tocan el periodo: desde, hasta (exclusivo) y días que viene (null = todos los del grupo). */
+  enrolments: {
+    studentId: string;
+    name: string;
+    from: string;
+    until: string | null;
+    days: number[] | null;
+  }[];
+  absences: { date: string; studentId: string }[];
+}
+
+export interface GroupAttendanceQuery {
+  /** null si el grupo no existe. */
+  between(groupId: string, from: LocalDate, to: LocalDate): Promise<GroupAttendanceData | null>;
+}
+
+export class AttendanceGroupNotFound extends Error {
+  constructor() {
+    super('Ese grupo no existe.');
+    this.name = 'AttendanceGroupNotFound';
+  }
+}
+
+/** Estado de un día de clase: lista pasada, dada por buena sin lista, sin lista (aún) o festivo. */
+export type GroupDayStatus = 'taken' | 'confirmed' | 'pending' | 'holiday';
+/** Un alumno un día: vino, faltó, sin saber (no hay lista) o null si ese día no le tocaba. */
+export type AttendanceMark = 'present' | 'absent' | 'unknown' | null;
+
+export interface GroupAttendanceView {
+  groupId: string;
+  name: string;
+  month: string;
+  days: { date: string; status: GroupDayStatus }[];
+  /** `marks` va en el orden de `days`; `classes` = días con lista en que le tocaba venir. */
+  students: {
+    id: string;
+    name: string;
+    marks: AttendanceMark[];
+    attended: number;
+    classes: number;
+  }[];
+}
+
+/**
+ * La asistencia de un grupo en un mes, día a día: los días de clase hasta hoy y, por cada alumno que estuvo inscrito,
+ * si vino a cada uno de los suyos.
+ */
+export class GroupAttendance {
+  constructor(
+    private readonly query: GroupAttendanceQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(groupId: string, month: string): Promise<GroupAttendanceView> {
+    const ym = YearMonth.fromString(month);
+    const today = LocalDate.fromInstant(this.clock.now());
+    const from = ym.firstDay();
+    const to = ym.lastDay().isBefore(today) ? ym.lastDay() : today;
+    const data = await this.query.between(groupId, from, to);
+    if (data === null) throw new AttendanceGroupNotFound();
+    const rollCalls = new Map(data.rollCalls.map((r) => [r.date, r.kind]));
+    const absent = new Set(data.absences.map((a) => `${a.date}|${a.studentId}`));
+    const days: { date: string; status: GroupDayStatus; weekday: number }[] = [];
+    for (let d = from; !to.isBefore(d); d = d.plusDays(1)) {
+      if (!data.weekdays.includes(d.isoWeekday())) continue;
+      const date = d.toString();
+      days.push({
+        date,
+        weekday: d.isoWeekday(),
+        status: data.holidays.has(date) ? 'holiday' : rollCalls.get(date) ?? 'pending',
+      });
+    }
+    const byStudent = new Map<string, GroupAttendanceView['students'][number]>();
+    for (const e of data.enrolments) {
+      const student = byStudent.get(e.studentId) ??
+        { id: e.studentId, name: e.name, marks: days.map(() => null), attended: 0, classes: 0 };
+      byStudent.set(e.studentId, student);
+      days.forEach((day, i) => {
+        const enrolled = e.from <= day.date && (e.until === null || day.date < e.until) &&
+          (e.days === null || e.days.includes(day.weekday));
+        if (!enrolled || day.status === 'holiday') return;
+        if (day.status !== 'taken') {
+          student.marks[i] = 'unknown';
+          return;
+        }
+        const mark = absent.has(`${day.date}|${e.studentId}`) ? 'absent' : 'present';
+        student.marks[i] = mark;
+        student.classes++;
+        if (mark === 'present') student.attended++;
+      });
+    }
+    return {
+      groupId,
+      name: data.name,
+      month: ym.toString(),
+      days: days.map(({ date, status }) => ({ date, status })),
+      students: [...byStudent.values()].filter((s) => s.marks.some((m) => m !== null)),
+    };
+  }
+}

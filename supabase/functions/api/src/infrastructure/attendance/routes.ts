@@ -6,6 +6,7 @@ import {
   ConfirmActivity,
   ConfirmWithoutRollCall,
   type FridayAttendance,
+  GroupAttendance,
   MarkFridayAsManager,
   MarkShiftDone,
   MissedRollCalls,
@@ -31,6 +32,7 @@ import {
   SqlActivityCheckRepository,
   SqlClassRoster,
   SqlFridayRoster,
+  SqlGroupAttendanceQuery,
   SqlMissedRollCallQuery,
   SqlStudentAttendanceQuery,
   SqlTeacherRosterQuery,
@@ -119,6 +121,7 @@ class PayrollSessionRecorder implements SessionRecorder {
 export function registerAttendanceRoutes(api: ApiApp): void {
   registerDomainErrors({
     ClassNotGiven: [404, 'not_found'],
+    AttendanceGroupNotFound: [404, 'not_found'],
     RollCallNotOpenYet: [409, 'roll_call_not_open'],
     RollCallClosed: [409, 'roll_call_closed'],
     RollCallStillOpen: [409, 'roll_call_still_open'],
@@ -278,6 +281,16 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         scope.user.id,
       );
       return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/attendance/groups/:groupId', access: 'admin' },
+    async (c, scope) => {
+      return c.json(
+        await new GroupAttendance(new SqlGroupAttendanceQuery(scope.tx), api.deps.clock)
+          .execute(param(c, 'groupId'), c.req.query('month') ?? ''),
+      );
     },
   );
 
