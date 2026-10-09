@@ -293,11 +293,18 @@ describe('Profesorado', () => {
     expect(screen.getByText('2 sesiones · 3 h · 48 €')).toBeInTheDocument();
   });
 
-  it('marks a holiday removing its sessions', async () => {
-    const fetch = api({ 'POST /api/admin/payroll/holidays': [200, { removed: 3 }] });
+  it('marks a holiday from the substitutions tab (not the timesheet), removing its sessions', async () => {
+    const fetch = api({
+      'POST /api/admin/payroll/holidays': [200, { removed: 3 }],
+      'GET /api/admin/payroll/substitutions?month=2026-09': [200, { items: [] }],
+      'GET /api/admin/payroll/holidays?season=2026': [200, { items: [] }],
+    });
     renderApp('/panel/profesores?mes=2026-09&pestana=horas');
+    await screen.findByRole('table', { name: 'Sesiones de septiembre 2026' });
+    expect(screen.queryByRole('button', { name: 'Marcar festivo' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Sustituciones y festivos' }));
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Marcar festivo' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir festivo' }));
     const dialog = await screen.findByRole('dialog', { name: 'Marcar festivo' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Marcar festivo' }));
 

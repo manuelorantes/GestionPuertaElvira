@@ -1,4 +1,4 @@
-import { CalendarX, Lock, Pencil, Trash2 } from 'lucide-react';
+import { Lock, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -9,14 +9,12 @@ import { usePayrollMutation, useSessions } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
 import { formatDate } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
-import { Button } from '@/shared/ui/Button';
 import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
 
-import { HolidayDialog } from './HolidayDialog';
 import { SessionDialog } from './SessionDialog';
 import { TeacherLink } from './TeacherLink';
 
@@ -34,7 +32,6 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
   const sessions = useSessions(month, teacherId);
   const [editing, setEditing] = useState<Session | null>(null);
   const [removing, setRemoving] = useState<Session | null>(null);
-  const [holiday, setHoliday] = useState(false);
   const remove = usePayrollMutation(deleteSession);
   const toast = useToast();
   const items = sessions.data ?? [];
@@ -146,16 +143,11 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
         <p className="flex-1 text-sm text-ink-muted">
           {items.length} sesiones · {hoursLabel(totalMinutes)} · {formatCents(totalCost)}
         </p>
-        <Button variant="secondary" onClick={() => setHoliday(true)} className="shrink-0">
-          <CalendarX aria-hidden size={18} />
-          Marcar festivo
-        </Button>
       </div>
       {renderBody()}
       {editing && (
         <SessionDialog session={editing} teachers={teachers} onClose={() => setEditing(null)} />
       )}
-      {holiday && <HolidayDialog onClose={() => setHoliday(false)} />}
       {removing && (
         <ConfirmDialog
           title="Quitar sesión"
