@@ -1,9 +1,12 @@
 import { InvalidValue, LocalDate, minutesOfDayInMadrid } from '../common/mod.ts';
 
-/** La lista aún no se puede pasar: la clase no ha empezado. */
+/** Minutos antes de que empiece la clase en que ya se puede pasar lista (para ir marcando a quien llega). */
+export const OPENS_BEFORE_MINUTES = 15;
+
+/** La lista aún no se puede pasar: faltan más de 15 minutos para la clase. */
 export class RollCallNotOpenYet extends Error {
   constructor() {
-    super('La lista se puede pasar cuando empieza la clase.');
+    super('La lista se puede pasar desde 15 minutos antes de que empiece la clase.');
     this.name = 'RollCallNotOpenYet';
   }
 }
@@ -19,9 +22,9 @@ export class RollCallClosed extends Error {
 export type RollCallKind = 'taken' | 'confirmed';
 
 /**
- * Lista de una clase un día (identidad: grupo + fecha). La pasa quien da la clase ese día, desde que empieza hasta el
- * final del día siguiente, marcando ausentes a alumnos de la lista de ese día; o administración la da por buena sin
- * lista cuando el plazo acabó sin pasarla.
+ * Lista de una clase un día (identidad: grupo + fecha). La pasa quien da la clase ese día, desde 15 minutos antes de que
+ * empiece hasta el final del día siguiente, marcando ausentes a alumnos de la lista de ese día; o administración la da
+ * por buena sin lista cuando el plazo acabó sin pasarla.
  */
 export class RollCall {
   private constructor(
@@ -80,7 +83,8 @@ export class RollCall {
   ): void {
     const today = LocalDate.fromInstant(now);
     if (
-      today.isBefore(this.date) || (today.equals(this.date) && minutesOfDayInMadrid(now) < start)
+      today.isBefore(this.date) ||
+      (today.equals(this.date) && minutesOfDayInMadrid(now) < start - OPENS_BEFORE_MINUTES)
     ) {
       throw new RollCallNotOpenYet();
     }

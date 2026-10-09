@@ -4,8 +4,8 @@ Las listas de clase que pasa el profesorado desde el móvil, el aviso a administ
 lista no se pasó y la asistencia de cada alumno.
 
 ### Requirement: Pasar lista
-Quien da una clase un día (su titular o quien le sustituye) MUST poder pasar su lista desde que empieza la clase hasta
-el final del día siguiente. La lista son los alumnos que van ese día (con su horario especial), todos marcados como
+Quien da una clase un día (su titular o quien le sustituye) MUST poder pasar su lista desde 15 minutos antes de que
+empiece la clase (para ir marcando a quien llega) hasta el final del día siguiente. La lista son los alumnos que van ese día (con su horario especial), todos marcados como
 presentes; se desmarca a quien falta y se guarda. Dentro del plazo se puede corregir. Solo se pueden marcar ausentes
 alumnos de la lista de ese día. Los turnos (encargado del club) y los festivos no tienen lista. Cada lista queda en el
 historial.
@@ -13,6 +13,10 @@ historial.
 #### Scenario: Al acabar la clase
 - **WHEN** Lucía abre la lista de su clase del martes a las 18:00 y desmarca a Pablo
 - **THEN** la lista queda pasada con Pablo ausente y el resto presentes, y su clase sale «Lista pasada»
+
+#### Scenario: Antes de la clase
+- **WHEN** Lucía abre la lista de su clase de las 17:00 a las 16:45
+- **THEN** ya puede pasarla; a las 16:44 todavía no
 
 #### Scenario: Fuera de plazo
 - **WHEN** Lucía intenta corregir el jueves la lista del martes
