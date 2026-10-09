@@ -1,4 +1,5 @@
 import {
+  Activity,
   BookOpen,
   CalendarDays,
   Clock,
@@ -87,6 +88,13 @@ export const PANEL_SECTIONS: PanelSection[] = [
     label: 'Usuarios',
     icon: UserCog,
     path: '/panel/usuarios',
+    roles: ['superadministrator'],
+  },
+  {
+    id: 'sistema',
+    label: 'Sistema',
+    icon: Activity,
+    path: '/panel/sistema',
     roles: ['superadministrator'],
   },
   ...TEACHER_SECTIONS,
