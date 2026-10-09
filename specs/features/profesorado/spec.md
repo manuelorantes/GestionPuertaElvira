@@ -103,7 +103,9 @@ con los totales del mes y ordenable por margen, € por hora u ocupación.
   cobradas o por cobrar y, en meses futuros, las previstas; sin cuotas de socio. Si un alumno va con varios profesores,
   su cuota se reparte según las horas semanales con cada uno.
 - Ocupación: plazas ocupadas de todas sus clases frente a las totales, contando cada día de clase.
-- Alumnos: los inscritos ese mes en los grupos de los que es titular (las clases que da como sustituto no cuentan). En
+- Alumnos: los inscritos en los grupos de los que es titular el mismo día de referencia que la ocupación (hoy en el mes
+  en curso, el último día en un mes pasado, el primero en uno futuro); quien cambió de grupo a mitad de mes cuenta solo
+  con el profesor nuevo, y las clases que da como sustituto no cuentan. En
   los totales, cada alumno MUST contar una sola vez aunque vaya con varios profesores; si hay alguno así, un asterisco
   junto al total abre la lista de esos alumnos, y cada nombre lleva a su ficha.
 

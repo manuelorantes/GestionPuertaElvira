@@ -347,15 +347,23 @@ Deno.test('Profitability should compare the expected hours of the month with the
           [carlos, { groups: ['Adultos I'], occupied: 4, capacity: 10 }],
         ]),
         // Ana va 2 h con Lucía y 1,5 h con Carlos; Pablo solo con Lucía.
+        // Rosa empezó el mes con Carlos y ahora va con Lucía: reparte su cuota, pero es alumna solo de Lucía.
         students: new Map([
           ['ana', new Map([[lucia, 120], [carlos, 90]])],
           ['pablo', new Map([[lucia, 120]])],
+          ['rosa', new Map([[lucia, 60], [carlos, 60]])],
         ]),
-        studentNames: new Map([['ana', 'Ana Pérez'], ['pablo', 'Pablo Gil']]),
+        teachersOn: new Map([
+          ['ana', new Set([lucia, carlos])],
+          ['pablo', new Set([lucia])],
+          ['rosa', new Set([lucia])],
+        ]),
+        studentNames: new Map([['ana', 'Ana Pérez'], ['pablo', 'Pablo Gil'], ['rosa', 'Rosa Gil']]),
       }),
   };
   const fees = {
-    monthlyFees: () => Promise.resolve(new Map([['ana', 7000], ['pablo', 4950], ['socio', 5000]])),
+    monthlyFees: () =>
+      Promise.resolve(new Map([['ana', 7000], ['pablo', 4950], ['rosa', 0], ['socio', 5000]])),
   };
   const rows = await new Profitability(
     fx,
@@ -380,13 +388,13 @@ Deno.test('Profitability should compare the expected hours of the month with the
       r.students,
     ]),
     [
-      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20, 2],
+      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20, 3],
       ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10, 1],
     ],
   );
-  // Ana va con los dos: cuenta una vez en el total y sale entre los compartidos.
+  // Ana va con los dos: cuenta una vez en el total y sale entre los compartidos; Rosa ya no va con Carlos.
   assertEquals(rows.students, {
-    total: 2,
+    total: 3,
     shared: [{ id: 'ana', name: 'Ana Pérez' }],
   });
 });
@@ -454,6 +462,7 @@ Deno.test('Profitability should use the hours actually recorded in a month alrea
       Promise.resolve({
         teachers: new Map([[carlos, { groups: ['Adultos I'], occupied: 4, capacity: 10 }]]),
         students: new Map([['ana', new Map([[carlos, 90]])]]),
+        teachersOn: new Map([['ana', new Set([carlos])]]),
         studentNames: new Map([['ana', 'Ana Pérez']]),
       }),
   };
@@ -569,7 +578,12 @@ Deno.test('TeacherReport should gather the months, payments and balance of a tea
     list(),
     {
       classLoad: () =>
-        Promise.resolve({ teachers: new Map(), students: new Map(), studentNames: new Map() }),
+        Promise.resolve({
+          teachers: new Map(),
+          students: new Map(),
+          teachersOn: new Map(),
+          studentNames: new Map(),
+        }),
     },
     { monthlyFees: () => Promise.resolve(new Map()) },
     fx.clock,
