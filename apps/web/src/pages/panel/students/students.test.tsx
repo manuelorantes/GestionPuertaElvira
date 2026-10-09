@@ -197,6 +197,7 @@ describe('Alumnos', () => {
           classes: 8,
           attended: 7,
           absences: [{ date: '2026-10-06', label: 'Iniciación A' }],
+          specials: [{ date: '2026-10-08', label: 'Avanzado B' }],
         },
       ],
     });
@@ -209,6 +210,10 @@ describe('Alumnos', () => {
     );
     expect(within(card).getByRole('list', { name: 'Faltas' })).toHaveTextContent(
       'Faltó el 06/10/2026 · Iniciación A',
+    );
+    // La asistencia especial (otra clase), aparte.
+    expect(within(card).getByRole('list', { name: 'Asistencia especial' })).toHaveTextContent(
+      'Vino el 08/10/2026 · Avanzado B',
     );
   });
 

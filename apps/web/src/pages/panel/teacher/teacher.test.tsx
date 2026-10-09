@@ -2,7 +2,8 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { todayIso } from '@/features/students/format';
-import { weekOf } from '@/features/teacher-space/dates';
+import { currentMonth, shiftMonth } from '@/features/billing/money';
+import { addDays, weekOf } from '@/features/teacher-space/dates';
 import { TEACHER, mockApi, renderApp } from '@/test/render';
 
 const today = todayIso();
@@ -108,10 +109,13 @@ describe('Pasar lista', () => {
           ...CLASS,
           date: '2026-10-13',
           students: 2,
+          period: 'open',
           list: [
             { id: 's1', name: 'Martina López Herrera', present: false },
             { id: 's2', name: 'Pablo Gil Ruiz', present: false },
           ],
+          guests: [],
+          others: [{ id: 's9', name: 'Lola Ruiz Pardo' }],
         },
       ],
       'PUT /api/teacher/roll-calls/g1/2026-10-13': [204],
@@ -127,6 +131,12 @@ describe('Pasar lista', () => {
     expect(martina).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /Pablo Gil Ruiz/ })).not.toBeChecked();
     expect(screen.getByText('1 de 2 alumnos · marca a quien ha venido')).toBeVisible();
+    // Asistencia especial: Lola, de otra clase, viene a recuperar.
+    await userEvent.click(screen.getByLabelText('Añadir alumno de otra clase'));
+    await userEvent.click(await screen.findByRole('option', { name: 'Lola Ruiz Pardo' }));
+    expect(screen.getByRole('list', { name: 'Asistencia especial' })).toHaveTextContent(
+      'Lola Ruiz Pardo',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Guardar lista' }));
 
     await waitFor(() =>
@@ -134,27 +144,81 @@ describe('Pasar lista', () => {
         spy.mock.calls.find(
           ([u, init]) => u === '/api/teacher/roll-calls/g1/2026-10-13' && init?.method === 'PUT',
         )?.[1]?.body,
-      ).toBe(JSON.stringify({ absent: ['s2'] })),
+      ).toBe(JSON.stringify({ absent: ['s2'], guests: ['s9'], past: false })),
     );
     expect(await screen.findByRole('heading', { name: 'Mis clases' })).toBeInTheDocument();
   });
 
-  it('cannot be changed once the deadline is over', async () => {
-    mockApi({
+  it('changes a past list only after confirming it', async () => {
+    const spy = mockApi({
       'GET /api/auth/me': [200, { user: TEACHER }],
       'GET /api/teacher/roll-calls/g1/2026-10-13': [
         200,
         {
           ...CLASS,
+          date: '2026-10-13',
           rollCall: 'missed',
-          list: [{ id: 's1', name: 'Martina López Herrera', present: true }],
+          period: 'past',
+          list: [{ id: 's1', name: 'Martina López Herrera', present: false }],
+          guests: [{ id: 's9', name: 'Lola Ruiz Pardo' }],
+          others: [],
+        },
+      ],
+      'PUT /api/teacher/roll-calls/g1/2026-10-13': [204],
+      [`GET /api/teacher/classes?from=${today}&to=${today}`]: [200, { items: [] }],
+    });
+    renderApp('/panel/lista/g1/2026-10-13');
+    expect(await screen.findByText(/Es una clase pasada/)).toBeVisible();
+    await userEvent.click(screen.getByRole('checkbox', { name: /Martina/ }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Quitar a Lola Ruiz Pardo de la asistencia especial' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar lista' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Cambiar una lista pasada' });
+    expect(dialog).toHaveTextContent(
+      '¿Seguro que quieres cambiar la asistencia de una clase pasada',
+    );
+    const put = () =>
+      spy.mock.calls.find(
+        ([u, init]) => u === '/api/teacher/roll-calls/g1/2026-10-13' && init?.method === 'PUT',
+      );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+    expect(put()).toBeUndefined();
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar lista' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Sí, cambiarla' }),
+    );
+    await waitFor(() =>
+      expect(put()?.[1]?.body).toBe(JSON.stringify({ absent: [], guests: [], past: true })),
+    );
+  });
+
+  it('lists the past classes month by month to see or change their list', async () => {
+    const month = shiftMonth(currentMonth(), -1);
+    const last = addDays(`${currentMonth()}-01`, -1);
+    mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      [`GET /api/teacher/classes?from=${today}&to=${today}`]: [200, { items: [] }],
+      [`GET /api/teacher/classes?from=${month}-01&to=${last}`]: [
+        200,
+        {
+          items: [
+            { ...CLASS, date: `${month}-06`, rollCall: 'taken' },
+            { ...CLASS, date: `${month}-13`, rollCall: 'missed' },
+          ],
         },
       ],
     });
-    renderApp('/panel/lista/g1/2026-10-13');
-    expect(await screen.findByText(/El plazo para pasar esta lista acabó/)).toBeVisible();
-    expect(screen.getByRole('checkbox', { name: /Martina/ })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Guardar lista' })).not.toBeInTheDocument();
+    renderApp('/panel');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Pasadas' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Mes anterior' }));
+    const links = await screen.findAllByRole('link', { name: /lista de/ });
+    // La más reciente primero; sin lista se puede pasar, con lista se corrige.
+    expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([
+      ['Pasar lista', `/panel/lista/g1/${month}-13`],
+      ['Corregir', `/panel/lista/g1/${month}-06`],
+    ]);
   });
 });
 

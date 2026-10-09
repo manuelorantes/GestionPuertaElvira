@@ -46,6 +46,7 @@ const ATTENDANCE = {
       marks: ['present', 'absent', null, 'unknown'],
       attended: 1,
       classes: 2,
+      member: true,
     },
     {
       id: 's2',
@@ -342,6 +343,41 @@ describe('Clases', () => {
     expect(within(table).getByRole('link', { name: 'Ana Ruiz Gil' })).toHaveAttribute(
       'href',
       '/panel/alumnos/s1',
+    );
+  });
+
+  it('marks with an asterisk who came to the group without being part of it', async () => {
+    api({
+      [`GET /api/admin/attendance/groups/g1?month=${MONTH}`]: [
+        200,
+        {
+          ...ATTENDANCE,
+          students: [
+            {
+              id: 's4',
+              name: 'Sara Gil Mora',
+              marks: [null, 'special', null, null],
+              attended: 0,
+              classes: 0,
+              member: false,
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/clases?pestana=asistencia');
+
+    const table = await screen.findByRole('table', { name: /Asistencia de Iniciación A/ });
+    expect(
+      within(table).getByLabelText(/Sara Gil Mora vino en asistencia especial el 07/),
+    ).toHaveTextContent('✓*');
+    await userEvent.click(
+      within(table).getByRole('button', { name: 'Asistencia especial de Sara Gil Mora' }),
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Asistencia especial de Sara Gil Mora' }),
+    ).toHaveTextContent(
+      `No es de este grupo: vino en asistencia especial el 07/${MONTH.slice(5)}.`,
     );
   });
 

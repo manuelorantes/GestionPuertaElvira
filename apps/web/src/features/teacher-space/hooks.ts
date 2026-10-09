@@ -23,7 +23,7 @@ export function useRollCall(groupId: string, date: string) {
 export function useSaveRollCall(groupId: string, date: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (absent: string[]) => api.saveRollCall(groupId, date, absent),
+    mutationFn: (changes: api.RollCallChanges) => api.saveRollCall(groupId, date, changes),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['teacher-classes'] });
       void queryClient.invalidateQueries({ queryKey: ['teacher-roll-call', groupId, date] });

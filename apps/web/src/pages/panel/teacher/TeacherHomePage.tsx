@@ -4,10 +4,12 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useSession } from '@/features/auth/useSession';
 import { todayIso } from '@/features/students/format';
 import type { TeacherClass } from '@/features/teacher-space/api';
-import { dayLabel, weekOf } from '@/features/teacher-space/dates';
+import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
+import { addDays, dayLabel, weekOf } from '@/features/teacher-space/dates';
 import { useTeacherClasses } from '@/features/teacher-space/hooks';
 import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
+import { MonthNav } from '@/shared/ui/MonthNav';
 import { Tabs } from '@/shared/ui/Tabs';
 
 import { ClassCard } from './ClassCard';
@@ -15,9 +17,13 @@ import { ClassCard } from './ClassCard';
 const TABS = [
   { id: 'hoy', label: 'Hoy' },
   { id: 'semana', label: 'Semana' },
+  { id: 'pasadas', label: 'Pasadas' },
 ];
 
-/** Portada de una cuenta de profesorado: sus clases de hoy y de la semana (o el aviso de cuenta sin vincular). */
+/**
+ * Portada de una cuenta de profesorado: sus clases de hoy, de la semana y las pasadas, mes a mes, para ver o cambiar su
+ * lista (o el aviso de cuenta sin vincular).
+ */
 export function TeacherHomePage() {
   const { data: user } = useSession();
   const firstName = user?.fullName.split(' ')[0] ?? '';
@@ -34,7 +40,7 @@ export function TeacherHomePage() {
       </div>
       {user?.teacherId ? (
         <Tabs label="Periodo" tabs={TABS} value={tab} onChange={setTab}>
-          {tab === 'hoy' ? <Today /> : <Week />}
+          {tab === 'hoy' ? <Today /> : tab === 'semana' ? <Week /> : <Past />}
         </Tabs>
       ) : (
         <Card className="px-5 py-6">
@@ -73,28 +79,73 @@ function Week() {
     <Agenda
       query={classes}
       empty="Esta semana no tienes clases."
+      render={(items) => <ByDay items={items} />}
+    />
+  );
+}
+
+/** Las clases de antes de hoy, mes a mes y de la más reciente a la más antigua, para ver o cambiar su lista. */
+function Past() {
+  const [month, setMonth] = useState(currentMonth());
+  const yesterday = addDays(todayIso(), -1);
+  const from = `${month}-01`;
+  const last = addDays(`${shiftMonth(month, 1)}-01`, -1);
+  const to = last < yesterday ? last : yesterday;
+  return (
+    <div className="flex flex-col gap-4">
+      <MonthNav
+        label={monthLabel(month)}
+        onPrevious={() => setMonth(shiftMonth(month, -1))}
+        onNext={() => month < currentMonth() && setMonth(shiftMonth(month, 1))}
+      />
+      {from > to ? (
+        <p className="py-6 text-center text-ink-muted">Este mes aún no has dado clases.</p>
+      ) : (
+        <PastMonth from={from} to={to} />
+      )}
+    </div>
+  );
+}
+
+function PastMonth({ from, to }: { from: string; to: string }) {
+  const classes = useTeacherClasses(from, to);
+  return (
+    <Agenda
+      query={classes}
+      empty="Ese mes no diste clases."
       render={(items) => {
-        const days = [...new Set(items.map((i) => i.date))];
-        return (
-          <div className="flex flex-col gap-5">
-            {days.map((date) => (
-              <section key={date} aria-label={dayLabel(date)}>
-                <h2 className="mb-2 text-sm font-semibold tracking-[0.06em] text-ink-muted uppercase">
-                  {dayLabel(date)}
-                </h2>
-                <div className="flex flex-col gap-3">
-                  {items
-                    .filter((i) => i.date === date)
-                    .map((item) => (
-                      <ClassCard key={`${item.date}-${item.groupId ?? item.dutyId}`} item={item} />
-                    ))}
-                </div>
-              </section>
-            ))}
-          </div>
+        const past = items
+          .filter((i) => i.groupId !== null)
+          .sort((a, b) => b.date.localeCompare(a.date) || a.start.localeCompare(b.start));
+        return past.length === 0 ? (
+          <p className="py-6 text-center text-ink-muted">Ese mes no diste clases.</p>
+        ) : (
+          <ByDay items={past} />
         );
       }}
     />
+  );
+}
+
+function ByDay({ items }: { items: TeacherClass[] }) {
+  const days = [...new Set(items.map((i) => i.date))];
+  return (
+    <div className="flex flex-col gap-5">
+      {days.map((date) => (
+        <section key={date} aria-label={dayLabel(date)}>
+          <h2 className="mb-2 text-sm font-semibold tracking-[0.06em] text-ink-muted uppercase">
+            {dayLabel(date)}
+          </h2>
+          <div className="flex flex-col gap-3">
+            {items
+              .filter((i) => i.date === date)
+              .map((item) => (
+                <ClassCard key={`${item.date}-${item.groupId ?? item.dutyId}`} item={item} />
+              ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 
