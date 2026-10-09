@@ -17,6 +17,7 @@ import { registerImportRoutes } from './infrastructure/import/routes.ts';
 import { registerPayrollRoutes } from './infrastructure/payroll/routes.ts';
 import { registerAuthRoutes } from './infrastructure/identity/routes.ts';
 import { registerStudentRoutes } from './infrastructure/students/routes.ts';
+import { registerSystemRoutes } from './infrastructure/system/routes.ts';
 import { registerTeacherRoutes } from './infrastructure/teachers/routes.ts';
 import {
   BcryptPasswordHasher,
@@ -109,5 +110,6 @@ export function buildApp(
   registerImportRoutes(api);
   registerDashboardRoutes(api);
   registerAttendanceRoutes(api);
+  registerSystemRoutes(api);
   return api;
 }
