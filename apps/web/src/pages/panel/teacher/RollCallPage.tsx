@@ -80,7 +80,7 @@ function RollCallForm({ data }: { data: RollCall }) {
         </h1>
       </div>
       {data.rollCall === 'upcoming' && (
-        <Alert>La lista se puede pasar cuando empieza la clase.</Alert>
+        <Alert>La lista se puede pasar desde 15 minutos antes de que empiece la clase.</Alert>
       )}
       {data.rollCall === 'missed' && (
         <Alert>El plazo para pasar esta lista acabó al final del día siguiente a la clase.</Alert>

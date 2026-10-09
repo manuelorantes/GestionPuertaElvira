@@ -70,6 +70,7 @@ Deno.test('TeacherClasses should add the classroom, the students of that day and
     class_({}),
     class_({ date: '2026-10-15' }),
     class_({ date: '2026-10-15', start: '19:00', groupId: 'g2' }),
+    class_({ date: '2026-10-15', start: '17:40', groupId: 'g3' }),
     class_({ groupId: null, dutyId: 'd1', label: 'Encargado del club' }),
   ]);
   await new TakeRollCall(agenda, roster, rolls, new FrozenClock('2026-10-13T18:00:00+02:00'))
@@ -85,6 +86,7 @@ Deno.test('TeacherClasses should add the classroom, the students of that day and
     ['2026-10-13', 'g1', 'alfil', 2, 'taken'],
     ['2026-10-15', 'g1', 'alfil', 1, 'open'],
     ['2026-10-15', 'g2', null, 0, 'upcoming'],
+    ['2026-10-15', 'g3', null, 0, 'open'],
     ['2026-10-13', null, null, 0, null],
   ]);
 });

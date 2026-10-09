@@ -12,8 +12,10 @@ const at = (iso: string) => new Date(`${iso}+02:00`);
 const take = (now: Date, absent: string[] = ['s2']) =>
   RollCall.take('g1', TUESDAY, START, 't1', ROSTER, absent, now);
 
-Deno.test('RollCall should be taken from the start of the class until the end of the next day', () => {
-  assertThrows(() => take(at('2026-10-13T16:59:00')), RollCallNotOpenYet);
+Deno.test('RollCall should be taken from 15 minutes before the class until the end of the next day', () => {
+  // Se abre 15 minutos antes de que empiece la clase (a las 16:45 para la de las 17:00).
+  assertThrows(() => take(at('2026-10-13T16:44:00')), RollCallNotOpenYet);
+  assertEquals(take(at('2026-10-13T16:45:00')).absent(), ['s2']);
   assertThrows(() => take(at('2026-10-12T20:00:00')), RollCallNotOpenYet);
   assertEquals(take(at('2026-10-13T17:00:00')).absent(), ['s2']);
   assertEquals(take(at('2026-10-14T23:59:00')).present(ROSTER), ['s1', 's3']);
