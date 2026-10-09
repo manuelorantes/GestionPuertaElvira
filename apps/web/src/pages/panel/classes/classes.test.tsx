@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { currentMonth, shiftMonth } from '@/features/billing/money';
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
 const TEACHER = {
@@ -25,6 +26,42 @@ const GROUP = {
   occupancyByDay: {},
   customName: true,
   weeklyPlan: 'two_hours',
+};
+
+const MONTH = currentMonth();
+const ATTENDANCE = {
+  groupId: 'g1',
+  name: 'Iniciación A',
+  month: MONTH,
+  days: [
+    { date: `${MONTH}-05`, status: 'taken' },
+    { date: `${MONTH}-07`, status: 'taken' },
+    { date: `${MONTH}-12`, status: 'holiday' },
+    { date: `${MONTH}-14`, status: 'pending' },
+  ],
+  students: [
+    {
+      id: 's1',
+      name: 'Ana Ruiz Gil',
+      marks: ['present', 'absent', null, 'unknown'],
+      attended: 1,
+      classes: 2,
+    },
+    {
+      id: 's2',
+      name: 'Pablo Gil Ruiz',
+      marks: ['present', 'present', null, 'unknown'],
+      attended: 2,
+      classes: 2,
+    },
+    {
+      id: 's3',
+      name: 'Luis Mora Gil',
+      marks: [null, null, null, 'unknown'],
+      attended: 0,
+      classes: 0,
+    },
+  ],
 };
 
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
@@ -235,7 +272,7 @@ describe('Clases', () => {
         },
       ],
     });
-    renderApp('/panel/clases?pestana=profesores');
+    renderApp('/panel/profesores?pestana=equipo');
 
     await user.type(await screen.findByLabelText('Nombre y apellidos'), 'Carlos Ruiz');
     await user.click(screen.getByRole('button', { name: 'Añadir profesor' }));
@@ -254,7 +291,7 @@ describe('Clases', () => {
   it('should show and change the hourly rate of a teacher', async () => {
     const user = userEvent.setup();
     const fetchSpy = api({ 'PUT /api/admin/teachers/t1': [204] });
-    renderApp('/panel/clases?pestana=profesores');
+    renderApp('/panel/profesores?pestana=equipo');
 
     expect(await screen.findByText('16 €/h')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Editar Lucía Moreno Gil' }));
@@ -272,6 +309,71 @@ describe('Clases', () => {
         }),
       ),
     );
+  });
+
+  it('shows the attendance of a group in a month and sorts it by percentage', async () => {
+    const user = userEvent.setup();
+    api({ [`GET /api/admin/attendance/groups/g1?month=${MONTH}`]: [200, ATTENDANCE] });
+    renderApp('/panel/clases?pestana=asistencia');
+
+    expect(screen.queryByRole('tab', { name: 'Profesores' })).not.toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: /Asistencia de Iniciación A/ });
+    expect(within(table).getByText('Festivo')).toBeInTheDocument();
+    expect(within(table).getByLabelText(/Ana Ruiz Gil faltó el 07/)).toHaveTextContent('✗');
+    const rows = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => (r as HTMLTableRowElement).cells[0]?.textContent);
+    expect(rows()).toEqual(['Ana Ruiz Gil', 'Luis Mora Gil', 'Pablo Gil Ruiz']);
+    const byPercent = within(table).getByRole('button', {
+      name: 'Ordenar por porcentaje de asistencia',
+    });
+    // Sin clases con lista, al final en los dos sentidos.
+    await user.click(byPercent);
+    expect(rows()).toEqual(['Pablo Gil Ruiz', 'Ana Ruiz Gil', 'Luis Mora Gil']);
+    await user.click(byPercent);
+    expect(rows()).toEqual(['Ana Ruiz Gil', 'Pablo Gil Ruiz', 'Luis Mora Gil']);
+    await user.click(within(table).getByRole('button', { name: 'Ordenar por alumno' }));
+    await user.click(within(table).getByRole('button', { name: 'Ordenar por alumno' }));
+    expect(rows()).toEqual(['Pablo Gil Ruiz', 'Luis Mora Gil', 'Ana Ruiz Gil']);
+    expect(within(table).getByText('—')).toBeInTheDocument();
+    expect(within(table).getByText('50 %')).toBeInTheDocument();
+    expect(within(table).getByRole('link', { name: 'Ana Ruiz Gil' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s1',
+    );
+  });
+
+  it('shows the attendance of the group in its sheet, under the enrolment', async () => {
+    api({
+      'GET /api/admin/groups/g1': [200, { ...GROUP, students: [] }],
+      [`GET /api/admin/attendance/groups/g1?month=${MONTH}`]: [200, ATTENDANCE],
+      [`GET /api/admin/attendance/groups/g1?month=${shiftMonth(MONTH, -1)}`]: [
+        200,
+        { ...ATTENDANCE, days: [], students: [] },
+      ],
+      [`GET /api/admin/attendance/groups/g1?month=${shiftMonth(MONTH, -2)}`]: [
+        200,
+        { ...ATTENDANCE, students: [] },
+      ],
+    });
+    renderApp('/panel/clases?grupo=g1');
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(within(sheet).getByRole('heading', { name: 'Asistencia' })).toBeInTheDocument();
+    expect(
+      await within(sheet).findByRole('table', { name: /Asistencia de Iniciación A/ }),
+    ).toHaveTextContent('100 %');
+    // El mes anterior: sin clases; el otro, sin nadie inscrito; y si falla, se dice.
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Mes anterior' }));
+    expect(await within(sheet).findByText(/aún no ha habido clases/)).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Mes anterior' }));
+    expect(await within(sheet).findByText('Nadie estaba inscrito esos días.')).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Mes anterior' }));
+    expect(
+      await within(sheet).findByText('No se ha podido cargar la asistencia.'),
+    ).toBeInTheDocument();
   });
 
   it('should be reachable from the panel navigation', async () => {

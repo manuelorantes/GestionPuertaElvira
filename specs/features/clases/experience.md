@@ -38,7 +38,7 @@
   `unprocessable` se muestra en el campo indicado por `details.field`; el resto, como mensaje general.
 - Estados de carga: esqueleto con «Cargando grupos…».
   Sin grupos: «Todavía no hay grupos. Crea el primero con «Nuevo grupo».»
-  Sin profesores: aviso en la pestaña Profesores y en el diálogo.
+  Sin profesores: aviso en el diálogo (se añaden en Profesores → Equipo).
 
 Colocación en el horario: la fila de inicio es `(inicio − 16:00) / 30 min + 1` y la de fin, `(fin − 16:00) / 30 min + 1`;
 la columna es el aula (1 o 2) dentro de cada día.

@@ -1,7 +1,7 @@
 # Layout — Clases
 
 Fuente: sección «Clases» de `GestionClub.dc.html`.
-Se añade la pestaña «Profesores» (lista básica).
+La lista de profesores está en Profesores → Equipo; aquí, la pestaña «Asistencia».
 La pestaña «Ocupación por meses» queda fuera de esta entrega porque aún no hay historia.
 
 ## 1. Component Hierarchy
@@ -9,7 +9,7 @@ La pestaña «Ocupación por meses» queda fuera de esta entrega porque aún no 
 ```
 ClassesPage (/panel/clases)
 ├── SectionHeader: antetítulo «Lunes a viernes · 3 aulas · N grupos», título «Clases», acción «Nuevo grupo» (icono plus)
-├── Tabs: «Horario semanal» | «Grupos» | «Profesores»
+├── Tabs: «Horario semanal» | «Grupos» | «Asistencia»
 ├── [Horario semanal] WeeklySchedule (tarjeta con scroll horizontal en pantallas estrechas)
 │   ├── Leyenda de niveles: Iniciación, Intermedio, Avanzado y competición, Particulares
 │   ├── Selector de aula: «Todas» (las tres aulas en columnas, vista resumida) | «Aula Alfil» | «Aula Caballo» | «Aula Peón» (solo esa aula, una columna por día, tarjetas con nombre, hora, profesor y ocupación)
@@ -19,13 +19,13 @@ ClassesPage (/panel/clases)
 ├── [Grupos] GroupsTable (tarjeta)
 │   ├── Cabecera: Grupo | Nivel | Profesor | Horario | Aula | Ocupación | (acciones)
 │   └── Fila: color de nivel + nombre | nivel | profesor | horario + modalidad | «Aula Alfil» | barra + «9/12» (+ «Sobre el cupo») | botón «Editar» (icono lápiz)
-├── [Profesores] TeachersPanel (tarjeta)
-│   ├── Formulario en línea: campo «Nombre y apellidos» + botón «Añadir profesor»
-│   └── Fila por profesor: nombre | «N grupos» | badge Activo/Inactivo | botón «Editar» → edición en línea: nombre, interruptor «Activo», «Guardar» y «Cancelar»
+├── [Asistencia] AttendanceTab: selector «Grupo» + meses de la temporada; tarjeta con GroupAttendanceTable
+│   └── GroupAttendanceTable: Alumno (ordenable, enlace a la ficha) | un día por columna («mar» + «13/10», «Festivo» o «Sin lista») con ✓ / ✗ / ? / vacío | % (ordenable; < 75 % en rojo); leyenda debajo
 ├── ClassGroupPanel (panel lateral al pulsar un grupo)
 │   ├── Cabecera: color de nivel, nombre, «Profesor · modalidad», aula, ocupación (por día si hay horarios especiales), botón «Editar»
 │   ├── Tarjeta «Alumnos inscritos»: fila por alumno «Nombre · N años» + «Ver ficha»
-│   └── Tarjeta «Inscribir alumno»: desplegable con búsqueda (al abrirlo salen todos los alumnos activos no inscritos; al escribir se filtran por nombre o apellidos, sin tildes ni mayúsculas) + botón «Inscribir»
+│   ├── Tarjeta «Inscribir alumno»: desplegable con búsqueda (al abrirlo salen todos los alumnos activos no inscritos; al escribir se filtran por nombre o apellidos, sin tildes ni mayúsculas) + botón «Inscribir»
+│   └── Tarjeta «Asistencia»: MonthNav (mes en curso) + GroupAttendanceTable
 └── ClassGroupDialog (alta o edición)
     ├── Título «Nuevo grupo» | «Editar grupo», botón cerrar
     ├── Nombre del grupo (opcional; el placeholder muestra el nombre por defecto que tendrá: día, hora, nivel y aula)
@@ -44,7 +44,7 @@ ClassesPage (/panel/clases)
 |---|---|---|---|---|
 | Nombre | «Nombre del grupo» | texto | no | 2–80 caracteres; vacío = nombre por defecto («Lunes 17:00 · Iniciación · Peón») |
 | Nivel | «Nivel» | select | sí | Iniciación, Intermedio, Avanzado, Particular |
-| Profesor | «Profesor» | select | sí | Profesores activos por nombre; sin profesores, aviso «Añade antes un profesor en la pestaña Profesores» |
+| Profesor | «Profesor» | select | sí | Profesores activos por nombre; sin profesores, aviso «Añade antes un profesor en Profesores → Equipo» |
 | Días | «Días» | botones conmutables (`aria-pressed`) | al menos uno | Lun–Vie |
 | Inicio | «Empieza» | select | sí | 16:00–20:30 cada 30 min |
 | Fin | «Termina» | select | sí | 16:30–21:00 cada 30 min |

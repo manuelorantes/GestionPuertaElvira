@@ -3,21 +3,27 @@ import { expect, test, type Page } from '@playwright/test';
 // Datos de `make e2e`: usuarios de desarrollo y demostración del diseño reiniciados.
 test.skip(({ isMobile }) => isMobile, 'Modifica datos compartidos: solo en escritorio');
 
-async function openClasses(page: Page) {
+async function logIn(page: Page) {
   await page.goto('/?acceso=1');
   await page.getByLabel('Email').fill('admin@puertaelvira.test');
   await page.getByLabel('Contraseña').fill('desarrollo-admin');
   await page.getByRole('button', { name: 'Entrar' }).click();
+}
+
+async function openClasses(page: Page) {
+  await logIn(page);
   await page.getByRole('link', { name: /clases/i }).click();
 }
 
 test('should create a teacher and a group and show it in the weekly schedule', async ({ page }) => {
-  await openClasses(page);
-
-  await page.getByRole('tab', { name: 'Profesores' }).click();
+  // Los profesores se dan de alta en Profesores → Equipo.
+  await logIn(page);
+  await page.getByRole('link', { name: /^profesores/i }).click();
+  await page.getByRole('tab', { name: 'Equipo' }).click();
   await page.getByLabel('Nombre y apellidos').fill('Elena Prueba Ruiz');
   await page.getByRole('button', { name: 'Añadir profesor' }).click();
   await expect(page.getByText('Elena Prueba Ruiz')).toBeVisible();
+  await page.getByRole('link', { name: /clases/i }).click();
 
   await page.getByRole('button', { name: 'Nuevo grupo' }).click();
   const dialog = page.getByRole('dialog', { name: 'Nuevo grupo' });
@@ -33,9 +39,14 @@ test('should create a teacher and a group and show it in the weekly schedule', a
 
   await expect(page.getByRole('status')).toHaveText('Grupo «Adultos III» creado');
   await page.getByRole('tab', { name: 'Horario semanal' }).click();
-  await expect(
-    page.getByRole('button', { name: /Adultos III, Lun · 19:30–21:00, Elena Prueba Ruiz/ }),
-  ).toBeVisible();
+  const block = page.getByRole('button', {
+    name: /Adultos III, Lun · 19:30–21:00, Elena Prueba Ruiz/,
+  });
+  await expect(block).toBeVisible();
+  // Su hoja tiene la asistencia, debajo de «Inscribir alumno».
+  await block.click();
+  const sheet = page.getByRole('dialog', { name: 'Adultos III' });
+  await expect(sheet.getByRole('heading', { name: 'Asistencia' })).toBeVisible();
 });
 
 test('should refuse a group that clashes with another in the same classroom', async ({ page }) => {

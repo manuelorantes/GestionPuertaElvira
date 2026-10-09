@@ -5,6 +5,7 @@ import { useRefreshClubData } from '@/shared/useRefreshClubData';
 
 import {
   confirmWithoutRollCall,
+  fetchGroupAttendance,
   fetchMissedRollCalls,
   fetchStudentAttendance,
   type MissedRollCall,
@@ -28,5 +29,13 @@ export function useStudentAttendance(studentId: string) {
   return useQuery({
     queryKey: ['student-attendance', studentId],
     queryFn: () => fetchStudentAttendance(studentId),
+  });
+}
+
+export function useGroupAttendance(groupId: string, month: string) {
+  return useQuery({
+    queryKey: ['group-attendance', groupId, month],
+    queryFn: () => fetchGroupAttendance(groupId, month),
+    enabled: groupId !== '',
   });
 }
