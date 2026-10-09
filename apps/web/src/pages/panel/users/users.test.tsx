@@ -234,3 +234,31 @@ describe('Usuarios', () => {
     );
   });
 });
+
+describe('Volver a mi cuenta', () => {
+  it('goes back to the summary from any page', async () => {
+    const IMPERSONATED = {
+      id: 'u2',
+      fullName: 'Club Ajedrez',
+      email: 'club@ejemplo.com',
+      role: 'administrator',
+      mustChangePassword: false,
+      impersonatedBy: { id: 'u0', fullName: 'Administración Pruebas' },
+    };
+    mockApi({
+      'GET /api/auth/me': [200, { user: IMPERSONATED }],
+      'POST /api/auth/impersonation/stop': [
+        200,
+        { user: { ...IMPERSONATED, impersonatedBy: null, id: 'u0', role: 'superadmin' } },
+      ],
+      'GET /api/admin/groups': [200, { items: [] }],
+      'GET /api/admin/teachers': [200, { items: [] }],
+      'GET /api/admin/dashboard': [500, {}],
+    });
+    renderApp('/panel/clases');
+    expect(await screen.findByRole('heading', { name: 'Clases' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a mi cuenta' }));
+    expect(await screen.findByRole('heading', { name: 'Resumen del club' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Clases' })).not.toBeInTheDocument();
+  });
+});
