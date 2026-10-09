@@ -7,6 +7,7 @@ import {
   DutyRef,
   ExpectedHours,
   GroupRef,
+  overlapShares,
   ScheduledGroup,
   SessionMinutes,
   SettlementCalculator,
@@ -189,4 +190,41 @@ Deno.test('DailyPlanner should give a substituted club duty to the substitute', 
     [session?.teacher.value, session?.label, session?.source],
     [ana.value, 'Encargado del club (sustitución)', `duty:${duty.id.value}`],
   );
+});
+
+Deno.test('overlapShares should tell what each session counts and with which ones it overlaps', () => {
+  const span = (s: { label: string; start: number; minutes: number; substitution?: boolean }) => ({
+    day: '2026-10-09',
+    start: s.start,
+    minutes: s.minutes,
+    substitution: s.substitution ?? false,
+  });
+  // Clase de 17:00 a 18:30 durante «Viernes» de 17:00 a 20:00: la clase entera, la actividad 1,5 h.
+  const friday = { label: 'Viernes', start: 17 * 60, minutes: 180 };
+  const class_ = { label: 'Viernes 17:00', start: 17 * 60, minutes: 90 };
+  assertEquals(
+    overlapShares([friday, class_], span).map((
+      s,
+    ) => [s.item.label, s.minutes, s.overlappedBy.map((o) => o.label)]),
+    [['Viernes 17:00', 90, []], ['Viernes', 90, ['Viernes 17:00']]],
+  );
+  // Dos clases a la misma hora: cuenta la suya y la sustitución se queda en 0; si las dos son suyas, la primera.
+  const substitution = {
+    label: 'Martes 17:00 (sustitución)',
+    start: 17 * 60,
+    minutes: 90,
+    substitution: true,
+  };
+  const own = { label: 'Martes 17:00', start: 17 * 60, minutes: 90 };
+  assertEquals(
+    overlapShares([substitution, own], span).map((
+      s,
+    ) => [s.item.label, s.minutes, s.overlappedBy.map((o) => o.label)]),
+    [['Martes 17:00', 90, []], ['Martes 17:00 (sustitución)', 0, ['Martes 17:00']]],
+  );
+  const other = { label: 'Martes 17:00 B', start: 17 * 60, minutes: 90 };
+  assertEquals(overlapShares([own, other], span).map((s) => [s.item.label, s.minutes]), [
+    ['Martes 17:00', 90],
+    ['Martes 17:00 B', 0],
+  ]);
 });

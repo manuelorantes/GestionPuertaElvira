@@ -6,6 +6,7 @@ import {
   DeleteAdvance,
   DeleteDuty,
   DeleteSession,
+  ListSessions,
   ListSettlements,
   PayAllSettlements,
   PaySettlement,
@@ -136,7 +137,7 @@ export function registerPayrollRoutes(api: ApiApp): void {
     const teacher = c.req.query('teacherId');
     return c.json({
       month: period.toString(),
-      items: await p.query.sessions(period, teacher ? teacher : null),
+      items: await new ListSessions(p.query).execute(period, teacher ? teacher : null),
     });
   });
 

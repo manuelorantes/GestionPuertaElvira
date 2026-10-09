@@ -48,6 +48,9 @@ Deno.test({
     assertEquals(await proposeSessions(), 0);
     const sessions = await list();
     assert(sessions.length > 0);
+    // Lo más reciente primero.
+    const dates = sessions.map((s) => String(s.date));
+    assertEquals(dates, [...dates].sort().reverse());
     assertEquals(sessions[0]?.label, 'Iniciación A');
     assertEquals(sessions[0]?.costCents, 1600);
     const count = sessions.length;
@@ -69,7 +72,7 @@ Deno.test({
     );
     assertEquals(
       body<{ removed: number }>(
-        await client.json('POST', '/api/admin/payroll/holidays', { date: sessions[0]?.date }),
+        await client.json('POST', '/api/admin/payroll/holidays', { date: sessions.at(-1)?.date }),
       ).removed,
       1,
     );
