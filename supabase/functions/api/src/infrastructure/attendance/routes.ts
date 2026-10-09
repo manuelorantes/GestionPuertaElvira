@@ -184,7 +184,8 @@ export function registerAttendanceRoutes(api: ApiApp): void {
       sessionTeacher(scope),
       param(c, 'groupId'),
       param(c, 'date'),
-      body.stringList('absent'),
+      { absent: body.stringList('absent'), guests: body.stringList('guests') },
+      body.bool('past'),
     );
     return c.body(null, 204);
   });

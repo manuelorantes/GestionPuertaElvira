@@ -40,6 +40,20 @@ export class SqlClassRoster implements ClassRoster {
     const rows = await this.sql`SELECT classroom FROM classes_group WHERE id = ${groupId}`;
     return rows[0] ? new Row(rows[0]).string('classroom') : null;
   }
+
+  async clubStudentsOn(date: LocalDate): Promise<RosterStudent[]> {
+    const day = date.toString();
+    const rows = await this.sql`SELECT id, full_name FROM students_student
+      WHERE joined_on <= ${day} AND (withdrawn_on IS NULL OR withdrawn_on > ${day}) ORDER BY search_name`;
+    return Row.all(rows).map((r) => ({ id: r.string('id'), name: r.string('full_name') }));
+  }
+
+  async namesOf(ids: readonly string[]): Promise<RosterStudent[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.sql`SELECT id, full_name FROM students_student
+      WHERE id::text = ANY(${[...ids]}) ORDER BY search_name`;
+    return Row.all(rows).map((r) => ({ id: r.string('id'), name: r.string('full_name') }));
+  }
 }
 
 /** Grupos de los que un profesor es titular, con sus alumnos (sin datos de contacto) y los días que viene cada uno. */
@@ -152,9 +166,15 @@ export class SqlStudentAttendanceQuery implements StudentAttendanceQuery {
         FROM attendance_absence a JOIN classes_group g ON g.id = a.group_id
        WHERE a.student_id = ${studentId} AND a.roll_date BETWEEN ${from.toString()} AND ${to.toString()}
        ORDER BY a.roll_date DESC`;
+    const specials = await this.sql`
+      SELECT a.roll_date::text AS date, g.name
+        FROM attendance_guest a JOIN classes_group g ON g.id = a.group_id
+       WHERE a.student_id = ${studentId} AND a.roll_date BETWEEN ${from.toString()} AND ${to.toString()}
+       ORDER BY a.roll_date DESC`;
     return {
       classes: count ? new Row(count).int('classes') : 0,
       absences: Row.all(absences).map((r) => ({ date: r.string('date'), label: r.string('name') })),
+      specials: Row.all(specials).map((r) => ({ date: r.string('date'), label: r.string('name') })),
     };
   }
 }
@@ -253,8 +273,17 @@ export class SqlGroupAttendanceQuery implements GroupAttendanceQuery {
     const absences = await this
       .sql`SELECT roll_date::text AS date, student_id FROM attendance_absence
       WHERE group_id = ${groupId} AND roll_date BETWEEN ${first} AND ${last}`;
+    const guests = await this.sql`
+      SELECT a.roll_date::text AS date, a.student_id, s.full_name
+        FROM attendance_guest a JOIN students_student s ON s.id = a.student_id
+       WHERE a.group_id = ${groupId} AND a.roll_date BETWEEN ${first} AND ${last}`;
     const g = new Row(group);
     return {
+      guests: Row.all(guests).map((r) => ({
+        date: r.string('date'),
+        studentId: r.string('student_id'),
+        name: r.string('full_name'),
+      })),
       name: g.string('name'),
       weekdays: g.intList('days'),
       holidays: new Set(Row.all(holidays).map((r) => r.string('day'))),
