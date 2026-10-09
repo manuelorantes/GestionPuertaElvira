@@ -326,3 +326,20 @@ Ref: attendance_roll_call.taken_by_teacher > teachers_teacher.id [delete: set nu
 Ref: attendance_roll_call.taken_by_user > identity_user.id [delete: set null]
 Ref: attendance_absence.(group_id, roll_date) > attendance_roll_call.(group_id, roll_date) [delete: cascade]
 Ref: attendance_absence.student_id > students_student.id [delete: cascade]
+
+// ---- Sistema -----------------------------------------------------------------------------------
+
+Table system_task_run {
+  id uuid [pk]
+  task varchar(40) [not null, note: 'workflow: horas-automaticas | copia-seguridad | keep-alive']
+  started_at timestamptz [not null]
+  finished_at timestamptz
+  outcome varchar(20) [not null, note: 'success | failure']
+  manual boolean [not null, default: false, note: 'lanzada a mano (Run workflow)']
+  url varchar(300) [note: 'la ejecución en GitHub Actions']
+
+  indexes {
+    (task, started_at)
+  }
+  Note: 'Ejecuciones de las tareas programadas, apuntadas por cada workflow al terminar (sección Sistema).'
+}
