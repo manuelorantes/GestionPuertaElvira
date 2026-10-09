@@ -81,8 +81,8 @@ export interface TaskStatusView {
 
 /** Estado de las tareas programadas: cómo fueron sus últimos turnos y cuándo toca el siguiente. */
 export class ScheduledTasksStatus {
-  /** Turnos que se muestran de cada tarea. */
-  static readonly SLOTS = 10;
+  /** Turnos del historial de cada tarea. */
+  static readonly SLOTS = 15;
 
   constructor(
     private readonly log: TaskRunLog,

@@ -33,7 +33,7 @@ Deno.test('ScheduledTasksStatus should show the last slots of each task and the 
   assertEquals(hours?.next, '2026-10-09T21:30:00.000Z');
   // Solo el turno del 8: antes no existía la tarea.
   assertEquals(hours?.slots.map((s) => [s.slot, s.status, s.delayMinutes]), [
-    ['2026-10-08T21:30:00.000Z', 'late', 231],
+    ['2026-10-08T21:30:00.000Z', 'done', 231],
   ]);
   assertEquals(hours?.lastRun?.startedAt, '2026-10-09T01:20:54.000Z');
   const backup = status.find((t) => t.id === 'copia-seguridad');

@@ -30,7 +30,7 @@ Deno.test('superadministrators should see the scheduled tasks with their last sl
       hours?.slots[0],
       {
         slot: '2026-10-08T21:30:00.000Z',
-        status: 'late',
+        status: 'done',
         delayMinutes: 231,
         startedAt: '2026-10-09T01:20:54.000Z',
         finishedAt: '2026-10-09T01:21:26.000Z',

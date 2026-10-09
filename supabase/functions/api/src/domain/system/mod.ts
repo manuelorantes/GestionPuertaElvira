@@ -2,8 +2,6 @@ import { InvalidValue } from '../common/mod.ts';
 
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
-/** Más tarde que esto desde su hora, una ejecución correcta cuenta como «con retraso». */
-export const LATE_AFTER_MINUTES = 30;
 /** GitHub puede retrasar horas los workflows programados: hasta aquí un turno sin ejecución está «pendiente». */
 const PENDING_FOR_MINUTES = 12 * 60;
 
@@ -77,7 +75,7 @@ export interface TaskRun {
   url: string | null;
 }
 
-export type SlotStatus = 'done' | 'late' | 'failed' | 'pending' | 'missed';
+export type SlotStatus = 'done' | 'failed' | 'pending' | 'missed';
 
 export interface SlotView {
   status: SlotStatus;
@@ -88,8 +86,8 @@ export interface SlotView {
 
 /**
  * Estado de un turno: la ejecución que le corresponde es la primera que arranca entre su hora y el turno siguiente.
- * Correcta en hora, «hecha»; correcta tarde, «con retraso»; con error, «falló». Sin ejecución, «pendiente» mientras
- * aún puede llegar (hasta 12 horas, sin pasar del turno siguiente) y «no se hizo» después.
+ * Correcta, «hecha» (aunque GitHub la haya retrasado: se guarda cuánto); con error, «falló». Sin ejecución,
+ * «pendiente» mientras aún puede llegar (hasta 12 horas, sin pasar del turno siguiente) y «no se hizo» después.
  */
 export function slotStatus(slot: Date, next: Date, runs: readonly TaskRun[], now: Date): SlotView {
   const run = [...runs]
@@ -104,10 +102,5 @@ export function slotStatus(slot: Date, next: Date, runs: readonly TaskRun[], now
     };
   }
   const delayMinutes = Math.round((run.startedAt.getTime() - slot.getTime()) / MINUTE);
-  const status = run.outcome === 'failure'
-    ? 'failed'
-    : delayMinutes > LATE_AFTER_MINUTES
-    ? 'late'
-    : 'done';
-  return { status, delayMinutes, run };
+  return { status: run.outcome === 'failure' ? 'failed' : 'done', delayMinutes, run };
 }

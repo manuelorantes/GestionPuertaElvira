@@ -36,7 +36,7 @@ const run = (startedAt: string, outcome: TaskRun['outcome'] = 'success'): TaskRu
   url: null,
 });
 
-Deno.test('slotStatus should tell done, late, failed, pending and missed slots apart', () => {
+Deno.test('slotStatus should tell done, failed, pending and missed slots apart', () => {
   const slot = new Date('2026-10-08T21:30:00Z');
   const next = new Date('2026-10-09T21:30:00Z');
   const at = (when: string) => new Date(when);
@@ -44,8 +44,9 @@ Deno.test('slotStatus should tell done, late, failed, pending and missed slots a
     slotStatus(slot, next, [run('2026-10-08T21:40:00Z')], at('2026-10-09T08:00:00Z')).status,
     'done',
   );
+  // Tarde pero bien: hecha (se guarda cuánto tardó en arrancar).
   const late = slotStatus(slot, next, [run('2026-10-09T01:20:00Z')], at('2026-10-09T08:00:00Z'));
-  assertEquals([late.status, late.delayMinutes], ['late', 230]);
+  assertEquals([late.status, late.delayMinutes], ['done', 230]);
   assertEquals(
     slotStatus(slot, next, [run('2026-10-08T21:35:00Z', 'failure')], at('2026-10-09T08:00:00Z'))
       .status,
