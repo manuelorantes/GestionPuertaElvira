@@ -3,17 +3,23 @@ import {
   ActivityProgress,
   type ClassAssignments,
   type ClassOnDay,
+  CommentClass,
+  type CommentEditor,
   ConfirmActivity,
   ConfirmWithoutRollCall,
+  EditClassComment,
   type FridayAttendance,
   GroupAttendance,
+  GroupClassComments,
   MarkFridayAsManager,
   MarkShiftDone,
   MissedRollCalls,
   OpenFridayList,
   OpenRollCall,
+  RollCallComments,
   type SessionRecorder,
   StudentAttendance,
+  StudentClassComments,
   TakeRollCall,
   TeacherClasses,
   TeacherStudents,
@@ -47,7 +53,11 @@ import {
   SqlTeacherRates,
   SqlTimesheetRepository,
 } from '../persistence/payroll.ts';
-import { SqlRollCallRepository } from '../persistence/rollcalls.ts';
+import {
+  SqlClassCommentQuery,
+  SqlClassCommentRepository,
+  SqlRollCallRepository,
+} from '../persistence/rollcalls.ts';
 import type { Sql } from '../persistence/sql.ts';
 import { MarkFriday } from '../../application/points/mod.ts';
 import type { Clock, LocalDate as Day } from '../../domain/common/mod.ts';
@@ -125,8 +135,10 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     RollCallNotOpenYet: [409, 'roll_call_not_open'],
     RollCallClosed: [409, 'roll_call_closed'],
     RollCallStillOpen: [409, 'roll_call_still_open'],
+    ClassCommentNotFound: [404, 'not_found'],
+    NotYourComment: [403, 'forbidden'],
   });
-  const teacher = (method: 'GET' | 'PUT' | 'POST', path: string) =>
+  const teacher = (method: 'GET' | 'PUT' | 'POST' | 'DELETE', path: string) =>
     ({ method, path, access: 'teacher' }) as const;
   const today = () => LocalDate.fromInstant(api.deps.clock.now()).toString();
   /** Los casos de uso del profesorado comparten agenda, lista de alumnos del día, listas y reloj. */
@@ -137,6 +149,21 @@ export function registerAttendanceRoutes(api: ApiApp): void {
       new SqlRollCallRepository(scope.tx),
       api.deps.clock,
     ] as const;
+
+  const commentClass = (scope: RequestScope) =>
+    new CommentClass(
+      new PayrollClassAssignments(scope.tx),
+      new SqlClassRoster(scope.tx),
+      new SqlRollCallRepository(scope.tx),
+      new SqlClassCommentRepository(scope.tx),
+      api.deps.clock,
+    );
+  const editComment = (scope: RequestScope) =>
+    new EditClassComment(new SqlClassCommentRepository(scope.tx), api.deps.clock);
+  const commentInput = (body: JsonBody) => ({
+    studentId: body.optionalString('studentId'),
+    text: body.requiredString('text'),
+  });
 
   const fridays = (scope: RequestScope) => new PointsFridayAttendance(scope.tx, api.deps.clock);
   const checks = (scope: RequestScope) => new SqlActivityCheckRepository(scope.tx);
@@ -187,6 +214,45 @@ export function registerAttendanceRoutes(api: ApiApp): void {
       { absent: body.stringList('absent'), guests: body.stringList('guests') },
       body.bool('past'),
     );
+    return c.body(null, 204);
+  });
+
+  // ---- Comentarios de la clase (desde la lista) -------------------------------------------------
+  api.defineRoute(
+    teacher('GET', '/api/teacher/roll-calls/:groupId/:date/comments'),
+    async (c, scope) => {
+      return c.json({
+        items: await new RollCallComments(
+          new PayrollClassAssignments(scope.tx),
+          new SqlClassCommentQuery(scope.tx),
+        ).execute(sessionTeacher(scope), param(c, 'groupId'), param(c, 'date')),
+      });
+    },
+  );
+
+  api.defineRoute(
+    teacher('POST', '/api/teacher/roll-calls/:groupId/:date/comments'),
+    async (c, scope) => {
+      const id = await commentClass(scope).asTeacher(
+        sessionTeacher(scope),
+        scope.user?.id ?? null,
+        param(c, 'groupId'),
+        param(c, 'date'),
+        commentInput(await JsonBody.from(c.req.raw)),
+      );
+      return c.json({ id }, 201);
+    },
+  );
+
+  const asTeacher = (scope: RequestScope): CommentEditor => ({ teacher: sessionTeacher(scope) });
+  api.defineRoute(teacher('PUT', '/api/teacher/comments/:id'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await editComment(scope).rewrite(param(c, 'id'), body.requiredString('text'), asTeacher(scope));
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(teacher('DELETE', '/api/teacher/comments/:id'), async (c, scope) => {
+    await editComment(scope).remove(param(c, 'id'), asTeacher(scope));
     return c.body(null, 204);
   });
 
@@ -319,6 +385,62 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         scope.user.id,
       );
       return c.body(null, 204);
+    },
+  );
+
+  // ---- Administración: comentarios de las clases ------------------------------------------------
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/attendance/groups/:groupId/comments', access: 'admin' },
+    async (c, scope) => {
+      return c.json({
+        items: await new GroupClassComments(new SqlClassCommentQuery(scope.tx)).execute(
+          param(c, 'groupId'),
+          c.req.query('month') ?? '',
+        ),
+      });
+    },
+  );
+
+  api.defineRoute(
+    { method: 'POST', path: '/api/admin/attendance/groups/:groupId/comments', access: 'admin' },
+    async (c, scope) => {
+      if (scope.user === null) throw httpError(401);
+      const body = await JsonBody.from(c.req.raw);
+      const id = await commentClass(scope).asStaff(
+        scope.user.id,
+        param(c, 'groupId'),
+        body.requiredString('date'),
+        commentInput(body),
+      );
+      return c.json({ id }, 201);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/attendance/comments/:id', access: 'admin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      await editComment(scope).rewrite(param(c, 'id'), body.requiredString('text'), 'staff');
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'DELETE', path: '/api/admin/attendance/comments/:id', access: 'admin' },
+    async (c, scope) => {
+      await editComment(scope).remove(param(c, 'id'), 'staff');
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/students/:id/class-comments', access: 'admin' },
+    async (c, scope) => {
+      return c.json({
+        items: await new StudentClassComments(new SqlClassCommentQuery(scope.tx)).execute(
+          param(c, 'id'),
+        ),
+      });
     },
   );
 }

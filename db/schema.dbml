@@ -341,6 +341,29 @@ Table attendance_guest {
 Ref: attendance_guest.(group_id, roll_date) > attendance_roll_call.(group_id, roll_date) [delete: cascade]
 Ref: attendance_guest.student_id > students_student.id [delete: cascade]
 
+Table attendance_comment {
+  id uuid [pk, note: 'UUIDv7']
+  group_id uuid [not null]
+  class_date date [not null]
+  student_id uuid [note: 'alumno del que trata; nulo si es de la clase']
+  body text [not null, note: '1–1000 caracteres']
+  written_by_teacher uuid [note: 'profesor que lo escribió desde su espacio; nulo si fue administración']
+  written_by_user uuid [note: 'cuenta con la que se escribió']
+  written_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (group_id, class_date)
+    student_id
+  }
+  Note: 'Comentarios de una clase un día: de la clase en sí o de un alumno de la lista o de asistencia especial.'
+}
+
+Ref: attendance_comment.group_id > classes_group.id [delete: cascade]
+Ref: attendance_comment.student_id > students_student.id [delete: cascade]
+Ref: attendance_comment.written_by_teacher > teachers_teacher.id [delete: set null]
+Ref: attendance_comment.written_by_user > identity_user.id [delete: set null]
+
 // ---- Sistema -----------------------------------------------------------------------------------
 
 Table system_task_run {
