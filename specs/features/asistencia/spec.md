@@ -74,3 +74,16 @@ La ficha de un alumno MUST mostrar su asistencia de la temporada: a cuántas cla
 #### Scenario: Una falta
 - **WHEN** Pablo faltó a una de sus ocho clases con lista de la temporada
 - **THEN** su ficha muestra «Vino a 7 de 8 clases (88 %)» y la falta con su fecha y clase
+
+### Requirement: Asistencia de un grupo
+Administración MUST poder ver la asistencia de un grupo en un mes, en la pestaña «Asistencia» de Clases (eligiendo
+grupo y mes) y en la hoja del grupo (debajo de «Inscribir alumno», con el mes en curso y flechas para cambiarlo): una
+fila por alumno que estuvo inscrito, una columna por día de clase del mes hasta hoy y el porcentaje de cada alumno.
+Cada casilla dice si vino (✓), si faltó (✗), si no hay lista pasada (?) o queda vacía si ese día no le tocaba (aún no
+estaba inscrito, ya no estaba o tiene horario especial). Los festivos y los días sin lista se indican en la cabecera.
+El porcentaje cuenta solo las clases con lista; por debajo del 75 % sale en rojo. La tabla se ordena por nombre o por
+porcentaje y el nombre lleva a la ficha del alumno.
+
+#### Scenario: Quién falta más
+- **WHEN** administración abre la asistencia de un grupo en octubre y ordena por porcentaje
+- **THEN** arriba sale quien menos ha venido a las clases con lista de ese mes

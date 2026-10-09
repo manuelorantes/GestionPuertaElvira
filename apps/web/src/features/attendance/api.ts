@@ -39,3 +39,27 @@ export interface StudentAttendance {
 export function fetchStudentAttendance(studentId: string): Promise<StudentAttendance> {
   return apiGet<StudentAttendance>(`/api/admin/students/${studentId}/attendance`);
 }
+
+/** Un alumno un día: vino, faltó, sin saber (no hay lista) o null si ese día no le tocaba. */
+export type AttendanceMark = 'present' | 'absent' | 'unknown' | null;
+
+/** Asistencia de un grupo en un mes: los días de clase hasta hoy y, por alumno, si vino a cada uno. */
+export interface GroupAttendance {
+  groupId: string;
+  name: string;
+  month: string;
+  days: { date: string; status: 'taken' | 'confirmed' | 'pending' | 'holiday' }[];
+  students: {
+    id: string;
+    name: string;
+    marks: AttendanceMark[];
+    attended: number;
+    classes: number;
+  }[];
+}
+
+export function fetchGroupAttendance(groupId: string, month: string): Promise<GroupAttendance> {
+  return apiGet<GroupAttendance>(
+    `/api/admin/attendance/groups/${groupId}?month=${encodeURIComponent(month)}`,
+  );
+}
