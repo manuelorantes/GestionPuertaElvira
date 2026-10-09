@@ -27,6 +27,14 @@ export interface ClassOnDay {
   activity: 'shift' | 'fridays' | null;
 }
 
+/**
+ * Apunta en las horas, en el momento, la sesión de una clase o actividad que su profesor acaba de pasar o confirmar (la
+ * tarea de la noche apunta el resto; si ya está apuntada, no hace nada).
+ */
+export interface SessionRecorder {
+  record(item: ClassOnDay): Promise<void>;
+}
+
 /** Quién da cada clase cada día (la agenda de nómina). */
 export interface ClassAssignments {
   agenda(teacherId: string, from: string, to: string): Promise<ClassOnDay[]>;
@@ -210,6 +218,7 @@ export class TakeRollCall {
     private readonly roster: ClassRoster,
     private readonly rollCalls: RollCallRepository,
     private readonly clock: Clock,
+    private readonly sessions: SessionRecorder | null = null,
   ) {}
 
   async execute(teacherId: string, groupId: string, date: string, absent: string[]): Promise<void> {
@@ -222,6 +231,8 @@ export class TakeRollCall {
     const roll = existing ?? RollCall.take(groupId, day, start, teacherId, roster, absent, now);
     if (existing) existing.correct(start, teacherId, roster, absent, now);
     await this.rollCalls.save(roll);
+    // Pasar lista apunta ya las horas de la clase.
+    await this.sessions?.record(item);
   }
 }
 
@@ -387,6 +398,7 @@ export class MarkShiftDone {
     private readonly assignments: ClassAssignments,
     private readonly checks: ActivityCheckRepository,
     private readonly clock: Clock,
+    private readonly sessions: SessionRecorder | null = null,
   ) {}
 
   async execute(teacherId: string, dutyId: string, date: string): Promise<void> {
@@ -396,6 +408,7 @@ export class MarkShiftDone {
     await this.checks.save(
       ActivityCheck.done(dutyId, day, minutesOf(item.start), teacherId, this.clock.now()),
     );
+    await this.sessions?.record(item);
   }
 }
 
@@ -434,6 +447,7 @@ export class MarkFridayAsManager {
     private readonly assignments: ClassAssignments,
     private readonly fridays: FridayAttendance,
     private readonly clock: Clock,
+    private readonly sessions: SessionRecorder | null = null,
   ) {}
 
   async execute(
@@ -448,6 +462,8 @@ export class MarkFridayAsManager {
     const item = await givenActivity(this.assignments, teacherId, dutyId, day, 'fridays');
     assertWithinWindow(day, minutesOf(item.start), this.clock.now());
     await this.fridays.mark(student, day, present, userId);
+    // La primera vez que el encargado marca a alguien se apuntan ya sus horas de la actividad.
+    if (present) await this.sessions?.record(item);
   }
 }
 

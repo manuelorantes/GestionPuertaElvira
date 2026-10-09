@@ -251,6 +251,41 @@ export class ProposeSessions {
 }
 
 /**
+ * Apunta en el momento la sesión de una clase o actividad de un día (cuando su profesor pasa lista o la confirma), sin
+ * esperar a la tarea de la noche: la del horario, para quien la da ese día. No hace nada si ya está apuntada, si es
+ * festivo o si la liquidación de ese mes ya está pagada.
+ */
+export class RecordScheduledSession {
+  constructor(
+    private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
+    private readonly substitutions: SubstitutionRepository,
+    private readonly holidays: HolidayCalendar,
+    private readonly timesheets: TimesheetRepository,
+    private readonly settlements: SettlementRepository,
+  ) {}
+
+  /** `source`: «group:<id>» o «duty:<id>». */
+  async execute(source: string, date: string): Promise<void> {
+    const day = LocalDate.fromString(date);
+    if (await this.holidays.isHoliday(day)) return;
+    const planned = new DailyPlanner()
+      .plan(
+        day,
+        await this.schedule.groups(),
+        await this.duties.all(),
+        await this.substitutions.onDate(day),
+        null,
+      )
+      .find((p) => p.source === source);
+    if (!planned) return;
+    if ((await this.timesheets.onDate(day)).some((e) => e.source === source)) return;
+    if ((await this.settlements.settlement(planned.teacher, YearMonth.of(day))) !== null) return;
+    await this.timesheets.save(TimesheetEntry.planned(TimesheetEntryId.generate(), planned));
+  }
+}
+
+/**
  * Apunta las horas automáticas de un día ya pasado que falten (p. ej. si ese día no se llegaron a apuntar), sin
  * duplicar las que ya hay. No hace nada en festivos ni toca liquidaciones pagadas. Devuelve cuántas creó.
  */

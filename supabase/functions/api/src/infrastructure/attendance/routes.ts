@@ -2,6 +2,7 @@ import { InvalidValue, LocalDate } from '../../domain/common/mod.ts';
 import {
   ActivityProgress,
   type ClassAssignments,
+  type ClassOnDay,
   ConfirmActivity,
   ConfirmWithoutRollCall,
   type FridayAttendance,
@@ -10,12 +11,18 @@ import {
   MissedRollCalls,
   OpenFridayList,
   OpenRollCall,
+  type SessionRecorder,
   StudentAttendance,
   TakeRollCall,
   TeacherClasses,
   TeacherStudents,
 } from '../../application/attendance/mod.ts';
-import { ListSettlements, TeacherAgenda, TeacherPayStatus } from '../../application/payroll/mod.ts';
+import {
+  ListSettlements,
+  RecordScheduledSession,
+  TeacherAgenda,
+  TeacherPayStatus,
+} from '../../application/payroll/mod.ts';
 import { type ApiApp, param, type RequestScope, sessionTeacher } from '../http/app.ts';
 import { httpError } from '../http/errors.ts';
 import { registerDomainErrors } from '../http/errors.ts';
@@ -91,6 +98,23 @@ class PayrollClassAssignments implements ClassAssignments {
   }
 }
 
+/** Apunta la sesión de una clase o actividad en las horas de nómina en cuanto su profesor la pasa o la confirma. */
+class PayrollSessionRecorder implements SessionRecorder {
+  constructor(private readonly sql: Sql) {}
+
+  record(item: ClassOnDay): Promise<void> {
+    const source = item.groupId !== null ? `group:${item.groupId}` : `duty:${item.dutyId}`;
+    return new RecordScheduledSession(
+      new SqlScheduleDirectory(this.sql),
+      new SqlDutyRepository(this.sql),
+      new SqlSubstitutionRepository(this.sql),
+      new SqlHolidayCalendar(this.sql),
+      new SqlTimesheetRepository(this.sql),
+      new SqlSettlementRepository(this.sql),
+    ).execute(source, item.date);
+  }
+}
+
 /** Espacio del profesorado: /api/teacher/* (el profesor sale siempre de la sesión, nunca de la URL). */
 export function registerAttendanceRoutes(api: ApiApp): void {
   registerDomainErrors({
@@ -153,7 +177,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
 
   api.defineRoute(teacher('PUT', '/api/teacher/roll-calls/:groupId/:date'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
-    await new TakeRollCall(...ports(scope)).execute(
+    await new TakeRollCall(...ports(scope), new PayrollSessionRecorder(scope.tx)).execute(
       sessionTeacher(scope),
       param(c, 'groupId'),
       param(c, 'date'),
@@ -187,8 +211,12 @@ export function registerAttendanceRoutes(api: ApiApp): void {
   api.defineRoute(
     teacher('POST', '/api/teacher/activities/:dutyId/:date/done'),
     async (c, scope) => {
-      await new MarkShiftDone(new PayrollClassAssignments(scope.tx), checks(scope), api.deps.clock)
-        .execute(sessionTeacher(scope), param(c, 'dutyId'), param(c, 'date'));
+      await new MarkShiftDone(
+        new PayrollClassAssignments(scope.tx),
+        checks(scope),
+        api.deps.clock,
+        new PayrollSessionRecorder(scope.tx),
+      ).execute(sessionTeacher(scope), param(c, 'dutyId'), param(c, 'date'));
       return c.body(null, 204);
     },
   );
@@ -212,6 +240,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         new PayrollClassAssignments(scope.tx),
         fridays(scope),
         api.deps.clock,
+        new PayrollSessionRecorder(scope.tx),
       ).execute(
         sessionTeacher(scope),
         scope.user?.id ?? null,
