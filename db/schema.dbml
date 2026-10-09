@@ -115,7 +115,6 @@ Table billing_account {
   preferred_plan varchar(20) [not null, note: 'monthly | three_months | six_months | rest_of_season (solo propone meses)']
   member boolean [not null, note: 'socio: cuota de socio por temporada']
   private_rate_cents int [note: 'precio por hora pactado de sus particulares']
-  points int [not null, note: 'contador manual, ≥ 0']
 }
 
 Table billing_charge {
@@ -343,3 +342,33 @@ Table system_task_run {
   }
   Note: 'Ejecuciones de las tareas programadas, apuntadas por cada workflow al terminar (sección Sistema).'
 }
+
+// ---- Puntos ------------------------------------------------------------------------------------
+
+Table points_movement {
+  id uuid [pk]
+  student_id uuid [not null]
+  movement_date date [not null, note: 'los puntos valen solo en su mes']
+  delta integer [not null, note: '+ ganados, − gastados; nunca 0']
+  kind varchar(20) [not null, note: 'friday | tournament | manual | redemption']
+  reference varchar(60) [note: 'viernes (AAAA-MM-DD), torneo o cobro; null en los ajustes a mano']
+  note varchar(200) [note: 'motivo del ajuste o recibo del canje']
+  created_by uuid
+  created_at timestamptz [not null]
+
+  indexes {
+    (student_id, kind, reference) [unique, note: 'solo viernes y torneos']
+    (student_id, movement_date)
+    movement_date
+  }
+}
+
+Table points_tournament {
+  id uuid [pk]
+  name varchar(120) [not null]
+  held_on date [not null]
+  points_per_photo smallint [not null, note: 'de 1 a 20']
+}
+
+Ref: points_movement.student_id > students_student.id [delete: cascade]
+Ref: points_movement.created_by > identity_user.id [delete: set null]
