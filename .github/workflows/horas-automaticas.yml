@@ -21,6 +21,8 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Hora de inicio (para la sección Sistema)
+        run: echo "TASK_STARTED_AT=$(date -u +%FT%TZ)" >> "$GITHUB_ENV"
       - uses: actions/checkout@v7
       - name: Preparar el usuario del runner
         run: echo "HOST_UID=$(id -u)" >> "$GITHUB_ENV" && echo "HOST_GID=$(id -g)" >> "$GITHUB_ENV"
@@ -37,3 +39,16 @@ jobs:
             api deno task console app:billing:generate-charges
         env:
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+      - name: Apuntar la ejecución (sección Sistema)
+        # Siempre, también si algo falló; si no se puede apuntar, solo avisa: no hace fallar la tarea.
+        if: always()
+        run: |
+          docker run --rm -e SUPABASE_DB_URL postgres:17-alpine psql "$SUPABASE_DB_URL" -qX -v ON_ERROR_STOP=1 -c \
+            "INSERT INTO system_task_run (task, started_at, finished_at, outcome, manual, url)
+             VALUES ('horas-automaticas', '$TASK_STARTED_AT', now(), '$OUTCOME', $MANUAL, '$RUN_URL')" \
+            || echo "::warning::No se pudo apuntar la ejecución en system_task_run"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          OUTCOME: ${{ job.status == 'success' && 'success' || 'failure' }}
+          MANUAL: ${{ github.event_name == 'workflow_dispatch' }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
