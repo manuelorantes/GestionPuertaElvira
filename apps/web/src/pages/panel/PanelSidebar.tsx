@@ -1,5 +1,5 @@
 import { LogOut } from 'lucide-react';
-import { NavLink } from 'react-router';
+import { Link, NavLink } from 'react-router';
 
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { currentMonth } from '@/features/billing/money';
@@ -19,7 +19,9 @@ export function PanelSidebar({ user, onLogout }: PanelSidebarProps) {
   return (
     <aside className="hidden w-62 shrink-0 flex-col border-r border-line-soft bg-surface-raised px-4 py-6 md:flex">
       <div className="flex items-center gap-3 px-2 pb-6">
-        <ClubLogo size={44} />
+        <Link to="/panel" aria-label="Ir al inicio" className="shrink-0 rounded-full">
+          <ClubLogo size={44} />
+        </Link>
         <p className="font-display text-lg leading-[1.05] font-bold tracking-[0.06em] text-ink-strong uppercase">
           Puerta Elvira
           <br />
