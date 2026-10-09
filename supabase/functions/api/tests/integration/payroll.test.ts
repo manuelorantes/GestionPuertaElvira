@@ -133,6 +133,22 @@ Deno.test({
         201,
       );
     }
+    // Rosa estuvo con Lucía desde el día 1 hasta hoy y desde hoy va con Carlos: es alumna solo de Carlos.
+    const rosa = body<{ id: string }>(
+      await client.json('POST', '/api/admin/students', {
+        fullName: 'Rosa Gil Ruiz',
+        groupIds: [lucias[0]?.id],
+      }),
+    ).id;
+    await db()`UPDATE classes_enrolment SET enrolled_on = ${`${month}-01`}, ends_on = ${today}
+                WHERE student_id = ${rosa}`;
+    assertEquals(
+      (await client.json('POST', `/api/admin/students/${rosa}/enrolments`, {
+        groupId: carlosGroup,
+      }))
+        .status,
+      204,
+    );
     const report = body<{
       items: Record<string, unknown>[];
       students: { total: number; shared: unknown[] };
@@ -142,9 +158,9 @@ Deno.test({
     assertEquals(row?.capacity, 60, '12 plazas × 5 días de clase');
     assertEquals(
       report.items.map((r) => [r.teacherName, r.students]).sort(),
-      [['Carlos Ruiz Márquez', 1], ['Lucía Moreno Gil', 2]],
+      [['Carlos Ruiz Márquez', 2], ['Lucía Moreno Gil', 2]],
     );
-    assertEquals(report.students.total, 2);
+    assertEquals(report.students.total, 3);
     assertEquals(
       (report.students.shared as { name: string }[]).map((s) => s.name),
       ['Ana Pérez Gil'],

@@ -137,6 +137,11 @@ export interface ClassLoad {
   teachers: Map<string, TeacherSeats>;
   /** Minutos semanales de cada alumno con cada profesor durante el mes (claves: alumno → profesor). */
   students: Map<string, Map<string, number>>;
+  /**
+   * Profesores de cada alumno el día de referencia del mes (hoy, o el último día si ya pasó, o el primero si es futuro):
+   * quien cambió de grupo a mitad de mes es alumno solo del profesor nuevo.
+   */
+  teachersOn: Map<string, Set<string>>;
   /** Nombre de cada alumno de `students`. */
   studentNames: Map<string, string>;
 }
@@ -522,7 +527,7 @@ export interface ProfitabilityRow {
   incomePerHourCents: number | null;
   occupied: number;
   capacity: number;
-  /** Alumnos de sus grupos ese mes (sin las clases que da como sustituto). */
+  /** Alumnos de sus grupos el día de referencia del mes (sin las clases que da como sustituto). */
   students: number;
 }
 
@@ -604,16 +609,17 @@ export class Profitability {
         incomePerHourCents: minutes > 0 ? Math.round((earned * 60) / minutes) : null,
         occupied: seats?.occupied ?? 0,
         capacity: seats?.capacity ?? 0,
-        students: [...load.students.values()].filter((shares) => shares.has(teacher.id)).length,
+        students: [...load.teachersOn.values()].filter((teachers) => teachers.has(teacher.id))
+          .length,
       });
     }
-    const shared = [...load.students]
-      .filter(([, shares]) => shares.size > 1)
+    const shared = [...load.teachersOn]
+      .filter(([, teachers]) => teachers.size > 1)
       .map(([student]) => ({ id: student, name: load.studentNames.get(student) ?? '' }))
       .sort((a, b) => a.name.localeCompare(b.name, 'es'));
     return {
       items: rows.sort((a, b) => b.marginCents - a.marginCents),
-      students: { total: load.students.size, shared },
+      students: { total: load.teachersOn.size, shared },
     };
   }
 }
