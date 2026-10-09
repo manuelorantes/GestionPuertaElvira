@@ -4,7 +4,8 @@ const WIDTH = 320;
 
 /**
  * Asterisco que al pincharlo abre una nota pequeña (se cierra con Escape, pinchando fuera o al desplazar). La nota va
- * en posición fija para que no la recorten las tarjetas con desplazamiento.
+ * en posición fija para que no la recorten las tarjetas con desplazamiento, y parte sus líneas aunque esté en una
+ * celda que no las parte.
  */
 export function AsteriskNote({ label, children }: { label: string; children: ReactNode }) {
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
@@ -49,9 +50,9 @@ export function AsteriskNote({ label, children }: { label: string; children: Rea
           style={{
             top: anchor.bottom + 4,
             left: Math.max(8, Math.min(anchor.left, window.innerWidth - WIDTH - 8)),
-            maxWidth: WIDTH,
+            maxWidth: `min(${WIDTH}px, calc(100vw - 16px))`,
           }}
-          className="fixed z-20 block rounded-sm border border-line-strong bg-surface-raised px-3 py-2 text-left text-[13px] font-normal text-ink shadow-overlay"
+          className="fixed z-20 block rounded-sm border border-line-strong bg-surface-raised px-3 py-2 text-left text-[13px] font-normal whitespace-normal text-ink shadow-overlay"
         >
           {children}
         </span>

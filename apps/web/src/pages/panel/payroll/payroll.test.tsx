@@ -285,7 +285,10 @@ describe('Profesorado', () => {
     const friday = within(table).getByRole('row', { name: /Viernes 1,5 h/ });
     expect(friday).toHaveTextContent('24 €');
     await userEvent.click(within(friday).getByRole('button', { name: 'Por qué cuenta 1,5 h' }));
-    expect(await screen.findByText(/Eran 3 h, pero se pisa con Viernes 17:00/)).toBeInTheDocument();
+    const note = await screen.findByRole('dialog', { name: 'Por qué cuenta 1,5 h' });
+    expect(note).toHaveTextContent(/Eran 3 h, pero se pisa con Viernes 17:00/);
+    // La celda de horas no parte líneas; la nota, sí (que no se salga de la pantalla).
+    expect(note).toHaveClass('whitespace-normal');
     // El total, con lo que cuenta: 3 h, no 4,5.
     expect(screen.getByText('2 sesiones · 3 h · 48 €')).toBeInTheDocument();
   });
