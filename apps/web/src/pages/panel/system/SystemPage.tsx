@@ -1,4 +1,5 @@
-import { ExternalLink } from 'lucide-react';
+import { ChevronDown, ExternalLink } from 'lucide-react';
+import { useState } from 'react';
 import { Navigate } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -16,7 +17,6 @@ const STATUS: Record<
   { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }
 > = {
   done: { label: 'Hecha', tone: 'success' },
-  late: { label: 'Con retraso', tone: 'warning' },
   failed: { label: 'Falló', tone: 'danger' },
   pending: { label: 'Pendiente', tone: 'neutral' },
   missed: { label: 'No se hizo', tone: 'danger' },
@@ -56,15 +56,17 @@ function SlotRow({ slot }: { slot: TaskSlot }) {
       <span className="w-36 shrink-0 tabular-nums">{madridDateTime(slot.slot)}</span>
       <Badge tone={status.tone}>{status.label}</Badge>
       <span className="flex-1 text-[13px] text-ink-muted">
-        {slot.status === 'late' && slot.delayMinutes !== null
-          ? `Arrancó con ${duration(slot.delayMinutes)} de retraso`
-          : slot.status === 'pending'
-            ? 'Aún puede llegar: GitHub a veces la retrasa'
-            : slot.status === 'missed'
-              ? 'No se ejecutó'
-              : slot.startedAt
-                ? `Arrancó a las ${MADRID_TIME.format(new Date(slot.startedAt))}`
-                : ''}
+        {slot.status === 'pending'
+          ? 'Aún puede llegar: GitHub a veces la retrasa'
+          : slot.status === 'missed'
+            ? 'No se ejecutó'
+            : slot.startedAt
+              ? `Arrancó a las ${MADRID_TIME.format(new Date(slot.startedAt))}${
+                  slot.delayMinutes !== null && slot.delayMinutes > 30
+                    ? ` (GitHub la lanzó ${duration(slot.delayMinutes)} tarde)`
+                    : ''
+                }`
+              : ''}
       </span>
       {slot.url && (
         <a
@@ -78,6 +80,41 @@ function SlotRow({ slot }: { slot: TaskSlot }) {
         </a>
       )}
     </li>
+  );
+}
+
+/** El último turno a la vista y, al abrir el historial, los 15 últimos con su estado. */
+function SlotHistory({ task }: { task: ScheduledTask }) {
+  const [open, setOpen] = useState(false);
+  const [latest, ...older] = task.slots;
+  return (
+    <>
+      <ul aria-label={`Último turno de ${task.name}`}>{latest && <SlotRow slot={latest} />}</ul>
+      {older.length > 0 && (
+        <div className="border-t border-line-soft">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+            className="flex w-full cursor-pointer items-center gap-1.5 px-5 py-2.5 text-left text-[13px] font-semibold text-brand hover:bg-surface-muted"
+          >
+            <ChevronDown
+              aria-hidden
+              size={15}
+              className={`transition-transform ${open ? 'rotate-180' : ''}`}
+            />
+            {open ? 'Ocultar historial' : `Ver historial (${task.slots.length} últimos)`}
+          </button>
+          {open && (
+            <ul aria-label={`Historial de ${task.name}`} className="border-t border-line-soft">
+              {older.map((slot) => (
+                <SlotRow key={slot.slot} slot={slot} />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -111,11 +148,7 @@ function TaskCard({ task }: { task: ScheduledTask }) {
         {task.slots.length === 0 ? (
           <p className="px-5 py-4 text-sm text-ink-muted">Aún no le ha tocado ningún turno.</p>
         ) : (
-          <ul aria-label={`Turnos de ${task.name}`}>
-            {task.slots.map((slot) => (
-              <SlotRow key={slot.slot} slot={slot} />
-            ))}
-          </ul>
+          <SlotHistory task={task} />
         )}
       </section>
     </Card>
@@ -131,9 +164,9 @@ export function SystemPage() {
     <main className="mx-auto flex max-w-[1080px] flex-col gap-5 px-4 py-6 md:px-8 md:py-8">
       <SectionHeader eyebrow="Tareas programadas" title="Sistema" />
       <p className="-mt-2 text-sm text-ink-muted">
-        Cada tarea apunta su ejecución al terminar. Una ejecución que arranca más de 30 minutos
-        tarde sale «Con retraso»; si no llega en 12 horas (o antes del turno siguiente), «No se
-        hizo». Las horas son de Madrid.
+        Cada tarea apunta su ejecución al terminar. Si acaba bien es «Hecha», aunque GitHub la lance
+        tarde; si no llega en 12 horas (o antes del turno siguiente), «No se hizo». Las horas son de
+        Madrid.
       </p>
       {tasks.isPending ? (
         <p className="text-ink-muted">Cargando tareas…</p>

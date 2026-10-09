@@ -1,7 +1,7 @@
 import { apiGet } from '@/shared/api/client';
 
-/** Hecha, con retraso, falló, pendiente (aún puede llegar) o no se hizo. */
-export type SlotStatus = 'done' | 'late' | 'failed' | 'pending' | 'missed';
+/** Hecha (aunque arrancara tarde), falló, pendiente (aún puede llegar) o no se hizo. */
+export type SlotStatus = 'done' | 'failed' | 'pending' | 'missed';
 
 export interface TaskSlot {
   slot: string;
