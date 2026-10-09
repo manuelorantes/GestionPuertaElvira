@@ -20,6 +20,7 @@ import {
   Profitability,
   ProposeSessions,
   RecordAdvance,
+  RecordScheduledSession,
   RecordSession,
   RefillDay,
   SaveDuty,
@@ -111,9 +112,10 @@ Deno.test('club duties count as hours without adding the classes given meanwhile
   await propose();
   const settlement = (await list().execute('2026-10')).find((s) => s.teacherId === carlos);
   assertEquals(settlement?.minutes, 4 * 180, '4 martes × 3 h, sin sumar la clase de 1,5 h');
+  // La clase (la más corta) cuenta entera; el turno, solo lo que le sobra.
   assertEquals(settlement?.lines.map((l) => [l.label, l.minutes]), [
-    ['Encargado del club', 720],
-    ['Adultos I', 0],
+    ['Adultos I', 4 * 90],
+    ['Encargado del club', 4 * 90],
   ]);
 });
 
@@ -659,4 +661,31 @@ Deno.test('TeacherPayStatus should show a teacher their hours and pay month by m
     owedCents: 0,
   });
   assertEquals(Object.keys(october ?? {}).includes('incomeCents'), false, 'sin ingresos ni margen');
+});
+
+Deno.test('RecordScheduledSession should record a class right away, once, and not on holidays or paid months', async () => {
+  const { fx, lucia, duties, substitutions, pay } = setUp();
+  const group = fx.scheduledGroups[0];
+  if (!group) throw new Error('Falta el grupo');
+  const record = (date: string) =>
+    new RecordScheduledSession(fx, duties, substitutions, fx, fx, fx).execute(
+      `group:${group.id.value}`,
+      date,
+    );
+  await record('2026-10-14');
+  await record('2026-10-14');
+  const entries = () => [...fx.entries.values()].filter((e) => e.teacher().value === lucia);
+  assertEquals(entries().map((e) => [e.date.toString(), e.minutes().minutes]), [[
+    '2026-10-14',
+    60,
+  ]]);
+  await record('2026-10-15');
+  assertEquals(entries().length, 1, 'el jueves no tiene esa clase');
+  await fx.add(LocalDate.fromString('2026-10-19'), 'Festivo');
+  await record('2026-10-19');
+  assertEquals(entries().length, 1, 'festivo');
+  await record('2026-09-28');
+  await pay().execute(lucia, '2026-09', '2026-10-01');
+  await record('2026-09-30');
+  assertEquals(entries().length, 2, 'septiembre ya está pagado: el 30 no entra');
 });

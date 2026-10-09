@@ -36,10 +36,16 @@ Cada profesor MUST tener una tarifa por hora (lo que el club le paga), de 15 €
 ### Requirement: Horas apuntadas solas
 Las horas MUST apuntarse solas cada noche, con una tarea diaria que se ejecuta después del cierre del club: cada clase
 del día crea su sesión, con la duración y la hora de inicio del grupo, para quien la da ese día (el titular o quien le
-sustituye); cada turno fijo (encargado del club), la suya. La tarea rellena lo que falte desde el mes anterior hasta
-hoy, así que si una noche no se ejecuta, la siguiente lo recupera; un día ya apuntado no se rellena otra vez (lo que
-administración borre no vuelve) y no se tocan las liquidaciones pagadas. Consultar el registro de horas, las
-liquidaciones, la rentabilidad o la ficha de un profesor no apunta nada.
+sustituye); cada actividad del club, la suya. La tarea rellena lo que falte desde el mes anterior hasta hoy, así que si
+una noche no se ejecuta, la siguiente lo recupera; un día ya apuntado no se rellena otra vez (lo que administración
+borre no vuelve) y no se tocan las liquidaciones pagadas. Consultar el registro de horas, las liquidaciones, la
+rentabilidad o la ficha de un profesor no apunta nada.
+Un profesor con cuenta no espera a la noche: al pasar la lista de una clase, al pulsar «Turno hecho» o al marcar a
+alguien en la lista de los viernes, su sesión de esa clase o actividad se apunta en el momento (si no estaba ya).
+
+#### Scenario: Horas al pasar lista
+- **WHEN** Lucía pasa la lista de su clase del martes a las 18:00
+- **THEN** su sesión de esa clase ya está en el registro de horas, y por la noche no se apunta otra vez
 
 #### Scenario: A media tarde
 - **WHEN** se consulta el registro de horas a las 17:30 de un martes
@@ -91,7 +97,13 @@ Administración MUST poder añadir sesiones de un grupo u otras actividades (con
 (de 0,5 a 12, en medias horas) y quitarlas (por ejemplo, un cambio de última hora o una falta), viendo el coste de cada una.
 
 ### Requirement: Liquidación mensual
-La liquidación de cada profesor y mes MUST ser horas × tarifa (sin contar dos veces las que se solapan el mismo día), redondeada a céntimos, con el detalle por grupo o actividad.
+La liquidación de cada profesor y mes MUST ser horas × tarifa, redondeada a céntimos, con el detalle por grupo o
+actividad. Las horas que se solapan el mismo día cuentan una sola vez y van a la sesión más corta: esta cuenta entera y
+la más larga se queda con lo que le sobra.
+
+#### Scenario: Clase durante la actividad de los viernes
+- **WHEN** Ángel tiene clase de 16:30 a 18:00 y la actividad «Viernes» de 17:00 a 20:00
+- **THEN** se le pagan 3,5 horas: 1,5 de la clase y 2 de la actividad
 Se paga a mes vencido: por defecto se muestra el mes anterior. Se puede imprimir y marcar como pagada, una a una o todas.
 
 #### Scenario: Pagar una liquidación
