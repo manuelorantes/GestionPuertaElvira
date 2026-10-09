@@ -124,58 +124,65 @@ describe('Puntos', () => {
     expect(screen.getAllByRole('row')).toHaveLength(3);
   });
 
-  it('creates a tournament and marks who sent the photo with the official kit', async () => {
+  it('shows the month gallery of tournament photos and adds one to a student found by name', async () => {
     const spy = mockApi({
       'GET /api/auth/me': [200, { user: ADMIN }],
-      [`GET /api/admin/points/students?month=${month}`]: [200, { month, items: [] }],
-      [`GET /api/admin/points/tournaments?month=${month}`]: [
+      [`GET /api/admin/points/students?month=${month}`]: [200, { month, items: STUDENTS }],
+      [`GET /api/admin/points/photos?month=${month}`]: [
         200,
         {
+          month,
           items: [
-            { id: 't1', name: 'Open de Granada', date: '2026-10-17', pointsPerPhoto: 2, photos: 0 },
+            {
+              id: 'f1',
+              studentId: 's2',
+              studentName: 'Alberto Rodriguez Garcia',
+              date: '2026-10-04',
+              note: 'Open de Granada',
+              points: 1,
+            },
           ],
         },
       ],
-      'GET /api/admin/points/tournaments/t1': [
-        200,
-        {
-          id: 't1',
-          name: 'Open de Granada',
-          date: '2026-10-17',
-          pointsPerPhoto: 2,
-          photos: 0,
-          students: [{ id: 's1', name: 'Natan Rodriguez Raposo', memberNumber: 46, sent: false }],
-        },
-      ],
-      'PUT /api/admin/points/tournaments/t1/students/s1': [204],
-      'POST /api/admin/points/tournaments': [201, { id: 't2' }],
+      'POST /api/admin/points/photos': [201, { id: 'f2' }],
     });
-    renderApp('/panel/puntos?pestana=torneos');
+    // jsdom no crea URLs de ficheros: la vista previa usa una de mentira.
+    URL.createObjectURL = vi.fn(() => 'blob:vista-previa');
+    URL.revokeObjectURL = vi.fn();
+    renderApp('/panel/puntos?pestana=fotos');
 
-    const list = await screen.findByRole('list', { name: 'Torneos' });
-    expect(list).toHaveTextContent('17/10/2026 · 2 puntos por foto · 0 fotos');
-    await userEvent.click(within(list).getByRole('button', { name: 'Marcar fotos' }));
-    const photos = await screen.findByRole('dialog');
-    await userEvent.click(await within(photos).findByRole('checkbox', { name: /Natan/ }));
-    await waitFor(() =>
-      expect(bodyOf(spy, '/api/admin/points/tournaments/t1/students/s1', 'PUT')).toBe(
-        JSON.stringify({ sent: true }),
-      ),
-    );
-    await userEvent.click(within(photos).getByRole('button', { name: 'Cerrar' }));
+    const gallery = await screen.findByRole('list', { name: /^Fotos de/ });
+    const photo = within(gallery).getByRole('img', {
+      name: 'Alberto Rodriguez Garcia en Open de Granada',
+    });
+    expect(photo).toHaveAttribute('src', '/api/admin/points/photos/f1/file');
+    expect(gallery).toHaveTextContent('04/10/2026 · Open de Granada');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Nuevo torneo' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Nuevo torneo' });
-    await userEvent.type(within(dialog).getByLabelText('Nombre'), 'Torneo de Navidad');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
-    await waitFor(() =>
-      expect(
-        JSON.parse(String(bodyOf(spy, '/api/admin/points/tournaments', 'POST'))),
-      ).toMatchObject({
-        name: 'Torneo de Navidad',
-        pointsPerPhoto: 1,
-      }),
+    await userEvent.click(screen.getByRole('button', { name: 'Añadir foto' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Añadir foto' });
+    const add = within(dialog).getByRole('button', { name: 'Añadir foto' });
+    expect(add).toBeDisabled();
+    await userEvent.type(within(dialog).getByRole('combobox', { name: 'Alumno' }), 'natan');
+    await userEvent.click(
+      await within(dialog).findByRole('option', { name: 'Natan Rodriguez Raposo' }),
     );
+    await userEvent.type(within(dialog).getByLabelText(/Torneo/), 'Torneo de Navidad');
+    await userEvent.upload(
+      within(dialog).getByLabelText('Foto'),
+      new File([new Uint8Array([0xff, 0xd8, 0xff])], 'foto.jpg', { type: 'image/jpeg' }),
+    );
+    expect(
+      within(dialog).getByRole('img', { name: 'Vista previa de la foto' }),
+    ).toBeInTheDocument();
+    await userEvent.click(add);
+    await waitFor(() => {
+      const form = spy.mock.calls.find(
+        ([u, init]) => u === '/api/admin/points/photos' && init?.method === 'POST',
+      )?.[1]?.body as FormData | undefined;
+      expect(form?.get('studentId')).toBe('s1');
+      expect(form?.get('note')).toBe('Torneo de Navidad');
+      expect(form?.get('file')).toBeInstanceOf(Blob);
+    });
   });
 
   it('is not for teachers', async () => {

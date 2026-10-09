@@ -1,4 +1,4 @@
-import { apiGet, apiSend } from '@/shared/api/client';
+import { apiGet, apiSend, apiUpload } from '@/shared/api/client';
 
 export type PointsKind = 'friday' | 'tournament' | 'manual' | 'redemption';
 
@@ -29,16 +29,14 @@ export interface FridayGrid {
   students: { id: string; name: string; memberNumber: number | null; present: string[] }[];
 }
 
-export interface Tournament {
+/** Una foto con la equipación oficial en un torneo (cada una da sus puntos en el mes de la foto). */
+export interface TournamentPhoto {
   id: string;
-  name: string;
+  studentId: string;
+  studentName: string;
   date: string;
-  pointsPerPhoto: number;
-  photos: number;
-}
-
-export interface TournamentDetail extends Tournament {
-  students: { id: string; name: string; memberNumber: number | null; sent: boolean }[];
+  note: string | null;
+  points: number;
 }
 
 const BASE = '/api/admin/points';
@@ -70,29 +68,29 @@ export function markFriday(date: string, studentId: string, present: boolean): P
   return apiSend('PUT', `${BASE}/fridays/${date}/students/${studentId}`, { present });
 }
 
-export async function fetchTournaments(month: string): Promise<Tournament[]> {
-  return (await apiGet<{ items: Tournament[] }>(`${BASE}/tournaments?month=${month}`)).items;
+export async function fetchPhotos(month: string): Promise<TournamentPhoto[]> {
+  return (await apiGet<{ items: TournamentPhoto[] }>(`${BASE}/photos?month=${month}`)).items;
 }
 
-export function fetchTournament(id: string): Promise<TournamentDetail> {
-  return apiGet<TournamentDetail>(`${BASE}/tournaments/${id}`);
+/** La imagen de una foto (la sirve la API con la sesión). */
+export function photoUrl(id: string): string {
+  return `${BASE}/photos/${id}/file`;
 }
 
-export async function saveTournament(
-  input: { name: string; date: string; pointsPerPhoto: number },
-  id?: string,
-): Promise<string> {
-  if (id) {
-    await apiSend('PUT', `${BASE}/tournaments/${id}`, input);
-    return id;
-  }
-  return (await apiSend<{ id: string }>('POST', `${BASE}/tournaments`, input)).id;
+export async function addPhoto(input: {
+  studentId: string;
+  date: string;
+  note: string;
+  file: Blob;
+}): Promise<string> {
+  const form = new FormData();
+  form.append('studentId', input.studentId);
+  form.append('date', input.date);
+  form.append('note', input.note);
+  form.append('file', input.file, 'foto.jpg');
+  return (await apiUpload<{ id: string }>(`${BASE}/photos`, form)).id;
 }
 
-export function deleteTournament(id: string): Promise<void> {
-  return apiSend('DELETE', `${BASE}/tournaments/${id}`);
-}
-
-export function markTournamentPhoto(id: string, studentId: string, sent: boolean): Promise<void> {
-  return apiSend('PUT', `${BASE}/tournaments/${id}/students/${studentId}`, { sent });
+export function deletePhoto(id: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/photos/${id}`);
 }

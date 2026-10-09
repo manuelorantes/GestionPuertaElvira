@@ -351,7 +351,7 @@ Table points_movement {
   movement_date date [not null, note: 'los puntos valen solo en su mes']
   delta integer [not null, note: '+ ganados, − gastados; nunca 0']
   kind varchar(20) [not null, note: 'friday | tournament | manual | redemption']
-  reference varchar(60) [note: 'viernes (AAAA-MM-DD), torneo o cobro; null en los ajustes a mano']
+  reference varchar(60) [note: 'viernes (AAAA-MM-DD), foto de torneo o cobro; null en los ajustes a mano']
   note varchar(200) [note: 'motivo del ajuste o recibo del canje']
   created_by uuid
   created_at timestamptz [not null]
@@ -363,12 +363,20 @@ Table points_movement {
   }
 }
 
-Table points_tournament {
+Table points_photo {
   id uuid [pk]
-  name varchar(120) [not null]
-  held_on date [not null]
-  points_per_photo smallint [not null, note: 'de 1 a 20']
+  student_id uuid [not null]
+  taken_on date [not null, note: 'el punto cuenta en el mes de la foto']
+  note varchar(120) [note: 'el torneo (opcional)']
+  document_key varchar(200) [not null, note: 'photos/<uuid>/<uuid>.jpg en el almacén de documentos']
+  mime_type varchar(60) [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    taken_on
+  }
 }
 
 Ref: points_movement.student_id > students_student.id [delete: cascade]
 Ref: points_movement.created_by > identity_user.id [delete: set null]
+Ref: points_photo.student_id > students_student.id [delete: cascade]
