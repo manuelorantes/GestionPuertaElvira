@@ -149,6 +149,101 @@ describe('Pasar lista', () => {
     expect(await screen.findByRole('heading', { name: 'Mis clases' })).toBeInTheDocument();
   });
 
+  it('comments the class and its students at once, and changes only its own comments', async () => {
+    const comment = (overrides: Record<string, unknown>) => ({
+      id: 'c1',
+      groupId: 'g1',
+      groupName: 'Martes 17:00',
+      date: '2026-10-13',
+      studentId: null,
+      studentName: null,
+      text: 'Hoy hemos dado mates de torres',
+      author: 'Lucía Moreno Gil',
+      authorTeacherId: 't1',
+      writtenAt: '2026-10-13T16:10:00.000Z',
+      editable: true,
+      ...overrides,
+    });
+    const spy = mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      'GET /api/teacher/roll-calls/g1/2026-10-13': [
+        200,
+        {
+          ...CLASS,
+          date: '2026-10-13',
+          students: 2,
+          period: 'open',
+          list: [
+            { id: 's1', name: 'Martina López Herrera', present: true },
+            { id: 's2', name: 'Pablo Gil Ruiz', present: true },
+          ],
+          guests: [{ id: 's9', name: 'Lola Ruiz Pardo' }],
+          others: [],
+        },
+      ],
+      'GET /api/teacher/roll-calls/g1/2026-10-13/comments': [
+        200,
+        {
+          items: [
+            comment({}),
+            comment({
+              id: 'c2',
+              studentId: 's1',
+              studentName: 'Martina López Herrera',
+              text: 'Llamar a su familia',
+              author: 'Junta Pruebas',
+              authorTeacherId: null,
+              editable: false,
+            }),
+          ],
+        },
+      ],
+      'POST /api/teacher/roll-calls/g1/2026-10-13/comments': [201, { id: 'c3' }],
+      'PUT /api/teacher/comments/c1': [204],
+    });
+    renderApp('/panel/lista/g1/2026-10-13');
+
+    const general = await screen.findByRole('list', { name: 'Comentarios de la clase' });
+    expect(general).toHaveTextContent('Hoy hemos dado mates de torres');
+    const aboutMartina = screen.getByRole('list', {
+      name: 'Comentarios sobre Martina López Herrera',
+    });
+    expect(aboutMartina).toHaveTextContent('Llamar a su familia');
+    expect(within(aboutMartina).queryByRole('button', { name: 'Editar comentario' })).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Comentar sobre Pablo Gil Ruiz' }));
+    await userEvent.type(
+      screen.getByLabelText('Comentario sobre Pablo Gil Ruiz'),
+      'Ha roto un reloj',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar comentario' }));
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.find(
+          ([u, init]) =>
+            u === '/api/teacher/roll-calls/g1/2026-10-13/comments' && init?.method === 'POST',
+        )?.[1]?.body,
+      ).toBe(JSON.stringify({ studentId: 's2', text: 'Ha roto un reloj' })),
+    );
+    // Quien vino de otra clase también se comenta.
+    expect(
+      screen.getByRole('button', { name: 'Comentar sobre Lola Ruiz Pardo' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(within(general).getByRole('button', { name: 'Editar comentario' }));
+    const field = within(general).getByLabelText('Comentario');
+    await userEvent.clear(field);
+    await userEvent.type(field, 'Mates de torres y de alfiles');
+    await userEvent.click(within(general).getByRole('button', { name: 'Guardar comentario' }));
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.find(
+          ([u, init]) => u === '/api/teacher/comments/c1' && init?.method === 'PUT',
+        )?.[1]?.body,
+      ).toBe(JSON.stringify({ text: 'Mates de torres y de alfiles' })),
+    );
+  });
+
   it('changes a past list only after confirming it', async () => {
     const spy = mockApi({
       'GET /api/auth/me': [200, { user: TEACHER }],

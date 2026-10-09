@@ -1,8 +1,16 @@
-import { ArrowLeft, Check, X } from 'lucide-react';
+import { ArrowLeft, Check, MessageSquarePlus, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import {
+  addRollCallComment,
+  type ClassComment,
+  type NewClassComment,
+  removeOwnComment,
+  rewriteOwnComment,
+} from '@/features/class-comments/api';
+import { useCommentChange, useRollCallComments } from '@/features/class-comments/hooks';
 import { classroomLabel } from '@/features/classes/classrooms';
 import type { RollCall, RosterStudent } from '@/features/teacher-space/api';
 import { dayLabel } from '@/features/teacher-space/dates';
@@ -14,9 +22,12 @@ import { Combobox } from '@/shared/ui/Combobox';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { useToast } from '@/shared/ui/Toast';
 
+import { CommentForm, CommentList } from '../attendance/ClassComments';
+
 /**
  * Pasar lista de una clase: nadie marcado al abrirla; se marca a quien ha venido y se guarda (el resto, falta). Abajo, la
- * asistencia especial: alumnos de otras clases que han venido. Una lista pasada se cambia confirmándolo.
+ * asistencia especial: alumnos de otras clases que han venido. Una lista pasada se cambia confirmándolo. Los comentarios
+ * (de cada alumno y de la clase) son opcionales y se guardan al momento, aparte de la lista.
  */
 export function RollCallPage() {
   const { groupId = '', date = '' } = useParams();
@@ -47,6 +58,76 @@ export function RollCallPage() {
   );
 }
 
+/** Los comentarios de la clase de ese día: verlos, escribir uno nuevo y cambiar los propios, al momento. */
+function useClassComments(groupId: string, date: string) {
+  const comments = useRollCallComments(groupId, date);
+  const toast = useToast();
+  const add = useCommentChange((comment: NewClassComment) =>
+    addRollCallComment(groupId, date, comment),
+  );
+  const rewrite = useCommentChange(({ id, text }: { id: string; text: string }) =>
+    rewriteOwnComment(id, text),
+  );
+  const remove = useCommentChange(removeOwnComment);
+  return {
+    about: (studentId: string | null) =>
+      (comments.data ?? []).filter((c) => c.studentId === studentId),
+    add: (comment: NewClassComment) =>
+      add.mutateAsync(comment).then(() => toast('Comentario guardado')),
+    rewrite: (id: string, text: string) =>
+      rewrite.mutateAsync({ id, text }).then(() => toast('Comentario cambiado')),
+    remove: (id: string) => remove.mutateAsync(id).then(() => toast('Comentario quitado')),
+  };
+}
+
+const CLASS_COMMENT = 'class';
+
+function CommentButton({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={`Comentar sobre ${name}`}
+      title="Añadir comentario"
+      onClick={onClick}
+      className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted"
+    >
+      <MessageSquarePlus aria-hidden size={18} />
+    </button>
+  );
+}
+
+interface CommentsAboutProps {
+  label: string;
+  formLabel: string;
+  comments: ClassComment[];
+  writing: boolean;
+  onSave: (text: string) => Promise<unknown>;
+  onCancel: () => void;
+  onRewrite: (id: string, text: string) => Promise<unknown>;
+  onRemove: (id: string) => Promise<unknown>;
+}
+
+/** Los comentarios sobre un alumno (o la clase) y, si se está escribiendo uno, su formulario. */
+function CommentsAbout({ label, formLabel, comments, writing, ...actions }: CommentsAboutProps) {
+  if (comments.length === 0 && !writing) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      {comments.length > 0 && (
+        <CommentList
+          label={label}
+          comments={comments}
+          canEdit={(c) => c.editable === true}
+          onRewrite={actions.onRewrite}
+          onRemove={actions.onRemove}
+        />
+      )}
+      {writing && (
+        <CommentForm label={formLabel} onSave={actions.onSave} onCancel={actions.onCancel} />
+      )}
+    </div>
+  );
+}
+
 function RollCallForm({ data }: { data: RollCall }) {
   const [absent, setAbsent] = useState(
     () => new Set(data.list.filter((s) => !s.present).map((s) => s.id)),
@@ -61,6 +142,22 @@ function RollCallForm({ data }: { data: RollCall }) {
   const past = data.period === 'past';
   const present = data.list.length - absent.size;
   const chosen = new Set(guests.map((g) => g.id));
+  const savedGuests = new Set(data.guests.map((g) => g.id));
+  const comments = useClassComments(data.groupId ?? '', data.date);
+  /** A quién se está comentando: un alumno, la clase (CLASS_COMMENT) o nadie. */
+  const [writingFor, setWritingFor] = useState<string | null>(null);
+  const commentsAbout = (studentId: string | null, name: string) => (
+    <CommentsAbout
+      label={studentId === null ? 'Comentarios de la clase' : `Comentarios sobre ${name}`}
+      formLabel={studentId === null ? 'Comentario de la clase' : `Comentario sobre ${name}`}
+      comments={comments.about(studentId)}
+      writing={writingFor === (studentId ?? CLASS_COMMENT)}
+      onSave={(text) => comments.add({ studentId, text }).then(() => setWritingFor(null))}
+      onCancel={() => setWritingFor(null)}
+      onRewrite={comments.rewrite}
+      onRemove={comments.remove}
+    />
+  );
 
   function toggle(id: string) {
     setAbsent((current) => {
@@ -115,27 +212,38 @@ function RollCallForm({ data }: { data: RollCall }) {
               const here = !absent.has(student.id);
               return (
                 <li key={student.id} className="border-b border-line-soft last:border-b-0">
-                  <label className="flex min-h-14 cursor-pointer items-center gap-3 px-4">
-                    <input
-                      type="checkbox"
-                      checked={here}
-                      disabled={!editable}
-                      onChange={() => toggle(student.id)}
-                      className="peer sr-only"
-                    />
-                    <span
-                      aria-hidden
-                      className={`flex size-7 shrink-0 items-center justify-center rounded-sm border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 ${
-                        here ? 'border-brand bg-brand text-surface-raised' : 'border-line-strong'
-                      }`}
-                    >
-                      {here && <Check size={18} strokeWidth={3} />}
-                    </span>
-                    <span className={`flex-1 ${here ? '' : 'text-ink-muted line-through'}`}>
-                      {student.name}
-                    </span>
-                    {!here && <span className="text-[13px] text-ink-muted">No vino</span>}
-                  </label>
+                  <div className="flex items-center pr-2">
+                    <label className="flex min-h-14 flex-1 cursor-pointer items-center gap-3 px-4">
+                      <input
+                        type="checkbox"
+                        checked={here}
+                        disabled={!editable}
+                        onChange={() => toggle(student.id)}
+                        className="peer sr-only"
+                      />
+                      <span
+                        aria-hidden
+                        className={`flex size-7 shrink-0 items-center justify-center rounded-sm border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 ${
+                          here ? 'border-brand bg-brand text-surface-raised' : 'border-line-strong'
+                        }`}
+                      >
+                        {here && <Check size={18} strokeWidth={3} />}
+                      </span>
+                      <span className={`flex-1 ${here ? '' : 'text-ink-muted line-through'}`}>
+                        {student.name}
+                      </span>
+                      {!here && <span className="text-[13px] text-ink-muted">No vino</span>}
+                    </label>
+                    {editable && (
+                      <CommentButton
+                        name={student.name}
+                        onClick={() => setWritingFor(student.id)}
+                      />
+                    )}
+                  </div>
+                  <div className="px-4 pb-3 empty:hidden">
+                    {commentsAbout(student.id, student.name)}
+                  </div>
                 </li>
               );
             })}
@@ -154,23 +262,29 @@ function RollCallForm({ data }: { data: RollCall }) {
         {guests.length > 0 && (
           <ul aria-label="Asistencia especial" className="divide-y divide-line-soft">
             {guests.map((g) => (
-              <li key={g.id} className="flex min-h-12 items-center gap-3">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border-2 border-brand bg-brand text-surface-raised">
-                  <Check aria-hidden size={18} strokeWidth={3} />
-                </span>
-                <span className="flex-1">
-                  {g.name} <span className="font-semibold text-brand">*</span>
-                </span>
-                {editable && (
-                  <button
-                    type="button"
-                    aria-label={`Quitar a ${g.name} de la asistencia especial`}
-                    onClick={() => setGuests((current) => current.filter((c) => c.id !== g.id))}
-                    className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
-                  >
-                    <X aria-hidden size={16} />
-                  </button>
-                )}
+              <li key={g.id}>
+                <div className="flex min-h-12 items-center gap-3">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border-2 border-brand bg-brand text-surface-raised">
+                    <Check aria-hidden size={18} strokeWidth={3} />
+                  </span>
+                  <span className="flex-1">
+                    {g.name} <span className="font-semibold text-brand">*</span>
+                  </span>
+                  {editable && (
+                    <button
+                      type="button"
+                      aria-label={`Quitar a ${g.name} de la asistencia especial`}
+                      onClick={() => setGuests((current) => current.filter((c) => c.id !== g.id))}
+                      className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                    >
+                      <X aria-hidden size={16} />
+                    </button>
+                  )}
+                  {editable && savedGuests.has(g.id) && (
+                    <CommentButton name={g.name} onClick={() => setWritingFor(g.id)} />
+                  )}
+                </div>
+                {commentsAbout(g.id, g.name)}
               </li>
             ))}
           </ul>
@@ -190,6 +304,28 @@ function RollCallForm({ data }: { data: RollCall }) {
               setPicked('');
             }}
           />
+        )}
+      </Card>
+      <Card className="flex flex-col gap-3 p-4">
+        <div>
+          <h2 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+            Comentarios de la clase
+          </h2>
+          <p className="mt-1 text-[13px] text-ink-muted">
+            Opcional: lo que habéis dado o cualquier cosa de la clase. Los comentarios se guardan al
+            momento.
+          </p>
+        </div>
+        {commentsAbout(null, '')}
+        {editable && writingFor !== CLASS_COMMENT && (
+          <Button
+            variant="secondary"
+            className="self-start"
+            onClick={() => setWritingFor(CLASS_COMMENT)}
+          >
+            <MessageSquarePlus aria-hidden size={16} />
+            Añadir comentario
+          </Button>
         )}
       </Card>
       {editable && (

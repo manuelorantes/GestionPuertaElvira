@@ -20,6 +20,7 @@ import { SidePanel } from '@/shared/ui/SidePanel';
 import { useToast } from '@/shared/ui/Toast';
 
 import { StudentAttendanceCard } from './StudentAttendanceCard';
+import { StudentCommentsCard } from './StudentCommentsCard';
 import { StudentBillingCard } from './StudentBillingCard';
 import { EnrolmentDialog } from './EnrolmentDialog';
 import { PickerDialog } from './PickerDialog';
@@ -295,6 +296,7 @@ export function StudentPanel() {
         </Card>
         <StudentBillingCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentAttendanceCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
+        <StudentCommentsCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
       </div>
 
       {action?.kind === 'edit' && (
