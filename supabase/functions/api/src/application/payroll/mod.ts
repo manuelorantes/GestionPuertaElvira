@@ -16,6 +16,7 @@ import {
   ExpectedHours,
   GroupRef,
   MonthlySettlement,
+  overlapShares,
   type ScheduledGroup,
   SessionMinutes,
   type Settlement,
@@ -119,12 +120,55 @@ export interface SessionView {
   teacherName: string;
   groupId: string | null;
   label: string;
+  /** Duración de la sesión. */
   minutes: number;
+  /** Lo que cuenta en la liquidación: menos si otra sesión del mismo día se queda con parte (ver `overlapShares`). */
+  countedMinutes: number;
+  /** Sesiones del mismo día que se quedan con sus minutos solapados (vacío si cuenta entera). */
+  overlapsWith: string[];
+  /** Coste de los minutos que cuenta. */
   costCents: number;
   fromSchedule: boolean;
   locked: boolean;
   /** La dio en lugar de su profesor (sustitución planificada de esa clase o turno ese día). */
   substitution: boolean;
+}
+
+/** Sesión tal como está guardada, con su hora de inicio (null si no se sabe) y la tarifa que se le aplica. */
+export type SessionRow = Omit<SessionView, 'countedMinutes' | 'overlapsWith' | 'costCents'> & {
+  start: number | null;
+  rateCents: number;
+};
+
+/**
+ * El registro de horas de un mes, lo más reciente primero: cada sesión con lo que cuenta de verdad (lo que se solapa
+ * el mismo día va a la más corta; a igual duración, a la suya antes que a la sustitución) y su coste.
+ */
+export class ListSessions {
+  constructor(private readonly query: PayrollQuery) {}
+
+  async execute(month: YearMonth, teacherId: string | null): Promise<SessionView[]> {
+    const rows = await this.query.sessions(month, teacherId);
+    const shares = overlapShares(rows, (r) => ({
+      day: `${r.teacherId}|${r.date}`,
+      start: r.start,
+      minutes: r.minutes,
+      substitution: r.substitution,
+    }));
+    return shares
+      .map(({ item: { start, rateCents, ...row }, minutes, overlappedBy }) => ({
+        ...row,
+        start,
+        countedMinutes: minutes,
+        overlapsWith: overlappedBy.map((o) => o.label),
+        costCents: Math.round((rateCents * minutes) / 60),
+      }))
+      .sort((a, b) =>
+        b.date.localeCompare(a.date) || (a.start ?? 0) - (b.start ?? 0) ||
+        a.label.localeCompare(b.label, 'es')
+      )
+      .map(({ start: _start, ...view }) => view);
+  }
 }
 
 /** Grupos de un profesor y plazas de sus clases: ocupadas y totales, contando cada día de clase. */
@@ -162,7 +206,7 @@ export interface MonthlyFees {
 
 export interface PayrollQuery {
   /** Sesiones del mes, por fecha; el coste usa la tarifa congelada si la liquidación está pagada. */
-  sessions(month: YearMonth, teacherId: string | null): Promise<SessionView[]>;
+  sessions(month: YearMonth, teacherId: string | null): Promise<SessionRow[]>;
 }
 
 export class SessionNotFound extends Error {

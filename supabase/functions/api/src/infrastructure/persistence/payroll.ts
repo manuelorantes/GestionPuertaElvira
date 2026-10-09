@@ -26,7 +26,7 @@ import type {
   PayrollQuery,
   ProposalLog,
   ScheduleDirectory,
-  SessionView,
+  SessionRow,
   SettlementRepository,
   SubstitutionRepository,
   TeacherDutyView,
@@ -350,7 +350,7 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
     private readonly today: () => LocalDate,
   ) {}
 
-  async sessions(month: YearMonth, teacherId: string | null): Promise<SessionView[]> {
+  async sessions(month: YearMonth, teacherId: string | null): Promise<SessionRow[]> {
     const rows = await this.sql`
       SELECT s.*, t.full_name, COALESCE(st.rate_cents, t.hourly_rate_cents) AS rate_cents, st.teacher_id IS NOT NULL AS locked,
              EXISTS (
@@ -372,7 +372,8 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
       groupId: row.nullableString('group_id'),
       label: row.string('label'),
       minutes: row.int('minutes'),
-      costCents: Math.round((row.int('rate_cents') * row.int('minutes')) / 60),
+      start: row.nullableInt('start_minutes'),
+      rateCents: row.int('rate_cents'),
       fromSchedule: row.bool('from_schedule'),
       locked: row.bool('locked'),
       substitution: row.bool('substitution'),

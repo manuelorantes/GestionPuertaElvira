@@ -1,3 +1,4 @@
+import type { SessionRow } from '../../src/application/payroll/mod.ts';
 import { assertEquals, assertRejects } from '@std/assert';
 
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
@@ -13,6 +14,7 @@ import {
   ChangeSettlementPaymentDate,
   DeleteAdvance,
   DeleteSession,
+  ListSessions,
   ListSettlements,
   PayAllSettlements,
   PaySettlement,
@@ -688,4 +690,44 @@ Deno.test('RecordScheduledSession should record a class right away, once, and no
   await pay().execute(lucia, '2026-09', '2026-10-01');
   await record('2026-09-30');
   assertEquals(entries().length, 2, 'septiembre ya está pagado: el 30 no entra');
+});
+
+Deno.test('ListSessions should show the newest first, what each session counts and with what it overlaps', async () => {
+  const row = (
+    date: string,
+    label: string,
+    start: number,
+    minutes: number,
+    substitution = false,
+  ): SessionRow => ({
+    id: `${date}-${label}`,
+    date,
+    teacherId: 'angel',
+    teacherName: 'Ángel',
+    groupId: null,
+    label,
+    minutes,
+    start,
+    rateCents: 1500,
+    fromSchedule: true,
+    locked: false,
+    substitution,
+  });
+  const rows = [
+    row('2026-10-08', 'Martes 17:00 (sustitución)', 17 * 60, 90, true),
+    row('2026-10-08', 'Jueves 17:00', 17 * 60, 90),
+    row('2026-10-09', 'Viernes', 17 * 60, 180),
+    row('2026-10-09', 'Viernes 17:00', 17 * 60, 90),
+  ];
+  const items = await new ListSessions({ sessions: () => Promise.resolve(rows) })
+    .execute(YearMonth.fromString('2026-10'), null);
+  assertEquals(
+    items.map((s) => [s.date, s.label, s.minutes, s.countedMinutes, s.costCents, s.overlapsWith]),
+    [
+      ['2026-10-09', 'Viernes', 180, 90, 2250, ['Viernes 17:00']],
+      ['2026-10-09', 'Viernes 17:00', 90, 90, 2250, []],
+      ['2026-10-08', 'Jueves 17:00', 90, 90, 2250, []],
+      ['2026-10-08', 'Martes 17:00 (sustitución)', 90, 0, 0, ['Jueves 17:00']],
+    ],
+  );
 });
