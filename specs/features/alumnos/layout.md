@@ -23,12 +23,13 @@ StudentsPage (/panel/alumnos)
 │   ├── Cabecera: avatar, nombre, «12 años · Iniciación A», badge de estado, cerrar, acciones «Editar» y «Dar de baja»
 │   ├── Tarjeta «Grupos»: por grupo, nombre, horario, «Aula N · Profesor», acciones «Mover» y «Quitar»; «Añadir grupo»
 │   ├── Tarjeta «Datos personales»: fecha de nacimiento, DNI, email, federado (licencia), autorización de imagen, alta, baja
-│   └── Tarjeta «Familia y contacto»: tutores con teléfono (enlace tel:), teléfono propio, familia directa con «Abrir» y «Quitar»; «Añadir hermano»
+│   ├── Tarjeta «Contacto»: tutores con teléfono (enlace tel:) y teléfono propio
+│   └── Tarjeta «Familia directa en el club»: cada familiar con «Abrir» y «Quitar»; «Añadir familia directa»
 ├── StudentDialog («Nuevo alumno» / «Editar alumno»)
 │   ├── Sección «Datos del alumno»: Nombre y apellidos · Fecha de nacimiento (DateField) · DNI (opcional) · Email de contacto (opcional)
 │   ├── Nota: «Solo el nombre es obligatorio…» con lo que quedará pendiente
-│   ├── Sección «Familia y contacto»: Tutor 1 + Teléfono · Tutor 2 (opcional) + Teléfono · Teléfono del alumno
-│   │   └── (solo alta) Familia directa en el club (select opcional)
+│   ├── Sección «Contacto»: Tutor 1 + Teléfono · Tutor 2 (opcional) + Teléfono · Teléfono del alumno
+│   ├── (solo alta) Sección «Familia directa en el club»: select opcional
 │   ├── Sección «Club»: (solo alta) Grupo (select) + «Añadir otro grupo» · interruptor Federado + Nº de licencia · interruptor Autorización de imagen
 │   └── Pie: Cancelar | «Dar de alta» o «Guardar cambios»
 ├── WithdrawDialog: «Dar de baja a <nombre>», DateField «Fecha de baja» (por defecto hoy), texto «Desde ese día deja de ocupar plaza en sus grupos.», Cancelar | «Dar de baja»
