@@ -158,6 +158,8 @@ Las migraciones no dependen del token, así que la base de datos queda al día a
 
 - **Supabase → Edge Functions → Logs** para errores de la API (los logs son JSON con `requestId`).
 - **Copias de seguridad**: el plan gratuito de Supabase no las hace; las hace el workflow de arriba, cada día.
+- **Sección Sistema** (superadministración): el estado de los últimos turnos de cada tarea programada y cuándo toca
+  la siguiente. Cada workflow apunta su ejecución en `system_task_run` al terminar.
 - **Workflows programados** (copia de seguridad, horas automáticas, mantener activo): GitHub los desactiva en un
   repositorio público tras 60 días sin actividad. Si eso pasa, se reactivan en *Actions* con *Enable workflow*.
 - **Límites gratuitos** (500 MB de base de datos, 1 GB de Storage, 500 000 invocaciones de funciones al mes):
