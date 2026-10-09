@@ -11,7 +11,6 @@ import {
 } from '../../src/domain/billing/mod.ts';
 import {
   AdjustCharge,
-  AdjustPoints,
   GenerateMonthlyCharges,
   GetStudentAccount,
   ImportPayment,
@@ -38,7 +37,7 @@ function generate(fx: BillingFixture, month: string): Promise<void> {
 }
 
 function quotes(fx: BillingFixture): QuotePayment {
-  return new QuotePayment(fx, fx, fx, fx, fx.clock);
+  return new QuotePayment(fx, fx, fx, fx, fx.clock, fx);
 }
 
 function quote(fx: BillingFixture, id: string, months: number): Promise<PaymentQuote> {
@@ -250,15 +249,13 @@ Deno.test('IssueInvoice should issue one invoice per payment with its own number
   );
 });
 
-Deno.test('MarkReminded and AdjustPoints should update the charge and the account', async () => {
+Deno.test('MarkReminded should note when the family was reminded', async () => {
   const fx = new BillingFixture();
-  const id = fx.student();
+  fx.student();
   await generate(fx, '2026-09');
   const first = [...fx.charges.values()][0] as Charge;
   await new MarkReminded(fx, fx.clock).execute(first.id.value);
-  await new AdjustPoints(fx).execute(id, 2);
   assert(first.remindedOn() !== null);
-  assertEquals((await fx.account(StudentRef.fromString(id)))?.points(), 2);
 });
 
 Deno.test('ImportPayment should record the exact amount of the sheet, skip paid months and respect closed seasons', async () => {
@@ -363,7 +360,9 @@ Deno.test('UpdateBillingSettings should replace prices, discounts, private rates
 Deno.test('RegisterPayment should spend the redeemed points and make a member of whoever pays the fee', async () => {
   const fx = new BillingFixture();
   const id = fx.student({ siblings: false });
-  await new AdjustPoints(fx).execute(id, 6);
+  // 6 puntos ganados en octubre (los de septiembre ya no valen).
+  fx.givePoints(id, '2026-10', 6);
+  fx.givePoints(id, '2026-09', 9);
   await generate(fx, '2026-10');
   const request = {
     studentId: id,
@@ -389,7 +388,7 @@ Deno.test('RegisterPayment should spend the redeemed points and make a member of
     .execute(request);
   const payment = await fx.payment(PaymentId.fromString(paymentId));
   assertEquals(payment?.lines.at(-1)?.label, 'Canje de 5 puntos (5 % de un mes) −2,25 €');
-  assertEquals((await fx.account(StudentRef.fromString(id)))?.points(), 1);
+  assertEquals(await fx.available(id, YearMonth.fromString('2026-10')), 1);
   await assertRejects(
     () => quotes(fx).execute({ ...request, redeemPoints: 5 }),
     InvalidPaymentRequest,

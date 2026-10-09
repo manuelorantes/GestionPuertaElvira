@@ -95,6 +95,19 @@ export interface ChargeRepository {
   saveCharge(charge: Charge): Promise<void>;
 }
 
+/** Los puntos de un alumno (sección Puntos): valen solo en el mes en que se ganan. */
+export interface PointsWallet {
+  available(student: string, month: YearMonth): Promise<number>;
+  /** Gasta puntos en un cobro: cuentan en el mes del cobro. */
+  redeem(
+    student: string,
+    date: LocalDate,
+    points: number,
+    payment: string,
+    note: string,
+  ): Promise<void>;
+}
+
 export interface PaymentRepository {
   payment(id: PaymentId): Promise<Payment | null>;
   savePayment(payment: Payment): Promise<void>;
@@ -478,7 +491,24 @@ export class QuotePayment {
     private readonly accounts: StudentAccountRepository,
     private readonly charges: ChargeRepository,
     private readonly clock: Clock,
+    private readonly points: PointsWallet,
   ) {}
+
+  /** Los puntos que el alumno puede canjear en un cobro de ese mes. */
+  availablePoints(studentId: string, month: YearMonth): Promise<number> {
+    return this.points.available(studentId, month);
+  }
+
+  /** Gasta los puntos canjeados en un cobro. */
+  redeemPoints(
+    studentId: string,
+    date: LocalDate,
+    points: number,
+    payment: string,
+    note: string,
+  ): Promise<void> {
+    return this.points.redeem(studentId, date, points, payment, note);
+  }
 
   async execute(request: PaymentRequest): Promise<PaymentQuote> {
     paymentMethodFromName(request.method);
@@ -497,7 +527,7 @@ export class QuotePayment {
     }
     const periods = await this.periods(ref, date, request.months);
     const account = await this.accounts.account(ref);
-    const available = account?.points() ?? 0;
+    const available = await this.points.available(ref.value, YearMonth.of(date));
     if (
       request.redeemPoints !== 0 &&
       (request.redeemPoints !== PointsRedemption.REQUIRED_POINTS ||
@@ -677,11 +707,19 @@ export class RegisterPayment {
         charge.coveredBy(payment.id);
         await this.charges.saveCharge(charge);
       }
-      // Los puntos canjeados se descuentan; pagar la cuota de socio convierte en socio.
-      if (request.redeemPoints > 0 || quote.kind === 'membership') {
+      // Los puntos canjeados se gastan (en el mes del cobro); pagar la cuota de socio convierte en socio.
+      if (request.redeemPoints > 0) {
+        await this.quotes.redeemPoints(
+          ref.value,
+          quote.date,
+          request.redeemPoints,
+          payment.id.value,
+          `Canje en el recibo ${payment.receipt.toString()}`,
+        );
+      }
+      if (quote.kind === 'membership') {
         const account = (await this.accounts.account(ref)) ?? StudentAccount.open(ref);
-        if (request.redeemPoints > 0) account.adjustPoints(-request.redeemPoints);
-        if (quote.kind === 'membership' && !account.isMember()) {
+        if (!account.isMember()) {
           account.update(account.preferredPlan(), true, account.privateRate());
         }
         await this.accounts.saveAccount(account);
@@ -882,7 +920,7 @@ export class GetStudentAccount {
       preferredPlan: account?.preferredPlan() ?? 'monthly',
       member: account?.isMember() === true,
       privateRate: rate === null ? null : decimal(rate),
-      points: account?.points() ?? 0,
+      points: await this.quotes.availablePoints(studentId, YearMonth.of(today)),
       suggestedMonths: months.suggested,
       remainingMonths: months.remaining,
       weeklyHours: student.regularWeeklyHours,
@@ -927,18 +965,6 @@ export class UpdateStudentAccount {
       : Money.fromDecimal(privateRate);
     account.update(preferredPlanFromName(plan), member, rate);
     await this.accounts.saveAccount(account);
-  }
-}
-
-export class AdjustPoints {
-  constructor(private readonly accounts: StudentAccountRepository) {}
-
-  async execute(studentId: string, delta: number): Promise<number> {
-    const ref = StudentRef.fromString(studentId);
-    const account = (await this.accounts.account(ref)) ?? StudentAccount.open(ref);
-    account.adjustPoints(delta);
-    await this.accounts.saveAccount(account);
-    return account.points();
   }
 }
 

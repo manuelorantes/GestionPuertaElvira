@@ -903,11 +903,10 @@ export class StudentAccount {
     private plan: PreferredPlan,
     private member: boolean,
     private rate: Money | null,
-    private balance: number,
   ) {}
 
   static open(student: StudentRef): StudentAccount {
-    return new StudentAccount(student, 'monthly', false, null, 0);
+    return new StudentAccount(student, 'monthly', false, null);
   }
 
   static restore(
@@ -915,9 +914,8 @@ export class StudentAccount {
     plan: PreferredPlan,
     member: boolean,
     privateRate: Money | null,
-    points: number,
   ): StudentAccount {
-    return new StudentAccount(student, plan, member, privateRate, points);
+    return new StudentAccount(student, plan, member, privateRate);
   }
 
   update(plan: PreferredPlan, member: boolean, privateRate: Money | null): void {
@@ -927,13 +925,6 @@ export class StudentAccount {
     this.plan = plan;
     this.member = member;
     this.rate = privateRate;
-  }
-
-  adjustPoints(delta: number): void {
-    if (this.balance + delta < 0) {
-      throw new InvalidValue('points', 'Los puntos no pueden quedar en negativo.');
-    }
-    this.balance += delta;
   }
 
   preferredPlan(): PreferredPlan {
@@ -946,9 +937,5 @@ export class StudentAccount {
 
   privateRate(): Money | null {
     return this.rate;
-  }
-
-  points(): number {
-    return this.balance;
   }
 }

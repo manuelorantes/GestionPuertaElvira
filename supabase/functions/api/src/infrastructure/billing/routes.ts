@@ -2,7 +2,6 @@ import { InvalidValue, LocalDate, Season, YearMonth } from '../../domain/common/
 import { paymentMethodFromName, paymentMethodLabel, StudentRef } from '../../domain/billing/mod.ts';
 import {
   AdjustCharge,
-  AdjustPoints,
   BillingStudentNotFound,
   ChangePaymentMethod,
   CorrectPaymentAmount,
@@ -37,6 +36,8 @@ import {
   SqlStudentDirectory,
 } from '../persistence/billing.ts';
 import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
+import { PointsWalletService } from '../../application/points/mod.ts';
+import { SqlPointMovementRepository } from '../persistence/points.ts';
 
 /** Casos de uso de cobros montados sobre la transacción de la petición. */
 export function billing(api: ApiApp, scope: RequestScope) {
@@ -61,7 +62,14 @@ export function billing(api: ApiApp, scope: RequestScope) {
     transactions,
     locks,
   );
-  const quotes = new QuotePayment(directory, settings, accounts, charges, clock);
+  const quotes = new QuotePayment(
+    directory,
+    settings,
+    accounts,
+    charges,
+    clock,
+    new PointsWalletService(new SqlPointMovementRepository(tx)),
+  );
   return {
     directory,
     settings,
@@ -286,19 +294,6 @@ export function registerBillingRoutes(api: ApiApp): void {
       return c.body(null, 204);
     },
   );
-
-  api.defineRoute(admin('POST', '/api/admin/billing/accounts/:id/points'), async (c, scope) => {
-    const b = billing(api, scope);
-    const id = param(c, 'id');
-    if ((await b.directory.find(StudentRef.fromString(id), b.today())) === null) {
-      throw new BillingStudentNotFound();
-    }
-    const points = await new AdjustPoints(b.accounts).execute(
-      id,
-      (await JsonBody.from(c.req.raw)).requiredInt('delta'),
-    );
-    return c.json({ points });
-  });
 
   api.defineRoute(admin('GET', '/api/admin/billing/settings'), async (c, scope) => {
     const s = await billing(api, scope).settings.get();

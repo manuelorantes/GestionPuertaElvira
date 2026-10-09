@@ -1,4 +1,4 @@
-import { type LocalDate, Money, type YearMonth } from '../../src/domain/common/mod.ts';
+import { type LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
   BillingSettings,
   type Charge,
@@ -92,6 +92,25 @@ export class BillingFixture
 
   saveSettings(settings: BillingSettings): Promise<void> {
     this.settings = settings;
+    return Promise.resolve();
+  }
+
+  /** Puntos de cada alumno y mes («id|AAAA-MM»). */
+  readonly points = new Map<string, number>();
+
+  givePoints(student: string, month: string, points: number): void {
+    this.points.set(`${student}|${month}`, (this.points.get(`${student}|${month}`) ?? 0) + points);
+  }
+
+  available(student: string, month: YearMonth): Promise<number> {
+    return Promise.resolve(this.points.get(`${student}|${month.toString()}`) ?? 0);
+  }
+
+  redeem(student: string, date: LocalDate, points: number): Promise<void> {
+    const key = `${student}|${YearMonth.of(date).toString()}`;
+    const left = (this.points.get(key) ?? 0) - points;
+    if (left < 0) throw new Error('Sin puntos suficientes');
+    this.points.set(key, left);
     return Promise.resolve();
   }
 
