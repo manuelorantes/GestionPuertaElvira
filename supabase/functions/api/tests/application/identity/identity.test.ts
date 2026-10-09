@@ -284,11 +284,12 @@ Deno.test('LinkTeacher should link a teacher account to an existing teacher and 
   assertEquals((await fx.users.find(user.id))?.linkedTeacher(), null);
 });
 
-Deno.test('LinkTeacher should refuse unknown teachers, teachers with another account and other roles', async () => {
+Deno.test('LinkTeacher should refuse unknown teachers, teachers with another account and the assistant', async () => {
   const fx = new IdentityFixture();
   await fx.existingUser({ role: 'teacher' });
   await fx.existingUser({ email: 'otra@club.es', role: 'teacher' });
   await fx.existingUser({ email: 'admin@club.es', role: 'administrator' });
+  await fx.existingUser({ email: 'asistente@club.es', role: 'assistant' });
   const free = '01990000-0000-7000-8000-0000000000cc';
   const link = new LinkTeacher(fx.users, teacherAccounts(fx, [LUCIA, free]), fx.log, fx.clock);
 
@@ -300,5 +301,6 @@ Deno.test('LinkTeacher should refuse unknown teachers, teachers with another acc
   await link.execute(IdentityFixture.EMAIL, LUCIA);
   await assertRejects(() => link.execute('otra@club.es', LUCIA), TeacherAlreadyLinked);
   await link.execute(IdentityFixture.EMAIL, LUCIA);
-  await assertRejects(() => link.execute('admin@club.es', free), InvalidValue, 'profesorado');
+  await assertRejects(() => link.execute('asistente@club.es', free), InvalidValue, 'asistente');
+  await link.execute('admin@club.es', free);
 });

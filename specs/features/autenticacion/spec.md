@@ -110,24 +110,45 @@ MUST quedar en el historial a su nombre, como el resto de cuentas.
 ### Requirement: Cuenta de profesorado vinculada a su profesor
 Una cuenta de profesorado MUST vincularse a la ficha de un profesor para ver lo suyo, y solo lo suyo: sus clases,
 sus alumnos y sus pagos (ver la spec de profesorado). Su menú tiene solo esas secciones. Un profesor MUST tener
-como mucho una cuenta, y solo las cuentas de profesorado se vinculan; al cambiar una cuenta a otro rol se
-desvincula. Una cuenta de profesorado sin vincular entra y ve un aviso para que administración la vincule, sin
-ningún dato.
+como mucho una cuenta vinculada. Se vinculan las cuentas de profesorado, administración y superadministración,
+nunca la de asistente; al cambiar una cuenta a asistente se desvincula. Una cuenta de profesorado sin vincular
+entra y ve un aviso para que administración la vincule, sin ningún dato.
 
 #### Scenario: Vincular al crear la cuenta
 - **WHEN** superadministración crea una cuenta con rol profesorado y elige a Lucía Moreno Gil como profesor
 - **THEN** esa cuenta ve las clases de Lucía al entrar
 
+#### Scenario: Una cuenta de asistente
+- **WHEN** superadministración intenta vincular la cuenta de asistente a un profesor
+- **THEN** el sistema lo rechaza
+
 #### Scenario: Un profesor ya vinculado
 - **WHEN** superadministración vincula a Lucía a una segunda cuenta
 - **THEN** el sistema lo rechaza: ese profesor ya tiene otra cuenta vinculada
+
+### Requirement: Administración que también da clases
+Una cuenta de administración o de superadministración vinculada a un profesor MUST tener, abajo a la izquierda del
+menú (en el móvil, en la barra de arriba), un botón para cambiar entre su espacio de administración y su espacio de
+profesor. En el espacio de profesor funciona como cualquier cuenta de profesorado vinculada a ese profesor (su menú,
+sus clases, sus listas, sus alumnos y sus pagos, y las secciones de administración la devuelven a sus clases), con
+el botón para volver a administración. Al iniciar sesión, al cerrarla y al entrar como otra cuenta o volver a la
+propia, empieza siempre en administración; al recargar la página sigue en el espacio en que estaba. Sin profesor
+vinculado no hay botón.
+
+#### Scenario: Pasar lista desde administración
+- **WHEN** Ana, de administración y vinculada a su ficha de profesora, pulsa «Cambiar a profesor»
+- **THEN** ve «Mis clases» con sus clases y puede pasar sus listas; con «Cambiar a administración» vuelve al resumen
+
+#### Scenario: Al entrar
+- **WHEN** Ana cierra sesión en su espacio de profesor y vuelve a entrar
+- **THEN** entra en administración
 
 ### Requirement: Sección Usuarios
 Superadministración MUST tener una sección «Usuarios», que nadie más ve, con todas las cuentas: nombre, email,
 rol, estado (activa o desactivada, y si tiene contraseña temporal) y última conexión (último inicio de sesión
 o actividad; «Nunca» si no ha entrado). Por defecto muestra las activas, con filtros Activos, Desactivados y
 Todos. Desde ella MUST poder crear cuentas, restablecer contraseñas (se muestra una contraseña temporal una
-sola vez y se cierran sus sesiones), desactivar y reactivar cuentas, cambiar su rol y, en las de profesorado,
+sola vez y se cierran sus sesiones), desactivar y reactivar cuentas, cambiar su rol y, en las de profesorado, administración y superadministración (también la suya),
 elegir el profesor al que corresponden («Sin vincular» si ninguno). Nadie MUST poder
 desactivar su propia cuenta ni cambiar su propio rol. Cada acción queda en el historial.
 

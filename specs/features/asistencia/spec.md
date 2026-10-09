@@ -63,7 +63,7 @@ antes hasta el final del día siguiente):
 Una clase apuntada en las horas (sesión de un grupo) cuya lista no se pasó, o una actividad del club que su encargado no
 confirmó, cuando acaba su plazo MUST aparecer en el
 bloque «Listas sin pasar» del resumen, con fecha, clase y profesor, y en un contador junto a «Resumen» en el menú.
-Solo cuentan las clases de profesores que pueden pasar lista (con su cuenta de profesorado activa y vinculada), desde
+Solo cuentan las clases de profesores que pueden pasar lista (con una cuenta activa vinculada a su ficha), desde
 el día en que se vinculó su cuenta y nunca antes del día en que se activó la asistencia. Para cada una, administración
 MUST poder:
 - **quitar la sesión** («No se dio»): deja de contar horas y de salir en el aviso; no se puede si la liquidación de

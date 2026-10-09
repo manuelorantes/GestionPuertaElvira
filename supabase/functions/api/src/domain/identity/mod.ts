@@ -25,6 +25,20 @@ export function roleFromName(name: string): Role {
   return name as Role;
 }
 
+/**
+ * Roles que pueden vincularse a la ficha de un profesor: el profesorado y la administración que además da clases
+ * (que cambia entre su espacio de administración y el de profesor). El asistente no da clases.
+ */
+const ROLES_THAT_TEACH: ReadonlySet<Role> = new Set([
+  'teacher',
+  'administrator',
+  'superadministrator',
+]);
+
+export function canTeach(role: Role): boolean {
+  return ROLES_THAT_TEACH.has(role);
+}
+
 export type AccountStatus = 'active' | 'disabled';
 
 /** Hash opaco de una contraseña: el dominio no conoce el algoritmo. */
@@ -272,24 +286,24 @@ export class User {
     this.currentStatus = 'active';
   }
 
-  /** Al dejar el rol de profesorado se pierde el vínculo con el profesor. */
+  /** Al pasar a un rol que no da clases se pierde el vínculo con el profesor. */
   changeRole(role: Role): void {
     this.currentRole = role;
-    if (role !== 'teacher') {
+    if (!canTeach(role)) {
       this.teacher = null;
       this.teacherLinkedAt = null;
     }
   }
 
   /**
-   * Vincula (o desvincula, con null) la cuenta a la ficha de un profesor: solo cuentas de profesorado. Recuerda desde
-   * cuándo, porque las listas sin pasar de ese profesor cuentan desde que puede pasarlas.
+   * Vincula (o desvincula, con null) la cuenta a la ficha de un profesor: profesorado o administración, nunca el
+   * asistente. Recuerda desde cuándo, porque las listas sin pasar de ese profesor cuentan desde que puede pasarlas.
    */
   linkTeacher(teacher: TeacherLink | null, now: Date): void {
-    if (teacher !== null && this.currentRole !== 'teacher') {
+    if (teacher !== null && !canTeach(this.currentRole)) {
       throw new InvalidValue(
         'teacherId',
-        'Solo una cuenta de profesorado se puede vincular a un profesor.',
+        'La cuenta de asistente no se puede vincular a un profesor.',
       );
     }
     if (teacher !== null && this.teacher !== null && teacher.equals(this.teacher)) return;

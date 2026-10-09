@@ -172,16 +172,16 @@ Deno.test('teacher accounts should be linked to one teacher each and see only te
     name: 'Lucía Moreno Gil',
   });
 
-  // Un profesor, una cuenta; solo las cuentas de profesorado se vinculan.
+  // Un profesor, una cuenta; el asistente no se vincula.
   const other = await createUser('otra@club.es', 'teacher');
   assertError(
     await client.json('PUT', `/api/admin/users/${other.id.value}/teacher`, { teacherId: lucia }),
     409,
     'teacher_already_linked',
   );
-  const admin = await createUser('junta@club.es');
+  const assistant = await createUser('asistente@club.es', 'assistant');
   assertError(
-    await client.json('PUT', `/api/admin/users/${admin.id.value}/teacher`, {
+    await client.json('PUT', `/api/admin/users/${assistant.id.value}/teacher`, {
       teacherId: await newTeacher(client, 'Carlos Ruiz Márquez'),
     }),
     422,
@@ -210,9 +210,9 @@ Deno.test('teacher accounts should be linked to one teacher each and see only te
   assertEquals(await linkedTo(), lucia);
   assertError(await teacher.get('/api/admin/students'), 403, 'forbidden');
 
-  // Pasar a otro rol quita el vínculo.
+  // Pasar a asistente quita el vínculo.
   assertEquals(
-    (await client.json('PUT', `/api/admin/users/${profe.id.value}/role`, { role: 'administrator' }))
+    (await client.json('PUT', `/api/admin/users/${profe.id.value}/role`, { role: 'assistant' }))
       .status,
     204,
   );
@@ -221,4 +221,34 @@ Deno.test('teacher accounts should be linked to one teacher each and see only te
       ?.teacher,
     null,
   );
+});
+
+Deno.test('administration linked to a teacher should use the teacher routes as that teacher', async () => {
+  const { client, selfId } = await superadmin();
+  const lucia = await newTeacher(client, 'Lucía Moreno Gil');
+  const junta = await createUser('junta@club.es');
+  const admin = new ApiClient();
+  await admin.logIn('junta@club.es');
+  assertError(await admin.get('/api/teacher/classes'), 403, 'forbidden');
+
+  assertEquals(
+    (await client.json('PUT', `/api/admin/users/${junta.id.value}/teacher`, { teacherId: lucia }))
+      .status,
+    204,
+  );
+  const meAsAdmin = (await admin.get('/api/auth/me')).body as {
+    user: { role: string; teacherId: string | null };
+  };
+  assertEquals([meAsAdmin.user.role, meAsAdmin.user.teacherId], ['administrator', lucia]);
+  assertEquals((await admin.get('/api/teacher/classes')).status, 200);
+  assertEquals((await admin.get('/api/admin/students')).status, 200);
+
+  // Superadministración también puede vincular su propia cuenta.
+  const carlos = await newTeacher(client, 'Carlos Ruiz Márquez');
+  assertEquals(
+    (await client.json('PUT', `/api/admin/users/${selfId}/teacher`, { teacherId: carlos }))
+      .status,
+    204,
+  );
+  assertEquals((await client.get('/api/teacher/classes')).status, 200);
 });
