@@ -99,7 +99,7 @@ describe('Mis alumnos', () => {
 });
 
 describe('Pasar lista', () => {
-  it('starts with everyone present, saves who did not come and goes back to the classes', async () => {
+  it('starts with nobody ticked, saves who did not come and goes back to the classes', async () => {
     const spy = mockApi({
       'GET /api/auth/me': [200, { user: TEACHER }],
       'GET /api/teacher/roll-calls/g1/2026-10-13': [
@@ -109,8 +109,8 @@ describe('Pasar lista', () => {
           date: '2026-10-13',
           students: 2,
           list: [
-            { id: 's1', name: 'Martina López Herrera', present: true },
-            { id: 's2', name: 'Pablo Gil Ruiz', present: true },
+            { id: 's1', name: 'Martina López Herrera', present: false },
+            { id: 's2', name: 'Pablo Gil Ruiz', present: false },
           ],
         },
       ],
@@ -119,12 +119,14 @@ describe('Pasar lista', () => {
     });
     renderApp('/panel/lista/g1/2026-10-13');
 
-    expect(await screen.findByText('2 de 2 alumnos · desmarca a quien no ha venido')).toBeVisible();
-    const pablo = screen.getByRole('checkbox', { name: /Pablo Gil Ruiz/ });
-    expect(pablo).toBeChecked();
-    await userEvent.click(pablo);
-    expect(pablo).not.toBeChecked();
-    expect(screen.getByText('1 de 2 alumnos · desmarca a quien no ha venido')).toBeVisible();
+    // Nadie marcado al abrirla: se marca a quien ha venido (Martina) y Pablo queda como falta.
+    expect(await screen.findByText('0 de 2 alumnos · marca a quien ha venido')).toBeVisible();
+    const martina = screen.getByRole('checkbox', { name: /Martina López Herrera/ });
+    expect(martina).not.toBeChecked();
+    await userEvent.click(martina);
+    expect(martina).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Pablo Gil Ruiz/ })).not.toBeChecked();
+    expect(screen.getByText('1 de 2 alumnos · marca a quien ha venido')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Guardar lista' }));
 
     await waitFor(() =>

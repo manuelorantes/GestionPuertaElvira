@@ -91,7 +91,7 @@ Deno.test('TeacherClasses should add the classroom, the students of that day and
   ]);
 });
 
-Deno.test('OpenRollCall and TakeRollCall should list the students of that day, all present by default', async () => {
+Deno.test('OpenRollCall and TakeRollCall should list the students of that day, none ticked until taken', async () => {
   const rolls = new InMemoryRollCalls();
   const clock = new FrozenClock('2026-10-13T18:00:00+02:00');
   const agenda = assignments([class_({})]);
@@ -100,9 +100,10 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, a
   const take = (absent: string[]) =>
     new TakeRollCall(agenda, roster, rolls, clock).execute('t1', 'g1', '2026-10-13', absent);
 
+  // Sin pasar, nadie está marcado: el profesor marca a quien viene.
   assertEquals((await open()).list, [
-    { id: 's1', name: 'Ana Pérez', present: true },
-    { id: 's2', name: 'Pablo Gil', present: true },
+    { id: 's1', name: 'Ana Pérez', present: false },
+    { id: 's2', name: 'Pablo Gil', present: false },
   ]);
   assertEquals((await open()).rollCall, 'open');
   await take(['s2']);

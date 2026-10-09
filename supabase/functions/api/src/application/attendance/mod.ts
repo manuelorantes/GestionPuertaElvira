@@ -141,7 +141,7 @@ export class TeacherStudents {
   }
 }
 
-/** La lista de una clase tal y como la ve el profesor: alumnos de ese día, marcados como presentes por defecto. */
+/** La lista de una clase tal y como la ve el profesor: alumnos de ese día, sin marcar hasta que la pasa. */
 export interface RollCallView extends TeacherClassView {
   groupId: string;
   students: number;
@@ -174,7 +174,8 @@ export class OpenRollCall {
     const item = await givenClass(this.assignments, teacherId, groupId, day);
     const students = await this.roster.studentsOn(groupId, day);
     const roll = await this.rollCalls.find(groupId, day);
-    const absent = roll?.absent() ?? [];
+    // Sin pasar, nadie está marcado (el profesor marca a quien viene); pasada, se ve lo que se guardó.
+    const absent = roll?.absent() ?? students.map((s) => s.id);
     return {
       ...item,
       classroom: await this.roster.classroomOf(groupId),
