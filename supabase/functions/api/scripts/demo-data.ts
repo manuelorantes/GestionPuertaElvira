@@ -1,7 +1,6 @@
 import { type Clock, LocalDate, Season, YearMonth } from '../src/domain/common/mod.ts';
 import { PayInvoice, RecordEntry, RegisterInvoice } from '../src/application/accounting/mod.ts';
 import {
-  AdjustPoints,
   GenerateMonthlyCharges,
   IssueInvoice,
   QuotePayment,
@@ -41,6 +40,9 @@ import {
 import { SqlStudentRepository } from '../src/infrastructure/persistence/students.ts';
 import { SqlTeacherRepository } from '../src/infrastructure/persistence/teachers.ts';
 import { ClassesEnrolments } from '../src/infrastructure/students/routes.ts';
+import { PointsWalletService } from '../src/application/points/mod.ts';
+import { PointMovement } from '../src/domain/points/mod.ts';
+import { SqlPointMovementRepository } from '../src/infrastructure/persistence/points.ts';
 
 /*
  * Datos de demostración FICTICIOS del diseño (profesorado, grupos, alumnos y cobros) para desarrollo
@@ -319,6 +321,8 @@ const INVOICES: [number, number, string, string, string, string, string, boolean
 
 /** Tablas que se vacían con `--reset` (en orden seguro para las claves ajenas). */
 const RESET_TABLES = [
+  'points_movement',
+  'points_tournament',
   'attendance_absence',
   'attendance_roll_call',
   'accounting_entry',
@@ -368,7 +372,15 @@ function useCases(tx: TransactionSql, clock: Clock) {
   const settlements = new SqlSettlementRepository(tx);
   const rates = new SqlTeacherRates(tx);
   const accounting = new SqlAccountingRepository(tx);
-  const quotes = new QuotePayment(directory, settings, accounts, charges, clock);
+  const points = new SqlPointMovementRepository(tx);
+  const quotes = new QuotePayment(
+    directory,
+    settings,
+    accounts,
+    charges,
+    clock,
+    new PointsWalletService(points),
+  );
   const noDocuments = {
     put: () => Promise.reject(new Error('La demostración no adjunta documentos.')),
     read: () => Promise.reject(new Error('La demostración no adjunta documentos.')),
@@ -389,7 +401,7 @@ function useCases(tx: TransactionSql, clock: Clock) {
     ),
     linkSiblings: new LinkSiblings(students, transactions),
     updateAccount: new UpdateStudentAccount(accounts),
-    adjustPoints: new AdjustPoints(accounts),
+    points,
     generateCharges: new GenerateMonthlyCharges(
       directory,
       settings,
@@ -514,7 +526,12 @@ async function seedBilling(
   await tx`UPDATE classes_enrolment SET enrolled_on = ${start}`;
   for (const [key, plan, member, rate, points] of ACCOUNTS) {
     await app.updateAccount.execute(id(studentIds, key), plan, member, rate);
-    if (points > 0) await app.adjustPoints.execute(id(studentIds, key), points);
+    // Puntos de este mes, para poder probar el canje al cobrar.
+    if (points > 0) {
+      await app.points.add(
+        PointMovement.manual(id(studentIds, key), today, points, 'Puntos de demostración', null),
+      );
+    }
   }
   const previous: YearMonth[] = [];
   for (let month = season.firstMonth(); !current.isBefore(month); month = month.next()) {
