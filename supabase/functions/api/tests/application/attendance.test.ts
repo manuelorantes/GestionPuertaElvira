@@ -1,19 +1,29 @@
 import { assertEquals, assertRejects } from '@std/assert';
 
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
-import { type RollCall, RollCallClosed } from '../../src/domain/attendance/mod.ts';
+import {
+  type ClassComment,
+  type RollCall,
+  RollCallClosed,
+  RollCallNotOpenYet,
+} from '../../src/domain/attendance/mod.ts';
 import {
   AttendanceGroupNotFound,
   type ClassAssignments,
+  ClassCommentNotFound,
+  type ClassCommentRepository,
   ClassNotGiven,
   type ClassOnDay,
   type ClassRoster,
+  CommentClass,
   ConfirmWithoutRollCall,
+  EditClassComment,
   GroupAttendance,
   type GroupAttendanceData,
   type GroupAttendanceQuery,
   type MissedRollCallQuery,
   MissedRollCalls,
+  NotYourComment,
   OpenRollCall,
   type RollCallRepository,
   RollCallStillOpen,
@@ -265,4 +275,118 @@ Deno.test('GroupAttendance should show each class day of the month until today a
       new GroupAttendance(query, new FrozenClock('2026-10-15T10:00:00Z')).execute('x', '2026-10'),
     AttendanceGroupNotFound,
   );
+});
+
+class InMemoryComments implements ClassCommentRepository {
+  readonly saved = new Map<string, ClassComment>();
+
+  find(id: string): Promise<ClassComment | null> {
+    return Promise.resolve(this.saved.get(id) ?? null);
+  }
+
+  save(comment: ClassComment): Promise<void> {
+    this.saved.set(comment.id, comment);
+    return Promise.resolve();
+  }
+
+  remove(id: string): Promise<void> {
+    this.saved.delete(id);
+    return Promise.resolve();
+  }
+}
+
+function commenting(now: string) {
+  const rolls = new InMemoryRollCalls();
+  const comments = new InMemoryComments();
+  const clock = new FrozenClock(now);
+  const agenda = assignments([class_({})]);
+  return {
+    rolls,
+    comments,
+    clock,
+    agenda,
+    comment: new CommentClass(agenda, roster, rolls, comments, clock),
+    edit: new EditClassComment(comments, clock),
+  };
+}
+
+Deno.test('CommentClass should let the teacher comment the class and its students once the roll call opens', async () => {
+  const { comment, comments } = commenting('2026-10-13T17:30:00+02:00');
+  const about = await comment.asTeacher('t1', 'u1', 'g1', '2026-10-13', {
+    studentId: 's2',
+    text: 'Ha roto un reloj',
+  });
+  const general = await comment.asTeacher('t1', 'u1', 'g1', '2026-10-13', {
+    studentId: null,
+    text: 'Hoy hemos dado mates de torres',
+  });
+  assertEquals(comments.saved.get(about)?.student, 's2');
+  assertEquals(comments.saved.get(about)?.author, { teacher: 't1', user: 'u1' });
+  assertEquals(comments.saved.get(general)?.text(), 'Hoy hemos dado mates de torres');
+
+  await assertRejects(
+    () =>
+      comment.asTeacher('t2', 'u2', 'g1', '2026-10-15', { studentId: null, text: 'Otra clase' }),
+    ClassNotGiven,
+  );
+  await assertRejects(
+    () => comment.asTeacher('t1', 'u1', 'g1', '2026-10-13', { studentId: 's3', text: 'No vino' }),
+    InvalidValue,
+    'alumnos de esa clase',
+  );
+  const early = commenting('2026-10-13T16:00:00+02:00');
+  await assertRejects(
+    () =>
+      early.comment.asTeacher('t1', 'u1', 'g1', '2026-10-13', { studentId: null, text: 'Pronto' }),
+    RollCallNotOpenYet,
+  );
+  // Una clase pasada se comenta sin confirmar nada: no cambia la asistencia.
+  const later = commenting('2026-10-20T10:00:00+02:00');
+  await later.comment.asTeacher('t1', 'u1', 'g1', '2026-10-13', { studentId: null, text: 'Bien' });
+  assertEquals(later.comments.saved.size, 1);
+});
+
+Deno.test('CommentClass should accept students that came to the class from another one', async () => {
+  const { comment, rolls, clock, agenda } = commenting('2026-10-13T18:00:00+02:00');
+  await new TakeRollCall(agenda, roster, rolls, clock).execute('t1', 'g1', '2026-10-13', {
+    absent: [],
+    guests: ['s3'],
+  });
+  const id = await comment.asTeacher('t1', 'u1', 'g1', '2026-10-13', {
+    studentId: 's3',
+    text: 'Ha venido a recuperar',
+  });
+  assertEquals(id.length > 0, true);
+});
+
+Deno.test('CommentClass should let administration comment a class that already happened', async () => {
+  const { comment, comments } = commenting('2026-10-14T10:00:00+02:00');
+  const id = await comment.asStaff('u9', 'g1', '2026-10-13', { studentId: 's1', text: 'Avisar' });
+  assertEquals(comments.saved.get(id)?.author, { teacher: null, user: 'u9' });
+  await assertRejects(
+    () => comment.asStaff('u9', 'g1', '2026-10-15', { studentId: null, text: 'Futuro' }),
+    InvalidValue,
+    'aún no',
+  );
+  await assertRejects(
+    () => comment.asStaff('u9', 'nope', '2026-10-13', { studentId: null, text: 'x' }),
+    AttendanceGroupNotFound,
+  );
+});
+
+Deno.test('EditClassComment should let teachers change only their comments and administration any', async () => {
+  const { comment, comments, edit } = commenting('2026-10-13T18:00:00+02:00');
+  const id = await comment.asTeacher('t1', 'u1', 'g1', '2026-10-13', {
+    studentId: 's1',
+    text: 'Ha llegado tarde',
+  });
+  await edit.rewrite(id, 'Ha llegado a mitad de clase', { teacher: 't1' });
+  assertEquals(comments.saved.get(id)?.text(), 'Ha llegado a mitad de clase');
+  await assertRejects(() => edit.rewrite(id, 'Otro', { teacher: 't2' }), NotYourComment);
+  await assertRejects(() => edit.remove(id, { teacher: 't2' }), NotYourComment);
+  await edit.rewrite(id, 'Revisado por la junta', 'staff');
+  assertEquals(comments.saved.get(id)?.text(), 'Revisado por la junta');
+  await edit.remove(id, { teacher: 't1' });
+  assertEquals(comments.saved.size, 0);
+  await assertRejects(() => edit.remove(id, 'staff'), ClassCommentNotFound);
 });

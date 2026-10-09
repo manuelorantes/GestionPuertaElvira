@@ -3,6 +3,7 @@ import { assertEquals, assertThrows } from '@std/assert';
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
 import {
   ActivityCheck,
+  ClassComment,
   RollCall,
   RollCallClosed,
   RollCallNotOpenYet,
@@ -106,4 +107,43 @@ Deno.test('ActivityCheck should be done by its manager in the same window as the
     ActivityCheck.confirm('d1', friday, 'u1', at('2026-10-19T09:00:00')).kind,
     'confirmed',
   );
+});
+
+const COMMENT_ID = '01990000-0000-7000-8000-0000000000c1';
+const write = (text: string, student: string | null = 's1') =>
+  ClassComment.write(
+    COMMENT_ID,
+    'g1',
+    TUESDAY,
+    student,
+    text,
+    { teacher: 't1', user: 'u1' },
+    at('2026-10-13T18:00:00'),
+  );
+
+Deno.test('ClassComment should keep the trimmed text about a student or the whole class', () => {
+  const comment = write('  Ha llegado a mitad de clase  ');
+  assertEquals([comment.text(), comment.student], ['Ha llegado a mitad de clase', 's1']);
+  assertEquals(write('Hoy hemos dado mates de torres', null).student, null);
+  assertThrows(() => write('   '), InvalidValue, 'Escribe');
+  assertThrows(() => write('x'.repeat(1001)), InvalidValue, '1000');
+});
+
+Deno.test('ClassComment should be rewritten only with valid text and know which teacher wrote it', () => {
+  const comment = write('Ha roto un reloj');
+  comment.rewrite('Ha roto un reloj sin querer', at('2026-10-14T10:00:00'));
+  assertEquals(comment.text(), 'Ha roto un reloj sin querer');
+  assertEquals(comment.updatedAt(), at('2026-10-14T10:00:00'));
+  assertThrows(() => comment.rewrite(' ', at('2026-10-14T11:00:00')), InvalidValue);
+  assertEquals([comment.isWrittenByTeacher('t1'), comment.isWrittenByTeacher('t2')], [true, false]);
+  const byStaff = ClassComment.write(
+    COMMENT_ID,
+    'g1',
+    TUESDAY,
+    null,
+    'Clase muy tranquila',
+    { teacher: null, user: 'u9' },
+    at('2026-10-13T18:00:00'),
+  );
+  assertEquals(byStaff.isWrittenByTeacher('t1'), false);
 });

@@ -217,3 +217,93 @@ export class ActivityCheck {
     );
   }
 }
+
+/** Quién escribió un comentario: el profesor que da la clase (desde su espacio) y la cuenta con la que lo hizo. */
+export interface CommentAuthor {
+  /** El profesor, o null si lo escribió administración. */
+  teacher: string | null;
+  user: string | null;
+}
+
+const COMMENT_MAX_LENGTH = 1000;
+
+function commentText(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed === '') throw new InvalidValue('text', 'Escribe el comentario.');
+  if ([...trimmed].length > COMMENT_MAX_LENGTH) {
+    throw new InvalidValue(
+      'text',
+      `El comentario puede tener como mucho ${COMMENT_MAX_LENGTH} caracteres.`,
+    );
+  }
+  return trimmed;
+}
+
+/**
+ * Comentario sobre una clase un día: de la clase en sí («hoy hemos dado mates de torres») o de un alumno de esa clase
+ * («ha llegado a mitad de clase»). Lo escribe quien da la clase o administración.
+ */
+export class ClassComment {
+  private constructor(
+    readonly id: string,
+    readonly group: string,
+    readonly date: LocalDate,
+    /** El alumno del que trata, o null si es de la clase. */
+    readonly student: string | null,
+    private body: string,
+    readonly author: CommentAuthor,
+    readonly writtenAt: Date,
+    private updated: Date,
+  ) {}
+
+  static write(
+    id: string,
+    group: string,
+    date: LocalDate,
+    student: string | null,
+    text: string,
+    author: CommentAuthor,
+    now: Date,
+  ): ClassComment {
+    return new ClassComment(id, group, date, student, commentText(text), author, now, now);
+  }
+
+  static restore(fields: {
+    id: string;
+    group: string;
+    date: LocalDate;
+    student: string | null;
+    text: string;
+    author: CommentAuthor;
+    writtenAt: Date;
+    updatedAt: Date;
+  }): ClassComment {
+    return new ClassComment(
+      fields.id,
+      fields.group,
+      fields.date,
+      fields.student,
+      fields.text,
+      fields.author,
+      fields.writtenAt,
+      fields.updatedAt,
+    );
+  }
+
+  rewrite(text: string, now: Date): void {
+    this.body = commentText(text);
+    this.updated = now;
+  }
+
+  isWrittenByTeacher(teacher: string): boolean {
+    return this.author.teacher === teacher;
+  }
+
+  text(): string {
+    return this.body;
+  }
+
+  updatedAt(): Date {
+    return this.updated;
+  }
+}
