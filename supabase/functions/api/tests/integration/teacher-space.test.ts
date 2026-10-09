@@ -150,6 +150,12 @@ Deno.test('a teacher should take the roll call of their class, all present by de
       assertEquals(created.status, 201, JSON.stringify(created.body));
       ids.push(body<{ id: string }>(created).id);
     }
+    // Lola es del grupo de Carlos: vendrá a recuperar a la clase de Lucía (asistencia especial).
+    const lola = await admin.json('POST', '/api/admin/students', {
+      fullName: 'Lola Ruiz Pardo',
+      groupIds: [other],
+    });
+    ids.push(body<{ id: string }>(lola).id);
     await createUser('profe@club.es', 'teacher');
     await db()`UPDATE identity_user SET teacher_id = ${lucia} WHERE email = 'profe@club.es'`;
     const teacher = new ApiClient();
@@ -185,6 +191,7 @@ Deno.test('a teacher should take the roll call of their class, all present by de
       season: 2026,
       classes: 1,
       absences: [{ date: '2026-10-13', label: 'Martes 17:00' }],
+      specials: [],
       attended: 0,
     });
     const taken = body<{ items: { rollCall: string }[] }>(
@@ -213,6 +220,23 @@ Deno.test('a teacher should take the roll call of their class, all present by de
     await teacher.logIn('profe@club.es');
     assertError(await teacher.json('PUT', url, { absent: [pablo] }), 409, 'roll_call_closed');
     assertEquals(await list(), [['Martina López Herrera', true], ['Pablo Gil Ruiz', true]]);
+    // Una lista pasada se cambia confirmándolo: Lola vino a recuperar (asistencia especial).
+    const lola = ids[2] ?? '';
+    const opened = body<{ period: string; others: { name: string }[] }>(await teacher.get(url));
+    assertEquals([opened.period, opened.others.map((o) => o.name)], ['past', ['Lola Ruiz Pardo']]);
+    assertEquals(
+      (await teacher.json('PUT', url, { absent: [], guests: [lola], past: true })).status,
+      204,
+    );
+    assertEquals(
+      body<{ guests: { name: string }[] }>(await teacher.get(url)).guests.map((g) => g.name),
+      ['Lola Ruiz Pardo'],
+    );
+    assertError(
+      await teacher.json('PUT', url, { absent: [], guests: [pablo], past: true }),
+      422,
+      'unprocessable',
+    );
     // Administración ve la asistencia del grupo en el mes: martes 6 sin lista (aún no estaban) y martes 13.
     await admin.logIn('junta@club.es');
     assertEquals(body(await admin.get(`/api/admin/attendance/groups/${group}?month=2026-10`)), {
@@ -222,15 +246,37 @@ Deno.test('a teacher should take the roll call of their class, all present by de
       days: [{ date: '2026-10-06', status: 'pending' }, { date: '2026-10-13', status: 'taken' }],
       students: [
         {
+          id: lola,
+          name: 'Lola Ruiz Pardo',
+          marks: [null, 'special'],
+          attended: 0,
+          classes: 0,
+          member: false,
+        },
+        {
           id: ids[0],
           name: 'Martina López Herrera',
           marks: [null, 'present'],
           attended: 1,
           classes: 1,
+          member: true,
         },
-        { id: pablo, name: 'Pablo Gil Ruiz', marks: [null, 'present'], attended: 1, classes: 1 },
+        {
+          id: pablo,
+          name: 'Pablo Gil Ruiz',
+          marks: [null, 'present'],
+          attended: 1,
+          classes: 1,
+          member: true,
+        },
       ],
     });
+    // En la ficha de Lola, aparte de sus clases.
+    assertEquals(
+      body<{ specials: unknown[] }>(await admin.get(`/api/admin/students/${lola}/attendance`))
+        .specials,
+      [{ date: '2026-10-13', label: 'Martes 17:00' }],
+    );
     assertError(
       await admin.get(
         '/api/admin/attendance/groups/01990000-0000-7000-8000-000000000000?month=2026-10',

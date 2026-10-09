@@ -11,7 +11,10 @@ export class SqlRollCallRepository implements RollCallRepository {
     const rows = await this.sql`
       SELECT r.*, COALESCE(
                (SELECT json_agg(a.student_id) FROM attendance_absence a
-                 WHERE a.group_id = r.group_id AND a.roll_date = r.roll_date), '[]'::json) AS absent
+                 WHERE a.group_id = r.group_id AND a.roll_date = r.roll_date), '[]'::json) AS absent,
+             COALESCE(
+               (SELECT json_agg(g.student_id) FROM attendance_guest g
+                 WHERE g.group_id = r.group_id AND g.roll_date = r.roll_date), '[]'::json) AS guests
         FROM attendance_roll_call r WHERE r.group_id = ${group} AND r.roll_date = ${date.toString()}`;
     if (!rows[0]) return null;
     const row = new Row(rows[0]);
@@ -20,6 +23,7 @@ export class SqlRollCallRepository implements RollCallRepository {
       date,
       kind: row.string('kind') as RollCallKind,
       absent: row.json('absent') as string[],
+      guests: row.json('guests') as string[],
       teacher: row.nullableString('taken_by_teacher'),
       user: row.nullableString('taken_by_user'),
       at: row.date('taken_at'),
@@ -48,6 +52,15 @@ export class SqlRollCallRepository implements RollCallRepository {
     for (const student of absent) {
       await this.sql`
         INSERT INTO attendance_absence (group_id, roll_date, student_id)
+        VALUES (${roll.group}, ${record.roll_date}, ${student}) ON CONFLICT DO NOTHING`;
+    }
+    const guests = roll.guests();
+    await this.sql`
+      DELETE FROM attendance_guest WHERE group_id = ${roll.group} AND roll_date = ${record.roll_date}
+         AND NOT (student_id::text = ANY(${guests}))`;
+    for (const student of guests) {
+      await this.sql`
+        INSERT INTO attendance_guest (group_id, roll_date, student_id)
         VALUES (${roll.group}, ${record.roll_date}, ${student}) ON CONFLICT DO NOTHING`;
     }
   }
