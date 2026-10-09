@@ -283,8 +283,8 @@ export class Settlement {
 
 /**
  * Liquidación = horas × tarifa, redondeada a céntimos, con el detalle por grupo o actividad. Las horas que se
- * solapan el mismo día (encargado del club mientras da una clase, dos clases a la vez por una sustitución) cuentan
- * una sola vez: cada sesión aporta solo los minutos que no cubre otra anterior (las más largas primero).
+ * solapan el mismo día (una actividad del club mientras da una clase, dos clases a la vez por una sustitución) cuentan
+ * una sola vez y van a la sesión más corta: esta cuenta entera y las más largas aportan solo lo que les sobra.
  */
 export class SettlementCalculator {
   settle(entries: readonly TimesheetEntry[], rate: Money): Settlement {
@@ -363,8 +363,9 @@ function effectiveMinutes<T>(items: readonly T[], span: (item: T) => Span): [T, 
     timed.set(s.day, [...(timed.get(s.day) ?? []), { item, span: s }]);
   }
   for (const day of timed.values()) {
+    // La más corta primero: cuenta entera y las más largas se quedan con lo que les sobra.
     const ordered = [...day].sort((a, b) =>
-      b.span.minutes - a.span.minutes || (a.span.start ?? 0) - (b.span.start ?? 0)
+      a.span.minutes - b.span.minutes || (a.span.start ?? 0) - (b.span.start ?? 0)
     );
     // Tramos ya contados, fusionados (sin solapes entre sí).
     let taken: [number, number][] = [];
