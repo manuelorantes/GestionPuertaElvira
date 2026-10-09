@@ -217,6 +217,58 @@ describe('Alumnos', () => {
     );
   });
 
+  it('should show the comments of their classes at the bottom of the card, newest first', async () => {
+    const user = userEvent.setup();
+    api({
+      'GET /api/admin/students/s1/class-comments': [
+        200,
+        {
+          items: [
+            {
+              id: 'c2',
+              groupId: 'g1',
+              groupName: 'Iniciación A',
+              date: '2026-10-13',
+              studentId: 's1',
+              studentName: 'Martina López Herrera',
+              text: 'Ha llegado a mitad de clase',
+              author: 'Lucía Moreno Gil',
+              authorTeacherId: 't1',
+              writtenAt: '2026-10-13T16:10:00.000Z',
+            },
+            {
+              id: 'c1',
+              groupId: 'g1',
+              groupName: 'Iniciación A',
+              date: '2026-10-06',
+              studentId: 's1',
+              studentName: 'Martina López Herrera',
+              text: 'Ha roto un reloj',
+              author: 'Junta Pruebas',
+              authorTeacherId: null,
+              writtenAt: '2026-10-06T16:10:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: /martina lópez herrera/i }));
+    const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    const list = await within(card).findByRole('list', { name: 'Comentarios de las clases' });
+    expect(
+      within(list)
+        .getAllByRole('listitem')
+        .map((li) => li.textContent),
+    ).toEqual([
+      expect.stringContaining(
+        'Ha llegado a mitad de clase13/10/2026 · Iniciación A · Lucía Moreno Gil',
+      ),
+      expect.stringContaining('Ha roto un reloj06/10/2026 · Iniciación A · Junta Pruebas'),
+    ]);
+  });
+
   it('should show what the student pays and why, the points and the history on the card', async () => {
     const account = {
       preferredPlan: 'monthly',

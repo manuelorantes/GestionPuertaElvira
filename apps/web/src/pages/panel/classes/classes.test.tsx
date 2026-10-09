@@ -346,6 +346,89 @@ describe('Clases', () => {
     );
   });
 
+  it('shows the comments of the month under the attendance and adds one from administration', async () => {
+    const user = userEvent.setup();
+    const comment = (overrides: Record<string, unknown>) => ({
+      id: 'c1',
+      groupId: 'g1',
+      groupName: 'Iniciación A',
+      date: `${MONTH}-05`,
+      studentId: null,
+      studentName: null,
+      text: 'Hoy hemos dado mates de torres',
+      author: 'Lucía Moreno Gil',
+      authorTeacherId: 't1',
+      writtenAt: `${MONTH}-05T17:00:00.000Z`,
+      ...overrides,
+    });
+    const spy = api({
+      [`GET /api/admin/attendance/groups/g1?month=${MONTH}`]: [200, ATTENDANCE],
+      [`GET /api/admin/attendance/groups/g1/comments?month=${MONTH}`]: [
+        200,
+        {
+          items: [
+            comment({}),
+            comment({
+              id: 'c2',
+              date: `${MONTH}-07`,
+              studentId: 's2',
+              studentName: 'Pablo Gil Ruiz',
+              text: 'Ha roto un reloj',
+            }),
+            comment({
+              id: 'c3',
+              date: `${MONTH}-07`,
+              studentId: 's1',
+              studentName: 'Ana Ruiz Gil',
+              text: 'Ha llegado a mitad de clase',
+            }),
+          ],
+        },
+      ],
+      'POST /api/admin/attendance/groups/g1/comments': [201, { id: 'c4' }],
+    });
+    renderApp('/panel/clases?pestana=asistencia');
+
+    const general = await screen.findByRole('list', { name: 'Comentarios de la clase' });
+    expect(general).toHaveTextContent('Hoy hemos dado mates de torres');
+    expect(general).toHaveTextContent(
+      `05/${MONTH.slice(5)}/${MONTH.slice(0, 4)} · Lucía Moreno Gil`,
+    );
+    const ofStudents = () => screen.getByRole('list', { name: 'Comentarios de los alumnos' });
+    expect(ofStudents()).toHaveTextContent('Ha roto un reloj');
+    expect(ofStudents()).toHaveTextContent('Ha llegado a mitad de clase');
+    const who = screen.getByRole('combobox', { name: 'Alumno' });
+    await user.selectOptions(who, 'Pablo Gil Ruiz');
+    expect(ofStudents()).toHaveTextContent('Ha roto un reloj');
+    expect(ofStudents()).not.toHaveTextContent('Ha llegado a mitad de clase');
+    await user.selectOptions(who, 'Luis Mora Gil');
+    expect(screen.getByText('Luis Mora Gil no tiene comentarios este mes.')).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Añadir comentario' }));
+    const day = screen.getByRole('combobox', { name: 'Día de la clase' });
+    expect(
+      within(day)
+        .getAllByRole('option')
+        .map((o) => o.textContent),
+    ).toEqual([
+      `14/${MONTH.slice(5)}/${MONTH.slice(0, 4)}`,
+      `07/${MONTH.slice(5)}/${MONTH.slice(0, 4)}`,
+      `05/${MONTH.slice(5)}/${MONTH.slice(0, 4)}`,
+    ]);
+    await user.selectOptions(day, `07/${MONTH.slice(5)}/${MONTH.slice(0, 4)}`);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sobre' }), 'Ana Ruiz Gil');
+    await user.type(screen.getByLabelText('Comentario'), 'Llamar a su familia');
+    await user.click(screen.getByRole('button', { name: 'Guardar comentario' }));
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.find(
+          ([u, init]) =>
+            u === '/api/admin/attendance/groups/g1/comments' && init?.method === 'POST',
+        )?.[1]?.body,
+      ).toBe(JSON.stringify({ date: `${MONTH}-07`, studentId: 's1', text: 'Llamar a su familia' })),
+    );
+  });
+
   it('marks with an asterisk who came to the group without being part of it', async () => {
     api({
       [`GET /api/admin/attendance/groups/g1?month=${MONTH}`]: [

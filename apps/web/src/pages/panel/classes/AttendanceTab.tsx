@@ -7,8 +7,9 @@ import { Card } from '@/shared/ui/Card';
 import { Select } from '@/shared/ui/Select';
 
 import { GroupAttendanceTable } from './GroupAttendanceTable';
+import { GroupClassComments } from './GroupClassComments';
 
-/** Asistencia a clase: un grupo y un mes, con quién vino a cada clase. */
+/** Asistencia a clase: un grupo y un mes, con quién vino a cada clase y los comentarios de las clases. */
 export function AttendanceTab({ groups }: { groups: ClassGroup[] }) {
   const [groupId, setGroupId] = useState(groups[0]?.id ?? '');
   const [month, setMonth] = useState(currentMonth());
@@ -26,7 +27,12 @@ export function AttendanceTab({ groups }: { groups: ClassGroup[] }) {
         <SeasonMonths month={month} selected={month} label="Mes" onChange={setMonth} />
       </div>
       <Card className="p-5">
-        {groupId && <GroupAttendanceTable groupId={groupId} month={month} />}
+        {groupId && (
+          <>
+            <GroupAttendanceTable groupId={groupId} month={month} />
+            <GroupClassComments groupId={groupId} month={month} />
+          </>
+        )}
       </Card>
     </div>
   );

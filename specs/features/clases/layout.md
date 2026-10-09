@@ -20,12 +20,13 @@ ClassesPage (/panel/clases)
 │   ├── Cabecera: Grupo | Nivel | Profesor | Horario | Aula | Ocupación | (acciones)
 │   └── Fila: color de nivel + nombre | nivel | profesor | horario + modalidad | «Aula Alfil» | barra + «9/12» (+ «Sobre el cupo») | botón «Editar» (icono lápiz)
 ├── [Asistencia] AttendanceTab: selector «Grupo» + meses de la temporada; tarjeta con GroupAttendanceTable
-│   └── GroupAttendanceTable: Alumno (ordenable, enlace a la ficha) | un día por columna («mar» + «13/10», «Festivo» o «Sin lista») con ✓ / ✗ / ? / vacío | % (ordenable; < 75 % en rojo); leyenda debajo
+│   ├── GroupAttendanceTable: Alumno (ordenable, enlace a la ficha) | un día por columna («mar» + «13/10», «Festivo» o «Sin lista») con ✓ / ✗ / ? / vacío | % (ordenable; < 75 % en rojo); leyenda debajo
+│   └── GroupClassComments «Comentarios»: botón «Añadir comentario» (Día de la clase, Sobre: toda la clase o un alumno, Comentario); «De la clase» (día · autor); «De los alumnos» con selector «Alumno» (Todos los alumnos o uno de la tabla); editar y quitar en cada uno
 ├── ClassGroupPanel (panel lateral al pulsar un grupo)
 │   ├── Cabecera: color de nivel, nombre, «Profesor · modalidad», aula, ocupación (por día si hay horarios especiales), botón «Editar»
 │   ├── Tarjeta «Alumnos inscritos»: fila por alumno «Nombre · N años» + «Ver ficha»
 │   ├── Tarjeta «Inscribir alumno»: desplegable con búsqueda (al abrirlo salen todos los alumnos activos no inscritos; al escribir se filtran por nombre o apellidos, sin tildes ni mayúsculas) + botón «Inscribir»
-│   └── Tarjeta «Asistencia»: MonthNav (mes en curso) + GroupAttendanceTable
+│   └── Tarjeta «Asistencia»: MonthNav (mes en curso) + GroupAttendanceTable + GroupClassComments
 └── ClassGroupDialog (alta o edición)
     ├── Título «Nuevo grupo» | «Editar grupo», botón cerrar
     ├── Nombre del grupo (opcional; el placeholder muestra el nombre por defecto que tendrá: día, hora, nivel y aula)
