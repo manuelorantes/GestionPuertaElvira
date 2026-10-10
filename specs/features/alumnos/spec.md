@@ -40,8 +40,16 @@ La lista MUST poder ordenarse por número de socio o alfabéticamente (por defec
 
 ### Requirement: Enlace a la ficha
 Allí donde el panel muestre el nombre de un alumno (resumen, cuotas, cobros y recibos, movimientos, material, puntos,
-clases, asistencia, comentarios, familia directa y «Mis grupos») MUST poder pulsarse para ir a su ficha. Quedan fuera
+clases, asistencia, comentarios, familia directa y «Mis grupos») MUST poder pulsarse para ver su ficha. Quedan fuera
 los sitios donde pulsar el nombre ya hace otra cosa (pasar lista, el historial de puntos) y los avisos de confirmación.
+Fuera de la sección Alumnos, la ficha MUST abrirse encima de la página en que se está, sin salir de ella: en la zona gris
+de fuera hay un botón «Ir a Alumnos» que lleva a su ficha en Alumnos; pulsar en cualquier otro punto de esa zona (o
+cerrarla) deja la página como estaba.
+
+#### Scenario: Ficha sin salir del resumen
+- **WHEN** administración pulsa el nombre de un alumno en «Recibos vencidos» del resumen
+- **THEN** se abre su ficha encima del resumen; si pulsa fuera, se cierra y sigue en el resumen; si pulsa «Ir a
+  Alumnos», pasa a la sección Alumnos con su ficha abierta
 
 ### Requirement: Ficha del alumno
 La ficha MUST mostrar:
