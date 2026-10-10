@@ -5,7 +5,7 @@ Fuente: sección «Contabilidad» (Movimientos, Facturas, Mes a mes y cierre) y 
 ```
 AccountingPage (/panel/contabilidad)
 ├── SectionHeader: «Temporada 2026/27» | «Contabilidad» | acción «Añadir factura» (icono upload)
-├── Tabs: Movimientos · Facturas · Mes a mes y cierre (?pestana=movimientos|facturas|cierre)
+├── Tabs: Movimientos · Facturas · Mes a mes y cierre · Ajustes · Diagnóstico (?pestana=movimientos|facturas|cierre|ajustes|diagnostico)
 ├── LedgerTab: MonthNav (?mes) + botón «Añadir movimiento»
 │   ├── Filtros sobre la tabla: chips «Todo | Ingresos | Pagos» (?tipo=ingresos|pagos; activo en negro) y, con Ingresos, debajo, franja «Forma de pago» con subfiltro «Todos | Tarjeta | Transferencia | Efectivo» (?forma=…; chips pequeños, activo verde suave); con filtro, «N movimientos · ±X» bajo la tabla
 │   ├── Tabla (2/3): icono entrada/salida (verde/rojo) | Fecha | Concepto | Categoría (chip) | Forma de pago | Importe (+/−); apuntes manuales con «Quitar»
