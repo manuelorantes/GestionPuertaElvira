@@ -8,6 +8,11 @@ export const CATEGORIES: Record<EntryKind, { value: string; label: string }[]> =
     { value: 'federation', label: 'Federación' },
     { value: 'tournaments', label: 'Torneos' },
     { value: 'utilities', label: 'Suministros' },
+    { value: 'president', label: 'Presidente' },
+    { value: 'cleaning', label: 'Limpieza' },
+    { value: 'water', label: 'Agua' },
+    { value: 'electricity', label: 'Electricidad' },
+    { value: 'internet', label: 'Wifi' },
     { value: 'other_expenses', label: 'Otros gastos' },
   ],
   income: [

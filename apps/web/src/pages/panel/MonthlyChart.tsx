@@ -5,6 +5,10 @@ import { formatCents, monthLabel, monthName } from '@/features/billing/money';
 interface MonthlyChartProps {
   months: { month: string; incomeCents: number; expenseCents: number }[];
   current: string;
+  /** Qué muestra, al principio de la descripción accesible. */
+  label: string;
+  /** Prefijo de las barras (para distinguir dos gráficas en la misma página). */
+  id: string;
 }
 
 /** Escala redonda para el eje: 1, 2 o 5 × 10ⁿ euros por división, en 4 divisiones. */
@@ -30,7 +34,7 @@ const BAR_STYLE: Record<BarKind, { label: string; color: string }> = {
 };
 
 /** Barras de ingresos y gastos por mes (sin dependencias de gráficos). */
-export function MonthlyChart({ months, current }: MonthlyChartProps) {
+export function MonthlyChart({ months, current, label, id: chartId }: MonthlyChartProps) {
   // La barra señalada (al pasar el ratón o al tocarla) muestra su importe.
   const [pointed, setPointed] = useState<string | null>(null);
   const max = axisMax(Math.max(...months.flatMap((m) => [m.incomeCents, m.expenseCents])));
@@ -43,11 +47,7 @@ export function MonthlyChart({ months, current }: MonthlyChartProps) {
     .join('; ');
 
   return (
-    <div
-      role="img"
-      aria-label={`Ingresos y gastos de la temporada, de septiembre a agosto (las cuotas, en el mes al que corresponden). ${description}`}
-      className="flex h-60 gap-3"
-    >
+    <div role="img" aria-label={`${label}. ${description}`} className="flex h-60 gap-3">
       <div
         aria-hidden
         className="flex min-w-11 flex-col justify-between pb-7 text-right text-xs text-ink-muted"
@@ -70,7 +70,7 @@ export function MonthlyChart({ months, current }: MonthlyChartProps) {
                 return (
                   <div
                     key={kind}
-                    data-testid={`barra-${id}`}
+                    data-testid={`${chartId}-${id}`}
                     className={`relative w-[42%] max-w-4 rounded-t-[3px] ${BAR_STYLE[kind].color}`}
                     style={{ height: `${(cents / max) * 100}%` }}
                     onPointerEnter={() => setPointed(id)}

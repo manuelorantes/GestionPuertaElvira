@@ -7,7 +7,7 @@ import { usePanelRole } from '@/features/auth/panelView';
 import { useSession } from '@/features/auth/useSession';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { formatCents, monthLabel, monthName } from '@/features/billing/money';
-import { fetchDashboard, type Dashboard } from '@/features/dashboard/api';
+import { fetchDashboard, type Dashboard, type MonthBars } from '@/features/dashboard/api';
 import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Avatar } from '@/shared/ui/Avatar';
@@ -85,23 +85,22 @@ function Summary({ data }: { data: Dashboard }) {
         />
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-        <Card className="p-6">
-          <div className="mb-5 flex flex-wrap items-baseline justify-between gap-4">
-            <Title>{`Mes a mes · temporada ${seasonLabel(data.chart[0]?.month ?? data.month)}`}</Title>
-            <div className="flex gap-4 text-[13px] text-ink-soft">
-              <span className="flex items-center gap-1.5">
-                <span aria-hidden className="size-3 rounded-[3px] bg-brand" />
-                Ingresos
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span aria-hidden className="size-3 rounded-[3px] bg-ink-strong" />
-                Gastos
-              </span>
-              <span className="text-ink-muted">{monthLabel(data.month)} en curso</span>
-            </div>
-          </div>
-          <MonthlyChart months={data.chart} current={data.month} />
-        </Card>
+        <div className="flex min-w-0 flex-col gap-6">
+          <ChartCard
+            title={`Ingresos y gastos de cada mes · ${seasonLabel(data.month)}`}
+            label="Lo que entra y sale cada mes, por fecha, de septiembre a agosto"
+            id="caja"
+            months={data.cashChart}
+            current={data.month}
+          />
+          <ChartCard
+            title={`Lo que corresponde a cada mes · ${seasonLabel(data.month)}`}
+            label="Lo que corresponde a cada mes, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan, y los gastos del mes en el suyo"
+            id="mes"
+            months={data.monthChart}
+            current={data.month}
+          />
+        </div>
         <Card className="flex flex-col gap-4 p-6">
           <Title>Ocupación de clases</Title>
           <div className="flex items-baseline gap-3">
@@ -231,6 +230,41 @@ function Summary({ data }: { data: Dashboard }) {
       </div>
       <BillingDialogs dialog={dialog} onChange={setDialog} />
     </>
+  );
+}
+
+/** Una gráfica de la temporada con su leyenda. */
+function ChartCard({
+  title,
+  label,
+  id,
+  months,
+  current,
+}: {
+  title: string;
+  label: string;
+  id: string;
+  months: MonthBars[];
+  current: string;
+}) {
+  return (
+    <Card className="p-6">
+      <div className="mb-5 flex flex-wrap items-baseline justify-between gap-4">
+        <Title>{title}</Title>
+        <div className="flex gap-4 text-[13px] text-ink-soft">
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className="size-3 rounded-[3px] bg-brand" />
+            Ingresos
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className="size-3 rounded-[3px] bg-ink-strong" />
+            Gastos
+          </span>
+          <span className="text-ink-muted">{monthLabel(current)} en curso</span>
+        </div>
+      </div>
+      <MonthlyChart months={months} current={current} label={label} id={id} />
+    </Card>
   );
 }
 
