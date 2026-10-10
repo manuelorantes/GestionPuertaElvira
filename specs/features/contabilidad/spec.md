@@ -97,5 +97,9 @@ Un ejercicio MUST poder cerrarse a partir de su último mes (agosto), en orden y
 - **WHEN** administración confirma el cierre
 - **THEN** se guardan ingresos, gastos y resultado; nada con fecha del ejercicio se puede crear, cambiar ni borrar (apuntes, facturas, cobros, liquidaciones), y el resultado pasa como saldo inicial del siguiente
 
+### Requirement: Diagnóstico de datos
+Contabilidad MUST tener una pestaña «Diagnóstico» con lo que no cuadra en los datos del club, explicado y con su
+solución, que se puede aceptar o descartar (ver [la spec de diagnóstico](../diagnostico/spec.md)).
+
 ### Requirement: Acceso restringido
 La contabilidad MUST estar reservada a cuentas de administración.
