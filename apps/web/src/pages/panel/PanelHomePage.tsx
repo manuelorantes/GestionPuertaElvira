@@ -67,7 +67,11 @@ function Summary({ data }: { data: Dashboard }) {
         <Kpi
           label="Pendiente de cobro"
           value={formatCents(data.pendingCents)}
-          hint={`Plazo hasta el 5 de ${month}`}
+          hint={`Plazo hasta el 5 de ${month}${
+            data.membershipPendingCents > 0
+              ? ` · y ${formatCents(data.membershipPendingCents)} de cuotas de socio`
+              : ''
+          }`}
         />
         <Kpi
           label={`Gastos de ${month}`}
