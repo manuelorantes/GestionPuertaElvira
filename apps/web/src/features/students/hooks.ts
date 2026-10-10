@@ -11,8 +11,12 @@ export function useStudents(filter: api.StudentFilter, search: string) {
   });
 }
 
-export function usePendingData() {
-  return useQuery({ queryKey: ['students', 'pending-data'], queryFn: api.fetchPendingData });
+export function usePendingData(enabled = true) {
+  return useQuery({
+    queryKey: ['students', 'pending-data'],
+    queryFn: api.fetchPendingData,
+    enabled,
+  });
 }
 
 export function useStudent(id: string | undefined) {

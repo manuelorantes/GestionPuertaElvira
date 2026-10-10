@@ -27,7 +27,8 @@ import { useToast } from '@/shared/ui/Toast';
 interface ClassGroupPanelProps {
   groupId: string;
   onClose: () => void;
-  onEdit: (group: ClassGroup) => void;
+  /** Sin él (profesorado), el grupo no se edita ni se inscribe a nadie. */
+  onEdit?: ((group: ClassGroup) => void) | undefined;
 }
 
 export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelProps) {
@@ -109,10 +110,12 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
           <OccupancyBar occupied={g.occupied} capacity={g.capacity} />
           <OccupancyByDay group={g} />
         </div>
-        <Button variant="secondary" className="mt-4" onClick={() => onEdit(g)}>
-          <Pencil aria-hidden size={16} />
-          Editar grupo
-        </Button>
+        {onEdit && (
+          <Button variant="secondary" className="mt-4" onClick={() => onEdit(g)}>
+            <Pencil aria-hidden size={16} />
+            Editar grupo
+          </Button>
+        )}
       </div>
       <div className="flex flex-col gap-4 p-6">
         {error && <Alert>{error}</Alert>}
@@ -144,25 +147,27 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
             ))}
           </ul>
         </Card>
-        <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
-          <Combobox
-            label="Inscribir alumno"
-            placeholder="Elige o busca un alumno…"
-            emptyText="Ningún alumno coincide"
-            options={options}
-            value={studentId}
-            onChange={setStudentId}
-          />
-          <Button
-            onClick={() => void submit()}
-            disabled={!studentId}
-            busy={enrol.isPending}
-            busyLabel="Inscribiendo…"
-            className="shrink-0"
-          >
-            Inscribir
-          </Button>
-        </Card>
+        {onEdit && (
+          <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-end">
+            <Combobox
+              label="Inscribir alumno"
+              placeholder="Elige o busca un alumno…"
+              emptyText="Ningún alumno coincide"
+              options={options}
+              value={studentId}
+              onChange={setStudentId}
+            />
+            <Button
+              onClick={() => void submit()}
+              disabled={!studentId}
+              busy={enrol.isPending}
+              busyLabel="Inscribiendo…"
+              className="shrink-0"
+            >
+              Inscribir
+            </Button>
+          </Card>
+        )}
         <Card className="p-4">
           <h3 className="mb-2 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
             Asistencia

@@ -13,6 +13,7 @@ import { useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { useGroups } from '@/features/classes/hooks';
 import { cancelCharge } from '@/features/billing/api';
@@ -73,6 +74,7 @@ export function StudentPanel() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const student = useStudent(id);
+  const canManage = useCanManageClub();
   const groups = useGroups();
   const others = useStudents('active', '');
   const toast = useToast();
@@ -170,24 +172,26 @@ export function StudentPanel() {
             <X aria-hidden size={18} />
           </button>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setAction({ kind: 'edit' })}>
-            <Pencil aria-hidden size={16} />
-            Editar
-          </Button>
-          {!s.withdrawnOn && (
-            <Button variant="secondary" onClick={() => setAction({ kind: 'withdraw' })}>
-              <UserMinus aria-hidden size={16} />
-              Dar de baja
+        {canManage && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => setAction({ kind: 'edit' })}>
+              <Pencil aria-hidden size={16} />
+              Editar
             </Button>
-          )}
-          {isWithdrawn && (
-            <Button variant="secondary" onClick={() => setAction({ kind: 'rejoin' })}>
-              <UserPlus aria-hidden size={16} />
-              Dar de alta de nuevo
-            </Button>
-          )}
-        </div>
+            {!s.withdrawnOn && (
+              <Button variant="secondary" onClick={() => setAction({ kind: 'withdraw' })}>
+                <UserMinus aria-hidden size={16} />
+                Dar de baja
+              </Button>
+            )}
+            {isWithdrawn && (
+              <Button variant="secondary" onClick={() => setAction({ kind: 'rejoin' })}>
+                <UserPlus aria-hidden size={16} />
+                Dar de alta de nuevo
+              </Button>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex flex-col gap-4 p-6">
         {error && <Alert>{error}</Alert>}
@@ -212,7 +216,7 @@ export function StudentPanel() {
                     En el grupo desde {formatDate(g.since)}
                   </p>
                 </div>
-                {!isWithdrawn && (
+                {!isWithdrawn && canManage && (
                   <>
                     <button
                       type="button"
@@ -262,7 +266,7 @@ export function StudentPanel() {
               </li>
             ))}
           </ul>
-          {!isWithdrawn && (
+          {!isWithdrawn && canManage && (
             <Button
               variant="ghost"
               className="mt-2"
@@ -333,27 +337,31 @@ export function StudentPanel() {
                 Abrir
                 <ChevronRight aria-hidden size={16} />
               </button>
-              <button
-                type="button"
-                aria-label={`Quitar de la familia directa a ${sibling.fullName}`}
-                onClick={() =>
-                  void mutate
-                    .mutateAsync(() => api.unlinkSibling(s.id, sibling.id))
-                    .then(
-                      () => done('Familiar desvinculado'),
-                      (failure: unknown) => setError(apiErrorMessage(failure)),
-                    )
-                }
-                className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
-              >
-                <X aria-hidden size={14} />
-              </button>
+              {canManage && (
+                <button
+                  type="button"
+                  aria-label={`Quitar de la familia directa a ${sibling.fullName}`}
+                  onClick={() =>
+                    void mutate
+                      .mutateAsync(() => api.unlinkSibling(s.id, sibling.id))
+                      .then(
+                        () => done('Familiar desvinculado'),
+                        (failure: unknown) => setError(apiErrorMessage(failure)),
+                      )
+                  }
+                  className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                >
+                  <X aria-hidden size={14} />
+                </button>
+              )}
             </div>
           ))}
-          <Button variant="ghost" className="mt-2" onClick={() => setAction({ kind: 'sibling' })}>
-            <Plus aria-hidden size={16} />
-            Añadir familia directa
-          </Button>
+          {canManage && (
+            <Button variant="ghost" className="mt-2" onClick={() => setAction({ kind: 'sibling' })}>
+              <Plus aria-hidden size={16} />
+              Añadir familia directa
+            </Button>
+          )}
         </Card>
         <StudentBillingCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentMaterialCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
