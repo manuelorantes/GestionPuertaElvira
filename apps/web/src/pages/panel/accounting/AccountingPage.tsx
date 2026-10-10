@@ -11,12 +11,14 @@ import { Tabs } from '@/shared/ui/Tabs';
 import { InvoiceDialog } from './InvoiceDialog';
 import { InvoicesTab } from './InvoicesTab';
 import { LedgerTab } from './LedgerTab';
+import { MonthlyCategoriesTab } from './MonthlyCategoriesTab';
 import { YearTab } from './YearTab';
 
 const TABS = [
   { id: 'movimientos', label: 'Movimientos' },
   { id: 'facturas', label: 'Facturas' },
   { id: 'cierre', label: 'Mes a mes y cierre' },
+  { id: 'ajustes', label: 'Ajustes' },
 ];
 
 export function AccountingPage() {
@@ -38,6 +40,7 @@ export function AccountingPage() {
 
   function renderTab() {
     if (tab === 'facturas') return <InvoicesTab />;
+    if (tab === 'ajustes') return <MonthlyCategoriesTab />;
     if (tab === 'cierre')
       return (
         <YearTab startYear={season} onChange={(year) => setParam('temporada', String(year))} />

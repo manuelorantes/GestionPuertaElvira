@@ -14,6 +14,8 @@ import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
+import { PeriodSelect } from './PeriodSelect';
+
 /** «Añadir movimiento»: ingreso o gasto anotado a mano. */
 export function EntryDialog({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<EntryKind>('income');
@@ -22,6 +24,7 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
   const [category, setCategory] = useState('');
   const [method, setMethod] = useState('transfer');
   const [amount, setAmount] = useState('');
+  const [period, setPeriod] = useState('');
   const save = useAccountingMutation(recordEntry);
   const toast = useToast();
   const year = new Date().getFullYear();
@@ -31,7 +34,15 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     if (invalid) return;
     await save
-      .mutateAsync({ date, kind, concept: concept.trim(), category, method, amount: amount.trim() })
+      .mutateAsync({
+        date,
+        kind,
+        concept: concept.trim(),
+        category,
+        method,
+        amount: amount.trim(),
+        period: period || null,
+      })
       .then(
         () => {
           toast('Movimiento añadido');
@@ -72,6 +83,12 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
           onChange={setDate}
           fromYear={year - 2}
           toYear={year + 1}
+        />
+        <PeriodSelect
+          date={date}
+          value={period}
+          onChange={setPeriod}
+          defaultLabel="El de la fecha"
         />
         <TextField label="Concepto" value={concept} onChange={(e) => setConcept(e.target.value)} />
         <Select

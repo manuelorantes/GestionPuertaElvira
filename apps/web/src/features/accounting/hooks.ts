@@ -25,6 +25,10 @@ export function useFiscalYear(startYear: number) {
   });
 }
 
+export function useMonthlyCategories() {
+  return useQuery({ queryKey: ['monthly-categories'], queryFn: api.fetchMonthlyCategories });
+}
+
 /** Mutación de Contabilidad que refresca movimientos, facturas y el ejercicio. */
 export function useAccountingMutation<Variables, Result = void>(
   mutationFn: (variables: Variables) => Promise<Result>,

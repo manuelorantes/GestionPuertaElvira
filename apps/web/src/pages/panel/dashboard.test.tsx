@@ -44,7 +44,9 @@ const SUMMARY = {
   expensesCents: 118000,
   activeStudents: 157,
   registeredStudents: 170,
-  chart,
+  cashChart: chart,
+  // Lo que corresponde a cada mes: solo las categorías del mes.
+  monthChart: chart.map((m) => ({ ...m, incomeCents: m.incomeCents - 20000, expenseCents: 90000 })),
   occupancy: {
     percent: 86,
     fullGroups: 3,
@@ -106,17 +108,20 @@ describe('Resumen', () => {
       screen.getByText('Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio'),
     ).toBeInTheDocument();
     expect(screen.getByText('157')).toBeInTheDocument();
-    const chartFigure = screen.getByRole('img', {
-      name: /Ingresos y gastos de la temporada, de septiembre a agosto/,
-    });
-    expect(chartFigure).toHaveAccessibleName(
-      expect.stringContaining('octubre 2026: ingresos 4120 €, gastos 1180 €'),
+    // Dos gráficas: lo que entra y sale cada mes, y lo que corresponde a cada mes.
+    expect(
+      screen.getByRole('img', { name: /Lo que entra y sale cada mes, por fecha/ }),
+    ).toHaveAccessibleName(expect.stringContaining('octubre 2026: ingresos 4120 €, gastos 1180 €'));
+    expect(screen.getByRole('img', { name: /Lo que corresponde a cada mes/ })).toHaveAccessibleName(
+      expect.stringContaining('octubre 2026: ingresos 3920 €, gastos 900 €'),
     );
-    await userEvent.hover(screen.getByTestId('barra-2026-10-income'));
+    await userEvent.hover(screen.getByTestId('caja-2026-10-income'));
     expect(screen.getByText('Ingresos de octubre 2026: 4120 €')).toBeVisible();
-    await userEvent.hover(screen.getByTestId('barra-2026-10-expense'));
+    await userEvent.hover(screen.getByTestId('caja-2026-10-expense'));
     expect(screen.getByText('Gastos de octubre 2026: 1180 €')).toBeVisible();
     expect(screen.queryByText('Ingresos de octubre 2026: 4120 €')).not.toBeInTheDocument();
+    await userEvent.hover(screen.getByTestId('mes-2026-10-expense'));
+    expect(screen.getByText('Gastos de octubre 2026: 900 €')).toBeVisible();
     expect(screen.getByText('86 %')).toBeInTheDocument();
     expect(screen.getByText('3 grupos completos')).toBeInTheDocument();
     expect(screen.getByText('Adultos II')).toBeInTheDocument();

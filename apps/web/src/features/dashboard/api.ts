@@ -2,6 +2,12 @@ import type { LedgerItem } from '@/features/accounting/api';
 import type { Charge } from '@/features/billing/api';
 import { apiGet } from '@/shared/api/client';
 
+export interface MonthBars {
+  month: string;
+  incomeCents: number;
+  expenseCents: number;
+}
+
 export interface Dashboard {
   month: string;
   today: string;
@@ -13,7 +19,10 @@ export interface Dashboard {
   expensesCents: number;
   activeStudents: number;
   registeredStudents: number;
-  chart: { month: string; incomeCents: number; expenseCents: number }[];
+  /** Lo que entra y sale cada mes, por fecha. */
+  cashChart: MonthBars[];
+  /** Lo que corresponde a cada mes, con las categorías «del mes» de Contabilidad. */
+  monthChart: MonthBars[];
   occupancy: {
     percent: number;
     fullGroups: number;

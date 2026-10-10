@@ -11,9 +11,8 @@ test('should summarise the club with real figures', async ({ page }) => {
   await page.getByRole('button', { name: 'Entrar' }).click();
 
   await expect(page.getByText(/^Cobrado en /)).toBeVisible();
-  await expect(
-    page.getByRole('img', { name: /Ingresos y gastos de la temporada, de septiembre a agosto/ }),
-  ).toBeVisible();
+  await expect(page.getByRole('img', { name: /Lo que entra y sale cada mes/ })).toBeVisible();
+  await expect(page.getByRole('img', { name: /Lo que corresponde a cada mes/ })).toBeVisible();
   await expect(page.getByText('Ocupación de clases')).toBeVisible();
   if (month !== 9) {
     await expect(page.getByRole('region', { name: 'Recibos vencidos' })).toContainText(

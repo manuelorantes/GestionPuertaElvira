@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
 const LEDGER = {
@@ -46,6 +47,7 @@ const LEDGER = {
       category: 'rent',
       method: 'transfer',
       amountCents: 95000,
+      period: '2026-09',
       categoryLabel: 'Alquiler',
       methodLabel: 'Transferencia',
     },
@@ -125,9 +127,10 @@ describe('Contabilidad', () => {
     expect(within(table).getByRole('row', { name: /Subvención municipal/ })).toHaveTextContent(
       '+600 €',
     );
-    expect(within(table).getByRole('row', { name: /Alquiler octubre/ })).toHaveTextContent(
-      '−950 €',
-    );
+    const rent = within(table).getByRole('row', { name: /Alquiler octubre/ });
+    expect(rent).toHaveTextContent('−950 €');
+    // Pagado en octubre, pero es de septiembre.
+    expect(rent).toHaveTextContent('Corresponde a septiembre 2026');
     expect(
       screen.getByText('Ingresos 645 € · Gastos 1366 € · Resultado −721 €'),
     ).toBeInTheDocument();
@@ -206,6 +209,12 @@ describe('Contabilidad', () => {
     await userEvent.type(within(dialog).getByLabelText('Concepto'), 'Comisión del banco');
     await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'other_expenses');
     await userEvent.type(within(dialog).getByLabelText('Importe (€)'), '6');
+    // Por defecto, el mes de la fecha; se puede elegir otro.
+    const lastMonth = shiftMonth(currentMonth(), -1);
+    await userEvent.selectOptions(
+      within(dialog).getByLabelText('Mes al que corresponde'),
+      lastMonth,
+    );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar movimiento' }));
 
     expect(await screen.findByText('Movimiento añadido')).toBeInTheDocument();
@@ -215,6 +224,35 @@ describe('Contabilidad', () => {
       concept: 'Comisión del banco',
       category: 'other_expenses',
       amount: '6',
+      period: shiftMonth(currentMonth(), -1),
+    });
+  });
+
+  it('chooses which categories count as of the month', async () => {
+    const fetch = api({
+      'GET /api/admin/accounting/monthly-categories': [
+        200,
+        { categories: ['teachers', 'rent', 'fees'] },
+      ],
+      'PUT /api/admin/accounting/monthly-categories': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=ajustes');
+
+    const expenses = await screen.findByRole('group', { name: 'Gastos del mes' });
+    expect(within(expenses).getByRole('checkbox', { name: 'Profesores' })).toBeChecked();
+    expect(within(expenses).getByRole('checkbox', { name: 'Material' })).not.toBeChecked();
+    const income = screen.getByRole('group', { name: 'Ingresos del mes' });
+    expect(within(income).getByRole('checkbox', { name: 'Cuotas' })).toBeChecked();
+    await userEvent.click(within(expenses).getByRole('checkbox', { name: 'Wifi' }));
+    await userEvent.click(within(expenses).getByRole('checkbox', { name: 'Alquiler' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    expect(await screen.findByText('Categorías guardadas')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/admin/accounting/monthly-categories' && init?.method === 'PUT',
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual({
+      categories: ['teachers', 'internet', 'fees'],
     });
   });
 
@@ -236,6 +274,9 @@ describe('Contabilidad', () => {
     await userEvent.type(within(dialog).getByLabelText('Concepto'), 'Relojes digitales');
     await userEvent.type(within(dialog).getByLabelText('Importe (€)'), '186');
     await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'material');
+    expect(within(dialog).getByLabelText('Mes al que corresponde')).toHaveDisplayValue(
+      `El de la factura (${monthLabel(currentMonth()).toLowerCase()})`,
+    );
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar factura' }));
 
     expect(await screen.findByText('Factura registrada')).toBeInTheDocument();
@@ -244,6 +285,7 @@ describe('Contabilidad', () => {
     );
     const form = sent?.[1]?.body as FormData;
     expect(form.get('supplier')).toBe('Escaque Material Didáctico');
+    expect(form.get('period')).toBe('');
     expect((form.get('file') as File).name).toBe('relojes.pdf');
     expect(fetch).toHaveBeenCalledWith(
       '/api/admin/accounting/invoices/i9/payment',
