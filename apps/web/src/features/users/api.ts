@@ -9,7 +9,9 @@ export interface ClubUser {
   status: 'active' | 'disabled';
   mustChangePassword: boolean;
   createdAt: string;
-  /** Profesor vinculado (solo cuentas de profesorado), o null. */
+  /** Emails adicionales con los que también se entra en la cuenta. */
+  otherEmails: string[];
+  /** Profesor vinculado (profesorado o administración que da clases), o null. */
   teacher: { id: string; name: string } | null;
   /** Último inicio de sesión o actividad, o null si nunca ha entrado. */
   lastSeenAt: string | null;
@@ -48,4 +50,13 @@ export function changeRole(id: string, role: Role): Promise<void> {
 /** Vincula una cuenta de profesorado a un profesor, o la desvincula con null. */
 export function linkTeacher(id: string, teacherId: string | null): Promise<void> {
   return apiSend('PUT', `/api/admin/users/${id}/teacher`, { teacherId });
+}
+
+/** Añade otro email con el que también se entra en la cuenta. */
+export function addUserEmail(id: string, email: string): Promise<void> {
+  return apiSend('POST', `/api/admin/users/${id}/emails`, { email });
+}
+
+export function removeUserEmail(id: string, email: string): Promise<void> {
+  return apiSend('DELETE', `/api/admin/users/${id}/emails`, { email });
 }

@@ -11,6 +11,7 @@ const USERS = [
     role: 'superadministrator',
     status: 'active',
     mustChangePassword: false,
+    otherEmails: [],
     createdAt: '2026-10-01T08:00:00.000Z',
     teacher: null,
     lastSeenAt: '2026-10-07T06:40:00.000Z',
@@ -22,6 +23,7 @@ const USERS = [
     role: 'administrator',
     status: 'active',
     mustChangePassword: true,
+    otherEmails: [],
     createdAt: '2026-10-07T08:00:00.000Z',
     teacher: null,
     lastSeenAt: null,
@@ -33,6 +35,7 @@ const USERS = [
     role: 'teacher',
     status: 'disabled',
     mustChangePassword: false,
+    otherEmails: [],
     createdAt: '2026-09-01T08:00:00.000Z',
     teacher: null,
     lastSeenAt: '2026-09-15T16:00:00.000Z',
@@ -44,6 +47,7 @@ const USERS = [
     role: 'teacher',
     status: 'active',
     mustChangePassword: false,
+    otherEmails: [],
     createdAt: '2026-10-08T08:00:00.000Z',
     teacher: { id: 't1', name: 'Lucía Moreno Gil' },
     lastSeenAt: null,
@@ -55,6 +59,7 @@ const USERS = [
     role: 'assistant',
     status: 'active',
     mustChangePassword: false,
+    otherEmails: [],
     createdAt: '2026-10-08T08:00:00.000Z',
     teacher: null,
     lastSeenAt: null,
@@ -241,6 +246,52 @@ describe('Usuarios', () => {
         role: 'teacher',
         teacherId: 't2',
       }),
+    );
+  });
+});
+
+describe('emails adicionales', () => {
+  it('adds and removes extra emails of an account from its row', async () => {
+    const spy = api({
+      'POST /api/admin/users/u2/emails': [204],
+      'DELETE /api/admin/users/u2/emails': [204],
+      'GET /api/admin/users': [
+        [200, { items: USERS }],
+        [
+          200,
+          {
+            items: USERS.map((u) =>
+              u.id === 'u2' ? { ...u, otherEmails: ['club.personal@gmail.com'] } : u,
+            ),
+          },
+        ],
+      ],
+    });
+    renderApp('/panel/usuarios');
+
+    const table = await screen.findByRole('table', { name: 'Cuentas de usuario' });
+    await userEvent.click(within(table).getByRole('button', { name: 'Emails de Club Ajedrez' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Emails de Club Ajedrez' });
+    expect(dialog).toHaveTextContent('Sin emails adicionales.');
+    await userEvent.type(within(dialog).getByLabelText('Añadir email'), 'club.personal@gmail.com');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir' }));
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/users/u2/emails')).toEqual({
+        email: 'club.personal@gmail.com',
+      }),
+    );
+
+    const list = await within(dialog).findByRole('list', { name: 'Emails adicionales' });
+    expect(within(table).getByText('club.personal@gmail.com')).toBeInTheDocument();
+    await userEvent.click(
+      within(list).getByRole('button', { name: 'Quitar club.personal@gmail.com' }),
+    );
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.some(
+          ([u, init]) => u === '/api/admin/users/u2/emails' && init?.method === 'DELETE',
+        ),
+      ).toBe(true),
     );
   });
 });
