@@ -18,6 +18,7 @@ import {
   ImportPayment,
   IssueInvoice,
   MarkReminded,
+  NoteChargeDiscount,
   type PaymentQuote,
   pendingCharges,
   QuotePayment,
@@ -563,4 +564,22 @@ Deno.test('SetChargeDiscount should only note the discount of a past month and r
     ['2026-09', 3600, 10],
     ['2026-10', 4950, 10],
   ]);
+});
+
+Deno.test('NoteChargeDiscount should note the discount of any month without changing its amount', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 3 });
+  await new ImportPayment(fx, fx, fx, fx).execute(
+    id,
+    'monthly',
+    YearMonth.fromString('2026-11'),
+    Money.cents(3600),
+    LocalDate.fromString('2026-10-01'),
+  );
+  await new NoteChargeDiscount(fx).execute(id, '2026-11', 20);
+  const charges = (await account(fx, id)).charges;
+  assertEquals(charges.map((c) => [c.period, c.amountCents, c.discountPercent]), [
+    ['2026-11', 3600, 20],
+  ]);
+  await assertRejects(() => new NoteChargeDiscount(fx).execute(id, '2026-12', 20), ChargeNotFound);
 });

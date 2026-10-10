@@ -1361,6 +1361,22 @@ export class ResetCharge {
   }
 }
 
+/** Apunta el descuento por pago adelantado que ya lleva una cuota (p. ej. importada de la hoja) sin cambiar su importe. */
+export class NoteChargeDiscount {
+  constructor(private readonly charges: ChargeRepository) {}
+
+  async execute(studentId: string, month: string, percent: number): Promise<void> {
+    const charge = await this.charges.chargeFor(
+      StudentRef.fromString(studentId),
+      'monthly',
+      YearMonth.fromString(month),
+    );
+    if (charge === null) throw new ChargeNotFound();
+    charge.noteDiscount(percent);
+    await this.charges.saveCharge(charge);
+  }
+}
+
 /** Fija a mano el descuento por pago adelantado de una cuota y la recalcula con lo que hace hoy el alumno. */
 export class SetChargeDiscount {
   constructor(
