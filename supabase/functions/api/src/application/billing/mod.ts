@@ -1271,15 +1271,21 @@ export class RecalculateCharges {
 
   /**
    * `previousFee`: la cuota de un mes que tenía antes del cambio; sirve para deducir el descuento por pago adelantado
-   * de cuotas que no lo tienen apuntado (las importadas de la hoja).
+   * de cuotas que no lo tienen apuntado (las importadas de la hoja). `notBefore`: el primer mes que se puede tocar
+   * (p. ej. el siguiente a una baja).
    */
-  async execute(studentId: string, previousFee: Money | null = null): Promise<void> {
+  async execute(
+    studentId: string,
+    previousFee: Money | null = null,
+    notBefore: YearMonth | null = null,
+  ): Promise<void> {
     const ref = StudentRef.fromString(studentId);
     const today = LocalDate.fromInstant(this.clock.now());
     const thisMonth = YearMonth.of(today);
-    const from = today.day <= RecalculateCharges.LAST_DAY_FOR_CURRENT_MONTH
+    const earliest = today.day <= RecalculateCharges.LAST_DAY_FOR_CURRENT_MONTH
       ? thisMonth
       : thisMonth.next();
+    const from = notBefore !== null && earliest.isBefore(notBefore) ? notBefore : earliest;
     const current = await currentFee(this.directory, this.accounts, this.settings, ref, today);
     if (current === null) return;
     const { fee, family } = current;

@@ -1,4 +1,4 @@
-import { LocalDate } from '../../domain/common/mod.ts';
+import { LocalDate, YearMonth } from '../../domain/common/mod.ts';
 import type { StudentId } from '../../domain/students/mod.ts';
 import {
   type AttendanceInput,
@@ -13,6 +13,7 @@ import {
   ChangeJoinDate,
   type EnrolmentRequest,
   type Enrolments,
+  FamilyLeftAlone,
   LinkSiblings,
   ListPendingData,
   type Membership,
@@ -304,10 +305,27 @@ export function registerStudentRoutes(api: ApiApp): void {
     { method: 'POST', path: '/api/admin/students/:id/withdrawal', access: 'admin' },
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
-      await new WithdrawStudent(students(scope), enrolments(scope), transactions(scope), clock)
-        .execute(param(c, 'id'), body.requiredString('date'));
+      const id = param(c, 'id');
+      const date = body.requiredString('date');
+      // Su familia directa deja de serlo: quien se queda sin nadie pierde el descuento desde el mes siguiente.
+      const family = (await new FamilyLeftAlone(students(scope)).execute(id)).map((s) => s.id);
+      await recalculatingFees(
+        api,
+        scope,
+        family,
+        () =>
+          new WithdrawStudent(students(scope), enrolments(scope), transactions(scope), clock)
+            .execute(id, date),
+        YearMonth.of(LocalDate.fromString(date)).next(),
+      );
       return c.body(null, 204);
     },
+  );
+
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/students/:id/family-left-alone', access: 'admin' },
+    async (c, scope) =>
+      c.json({ items: await new FamilyLeftAlone(students(scope)).execute(param(c, 'id')) }),
   );
 
   api.defineRoute(

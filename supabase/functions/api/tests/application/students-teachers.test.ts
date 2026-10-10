@@ -6,6 +6,7 @@ import { StudentId } from '../../src/domain/students/mod.ts';
 import { TeacherId } from '../../src/domain/teachers/mod.ts';
 import {
   ChangeJoinDate,
+  FamilyLeftAlone,
   LinkSiblings,
   ListPendingData,
   RegisterStudent,
@@ -129,6 +130,24 @@ Deno.test('WithdrawStudent should withdraw and end enrolments on the same date',
     (await repo.find(StudentId.fromString(id)))?.isActiveOn(LocalDate.fromString('2026-10-31')),
   );
   assertEquals(enrolments.ended, [{ student: id, on: '2026-10-31' }]);
+});
+
+Deno.test('WithdrawStudent should unlink the direct family, and tell who would be left without any', async () => {
+  const { repo, enrolments, transactions, clock, register } = students();
+  const pablo = await register(['g1']);
+  // Lola solo tiene a Pablo; Hugo tiene a Pablo y a Ana, que sigue de alta.
+  const lola = await register(['g1'], [pablo]);
+  const ana = await register(['g1']);
+  const hugo = await register(['g1'], [pablo, ana]);
+
+  assertEquals((await new FamilyLeftAlone(repo).execute(pablo)).map((s) => s.id), [lola]);
+
+  await new WithdrawStudent(repo, enrolments, transactions, clock).execute(pablo, '2026-10-02');
+  const siblingsOf = async (id: string) =>
+    (await repo.find(StudentId.fromString(id)))?.siblings().map((s) => s.value) ?? [];
+  assertEquals(await siblingsOf(pablo), []);
+  assertEquals(await siblingsOf(lola), []);
+  assertEquals(await siblingsOf(hugo), [ana]);
 });
 
 Deno.test('RejoinStudent should join a withdrawn student again from a date, in groups or as a member', async () => {

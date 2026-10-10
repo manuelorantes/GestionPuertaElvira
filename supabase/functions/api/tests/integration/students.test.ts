@@ -1,6 +1,6 @@
 import { assertEquals } from '@std/assert';
 
-import { LocalDate } from '../../src/domain/common/mod.ts';
+import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
 
@@ -573,4 +573,58 @@ Deno.test('registering a student should suggest those with the same name and fir
   const teacher = new ApiClient();
   await teacher.logIn('profe@club.es');
   assertError(await teacher.get('/api/admin/students/similar?name=Pablo%20Gil'), 403, 'forbidden');
+});
+
+Deno.test({
+  name:
+    'withdrawing a student unlinks the direct family; who is left alone loses the family discount from the next month',
+  // Necesita tres meses seguidos de clases por delante.
+  ignore: (() => {
+    const month = YearMonth.of(LocalDate.fromInstant(new Date()));
+    const season = Season.teachingSeason(month);
+    return season === null || !season.includes(month.next().next());
+  })(),
+  async fn() {
+    const fx = await fixture();
+    const today = LocalDate.fromInstant(new Date()).toString();
+    const pablo = await register(fx, { fullName: 'Pablo Gil Ruiz' });
+    const lola = await register(fx, { fullName: 'Lola Gil Ruiz', siblingIds: [pablo] });
+    // Lola paga tres meses con el descuento familiar.
+    const paid = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: lola,
+      kind: 'monthly',
+      months: 3,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(paid.status, 201, JSON.stringify(paid.body));
+    const charges = async () =>
+      body<{ charges: { period: string; amountCents: number }[] }>(
+        await fx.client.get(`/api/admin/billing/accounts/${lola}`),
+      ).charges.map((c) => c.amountCents);
+    const [thisMonth, next] = await charges();
+
+    assertEquals(
+      body<{ items: unknown[] }>(
+        await fx.client.get(`/api/admin/students/${pablo}/family-left-alone`),
+      )
+        .items,
+      [{ id: lola, fullName: 'Lola Gil Ruiz' }],
+    );
+    assertEquals(
+      (await fx.client.json('POST', `/api/admin/students/${pablo}/withdrawal`, { date: today }))
+        .status,
+      204,
+    );
+
+    assertEquals(
+      body<{ siblings: unknown[] }>(await fx.client.get(`/api/admin/students/${lola}`)).siblings,
+      [],
+    );
+    const after = await charges();
+    // El mes de la baja se queda como estaba; los siguientes, sin descuento familiar.
+    assertEquals(after[0], thisMonth);
+    assertEquals((after[1] ?? 0) > (next ?? 0), true, JSON.stringify({ before: next, after }));
+    assertEquals(after[1], after[2]);
+  },
 });

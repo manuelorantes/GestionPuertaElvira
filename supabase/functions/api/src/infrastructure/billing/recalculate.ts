@@ -1,5 +1,5 @@
 import { GenerateMonthlyCharges, RecalculateCharges } from '../../application/billing/mod.ts';
-import type { Money } from '../../domain/common/mod.ts';
+import type { Money, YearMonth } from '../../domain/common/mod.ts';
 import type { ApiApp, RequestScope } from '../http/app.ts';
 import {
   SqlBillingSettingsRepository,
@@ -46,13 +46,14 @@ export async function recalculatingFees<T>(
   scope: RequestScope,
   studentIds: string[],
   change: () => Promise<T>,
+  notBefore: YearMonth | null = null,
 ): Promise<T> {
   const recalculate = recalculator(api, scope);
   const ids = [...new Set(studentIds)];
   const before = new Map<string, Money | null>();
   for (const id of ids) before.set(id, await recalculate.currentFee(id));
   const result = await change();
-  for (const id of ids) await recalculate.execute(id, before.get(id) ?? null);
+  for (const id of ids) await recalculate.execute(id, before.get(id) ?? null, notBefore);
   // Y las cuotas que les falten (p. ej. al inscribir en un grupo a quien no tenía), al momento.
   await generatingCharges(api, scope, ids);
   return result;

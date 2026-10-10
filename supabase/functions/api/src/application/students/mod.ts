@@ -345,7 +345,10 @@ export class WithdrawStudent {
     private readonly clock: Clock,
   ) {}
 
-  /** Baja en una fecha (hoy o futura): desde ese día deja de ocupar plaza en todos sus grupos. */
+  /**
+   * Baja en una fecha (hoy o futura): desde ese día deja de ocupar plaza en todos sus grupos, y deja de ser familia
+   * directa de quien lo era (pierden el descuento familiar si no les queda nadie más).
+   */
   async execute(id: string, date: string): Promise<void> {
     const student = await lookUp(this.students, id);
     const on = LocalDate.fromString(date);
@@ -353,7 +356,32 @@ export class WithdrawStudent {
     await this.transactions.run(async () => {
       await this.students.save(student);
       await this.enrolments.endAll(student.id, on);
+      for (const sibling of student.siblings()) {
+        await Siblings.unlink(this.students, id, sibling.value);
+      }
     });
+  }
+}
+
+/** Familia directa de un alumno que se quedaría sin nadie de alta en el club si él se diera de baja. */
+export class FamilyLeftAlone {
+  constructor(private readonly students: StudentRepository) {}
+
+  async execute(id: string): Promise<{ id: string; fullName: string }[]> {
+    const student = await lookUp(this.students, id);
+    const alone: { id: string; fullName: string }[] = [];
+    for (const siblingId of student.siblings()) {
+      const sibling = await this.students.find(siblingId);
+      if (!sibling || sibling.withdrawnOn() !== null) continue;
+      let others = false;
+      for (const otherId of sibling.siblings()) {
+        if (otherId.value === id) continue;
+        const other = await this.students.find(otherId);
+        if (other && other.withdrawnOn() === null) others = true;
+      }
+      if (!others) alone.push({ id: sibling.id.value, fullName: sibling.details().fullName.value });
+    }
+    return alone.sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
   }
 }
 
