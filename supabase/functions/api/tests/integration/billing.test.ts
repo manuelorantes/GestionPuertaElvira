@@ -584,3 +584,55 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name: 'a payment corrected in accounting keeps its receipt, except the payment method',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const registered = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'membership',
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(registered.status, 201, JSON.stringify(registered.body));
+    const payment = body<{ id: string }>(registered).id;
+    const month = today.slice(0, 7);
+    type Line = {
+      sourceId: string;
+      concept: string;
+      category: string;
+      method: string;
+      amountCents: number;
+      corrected: boolean;
+    };
+    const line = async () =>
+      body<{ items: Line[] }>(
+        await fx.client.get(`/api/admin/accounting/ledger?month=${month}`),
+      ).items.find((i) => i.sourceId === payment);
+    const original = await line();
+
+    const edited = await fx.client.json('PUT', '/api/admin/accounting/movements', {
+      source: 'payment',
+      sourceId: payment,
+      month,
+      concept: original?.concept ?? '',
+      category: 'other_income',
+      method: 'transfer',
+      amount: '45',
+      period: month,
+    });
+    assertEquals(edited.status, 204, JSON.stringify(edited.body));
+    const corrected = await line();
+    assertEquals(
+      [corrected?.category, corrected?.method, corrected?.amountCents, corrected?.corrected],
+      ['other_income', 'transfer', 4500, true],
+    );
+    // El recibo sigue con su importe; la forma de pago sí cambia.
+    const receipt = body<{ totalCents: number; method: string }>(
+      await fx.client.get(`/api/admin/billing/payments/${payment}`),
+    );
+    assertEquals([receipt.totalCents, receipt.method], [5000, 'transfer']);
+  },
+});

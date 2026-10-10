@@ -289,6 +289,26 @@ export class ManualEntry {
     );
   }
 
+  /** El mismo apunte con otros datos (la fecha y el tipo no cambian). */
+  revise(
+    concept: string,
+    category: Category,
+    method: Method,
+    amount: Money,
+    period: YearMonth,
+  ): ManualEntry {
+    return ManualEntry.record(
+      this.id,
+      this.date,
+      this.kind,
+      concept,
+      category,
+      method,
+      amount,
+      period,
+    );
+  }
+
   static restore(fields: {
     id: ManualEntryId;
     date: LocalDate;
@@ -354,10 +374,10 @@ export class SupplierInvoice {
     readonly date: LocalDate,
     readonly number: string,
     readonly supplier: string,
-    readonly concept: string,
-    readonly category: string,
-    readonly amount: Money,
-    readonly period: YearMonth,
+    private currentConcept: string,
+    private currentCategory: string,
+    private currentAmount: Money,
+    private currentPeriod: YearMonth,
     private paid: LocalDate | null,
     private paymentMethod: Method | null,
     private document: Attachment | null,
@@ -423,6 +443,42 @@ export class SupplierInvoice {
     );
   }
 
+  get concept(): string {
+    return this.currentConcept;
+  }
+
+  get category(): string {
+    return this.currentCategory;
+  }
+
+  get amount(): Money {
+    return this.currentAmount;
+  }
+
+  get period(): YearMonth {
+    return this.currentPeriod;
+  }
+
+  /** Corrige sus datos; la forma de pago, solo si ya está pagada. */
+  revise(
+    concept: string,
+    category: Category,
+    amount: Money,
+    period: YearMonth,
+    method: Method | null,
+  ): void {
+    if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
+    if (category.kind !== 'expense') {
+      throw new InvalidValue('category', 'Una factura de proveedor es un gasto.');
+    }
+    if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
+    this.currentConcept = concept.trim();
+    this.currentCategory = category.code;
+    this.currentAmount = amount;
+    this.currentPeriod = period;
+    if (this.paid !== null && method !== null) this.paymentMethod = method;
+  }
+
   pay(on: LocalDate, method: Method): void {
     if (this.paid !== null) throw new InvoiceAlreadyPaid();
     this.paid = on;
@@ -450,6 +506,51 @@ export class SupplierInvoice {
 
   attachment(): Attachment | null {
     return this.document;
+  }
+}
+
+/**
+ * Corrección en contabilidad de un movimiento que viene de otra sección (un cobro, una liquidación, un anticipo): cambia
+ * cómo sale en el libro, no el cobro ni la nómina. `method` null: la del movimiento.
+ */
+export class LedgerCorrection {
+  private constructor(
+    readonly source: string,
+    readonly sourceId: string,
+    readonly concept: string,
+    readonly category: string,
+    readonly method: Method | null,
+    readonly amount: Money,
+    readonly period: YearMonth,
+  ) {}
+
+  static of(
+    source: string,
+    sourceId: string,
+    kind: EntryKind,
+    concept: string,
+    category: Category,
+    method: Method | null,
+    amount: Money,
+    period: YearMonth,
+  ): LedgerCorrection {
+    if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
+    if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
+    if (category.kind !== kind) {
+      throw new InvalidValue(
+        'category',
+        `La categoría no corresponde a un ${kind === 'income' ? 'ingreso' : 'gasto'}.`,
+      );
+    }
+    return new LedgerCorrection(
+      source,
+      sourceId,
+      concept.trim(),
+      category.code,
+      method,
+      amount,
+      period,
+    );
   }
 }
 

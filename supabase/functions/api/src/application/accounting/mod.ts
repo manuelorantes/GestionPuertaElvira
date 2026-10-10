@@ -11,6 +11,7 @@ import {
   type Category,
   CategoryCatalog,
   FiscalYear,
+  LedgerCorrection,
   ManualEntry,
   ManualEntryId,
   methodFromName,
@@ -47,6 +48,8 @@ export interface LedgerLine {
    * facturas y, en los cobros, el del cobro.
    */
   period: string;
+  /** Un cobro, liquidación o anticipo corregido en contabilidad (su recibo o nómina siguen igual). */
+  corrected: boolean;
 }
 
 export interface LedgerQuery {
@@ -110,6 +113,102 @@ export interface AccountingCategoryRepository {
   /** Si algún apunte, factura o corrección la usa. */
   categoryInUse(code: string): Promise<boolean>;
   removeCategory(code: string): Promise<void>;
+}
+
+/** Correcciones en contabilidad de movimientos que vienen de Cobros o de Profesorado. */
+export interface LedgerCorrections {
+  saveCorrection(correction: LedgerCorrection): Promise<void>;
+}
+
+/** Cobros: cambiar la forma de pago de un cobro (sale en su recibo). */
+export interface PaymentMethods {
+  changePaymentMethod(paymentId: string, method: string): Promise<void>;
+}
+
+export class MovementNotFound extends Error {
+  constructor() {
+    super('No se ha encontrado ese movimiento.');
+    this.name = 'MovementNotFound';
+  }
+}
+
+export interface MovementEdit {
+  source: string;
+  sourceId: string;
+  /** Mes del libro en que sale (para encontrar los que vienen de otras secciones). */
+  month: string;
+  concept: string;
+  category: string;
+  method: string;
+  amount: string;
+  period: string;
+}
+
+/**
+ * Edita un movimiento del libro. Los apuntes y las facturas cambian de verdad; los cobros, liquidaciones y anticipos se
+ * corrigen solo en contabilidad (el recibo, las cuotas y la nómina siguen igual), salvo la forma de pago de un cobro, que
+ * cambia también en el cobro.
+ */
+export class EditMovement {
+  constructor(
+    private readonly entries: ManualEntryRepository,
+    private readonly invoices: SupplierInvoiceRepository,
+    private readonly closed: ClosedPeriods,
+    private readonly categories: AccountingCategoryRepository,
+    private readonly ledger: LedgerQuery,
+    private readonly corrections: LedgerCorrections,
+    private readonly payments: PaymentMethods,
+  ) {}
+
+  async execute(edit: MovementEdit): Promise<void> {
+    const catalog = await this.categories.catalog();
+    const category = catalog.require(edit.category);
+    const method = methodFromName(edit.method);
+    const amount = Money.fromDecimal(edit.amount);
+    const period = YearMonth.fromString(edit.period);
+    if (edit.source === 'manual') {
+      const entry = await this.entries.entry(ManualEntryId.fromString(edit.sourceId));
+      if (entry === null) throw new EntryNotFound();
+      await PeriodClosed.guard(this.closed, entry.date);
+      await this.entries.saveEntry(entry.revise(edit.concept, category, method, amount, period));
+      return;
+    }
+    if (edit.source === 'invoice') {
+      const invoice = await this.invoices.invoice(SupplierInvoiceId.fromString(edit.sourceId));
+      if (invoice === null) throw new SupplierInvoiceNotFound();
+      await PeriodClosed.guard(this.closed, invoice.paidOn() ?? invoice.date);
+      // En el libro sale «proveedor · concepto»: se guarda solo el concepto.
+      const prefix = `${invoice.supplier} · `;
+      const concept = edit.concept.startsWith(prefix)
+        ? edit.concept.slice(prefix.length)
+        : edit.concept;
+      invoice.revise(concept, category, amount, period, method);
+      await this.invoices.saveInvoice(invoice);
+      return;
+    }
+    const line = (await this.ledger.lines(YearMonth.fromString(edit.month))).find(
+      (l) => l.source === edit.source && l.sourceId === edit.sourceId,
+    );
+    if (!line) throw new MovementNotFound();
+    await PeriodClosed.guard(this.closed, LocalDate.fromString(line.date));
+    const isPayment = edit.source === 'payment';
+    if (isPayment && edit.method !== line.method) {
+      await this.payments.changePaymentMethod(edit.sourceId, edit.method);
+    }
+    await this.corrections.saveCorrection(
+      LedgerCorrection.of(
+        edit.source,
+        edit.sourceId,
+        line.kind === 'income' ? 'income' : 'expense',
+        edit.concept,
+        category,
+        // La de un cobro va en el cobro; la de lo demás, en la corrección.
+        isPayment ? null : method,
+        amount,
+        period,
+      ),
+    );
+  }
 }
 
 export class CategoryInUse extends Error {

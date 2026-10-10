@@ -3,6 +3,7 @@ import {
   type Category,
   CategoryCatalog,
   FiscalYear,
+  type LedgerCorrection,
   type ManualEntry,
   type ManualEntryId,
   type SeasonClosing,
@@ -12,9 +13,11 @@ import {
 import type {
   AccountingCategoryRepository,
   DocumentStorage,
+  LedgerCorrections,
   LedgerLine,
   LedgerQuery,
   ManualEntryRepository,
+  PaymentMethods,
   SeasonClosingRepository,
   SupplierInvoiceRepository,
 } from '../../src/application/accounting/mod.ts';
@@ -30,8 +33,26 @@ export class AccountingFixture
     DocumentStorage,
     LedgerQuery,
     ClosedPeriods,
-    AccountingCategoryRepository {
+    AccountingCategoryRepository,
+    LedgerCorrections,
+    PaymentMethods {
   customCategories: Category[] = [];
+  corrections = new Map<string, LedgerCorrection>();
+  paymentMethodChanges: [string, string][] = [];
+
+  saveCorrection(correction: LedgerCorrection): Promise<void> {
+    this.corrections.set(`${correction.source}/${correction.sourceId}`, correction);
+    return Promise.resolve();
+  }
+
+  changePaymentMethod(paymentId: string, method: string): Promise<void> {
+    this.paymentMethodChanges.push([paymentId, method]);
+    // El cobro cambia: el libro lo verá con su nueva forma de pago.
+    this.external = this.external.map((l) =>
+      l.source === 'payment' && l.sourceId === paymentId ? { ...l, method } : l
+    );
+    return Promise.resolve();
+  }
   entries = new Map<string, ManualEntry>();
   invoices = new Map<string, SupplierInvoice>();
   seasonClosings = new Map<number, SeasonClosing>();
@@ -133,7 +154,22 @@ export class AccountingFixture
   }
 
   lines(month: YearMonth): Promise<LedgerLine[]> {
-    const lines = this.external.filter((l) => l.date.startsWith(month.toString()));
+    const lines = this.external
+      .filter((l) => l.date.startsWith(month.toString()))
+      .map((l) => {
+        const c = this.corrections.get(`${l.source}/${l.sourceId}`);
+        return c
+          ? {
+            ...l,
+            concept: c.concept,
+            category: c.category,
+            method: c.method ?? l.method,
+            amountCents: c.amount.cents,
+            period: c.period.toString(),
+            corrected: true,
+          }
+          : l;
+      });
     for (const e of this.entries.values()) {
       if (YearMonth.of(e.date).equals(month)) {
         lines.push({
@@ -147,6 +183,7 @@ export class AccountingFixture
           amountCents: e.amount.cents,
           studentId: null,
           period: e.period.toString(),
+          corrected: false,
         });
       }
     }
@@ -158,12 +195,13 @@ export class AccountingFixture
           sourceId: i.id.value,
           date: paidOn.toString(),
           kind: 'expense',
-          concept: i.supplier,
+          concept: `${i.supplier} · ${i.concept}`,
           category: i.category,
           method: i.method() ?? '',
           amountCents: i.amount.cents,
           studentId: null,
           period: i.period.toString(),
+          corrected: false,
         });
       }
     }
