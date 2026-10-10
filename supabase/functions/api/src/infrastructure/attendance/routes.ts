@@ -22,7 +22,10 @@ import {
   StudentClassComments,
   TakeRollCall,
   TeacherClasses,
-  TeacherStudents,
+  TeacherGroupAccess,
+  TeacherGroupAttendance,
+  TeacherGroupComments,
+  TeacherGroups,
 } from '../../application/attendance/mod.ts';
 import {
   ListSettlements,
@@ -137,6 +140,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     RollCallStillOpen: [409, 'roll_call_still_open'],
     ClassCommentNotFound: [404, 'not_found'],
     NotYourComment: [403, 'forbidden'],
+    GroupNotYours: [404, 'not_found'],
   });
   const teacher = (method: 'GET' | 'PUT' | 'POST' | 'DELETE', path: string) =>
     ({ method, path, access: 'teacher' }) as const;
@@ -187,12 +191,41 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     });
   });
 
-  api.defineRoute(teacher('GET', '/api/teacher/students'), async (c, scope) => {
+  // ---- Mis grupos -----------------------------------------------------------------------------
+  const groupAccess = (scope: RequestScope) =>
+    new TeacherGroupAccess(new SqlTeacherRosterQuery(scope.tx), api.deps.clock);
+  const groupAttendance = (scope: RequestScope) =>
+    new GroupAttendance(new SqlGroupAttendanceQuery(scope.tx), api.deps.clock);
+
+  api.defineRoute(teacher('GET', '/api/teacher/groups'), async (c, scope) => {
     return c.json({
-      items: await new TeacherStudents(new SqlTeacherRosterQuery(scope.tx), api.deps.clock).execute(
-        sessionTeacher(scope),
-      ),
+      items: await new TeacherGroups(
+        groupAccess(scope),
+        new SqlTeacherRosterQuery(scope.tx),
+        groupAttendance(scope),
+        api.deps.clock,
+      ).execute(sessionTeacher(scope)),
     });
+  });
+
+  api.defineRoute(teacher('GET', '/api/teacher/groups/:groupId/attendance'), async (c, scope) => {
+    return c.json(
+      await new TeacherGroupAttendance(groupAccess(scope), groupAttendance(scope)).execute(
+        sessionTeacher(scope),
+        param(c, 'groupId'),
+        c.req.query('month') ?? '',
+      ),
+    );
+  });
+
+  api.defineRoute(teacher('GET', '/api/teacher/groups/:groupId/comments'), async (c, scope) => {
+    return c.json(
+      await new TeacherGroupComments(
+        groupAccess(scope),
+        new SqlClassCommentQuery(scope.tx),
+        api.deps.clock,
+      ).execute(sessionTeacher(scope), param(c, 'groupId'), c.req.query('before') ?? null),
+    );
   });
 
   api.defineRoute(teacher('GET', '/api/teacher/roll-calls/:groupId/:date'), async (c, scope) => {

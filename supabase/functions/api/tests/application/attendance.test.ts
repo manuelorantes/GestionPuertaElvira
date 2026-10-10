@@ -11,7 +11,9 @@ import {
   AttendanceGroupNotFound,
   type ClassAssignments,
   ClassCommentNotFound,
+  type ClassCommentQuery,
   type ClassCommentRepository,
+  type ClassCommentView,
   ClassNotGiven,
   type ClassOnDay,
   type ClassRoster,
@@ -21,6 +23,7 @@ import {
   GroupAttendance,
   type GroupAttendanceData,
   type GroupAttendanceQuery,
+  GroupNotYours,
   type MissedRollCallQuery,
   MissedRollCalls,
   NotYourComment,
@@ -30,6 +33,11 @@ import {
   StudentAttendance,
   TakeRollCall,
   TeacherClasses,
+  TeacherGroupAccess,
+  TeacherGroupAttendance,
+  TeacherGroupComments,
+  TeacherGroups,
+  type TeacherRosterQuery,
 } from '../../src/application/attendance/mod.ts';
 import { FrozenClock } from '../support/identity.ts';
 
@@ -394,4 +402,176 @@ Deno.test('EditClassComment should let teachers change only their comments and a
   await edit.remove(id, { teacher: 't1' });
   assertEquals(comments.saved.size, 0);
   await assertRejects(() => edit.remove(id, 'staff'), ClassCommentNotFound);
+});
+
+// ---- Mis grupos ------------------------------------------------------------------------------
+
+/** Lucía es titular de g1 y sustituye a Carlos en g2 el martes 13 de octubre. */
+const teacherGroups = (): TeacherRosterQuery => ({
+  taughtGroupIds: (teacher) => Promise.resolve(teacher === 'lucia' ? ['g1'] : []),
+  substitutedGroupIds: (teacher, from, to) =>
+    Promise.resolve(
+      teacher === 'lucia' && from.toString() <= '2026-10-13' && '2026-10-13' <= to.toString()
+        ? ['g2']
+        : [],
+    ),
+  rostersOf: (ids) =>
+    Promise.resolve(
+      [
+        {
+          groupId: 'g1',
+          name: 'Iniciación A',
+          days: ['tue', 'thu'],
+          start: '17:00',
+          end: '18:30',
+          classroom: 'alfil',
+          students: [
+            { id: 'ana', name: 'Ana', days: ['tue', 'thu'] },
+            { id: 'luis', name: 'Luis', days: ['thu'] },
+          ],
+        },
+        {
+          groupId: 'g2',
+          name: 'Avanzado',
+          days: ['tue'],
+          start: '18:30',
+          end: '20:00',
+          classroom: 'torre',
+          students: [],
+        },
+      ].filter((g) => ids.includes(g.groupId)),
+    ),
+});
+
+const access = (now: string) => new TeacherGroupAccess(teacherGroups(), new FrozenClock(now));
+
+Deno.test('TeacherGroupAccess should show the groups taught and those substituted within a week', async () => {
+  const visible = async (now: string) => [...(await access(now).visible('lucia')).entries()];
+  assertEquals(await visible('2026-10-06T10:00:00+02:00'), [['g1', false], ['g2', true]]);
+  assertEquals(await visible('2026-10-05T10:00:00+02:00'), [['g1', false]]);
+  assertEquals(await visible('2026-10-20T22:00:00+02:00'), [['g1', false], ['g2', true]]);
+  assertEquals(await visible('2026-10-21T10:00:00+02:00'), [['g1', false]]);
+  await access('2026-10-21T10:00:00+02:00').assert('lucia', 'g1');
+  await assertRejects(
+    () => access('2026-10-21T10:00:00+02:00').assert('lucia', 'g2'),
+    GroupNotYours,
+  );
+  await assertRejects(
+    () => access('2026-10-13T10:00:00+02:00').assert('carlos', 'g1'),
+    GroupNotYours,
+  );
+});
+
+/** Asistencia de g1: Ana vino el 29/09 y faltó el 06/10; Luis vino el 08/10. */
+const seasonAttendance = (asked: string[] = []): GroupAttendanceQuery => ({
+  between: (id, from, to) => {
+    asked.push(`${id} ${from}…${to}`);
+    return Promise.resolve({
+      name: id,
+      weekdays: [2, 4],
+      holidays: new Set<string>(),
+      rollCalls: id === 'g1'
+        ? [
+          { date: '2026-09-29', kind: 'taken' as const },
+          { date: '2026-10-06', kind: 'taken' as const },
+          { date: '2026-10-08', kind: 'taken' as const },
+        ]
+        : [],
+      enrolments: id === 'g1'
+        ? [
+          { studentId: 'ana', name: 'Ana', from: '2026-09-01', until: null, days: [2] },
+          { studentId: 'luis', name: 'Luis', from: '2026-10-01', until: null, days: [4] },
+        ]
+        : [],
+      absences: [{ date: '2026-10-06', studentId: 'ana' }],
+      guests: [],
+    });
+  },
+});
+
+Deno.test('GroupAttendance should add up the whole season so far', async () => {
+  const asked: string[] = [];
+  const view = await new GroupAttendance(
+    seasonAttendance(asked),
+    new FrozenClock('2026-10-15T10:00:00Z'),
+  )
+    .season('g1');
+  assertEquals(asked, ['g1 2026-09-01…2026-10-15']);
+  assertEquals(view.students.map((s) => [s.name, s.attended, s.classes]), [
+    ['Ana', 1, 2],
+    ['Luis', 1, 1],
+  ]);
+});
+
+Deno.test('TeacherGroups should list each visible group with its students and their season attendance', async () => {
+  const clock = new FrozenClock('2026-10-15T10:00:00+02:00');
+  const groups = await new TeacherGroups(
+    new TeacherGroupAccess(teacherGroups(), clock),
+    teacherGroups(),
+    new GroupAttendance(seasonAttendance(), clock),
+    clock,
+  ).execute('lucia');
+  assertEquals(groups.map((g) => [g.name, g.substitution]), [['Iniciación A', false], [
+    'Avanzado',
+    true,
+  ]]);
+  assertEquals(groups[0]?.students, [
+    { id: 'ana', name: 'Ana', days: ['tue', 'thu'], attended: 1, classes: 2 },
+    { id: 'luis', name: 'Luis', days: ['thu'], attended: 1, classes: 1 },
+  ]);
+});
+
+Deno.test('TeacherGroupAttendance should show a month of a visible group only', async () => {
+  const clock = new FrozenClock('2026-10-15T10:00:00+02:00');
+  const attendance = new TeacherGroupAttendance(
+    new TeacherGroupAccess(teacherGroups(), clock),
+    new GroupAttendance(seasonAttendance(), clock),
+  );
+  const view = await attendance.execute('lucia', 'g1', '2026-10');
+  assertEquals(view.month, '2026-10');
+  await assertRejects(() => attendance.execute('carlos', 'g1', '2026-10'), GroupNotYours);
+});
+
+const comment = (date: string, writtenAt: string, text: string): ClassCommentView => ({
+  id: text,
+  groupId: 'g1',
+  groupName: 'Iniciación A',
+  date,
+  studentId: null,
+  studentName: null,
+  text,
+  author: 'Lucía',
+  authorTeacherId: 'lucia',
+  writtenAt,
+});
+
+Deno.test('TeacherGroupComments should show the last four weeks, newest first, and then the previous ones', async () => {
+  const asked: string[] = [];
+  const query: ClassCommentQuery = {
+    ofClass: () => Promise.resolve([]),
+    ofStudent: () => Promise.resolve([]),
+    ofGroup: (_group, from, to) => {
+      asked.push(`${from}…${to}`);
+      return Promise.resolve([
+        comment('2026-09-29', '2026-09-29T18:00:00Z', 'martes'),
+        comment('2026-10-01', '2026-10-01T18:00:00Z', 'jueves'),
+        comment('2026-10-01', '2026-10-01T18:30:00Z', 'jueves, después'),
+      ].filter((c) => from.toString() <= c.date && c.date <= to.toString()));
+    },
+  };
+  // El jueves 1 de octubre se comenta; el martes 6 se repasa.
+  const clock = new FrozenClock('2026-10-06T16:00:00+02:00');
+  const comments = new TeacherGroupComments(
+    new TeacherGroupAccess(teacherGroups(), clock),
+    query,
+    clock,
+  );
+  const recent = await comments.execute('lucia', 'g1', null);
+  assertEquals(recent.items.map((c) => c.text), ['jueves, después', 'jueves', 'martes']);
+  assertEquals(recent.nextBefore, '2026-09-08');
+  const older = await comments.execute('lucia', 'g1', '2026-09-08');
+  // La ventana se corta al principio de la temporada.
+  assertEquals(older.nextBefore, null);
+  assertEquals(asked, ['2026-09-09…2026-10-06', '2026-09-01…2026-09-08']);
+  await assertRejects(() => comments.execute('carlos', 'g1', null), GroupNotYours);
 });
