@@ -14,6 +14,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
+import { REJOIN_ACTION } from '@/features/students/links';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { useGroups } from '@/features/classes/hooks';
 import { cancelCharge } from '@/features/billing/api';
@@ -79,12 +80,19 @@ export function StudentPanel() {
   const others = useStudents('active', '');
   const toast = useToast();
   const overCapacity = useOverCapacityConfirm();
-  const [action, setAction] = useState<Action | null>(null);
+  // Desde el aviso de «Nuevo alumno» se llega con «Dar de alta de nuevo» ya abierto.
+  const [action, setAction] = useState<Action | null>(() =>
+    searchParams.get('accion') === REJOIN_ACTION ? { kind: 'rejoin' } : null,
+  );
   const [error, setError] = useState<string | null>(null);
   const mutate = useStudentMutation(async (work: () => Promise<unknown>) => {
     await work();
   });
-  const close = () => void navigate(`/panel/alumnos${searchParams.size ? `?${searchParams}` : ''}`);
+  const close = () => {
+    const back = new URLSearchParams(searchParams);
+    back.delete('accion');
+    void navigate(`/panel/alumnos${back.size ? `?${back}` : ''}`);
+  };
 
   if (!student.data) {
     return (
@@ -393,7 +401,7 @@ export function StudentPanel() {
           }
         />
       )}
-      {action?.kind === 'rejoin' && (
+      {action?.kind === 'rejoin' && isWithdrawn && (
         <RejoinDialog
           name={s.fullName.split(' ')[0] ?? s.fullName}
           groups={groups.data ?? []}

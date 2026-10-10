@@ -70,6 +70,11 @@ hay clase en varias aulas, MUST pedirse el aula; si no hay clase, MUST avisarse 
 hasta corregirlo. Se puede indicar familia directa ya inscrita. Un alumno MAY darse de alta sin ningún horario:
 es un socio sin clases, queda marcado como socio (se le pedirá la cuota de socio) y se podrá inscribir más adelante.
 La fecha de alta MUST poder elegirse (por defecto hoy, nunca futura): sus grupos empiezan ese día.
+Mientras se escribe el nombre de un alumno nuevo, el sistema MUST avisar de los alumnos que coinciden en **nombre y
+primer apellido** (todas las palabras menos la última, o las dos si solo hay dos; sin tildes ni mayúsculas), con su
+número de socio, edad y grupos: primero los de baja, con la fecha de la baja y «Es este: darle de alta de nuevo», que
+cierra el alta y abre su ficha con «Dar de alta de nuevo» (ver «Volver a darse de alta»); después los de alta, con
+«Ver ficha». Es solo un aviso: si es otra persona, el alta sigue igual.
 
 #### Scenario: Alta en dos grupos
 - **WHEN** administración da de alta a un alumno con horario lunes 17:00–18:00 (aula Alfil) y viernes 16:30–17:30
@@ -82,6 +87,15 @@ La fecha de alta MUST poder elegirse (por defecto hoy, nunca futura): sus grupos
 #### Scenario: Alta fallida
 - **WHEN** el alta no puede completarse (por ejemplo, por un grupo completo sin confirmar)
 - **THEN** no queda ningún dato del alumno guardado
+
+#### Scenario: Ya estuvo en el club
+- **WHEN** administración escribe «Pablo Gil Ruiz» en un alta nueva y hay un Pablo Gil Ruiz de baja desde junio
+- **THEN** le sugiere que es ese alumno; si pulsa «Es este: darle de alta de nuevo», se abre su ficha para darle de alta
+  de nuevo con su número de socio e historial
+
+#### Scenario: Otra persona con nombre parecido
+- **WHEN** administración escribe «Pablo Gil Ruiz» y hay un Pablo Gil Martín de alta
+- **THEN** le avisa de que ya hay un alumno de alta con un nombre parecido, y puede dar de alta al nuevo igualmente
 
 #### Scenario: Socio sin clases
 - **WHEN** administración da de alta a un alumno sin elegir ningún grupo
