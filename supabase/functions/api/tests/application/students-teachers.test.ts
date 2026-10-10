@@ -10,8 +10,11 @@ import {
   ListPendingData,
   RegisterStudent,
   RejoinStudent,
+  SimilarStudents,
   type StudentInput,
   StudentNotFound,
+  type StudentQuery,
+  type StudentSummary,
   UnlinkSiblings,
   UpdateStudent,
   WithdrawStudent,
@@ -254,4 +257,38 @@ Deno.test('ListPendingData should list active students with what they are missin
     missing: ['birth_date', 'guardian', 'email'],
   }]);
   assert(!pending.some((p) => p.id === complete));
+});
+
+const summary = (fullName: string, withdrawnOn: string | null = null): StudentSummary => ({
+  id: fullName,
+  memberNumber: 1,
+  fullName,
+  age: 12,
+  status: withdrawnOn === null ? 'active' : 'withdrawn',
+  withdrawnOn,
+  groups: [],
+  hasSiblings: false,
+});
+
+Deno.test('SimilarStudents should suggest the students sharing name and first surname, withdrawn first', async () => {
+  const asked: string[] = [];
+  const query: StudentQuery = {
+    list: (filter, search) => {
+      asked.push(`${filter} ${search}`);
+      return Promise.resolve([
+        summary('Pablo Gil Martín'),
+        summary('Pablo Gil Ruiz', '2026-06-30'),
+        summary('Lola Gil Ruiz', '2026-06-30'),
+        summary('Pablo Garrido Gil'),
+      ]);
+    },
+    total: () => Promise.resolve(4),
+    detail: () => Promise.resolve(null),
+  };
+  const similar = new SimilarStudents(query, new FrozenClock('2026-10-02T10:00:00+02:00'));
+  const found = await similar.execute('  Pablo Gil Ruiz ');
+  assertEquals(found.map((s) => s.fullName), ['Pablo Gil Ruiz', 'Pablo Gil Martín']);
+  // Se preselecciona por la primera palabra para no recorrer todo el alumnado.
+  assertEquals(asked, ['all Pablo']);
+  assertEquals(await similar.execute('Pablo'), []);
 });

@@ -262,6 +262,29 @@ export class Student {
   }
 }
 
+/** Palabras de un nombre sin tildes ni mayúsculas («  María  López » → ['maria', 'lopez']). */
+function nameWords(fullName: string): string[] {
+  return fullName.toLowerCase().normalize('NFD').replace(/\p{M}+/gu, '').split(/\s+/).filter(
+    Boolean,
+  );
+}
+
+/** Nombre y primer apellido: todas las palabras menos la última (el segundo apellido), o las dos si solo hay dos. */
+function nameAndFirstSurname(fullName: string): string | null {
+  const words = nameWords(fullName);
+  if (words.length < 2) return null;
+  return (words.length === 2 ? words : words.slice(0, -1)).join(' ');
+}
+
+/**
+ * Si dos nombres pueden ser el mismo alumno: coinciden en nombre y primer apellido (sin tildes ni mayúsculas), aunque
+ * el segundo apellido falte o difiera. Sirve para avisar al dar de alta, no para decidir.
+ */
+export function shareNameAndFirstSurname(a: string, b: string): boolean {
+  const key = nameAndFirstSurname(a);
+  return key !== null && key === nameAndFirstSurname(b);
+}
+
 /**
  * Cambio de números de socio. Los números los da la base de datos al dar de alta, en orden y sin
  * reutilizar nunca uno; aquí solo se permite repartir de otra forma los que ya tienen esos alumnos

@@ -230,6 +230,7 @@ export class SqlStudentQuery implements StudentQuery {
       fullName: row.string('full_name'),
       age: age(row, on),
       status: status(row.nullableString('withdrawn_on'), on),
+      withdrawnOn: row.nullableString('withdrawn_on'),
       groups: (groupsByStudent.get(row.string('id')) ?? []).map((g) => ({
         id: g.id,
         name: g.name,

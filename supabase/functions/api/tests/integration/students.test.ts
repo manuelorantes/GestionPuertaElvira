@@ -534,3 +534,36 @@ Deno.test('changing the join date moves the groups that started with it', async 
     'unprocessable',
   );
 });
+
+Deno.test('registering a student should suggest those with the same name and first surname, withdrawn first', async () => {
+  const fx = await fixture();
+  const today = LocalDate.fromInstant(new Date()).toString();
+  const create = async (fullName: string) => {
+    const created = await fx.client.json('POST', '/api/admin/students', { fullName, groupIds: [] });
+    assertEquals(created.status, 201, JSON.stringify(created.body));
+    return (created.body as { id: string }).id;
+  };
+  await create('Pablo Gil Martín');
+  const before = await create('Pablo Gil Ruiz');
+  await create('Lola Gil Ruiz');
+  assertEquals(
+    (await fx.client.json('POST', `/api/admin/students/${before}/withdrawal`, { date: today }))
+      .status,
+    204,
+  );
+
+  const similar = (await fx.client.get(
+    `/api/admin/students/similar?name=${encodeURIComponent('pablo gil ruíz')}`,
+  )).body as { items: { id: string; fullName: string; status: string; withdrawnOn: string }[] };
+  assertEquals(similar.items.map((s) => [s.fullName, s.status]), [
+    ['Pablo Gil Ruiz', 'withdrawn'],
+    ['Pablo Gil Martín', 'active'],
+  ]);
+  assertEquals(similar.items[0]?.withdrawnOn, today);
+
+  // El profesorado no da de alta: no tiene esta consulta.
+  await createUser('profe@club.es', 'teacher');
+  const teacher = new ApiClient();
+  await teacher.logIn('profe@club.es');
+  assertError(await teacher.get('/api/admin/students/similar?name=Pablo%20Gil'), 403, 'forbidden');
+});
