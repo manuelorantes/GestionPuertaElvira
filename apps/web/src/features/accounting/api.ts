@@ -109,6 +109,30 @@ export function attachmentUrl(id: string): string {
   return `${BASE}/invoices/${id}/attachment`;
 }
 
+/** Una categoría del libro: de serie o creada por el club (`custom`, se puede renombrar). */
+export interface Category {
+  code: string;
+  kind: EntryKind;
+  label: string;
+  custom: boolean;
+}
+
+export async function fetchCategories(): Promise<Category[]> {
+  return (await apiGet<{ items: Category[] }>(`${BASE}/categories`)).items;
+}
+
+export function addCategory(input: { kind: EntryKind; label: string }): Promise<Category> {
+  return apiSend('POST', `${BASE}/categories`, input);
+}
+
+export function renameCategory(input: { code: string; label: string }): Promise<void> {
+  return apiSend('PUT', `${BASE}/categories/${input.code}`, { label: input.label });
+}
+
+export function removeCategory(code: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/categories/${code}`);
+}
+
 /** Categorías que cuentan como ingresos y gastos «del mes» en el resumen. */
 export async function fetchMonthlyCategories(): Promise<string[]> {
   return (await apiGet<{ categories: string[] }>(`${BASE}/monthly-categories`)).categories;

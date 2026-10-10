@@ -1,30 +1,5 @@
 export type EntryKind = 'income' | 'expense';
 
-export const CATEGORIES: Record<EntryKind, { value: string; label: string }[]> = {
-  expense: [
-    { value: 'teachers', label: 'Profesores' },
-    { value: 'rent', label: 'Alquiler' },
-    { value: 'material', label: 'Material' },
-    { value: 'federation', label: 'Federación' },
-    { value: 'tournaments', label: 'Torneos' },
-    { value: 'utilities', label: 'Suministros' },
-    { value: 'president', label: 'Presidente' },
-    { value: 'cleaning', label: 'Limpieza' },
-    { value: 'water', label: 'Agua' },
-    { value: 'electricity', label: 'Electricidad' },
-    { value: 'internet', label: 'Wifi' },
-    { value: 'other_expenses', label: 'Otros gastos' },
-  ],
-  income: [
-    { value: 'fees', label: 'Cuotas' },
-    { value: 'membership', label: 'Cuota de socio' },
-    { value: 'material_sales', label: 'Venta de material' },
-    { value: 'grants', label: 'Subvenciones' },
-    { value: 'tournament_income', label: 'Torneos' },
-    { value: 'other_income', label: 'Otros ingresos' },
-  ],
-};
-
 export const METHODS = [
   { value: 'cash', label: 'Efectivo' },
   { value: 'transfer', label: 'Transferencia' },

@@ -95,9 +95,21 @@ const months = Array.from({ length: 12 }, (_, i) => {
   };
 });
 
+const BUILT_IN = [
+  ['teachers', 'expense', 'Profesores'],
+  ['rent', 'expense', 'Alquiler'],
+  ['material', 'expense', 'Material'],
+  ['electricity', 'expense', 'Electricidad'],
+  ['internet', 'expense', 'Wifi'],
+  ['other_expenses', 'expense', 'Otros gastos'],
+  ['fees', 'income', 'Cuotas'],
+  ['grants', 'income', 'Subvenciones'],
+].map(([code, kind, label]) => ({ code, kind, label, custom: false }));
+
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /api/auth/me': [200, { user: ADMIN }],
+    'GET /api/admin/accounting/categories': [200, { items: BUILT_IN }],
     'GET /api/admin/accounting/ledger?month=2026-10': [200, LEDGER],
     'GET /api/admin/accounting/invoices': [200, { items: INVOICES }],
     'GET /api/admin/accounting/years/2026': [
@@ -226,6 +238,65 @@ describe('Contabilidad', () => {
       amount: '6',
       period: shiftMonth(currentMonth(), -1),
     });
+  });
+
+  it('adds the club own categories, renames them and removes the unused ones', async () => {
+    const seguro = { code: 'c_seguro', kind: 'expense', label: 'Seguro', custom: true };
+    const fetch = api({
+      'GET /api/admin/accounting/monthly-categories': [200, { categories: ['fees'] }],
+      'GET /api/admin/accounting/categories': [
+        [200, { items: BUILT_IN }],
+        [200, { items: [...BUILT_IN, seguro] }],
+      ],
+      'POST /api/admin/accounting/categories': [201, seguro],
+      'PUT /api/admin/accounting/categories/c_seguro': [204],
+      'DELETE /api/admin/accounting/categories/c_seguro': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=ajustes');
+
+    const adding = await screen.findByRole('form', { name: 'Añadir categoría' });
+    await userEvent.click(within(adding).getByRole('button', { name: 'Gasto' }));
+    await userEvent.type(within(adding).getByLabelText('Nombre'), 'Seguro');
+    await userEvent.click(within(adding).getByRole('button', { name: 'Añadir' }));
+    expect(await screen.findByText('Categoría añadida')).toBeInTheDocument();
+    const sent = (method: string, url: string) =>
+      JSON.parse(
+        String(
+          fetch.mock.calls.find(([u, init]) => u === url && init?.method === method)?.[1]?.body,
+        ),
+      ) as unknown;
+    expect(sent('POST', '/api/admin/accounting/categories')).toEqual({
+      kind: 'expense',
+      label: 'Seguro',
+    });
+
+    // Las del club se renombran y se quitan; las de serie, no.
+    const own = await screen.findByRole('list', { name: 'Categorías del club' });
+    expect(within(own).getByText('Seguro')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Renombrar Alquiler' })).not.toBeInTheDocument();
+    await userEvent.click(within(own).getByRole('button', { name: 'Renombrar Seguro' }));
+    const name = within(own).getByLabelText('Nuevo nombre de Seguro');
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Seguro del local');
+    await userEvent.click(within(own).getByRole('button', { name: 'Guardar nombre' }));
+    await waitFor(() =>
+      expect(sent('PUT', '/api/admin/accounting/categories/c_seguro')).toEqual({
+        label: 'Seguro del local',
+      }),
+    );
+    await userEvent.click(within(own).getByRole('button', { name: 'Quitar Seguro' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog', { name: /Quitar la categoría/ })).getByRole(
+        'button',
+        { name: 'Quitar' },
+      ),
+    );
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/admin/accounting/categories/c_seguro',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
   });
 
   it('chooses which categories count as of the month', async () => {
