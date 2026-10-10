@@ -171,9 +171,18 @@ describe('profesorado', () => {
     expect(await screen.findByRole('heading', { name: 'Mis clases' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Secciones' });
     expect(within(nav).getByRole('link', { name: /Mis clases/ })).toHaveAttribute('href', '/panel');
-    for (const name of [/Resumen/, /Alumnos$/, /Cobros/, /Profesores/, /Contabilidad/]) {
+    for (const name of [/Resumen/, /Cobros/, /Profesores/, /Contabilidad/, /Puntos/]) {
       expect(within(nav).queryByRole('link', { name })).not.toBeInTheDocument();
     }
+    // Clases y Alumnos del club, de solo lectura.
+    expect(within(nav).getByRole('link', { name: /^Clases/ })).toHaveAttribute(
+      'href',
+      '/panel/clases',
+    );
+    expect(within(nav).getByRole('link', { name: /^Alumnos/ })).toHaveAttribute(
+      'href',
+      '/panel/alumnos',
+    );
     const mobile = screen.getByRole('navigation', { name: 'Secciones móvil' });
     expect(within(mobile).queryByRole('link', { name: /Cobrar/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/no está vinculada/)).not.toBeInTheDocument();

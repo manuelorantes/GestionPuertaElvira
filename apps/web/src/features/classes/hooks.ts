@@ -23,8 +23,8 @@ export function useGroup(id: string) {
   return useQuery({ queryKey: [...GROUPS_KEY, id], queryFn: () => fetchGroup(id) });
 }
 
-export function useTeachers() {
-  return useQuery({ queryKey: TEACHERS_KEY, queryFn: fetchTeachers });
+export function useTeachers(enabled = true) {
+  return useQuery({ queryKey: TEACHERS_KEY, queryFn: fetchTeachers, enabled });
 }
 
 /** Grupos y profesores afectan a cuotas, horas propuestas, rentabilidad y resumen: se refresca todo. */

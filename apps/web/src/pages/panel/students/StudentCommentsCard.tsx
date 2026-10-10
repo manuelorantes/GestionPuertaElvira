@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { removeComment, rewriteComment } from '@/features/class-comments/api';
 import { useCommentChange, useStudentComments } from '@/features/class-comments/hooks';
 import { Card } from '@/shared/ui/Card';
@@ -21,6 +22,7 @@ export function StudentCommentsCard({
     rewriteComment(id, text),
   );
   const remove = useCommentChange(removeComment);
+  const canManage = useCanManageClub();
   return (
     <Card className="p-4">
       {title('Comentarios de las clases')}
@@ -33,7 +35,7 @@ export function StudentCommentsCard({
           label="Comentarios de las clases"
           comments={comments.data}
           show={{ date: true, group: true }}
-          canEdit={() => true}
+          canEdit={() => canManage}
           onRewrite={(id, text) =>
             rewrite.mutateAsync({ id, text }).then(() => toast('Comentario cambiado'))
           }

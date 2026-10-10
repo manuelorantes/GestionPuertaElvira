@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { formatCents } from '@/features/billing/money';
 import { orderLabel } from '@/features/equipment/labels';
 import { useOrders } from '@/features/equipment/hooks';
@@ -23,6 +24,7 @@ export function StudentMaterialCard({
   const orders = useOrders({ open: false, studentId });
   const [dialog, setDialog] = useState<MaterialDialog>(null);
   const [billing, setBilling] = useState<BillingDialog>(null);
+  const canManage = useCanManageClub();
   const items = orders.data ?? [];
 
   return (
@@ -50,7 +52,7 @@ export function StudentMaterialCard({
                 </span>
               </span>
               <OrderBadges order={order} />
-              {order.status === 'ordered' && order.chargeId && (
+              {order.status === 'ordered' && order.chargeId && canManage && (
                 <button
                   type="button"
                   onClick={() =>
@@ -70,15 +72,20 @@ export function StudentMaterialCard({
           ))}
         </ul>
       )}
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <Button variant="secondary" onClick={() => setDialog({ type: 'order' })}>
-          <Plus aria-hidden size={16} />
-          Apuntar pedido
-        </Button>
-        <Link to="/panel/cobros?pestana=material" className="text-[13px] font-semibold text-brand">
-          Ver en Material deportivo
-        </Link>
-      </div>
+      {canManage && (
+        <div className="mt-3 flex items-center justify-between gap-3">
+          <Button variant="secondary" onClick={() => setDialog({ type: 'order' })}>
+            <Plus aria-hidden size={16} />
+            Apuntar pedido
+          </Button>
+          <Link
+            to="/panel/cobros?pestana=material"
+            className="text-[13px] font-semibold text-brand"
+          >
+            Ver en Material deportivo
+          </Link>
+        </div>
+      )}
       <MaterialDialogs dialog={dialog} onClose={() => setDialog(null)} studentId={studentId} />
       <BillingDialogs dialog={billing} onChange={setBilling} />
     </Card>
