@@ -378,6 +378,7 @@ describe('Alumnos', () => {
       hasPrivateLessons: false,
       membershipPaid: false,
       membershipFeeCents: 5000,
+      membershipCharge: { id: 'c-socio', pendingCents: 5000 },
       charges: [],
       balanceCents: 0,
       materialCharges: [],
@@ -404,6 +405,33 @@ describe('Alumnos', () => {
               totalCents: 4050,
               invoiceNumber: null,
             },
+            // Con muchos cobros, la cuota de socio (la más antigua) también sale.
+            ...['2026-10', '2026-11', '2026-12', '2027-01', '2027-02', '2027-03'].map(
+              (period, i) => ({
+                id: `p-${period}`,
+                receiptNumber: `R-2026-01${i}`,
+                paidOn: '2026-09-02',
+                studentId: 's1',
+                studentName: 'Martina López Herrera',
+                kind: 'monthly',
+                concept: monthLabel(period),
+                method: 'cash',
+                totalCents: 4500,
+                invoiceNumber: null,
+              }),
+            ),
+            {
+              id: 'p0',
+              receiptNumber: 'R-2026-0000',
+              paidOn: '2026-09-01',
+              studentId: 's1',
+              studentName: 'Martina López Herrera',
+              kind: 'membership',
+              concept: 'Cuota de socio 2026/27',
+              method: 'cash',
+              totalCents: 5000,
+              invoiceNumber: null,
+            },
           ],
         },
       ],
@@ -412,6 +440,7 @@ describe('Alumnos', () => {
 
     const history = await screen.findByRole('list', { name: 'Historial de cobros' });
     expect(within(history).getByText('Septiembre 2026')).toBeInTheDocument();
+    expect(within(history).getByText('Cuota de socio 2026/27')).toBeInTheDocument();
     expect(within(history).getByText('40,50 €')).toBeInTheDocument();
     expect(screen.getByText('2 h semanales')).toBeInTheDocument();
     expect(screen.getByText('Sí, por familia directa')).toBeInTheDocument();
@@ -526,6 +555,7 @@ describe('Alumnos', () => {
       hasPrivateLessons: false,
       membershipPaid: true,
       membershipFeeCents: 5000,
+      membershipCharge: { id: 'c-socio', pendingCents: 0 },
       charges: [
         {
           id: 'c9',
@@ -571,6 +601,10 @@ describe('Alumnos', () => {
 
     const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
     expect(within(season).getByText('Faltan 30 €')).toBeInTheDocument();
+    // La cuota de socio, con las del mes.
+    const membership = within(season).getByText('Cuota de socio').closest('li');
+    expect(membership).toHaveTextContent('50 €');
+    expect(membership).toHaveTextContent('Cobrada');
     expect(within(season).getByText('Fijada a mano · Cambio de tarifa')).toBeInTheDocument();
     expect(within(season).getByText('−10 % familia · −10 % pago adelantado')).toBeInTheDocument();
 
