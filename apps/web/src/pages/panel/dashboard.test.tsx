@@ -19,6 +19,7 @@ const SUMMARY = {
   collectedCents: 412000,
   expectedCents: 658000,
   pendingCents: 246000,
+  membershipPendingCents: 275000,
   expensesCents: 118000,
   activeStudents: 157,
   registeredStudents: 170,
@@ -79,6 +80,10 @@ describe('Resumen', () => {
     expect(screen.getByText('4120 €')).toBeInTheDocument();
     expect(screen.getByText('de 6580 € previstos')).toBeInTheDocument();
     expect(screen.getByText('2460 €')).toBeInTheDocument();
+    // Las cuotas de socio pendientes, aparte de las del mes.
+    expect(
+      screen.getByText('Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio'),
+    ).toBeInTheDocument();
     expect(screen.getByText('157')).toBeInTheDocument();
     const chartFigure = screen.getByRole('img', {
       name: /Ingresos y gastos de la temporada, de septiembre a agosto/,
