@@ -46,6 +46,16 @@ los cobros. Los movimientos de otro mes MUST indicarlo («Corresponde a septiemb
 - **THEN** el movimiento sale en octubre con «Corresponde a septiembre 2026», y en el resumen cuenta como gasto de
   septiembre en «Lo que corresponde a cada mes»
 
+### Requirement: Categorías del club
+En «Ajustes», administración MUST poder añadir categorías propias de ingresos o de gastos, renombrarlas y quitarlas
+mientras ningún movimiento las use. Las de serie no se renombran ni se quitan. No MAY haber dos categorías con el mismo
+nombre dentro de los ingresos ni dentro de los gastos. Las del club salen en los desplegables de apuntes y facturas y
+se pueden marcar como «del mes».
+
+#### Scenario: Categoría con movimientos
+- **WHEN** administración intenta quitar la categoría «Seguro», que ya usa un apunte
+- **THEN** no se quita y se explica que tiene movimientos
+
 ### Requirement: Categorías del mes
 En la pestaña «Ajustes», administración MUST poder marcar qué categorías de ingresos y gastos cuentan como «del mes»
 (las que salen en la gráfica «Lo que corresponde a cada mes» del resumen). Por defecto: en ingresos, Cuotas; en gastos,
