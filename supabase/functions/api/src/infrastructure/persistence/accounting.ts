@@ -5,6 +5,7 @@ import {
   CategoryCatalog,
   type EntryKind,
   FiscalYear,
+  type LedgerCorrection,
   ManualEntry,
   ManualEntryId,
   methodFromName,
@@ -18,6 +19,7 @@ import type {
   AccountingSettingsRepository,
   InvoiceQuery,
   InvoiceView,
+  LedgerCorrections,
   LedgerLine,
   LedgerQuery,
   ManualEntryRepository,
@@ -33,7 +35,8 @@ export class SqlAccountingRepository
     SupplierInvoiceRepository,
     SeasonClosingRepository,
     AccountingSettingsRepository,
-    AccountingCategoryRepository {
+    AccountingCategoryRepository,
+    LedgerCorrections {
   constructor(private readonly sql: Sql) {}
 
   async catalog(): Promise<CategoryCatalog> {
@@ -54,10 +57,21 @@ export class SqlAccountingRepository
       ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label`;
   }
 
+  async saveCorrection(c: LedgerCorrection): Promise<void> {
+    await this.sql`INSERT INTO accounting_correction
+      (source, source_id, concept, category, method, amount_cents, period)
+      VALUES (${c.source}, ${c.sourceId}, ${c.concept}, ${c.category}, ${c.method},
+              ${c.amount.cents}, ${c.period.toString()})
+      ON CONFLICT (source, source_id) DO UPDATE SET concept = EXCLUDED.concept,
+        category = EXCLUDED.category, method = EXCLUDED.method,
+        amount_cents = EXCLUDED.amount_cents, period = EXCLUDED.period`;
+  }
+
   async categoryInUse(code: string): Promise<boolean> {
     const rows = await this.sql`SELECT
       EXISTS (SELECT 1 FROM accounting_entry WHERE category = ${code})
-      OR EXISTS (SELECT 1 FROM accounting_invoice WHERE category = ${code}) AS used`;
+      OR EXISTS (SELECT 1 FROM accounting_invoice WHERE category = ${code})
+      OR EXISTS (SELECT 1 FROM accounting_correction WHERE category = ${code}) AS used`;
     return new Row(rows[0] ?? {}).bool('used');
   }
 
@@ -97,7 +111,8 @@ export class SqlAccountingRepository
     await this
       .sql`INSERT INTO accounting_entry (id, entry_date, kind, concept, category, method, amount_cents, period)
       VALUES (${e.id.value}, ${e.date.toString()}, ${e.kind}, ${e.concept}, ${e.category}, ${e.method}, ${e.amount.cents}, ${e.period.toString()})
-      ON CONFLICT (id) DO NOTHING`;
+      ON CONFLICT (id) DO UPDATE SET concept = EXCLUDED.concept, category = EXCLUDED.category,
+        method = EXCLUDED.method, amount_cents = EXCLUDED.amount_cents, period = EXCLUDED.period`;
   }
 
   async deleteEntry(id: ManualEntryId): Promise<void> {
@@ -153,6 +168,10 @@ export class SqlAccountingRepository
       ON CONFLICT (id) DO UPDATE SET ${
       this.sql(
         record,
+        'concept',
+        'category',
+        'amount_cents',
+        'period',
         'paid_on',
         'method',
         'attachment_key',
@@ -232,7 +251,13 @@ export class SqlLedgerQuery implements LedgerQuery {
   async linesBetween(first: YearMonth, last: YearMonth): Promise<LedgerLine[]> {
     const from = first.firstDay().toString();
     const to = last.lastDay().toString();
+    // Lo que viene de Cobros y Profesorado sale con su corrección en contabilidad, si la tiene.
     const rows = await this.sql`
+      SELECT u.source, u.source_id, u.date, u.kind,
+             COALESCE(c.concept, u.concept) AS concept, COALESCE(c.category, u.category) AS category,
+             COALESCE(c.method, u.method) AS method, COALESCE(c.amount_cents, u.amount) AS amount,
+             u.student_id, COALESCE(c.period, u.period) AS period, c.source IS NOT NULL AS corrected
+        FROM (
       SELECT 'payment' AS source, p.id::text AS source_id, p.paid_on::text AS date, 'income' AS kind,
              p.concept || ' · ' || s.full_name AS concept,
              CASE p.kind WHEN 'membership' THEN 'membership' WHEN 'material' THEN 'material_sales' ELSE 'fees' END AS category, p.method, p.total_cents AS amount,
@@ -262,7 +287,9 @@ export class SqlLedgerQuery implements LedgerQuery {
       SELECT 'manual', e.id::text, e.entry_date::text, e.kind, e.concept, e.category, e.method, e.amount_cents, NULL,
              COALESCE(e.period, to_char(e.entry_date, 'YYYY-MM'))
         FROM accounting_entry e
-       WHERE e.entry_date BETWEEN ${from} AND ${to}`;
+       WHERE e.entry_date BETWEEN ${from} AND ${to}
+        ) u
+        LEFT JOIN accounting_correction c ON c.source = u.source AND c.source_id = u.source_id`;
     return Row.all(rows).map((r) => ({
       source: r.string('source'),
       sourceId: r.string('source_id'),
@@ -274,6 +301,7 @@ export class SqlLedgerQuery implements LedgerQuery {
       amountCents: r.int('amount'),
       studentId: r.nullableString('student_id'),
       period: r.string('period'),
+      corrected: r.bool('corrected'),
     }));
   }
 }

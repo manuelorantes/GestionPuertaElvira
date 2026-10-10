@@ -8,6 +8,7 @@ import {
   DeleteInvoice,
   DocumentNotFound,
   type DocumentStorage,
+  EditMovement,
   FiscalYearSummary,
   GetMonthlyCategories,
   ListCategories,
@@ -29,7 +30,8 @@ import {
   SqlInvoiceQuery,
   SqlLedgerQuery,
 } from '../persistence/accounting.ts';
-import { SqlClosedPeriods } from '../persistence/billing.ts';
+import { SqlClosedPeriods, SqlPaymentRepository } from '../persistence/billing.ts';
+import { ChangePaymentMethod } from '../../application/billing/mod.ts';
 
 /** El tipo se deduce del contenido, no de lo que declare el navegador. */
 export function sniffMimeType(bytes: Uint8Array): string {
@@ -82,6 +84,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     InvoiceAlreadyPaid: [409, 'invoice_paid'],
     InvoiceAlreadyPaidCannotBeDeleted: [409, 'invoice_paid'],
     CategoryInUse: [409, 'category_in_use'],
+    MovementNotFound: [404, 'not_found'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, upload = false) => ({
     method,
@@ -132,6 +135,26 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
       period: b.optionalString('period'),
     });
     return c.json({ id }, 201);
+  });
+
+  // Editar un movimiento del libro: el «source» y «sourceId» van en el cuerpo (los de Profesorado llevan «/»).
+  api.defineRoute(admin('PUT', '/api/admin/accounting/movements'), async (c, scope) => {
+    const b = await JsonBody.from(c.req.raw);
+    const { accounting, closed, ledger } = repos(scope);
+    const payments = new SqlPaymentRepository(scope.tx);
+    await new EditMovement(accounting, accounting, closed, accounting, ledger, accounting, {
+      changePaymentMethod: (id, method) => new ChangePaymentMethod(payments).execute(id, method),
+    }).execute({
+      source: b.requiredString('source'),
+      sourceId: b.requiredString('sourceId'),
+      month: b.requiredString('month'),
+      concept: b.requiredString('concept'),
+      category: b.requiredString('category'),
+      method: b.requiredString('method'),
+      amount: b.requiredString('amount'),
+      period: b.requiredString('period'),
+    });
+    return c.body(null, 204);
   });
 
   api.defineRoute(admin('DELETE', '/api/admin/accounting/entries/:id'), async (c, scope) => {
