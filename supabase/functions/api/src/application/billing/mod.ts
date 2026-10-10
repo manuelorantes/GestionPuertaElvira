@@ -1403,3 +1403,79 @@ export class SetChargeDiscount {
     await this.charges.saveCharge(charge);
   }
 }
+
+export const CHAINED_DISCOUNT_REASON = 'Error en el cálculo de varios descuentos';
+export const CHAINED_DISCOUNT_EXTRA_CONCEPT = 'Extra por error en el cálculo de varios descuentos';
+
+/**
+ * Deshace unas cuotas en las que el descuento familiar y el de pago adelantado se aplicaron en cadena en vez de
+ * sumarse (importadas así de la hoja): cada cuota pasa al importe con los descuentos sumados y con su porcentaje de
+ * pago adelantado apuntado; a cada recibo que la cubría se le descuenta la diferencia con una línea de corrección, y lo
+ * cobrado de más se registra aparte, en un solo cobro con el concepto de extra, que queda como saldo a favor.
+ */
+export class UnchainDiscounts {
+  constructor(
+    private readonly directory: StudentDirectory,
+    private readonly settings: BillingSettingsRepository,
+    private readonly charges: ChargeRepository,
+    private readonly payments: PaymentRepository,
+    private readonly sequence: DocumentSequence,
+    private readonly closed: ClosedPeriods,
+    private readonly clock: Clock,
+    private readonly locks: Locks,
+  ) {}
+
+  /** @returns lo cobrado de más que se ha separado (0 si no había nada cobrado). */
+  async execute(studentId: string, months: string[], percent: number): Promise<Money> {
+    const ref = StudentRef.fromString(studentId);
+    await this.locks.acquire(`billing:student:${ref.value}`);
+    if (!Number.isInteger(percent) || percent <= 0 || percent >= 100) {
+      throw new InvalidValue('percent', 'El descuento por pago adelantado no es válido.');
+    }
+    const today = LocalDate.fromInstant(this.clock.now());
+    const student = await this.directory.find(ref, today);
+    if (student === null) throw new BillingStudentNotFound();
+    const family = student.hasSiblings ? (await this.settings.get()).tariff.familyPercent : 0;
+    let extra = Money.zero();
+    let first: Payment | null = null;
+    for (const month of months) {
+      const charge = await this.charges.chargeFor(ref, 'monthly', YearMonth.fromString(month));
+      if (charge === null || charge.isManual()) continue;
+      const before = charge.amount;
+      // La cuota de un mes antes del pago adelantado en cadena: la que lleva solo el descuento familiar.
+      const fee = Money.cents(Math.round((before.cents * 100) / (100 - percent)));
+      charge.setDiscount(percent, fee, family);
+      const difference = before.minus(charge.amount);
+      if (difference.cents <= 0) continue;
+      await this.charges.saveCharge(charge);
+      const paidBy = charge.paidBy();
+      if (paidBy === null) continue;
+      const payment = await this.payments.payment(paidBy);
+      if (payment === null) continue;
+      const taken = difference.cents > payment.total.cents ? payment.total : difference;
+      payment.correctTotal(payment.total.minus(taken), CHAINED_DISCOUNT_REASON);
+      await this.payments.savePayment(payment);
+      extra = extra.plus(taken);
+      first ??= payment;
+    }
+    if (first === null || extra.cents === 0) return Money.zero();
+    await PeriodClosed.guard(this.closed, first.paidOn);
+    const season = Season.containing(YearMonth.of(first.paidOn));
+    await this.payments.savePayment(Payment.register({
+      id: PaymentId.generate(),
+      student: ref,
+      paidOn: first.paidOn,
+      method: first.method,
+      receipt: DocumentNumber.receipt(
+        season.startYear,
+        await this.sequence.next('R', season.startYear),
+      ),
+      kind: 'monthly',
+      concept: CHAINED_DISCOUNT_EXTRA_CONCEPT,
+      lines: [new QuoteLine(CHAINED_DISCOUNT_EXTRA_CONCEPT, extra)],
+      total: extra,
+      periods: months.map((m) => YearMonth.fromString(m)),
+    }));
+    return extra;
+  }
+}

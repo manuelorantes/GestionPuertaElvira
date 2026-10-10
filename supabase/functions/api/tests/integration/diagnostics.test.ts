@@ -335,3 +335,88 @@ Deno.test({
     assertEquals(diagnosis.items.length, diagnosis.run?.openCount);
   },
 });
+
+Deno.test({
+  name:
+    'diagnostics should unchain family and prepayment discounts, correcting receipts and separating the extra',
+  ignore: outsideSeason,
+  async fn() {
+    await resetDatabase();
+    await createUser('junta@club.es');
+    const client = new ApiClient();
+    await client.logIn('junta@club.es');
+    const teacher = await newTeacher(client, 'Lucía Moreno Gil');
+    const group = await newGroup(client, teacher);
+    const newStudent = async (fullName: string) =>
+      body<{ id: string }>(
+        await client.json('POST', '/api/admin/students', {
+          fullName,
+          birthDate: '2016-05-01',
+          guardians: [{ name: 'Francisco', phone: '608002669' }],
+          imageConsent: false,
+          groupIds: [group],
+        }),
+      ).id;
+    const irene = await newStudent('Irene Pérez Soto');
+    const mario = await newStudent('Mario Pérez Soto');
+    assertEquals(
+      (await client.json('POST', `/api/admin/students/${irene}/siblings`, { siblingId: mario }))
+        .status,
+      204,
+    );
+    // Irene paga el mes (2 h con familia: 40,50 €) y después se deja la cuota y el recibo como en la hoja: 32,40 €.
+    const registered = await client.json('POST', '/api/admin/billing/payments', {
+      studentId: irene,
+      kind: 'monthly',
+      months: 1,
+      method: 'cash',
+      date: today.toString(),
+    });
+    assertEquals(registered.status, 201, JSON.stringify(registered.body));
+    const receipt = body<{ id: string }>(registered).id;
+    await db()`UPDATE billing_charge SET amount_cents = 3240, discount_percent = 0
+      WHERE student_id = ${irene} AND kind = 'monthly' AND period = ${month.toString()}`;
+    await db()`UPDATE billing_payment SET total_cents = 3240, credit_cents = 3240,
+        lines = '[{"label":"Importado de la hoja","amountCents":3240}]'
+      WHERE id = ${receipt}`;
+
+    const first = await diagnose(client);
+    const finding = byRule(first, 'chained_discounts')[0];
+    assert(finding, 'falta el hallazgo de descuentos en cadena');
+    assertEquals(finding.entity.id, irene);
+    assertEquals(byRule(first, 'fee_mismatch').filter((f) => f.entity.id === irene), []);
+    assertEquals(
+      (await client.json('POST', `/api/admin/diagnostics/findings/${finding.id}/accept`)).status,
+      204,
+    );
+
+    const account = body<{
+      charges: { period: string; amountCents: number; discountPercent: number; status: string }[];
+      balanceCents: number;
+    }>(await client.get(`/api/admin/billing/accounts/${irene}`));
+    const charge = account.charges.find((c) => c.period === month.toString());
+    assertEquals([charge?.amountCents, charge?.discountPercent, charge?.status], [
+      3150,
+      20,
+      'paid',
+    ]);
+    assertEquals(account.balanceCents, 90, 'el extra queda como saldo a favor');
+
+    const payments = body<{ items: { id: string; concept: string; totalCents: number }[] }>(
+      await client.get(`/api/admin/billing/payments?studentId=${irene}`),
+    ).items;
+    assertEquals(payments.find((p) => p.id === receipt)?.totalCents, 3150);
+    const extra = payments.find((p) =>
+      p.concept === 'Extra por error en el cálculo de varios descuentos'
+    );
+    assertEquals(extra?.totalCents, 90);
+    const detail = body<{ lines: { label: string; amountCents: number }[] }>(
+      await client.get(`/api/admin/billing/payments/${receipt}`),
+    );
+    assertEquals(detail.lines.at(-1), {
+      label: 'Corrección: Error en el cálculo de varios descuentos',
+      amountCents: -90,
+    });
+    assertEquals(byRule(await diagnose(client), 'chained_discounts'), []);
+  },
+});

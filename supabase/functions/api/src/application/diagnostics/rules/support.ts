@@ -54,3 +54,28 @@ export function discountedFee(student: FactStudent, prepaymentPercent: number): 
 }
 
 export const isActive = (student: FactStudent): boolean => student.status === 'active';
+
+/**
+ * Si el importe de una cuota es el de aplicar el descuento familiar y después uno de pago adelantado (en cadena) en
+ * vez de sumarlos: el porcentaje de pago adelantado y lo que debería valer. Solo tiene sentido con familia y tramo.
+ */
+export function chainedPrepayment(
+  student: FactStudent,
+  amountCents: number,
+  percents: readonly number[],
+): { percent: number; additiveCents: number; chainedCents: number } | null {
+  if (!student.familyDiscount || student.tierCents <= 0 || student.privateLessonsCents > 0) {
+    return null;
+  }
+  const family = student.familyPercent;
+  for (const percent of percents) {
+    const chainedCents = Math.round(
+      (student.tierCents * (100 - family) * (100 - percent)) / 10000,
+    );
+    const additiveCents = Math.round((student.tierCents * (100 - family - percent)) / 100);
+    if (amountCents === chainedCents && chainedCents !== additiveCents) {
+      return { percent, additiveCents, chainedCents };
+    }
+  }
+  return null;
+}
