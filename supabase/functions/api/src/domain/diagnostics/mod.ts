@@ -6,6 +6,7 @@ export type Severity = 'money' | 'club' | 'form';
 
 export type RuleCode =
   | 'fee_mismatch'
+  | 'chained_discounts'
   | 'generic_category'
   | 'invoice_duplicates_entry'
   | 'teacher_expense_as_entry'
@@ -38,6 +39,12 @@ export interface RuleDefinition {
 /** Las reglas, en el orden en que se muestran: primero el dinero, luego los datos del club y al final la forma. */
 export const RULE_CATALOGUE: readonly RuleDefinition[] = [
   { code: 'fee_mismatch', title: 'Cuota distinta de la tarifa', severity: 'money', hasFix: true },
+  {
+    code: 'chained_discounts',
+    title: 'Descuentos aplicados en cadena',
+    severity: 'money',
+    hasFix: true,
+  },
   {
     code: 'generic_category',
     title: 'Gasto en una categoría genérica que tiene la suya',
@@ -199,6 +206,7 @@ function canonicalJson(data: FindingData): string {
 export type Fix =
   | { kind: 'reprice_charge'; studentId: string; month: string }
   | { kind: 'note_discount'; studentId: string; month: string; percent: number }
+  | { kind: 'unchain_discounts'; studentId: string; months: string[]; percent: number }
   | { kind: 'link_family'; a: string; b: string }
   | { kind: 'set_enrolment_start'; studentId: string; groupIds: string[]; date: string }
   | { kind: 'own_phone_from_guardian'; studentId: string }

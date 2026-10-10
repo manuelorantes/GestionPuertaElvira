@@ -9,7 +9,12 @@ import {
   EntryNotFound,
   SupplierInvoiceNotFound,
 } from '../../application/accounting/mod.ts';
-import { decimal, NoteChargeDiscount, SetChargeDiscount } from '../../application/billing/mod.ts';
+import {
+  decimal,
+  NoteChargeDiscount,
+  SetChargeDiscount,
+  UnchainDiscounts,
+} from '../../application/billing/mod.ts';
 import { ChangeEnrolmentStart } from '../../application/classes/mod.ts';
 import type { FixExecutor } from '../../application/diagnostics/mod.ts';
 import { RecordAdvance } from '../../application/payroll/mod.ts';
@@ -27,6 +32,8 @@ import {
   SqlBillingSettingsRepository,
   SqlChargeRepository,
   SqlClosedPeriods,
+  SqlDocumentSequence,
+  SqlPaymentRepository,
   SqlStudentAccountRepository,
   SqlStudentDirectory,
 } from '../persistence/billing.ts';
@@ -36,7 +43,7 @@ import {
   SqlSettlementRepository,
   SqlTeacherRates,
 } from '../persistence/payroll.ts';
-import { SavepointTransactionRunner } from '../persistence/sql.ts';
+import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
 import { SqlStudentQuery, SqlStudentRepository } from '../persistence/students.ts';
 
 export class UseCaseFixExecutor implements FixExecutor {
@@ -55,6 +62,8 @@ export class UseCaseFixExecutor implements FixExecutor {
           fix.month,
           fix.percent,
         );
+      case 'unchain_discounts':
+        return await this.unchainDiscounts(fix.studentId, fix.months, fix.percent);
       case 'link_family':
         return await this.linkFamily(fix.a, fix.b);
       case 'set_enrolment_start':
@@ -100,6 +109,19 @@ export class UseCaseFixExecutor implements FixExecutor {
       charges,
       this.clock,
     ).execute(studentId, month, charge?.discountPercent() ?? 0);
+  }
+
+  private async unchainDiscounts(studentId: string, months: string[], percent: number) {
+    await new UnchainDiscounts(
+      new SqlStudentDirectory(this.tx),
+      new SqlBillingSettingsRepository(this.tx),
+      new SqlChargeRepository(this.tx),
+      new SqlPaymentRepository(this.tx),
+      new SqlDocumentSequence(this.tx),
+      new SqlClosedPeriods(this.tx),
+      this.clock,
+      new PostgresAdvisoryLocks(this.tx),
+    ).execute(studentId, months, percent);
   }
 
   private async linkFamily(a: string, b: string): Promise<void> {

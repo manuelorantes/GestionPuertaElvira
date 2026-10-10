@@ -2,12 +2,22 @@
 import { Money } from '../../../domain/common/mod.ts';
 import { prepaymentIn } from '../../../domain/billing/mod.ts';
 import type { Candidate, FactCharge, Facts, FactStudent, Rule } from '../facts.ts';
-import { discountedFee, euros, hoursLabel, isActive, monthLabel, studentRef } from './support.ts';
+import {
+  chainedPrepayment,
+  discountedFee,
+  euros,
+  hoursLabel,
+  isActive,
+  monthLabel,
+  studentRef,
+} from './support.ts';
 
 const monthlyOf = (facts: Facts, student: FactStudent): FactCharge[] =>
   facts.charges.filter((c) => c.studentId === student.id && c.kind === 'monthly');
 
 const live = (charge: FactCharge): boolean => charge.status !== 'cancelled';
+
+const percentsOf = (facts: Facts): number[] => facts.prepayments.map((p) => p.percent);
 
 const PROPOSAL_FIX_FROM_RECORD =
   'Inscribirlo en su grupo o darlo de baja desde su ficha; el diagnóstico dejará de mostrarlo solo.';
@@ -23,6 +33,8 @@ export const feeMismatch: Rule = (facts) => {
     for (const charge of monthlyOf(facts, student)) {
       if (charge.manual || !live(charge)) continue;
       if (!facts.seasonMonths.includes(charge.period)) continue;
+      // Los descuentos aplicados en cadena son de la regla siguiente.
+      if (chainedPrepayment(student, charge.amountCents, percentsOf(facts)) !== null) continue;
       const unnoted = unnotedPrepayment(facts, student, charge);
       if (unnoted !== null) {
         found.push(unnoted);
@@ -106,6 +118,51 @@ function feeExplanation(student: FactStudent, charge: FactCharge, expected: numb
     euros(student.tierCents)
   })${privateLessons}${withDiscounts}: le corresponden ${euros(expected)}.`;
 }
+
+export const CHAINED_EXTRA_CONCEPT = 'Extra por error en el cálculo de varios descuentos';
+
+/**
+ * Regla «Descuentos aplicados en cadena»: cuotas de la temporada (también pasadas y cobradas) cuyo importe sale de
+ * aplicar el descuento familiar y después el de pago adelantado, en vez de sumarlos. Un hallazgo por alumno.
+ */
+export const chainedDiscounts: Rule = (facts) =>
+  facts.students.filter((s) => isActive(s) && s.familyDiscount).flatMap((student): Candidate[] => {
+    const matches = monthlyOf(facts, student)
+      .filter((c) => !c.manual && live(c) && facts.seasonMonths.includes(c.period))
+      .flatMap((c) => {
+        const chained = chainedPrepayment(student, c.amountCents, percentsOf(facts));
+        return chained === null ? [] : [{ charge: c, ...chained }];
+      })
+      .sort((a, b) => a.charge.period.localeCompare(b.charge.period));
+    const first = matches[0];
+    if (!first) return [];
+    const extraCents = matches.reduce((sum, m) => sum + m.charge.amountCents - m.additiveCents, 0);
+    const paidExtraCents = matches.reduce(
+      (sum, m) =>
+        sum + Math.max(0, Math.min(m.charge.coveredCents, m.charge.amountCents) - m.additiveCents),
+      0,
+    );
+    const months = matches.map((m) => m.charge.period);
+    const total = student.familyPercent + first.percent;
+    return [{
+      rule: 'chained_discounts',
+      entity: studentRef(student),
+      data: { months: months.join(','), percent: first.percent, extraCents },
+      explanation: `En ${matches.length} ${matches.length === 1 ? 'cuota' : 'cuotas'} (${
+        months.map(monthLabel).join(', ')
+      }) se aplicó el ${student.familyPercent} % familiar y después el ${first.percent} % de pago adelantado (${
+        euros(first.chainedCents)
+      }), en vez de sumarlos (${total} %: ${euros(first.additiveCents)}). Son ${
+        euros(extraCents)
+      } de más${paidExtraCents > 0 ? `, de los que ya ha pagado ${euros(paidExtraCents)}` : ''}.`,
+      proposal: `Dejar cada cuota en ${
+        euros(first.additiveCents)
+      } con el ${first.percent} % apuntado, descontar la diferencia de cada recibo (línea «Corrección») y registrar aparte un cobro de ${
+        euros(paidExtraCents)
+      } con el concepto «${CHAINED_EXTRA_CONCEPT}», que queda como saldo a favor.`,
+      fix: { kind: 'unchain_discounts', studentId: student.id, months, percent: first.percent },
+    }];
+  });
 
 /** Regla 2: alumno activo sin grupos con cuotas del mes en curso o futuras. */
 export const chargeWithoutGroup: Rule = (facts) =>
@@ -213,6 +270,7 @@ export const enrolmentAfterPayment: Rule = (facts) =>
 
 export const feeRules: readonly Rule[] = [
   feeMismatch,
+  chainedDiscounts,
   chargeWithoutGroup,
   paidButNoGroup,
   memberNeverPaid,

@@ -60,10 +60,18 @@ cerrado no se vuelve a aceptar ni a descartar.
   y el hallazgo sale en «Aceptados»
 
 #### Scenario: Pago adelantado sin apuntar
-- **WHEN** Mario tiene 2 h con descuento familiar (40,50 €) y su cuota importada de noviembre es de 32,40 € sin
-  porcentaje apuntado
+- **WHEN** Mario tiene 2 h con descuento familiar (40,50 €) y su cuota importada de noviembre es de 31,50 € (45 € con
+  el 10 % familiar y el 20 % de temporada sumados) sin porcentaje apuntado
 - **THEN** el hallazgo explica que lleva un 20 % de pago adelantado sin apuntar y, al aceptarlo, la cuota queda en
-  32,40 € con el 20 % apuntado y su ficha muestra «−10 % familia · −20 % pago adelantado»
+  31,50 € con el 20 % apuntado y su ficha muestra «−10 % familia · −20 % pago adelantado»
+
+#### Scenario: Descuentos aplicados en cadena
+- **WHEN** Irene tiene 2 h con descuento familiar (40,50 €) y sus diez cuotas de la temporada, cobradas, son de
+  32,40 € (40,50 € − 20 %, en vez de 45 € − 30 % = 31,50 €)
+- **THEN** sale «Descuentos aplicados en cadena» con 9 € de más; al aceptarlo, cada cuota pasa a 31,50 € con el 20 %
+  apuntado, cada recibo baja 0,90 € con la línea «Corrección: Error en el cálculo de varios descuentos» y se
+  registra un cobro aparte de 9 € con el concepto «Extra por error en el cálculo de varios descuentos», que su ficha
+  muestra como saldo a favor
 
 #### Scenario: Los datos cambiaron
 - **WHEN** administración acepta un hallazgo cuyo caso ha cambiado desde el diagnóstico
@@ -87,9 +95,16 @@ Dinero:
    ya cobradas. La explicación muestra horas, tarifa, particulares, descuentos y los dos importes. Arreglo:
    ajustar la cuota al importe calculado (lo cobrado se reparte de nuevo; la diferencia queda pendiente o a favor).
    Si la cuota no tiene apuntado el pago adelantado y su importe es la cuota de un mes con uno de los porcentajes de
-   la tarifa (sumado al familiar o aplicado encima, como hacía la hoja), el hallazgo propone apuntar ese porcentaje
-   sin cambiar el importe, también en los meses ya pasados. Solo si el alumno tiene al menos los meses que pide ese
-   descuento (3, 6 o 9) con ese mismo importe y sin porcentaje apuntado; si no, es un importe equivocado.
+   la tarifa sumado al familiar, el hallazgo propone apuntar ese porcentaje sin cambiar el importe, también en los
+   meses ya pasados. Solo si el alumno tiene al menos los meses que pide ese descuento (3, 6 o 9) con ese mismo
+   importe y sin porcentaje apuntado; si no, es un importe equivocado.
+1b. **Descuentos aplicados en cadena**: cuotas de la temporada (también pasadas y cobradas) de un alumno con descuento
+   familiar cuyo importe sale de aplicar el familiar y después uno de los porcentajes de pago adelantado, en vez de
+   sumarlos (45 € − 10 % − 20 % = 32,40 € en vez de 45 € − 30 % = 31,50 €). Un hallazgo por alumno, con lo cobrado de
+   más. Arreglo: cada cuota pasa al importe con los descuentos sumados y con el porcentaje apuntado; a cada recibo que
+   la cubría se le descuenta la diferencia con una línea «Corrección: Error en el cálculo de varios descuentos»; y lo
+   cobrado de más se registra en un único cobro aparte, en la fecha y forma de pago del primero, con el concepto
+   «Extra por error en el cálculo de varios descuentos», que queda como saldo a favor del alumno.
 2. **Gasto en una categoría genérica que tiene la suya**: apunte manual de gasto o factura en «Otros gastos» o
    «Suministros» cuyo concepto habla de limpieza, presidente, luz o electricidad, agua, internet, wifi, fibra o Digi,
    alquiler o comunidad, cuando el club tiene esa categoría. Arreglo: cambiar la categoría.

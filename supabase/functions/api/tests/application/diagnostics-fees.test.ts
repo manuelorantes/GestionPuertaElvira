@@ -54,12 +54,12 @@ Deno.test('fee_mismatch should keep the prepayment discount noted in the charge 
   const facts = factsWith({
     students: [irene, baja],
     charges: [
-      // 45 € con 10 % familiar y 20 % de temporada sumados: 31,50 €; estaba a 32,40 €.
+      // 45 € con 10 % familiar y 20 % de temporada sumados: 31,50 €; estaba a 33 € (importe equivocado).
       charge({
         studentId: 'irene',
         period: '2026-12',
-        amountCents: 3240,
-        coveredCents: 3240,
+        amountCents: 3300,
+        coveredCents: 3300,
         status: 'paid',
         discountPercent: 20,
       }),
@@ -80,7 +80,7 @@ Deno.test('fee_mismatch should keep the prepayment discount noted in the charge 
   const found = ofRule(facts, 'fee_mismatch');
   assertEquals(found.map((c) => c.data), [{
     month: '2026-12',
-    amountCents: 3240,
+    amountCents: 3300,
     expectedCents: 3150,
   }]);
   assertStringIncludes(found[0]?.explanation ?? '', '20 %');
@@ -96,9 +96,9 @@ Deno.test('fee_mismatch should propose noting the prepayment discount that an im
   });
   const facts = factsWith({
     students: [mario],
-    // Pagó la temporada: 40,50 € con el 20 % aplicado encima, como en la hoja, de septiembre a junio.
+    // Pagó la temporada: 45 € − 10 % familiar − 20 % de temporada = 31,50 €, sin el 20 % apuntado.
     charges: SEASON_MONTHS.map((period) =>
-      charge({ studentId: 'mario', period, amountCents: 3240, coveredCents: 3240, status: 'paid' })
+      charge({ studentId: 'mario', period, amountCents: 3150, coveredCents: 3150, status: 'paid' })
     ),
   });
   const found = ofRule(facts, 'fee_mismatch');
@@ -109,7 +109,7 @@ Deno.test('fee_mismatch should propose noting the prepayment discount that an im
     month: '2026-11',
     percent: 20,
   });
-  assertEquals(found[2]?.data, { month: '2026-11', amountCents: 3240, discountPercent: 20 });
+  assertEquals(found[2]?.data, { month: '2026-11', amountCents: 3150, discountPercent: 20 });
   assertStringIncludes(found[2]?.explanation ?? '', '20 % de pago adelantado');
   assertStringIncludes(found[2]?.proposal ?? '', 'sin cambiar su importe');
 });
@@ -297,4 +297,57 @@ Deno.test('enrolment_after_payment should propose moving «since» to the join d
     groupIds: ['g1', 'g2'],
     date: '2026-09-01',
   });
+});
+
+Deno.test('chained_discounts should flag charges where family and prepayment discounts were applied one after the other', () => {
+  const irene = student({ id: 'irene', tierCents: 4500, feeCents: 4050, familyDiscount: true });
+  const additive = student({ id: 'ok', tierCents: 4500, feeCents: 4050, familyDiscount: true });
+  const facts = factsWith({
+    students: [irene, additive],
+    charges: [
+      // 45 € − 10 % = 40,50 €; − 20 % = 32,40 € (en cadena) en vez de 45 € − 30 % = 31,50 €.
+      charge({
+        studentId: 'irene',
+        period: '2026-09',
+        amountCents: 3240,
+        coveredCents: 3240,
+        status: 'paid',
+      }),
+      charge({
+        studentId: 'irene',
+        period: '2026-10',
+        amountCents: 3240,
+        coveredCents: 3240,
+        status: 'paid',
+      }),
+      charge({ studentId: 'irene', period: '2026-11', amountCents: 3240, status: 'due' }),
+      charge({
+        studentId: 'ok',
+        period: '2026-10',
+        amountCents: 3150,
+        coveredCents: 3150,
+        status: 'paid',
+        discountPercent: 20,
+      }),
+    ],
+  });
+  const found = ofRule(facts, 'chained_discounts');
+  assertEquals(found.length, 1);
+  assertEquals(found[0]?.entity.id, 'irene');
+  assertEquals(found[0]?.data, { months: '2026-09,2026-10,2026-11', percent: 20, extraCents: 270 });
+  assertStringIncludes(found[0]?.explanation ?? '', '32,40 €');
+  assertStringIncludes(found[0]?.explanation ?? '', '30 %: 31,50 €');
+  assertStringIncludes(found[0]?.explanation ?? '', 'ya ha pagado 1,80 €');
+  assertStringIncludes(
+    found[0]?.proposal ?? '',
+    'Extra por error en el cálculo de varios descuentos',
+  );
+  assertEquals(found[0]?.fix, {
+    kind: 'unchain_discounts',
+    studentId: 'irene',
+    months: ['2026-09', '2026-10', '2026-11'],
+    percent: 20,
+  });
+  // Ni «cuota distinta de la tarifa» ni «pago adelantado sin apuntar» vuelven a señalar esas cuotas.
+  assertEquals(ofRule(facts, 'fee_mismatch'), []);
 });

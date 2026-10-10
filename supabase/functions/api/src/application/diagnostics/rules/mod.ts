@@ -20,10 +20,11 @@ const ALL: readonly Rule[] = [
 /** Qué regla produce cada código, averiguado ejecutándolas sobre hechos vacíos no sirve: se declara aquí. */
 const BY_CODE: Record<RuleCode, Rule> = {
   fee_mismatch: feeRules[0] as Rule,
-  charge_without_group: feeRules[1] as Rule,
-  paid_but_no_group: feeRules[2] as Rule,
-  member_never_paid: feeRules[3] as Rule,
-  enrolment_after_payment: feeRules[4] as Rule,
+  chained_discounts: feeRules[1] as Rule,
+  charge_without_group: feeRules[2] as Rule,
+  paid_but_no_group: feeRules[3] as Rule,
+  member_never_paid: feeRules[4] as Rule,
+  enrolment_after_payment: feeRules[5] as Rule,
   family_unlinked: familyRules[0] as Rule,
   family_not_mutual: familyRules[1] as Rule,
   adult_guardian_is_self: studentRules[0] as Rule,

@@ -111,7 +111,7 @@ Deno.test('Finding should restore from storage keeping its state', () => {
 Deno.test('rule catalogue should have every rule once, in screen order, with its severity', () => {
   const codes = RULE_CATALOGUE.map((r) => r.code);
   assertEquals(new Set(codes).size, codes.length);
-  assertEquals(codes.length, 21);
+  assertEquals(codes.length, 22);
   assertEquals(ruleDefinition('fee_mismatch').severity, 'money');
   assertEquals(ruleDefinition('fee_mismatch').hasFix, true);
   assertEquals(ruleDefinition('charge_without_group').hasFix, false);
