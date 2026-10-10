@@ -192,7 +192,9 @@ describe('Contabilidad', () => {
 
     const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
     const fee = within(table).getByRole('row', { name: /Martina López Herrera/ });
-    expect(within(fee).queryByRole('button')).not.toBeInTheDocument();
+    // Se edita, pero no se quita: se gestiona en su sección.
+    expect(within(fee).getByRole('button', { name: /^Editar/ })).toBeVisible();
+    expect(within(fee).queryByRole('button', { name: /^Quitar/ })).not.toBeInTheDocument();
     expect(within(fee).getByRole('link', { name: /Ir a Cobros/ })).toHaveAttribute(
       'href',
       '/panel/cobros?pestana=registro',
@@ -209,6 +211,45 @@ describe('Contabilidad', () => {
     expect(
       await screen.findByRole('tab', { name: 'Cobros registrados', selected: true }),
     ).toBeInTheDocument();
+  });
+
+  it('edits a movement after confirming what changes; a payment only in accounting', async () => {
+    const fetch = api({ 'PUT /api/admin/accounting/movements': [204] });
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
+    await userEvent.click(
+      within(table).getByRole('button', { name: 'Editar Octubre 2026 · Martina López Herrera' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Editar movimiento' });
+    const amount = within(dialog).getByLabelText('Importe (€)');
+    expect(amount).toHaveValue('45');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '40');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Forma de pago'), 'transfer');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+
+    // Antes de guardar, lo que cambia y qué no cambia fuera de contabilidad.
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
+    expect(within(confirm).getByText('Importe: 45 € → 40 €')).toBeVisible();
+    expect(within(confirm).getByText('Forma de pago: Efectivo → Transferencia')).toBeVisible();
+    expect(within(confirm).getByText(/El recibo y las cuotas del alumno no cambian/)).toBeVisible();
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
+
+    expect(await screen.findByText('Movimiento editado')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/admin/accounting/movements' && init?.method === 'PUT',
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual({
+      source: 'payment',
+      sourceId: 'p1',
+      month: '2026-10',
+      concept: 'Octubre 2026 · Martina López Herrera',
+      category: 'fees',
+      method: 'transfer',
+      amount: '40',
+      period: '2026-10',
+    });
   });
 
   it('adds a manual expense', async () => {

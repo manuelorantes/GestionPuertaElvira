@@ -15,6 +15,8 @@ export interface LedgerItem {
   studentId: string | null;
   /** Mes al que corresponde («AAAA-MM»). */
   period: string;
+  /** Un cobro, liquidación o anticipo corregido en contabilidad (su recibo o nómina siguen igual). */
+  corrected: boolean;
   categoryLabel: string;
   methodLabel: string;
 }
@@ -87,6 +89,20 @@ export function fetchFiscalYear(startYear: number): Promise<FiscalYear> {
 
 export async function recordEntry(entry: EntryPayload): Promise<string> {
   return (await apiSend<{ id: string }>('POST', `${BASE}/entries`, entry)).id;
+}
+
+/** Edita un movimiento del libro (en cobros y liquidaciones, solo como sale en contabilidad). */
+export function editMovement(input: {
+  source: string;
+  sourceId: string;
+  month: string;
+  concept: string;
+  category: string;
+  method: string;
+  amount: string;
+  period: string;
+}): Promise<void> {
+  return apiSend('PUT', `${BASE}/movements`, input);
 }
 
 export function deleteEntry(id: string): Promise<void> {
