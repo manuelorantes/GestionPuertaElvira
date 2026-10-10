@@ -175,8 +175,8 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
             />
           </div>
           <GroupAttendanceTable groupId={groupId} month={attendanceMonth} />
-          <GroupClassComments groupId={groupId} month={attendanceMonth} />
         </Card>
+        <GroupClassComments groupId={groupId} month={attendanceMonth} className="p-4" />
       </div>
       {overCapacity.message && (
         <ConfirmDialog

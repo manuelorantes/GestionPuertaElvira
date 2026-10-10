@@ -51,8 +51,8 @@ comentario (hasta 1000 caracteres) se guarda al momento, aparte de la lista, con
 En la lista se ven todos los comentarios de esa clase ese día; el profesor solo cambia o quita los suyos.
 Administración MUST verlos, añadirlos (de una clase que ya se dio: día, toda la clase o un alumno, y texto), cambiarlos y
 quitarlos:
-- en la asistencia del grupo (pestaña «Asistencia» de Clases y hoja del grupo), debajo de la tabla, los del mes que se
-  muestra: primero los de la clase (día, comentario y quién lo escribió) y debajo los de los alumnos, con un selector
+- en la asistencia del grupo (pestaña «Asistencia» de Clases y hoja del grupo), en su propia tarjeta debajo de la de la
+  asistencia, los del mes que se muestra: primero los de la clase (día, comentario y quién lo escribió) y debajo los de los alumnos, con un selector
   por los alumnos de la tabla (los del grupo y los que vinieron en asistencia especial; por defecto, todos);
 - en la ficha del alumno, abajo del todo, en «Comentarios de las clases»: día, clase, comentario y quién lo escribió,
   del más reciente al más antiguo.

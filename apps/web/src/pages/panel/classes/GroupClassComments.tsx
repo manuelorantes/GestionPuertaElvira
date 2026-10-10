@@ -11,6 +11,7 @@ import {
 import { useCommentChange, useGroupComments } from '@/features/class-comments/hooks';
 import { formatDate } from '@/features/students/format';
 import { Button } from '@/shared/ui/Button';
+import { Card } from '@/shared/ui/Card';
 import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
 
@@ -20,11 +21,20 @@ const ALL_STUDENTS = '';
 const WHOLE_CLASS = '';
 
 /**
- * Comentarios de un grupo en un mes, debajo de su asistencia: primero los de la clase y después los de los alumnos, con
+ * Comentarios de un grupo en un mes, en su propia tarjeta debajo de la asistencia: primero los de la clase y después los de los alumnos, con
  * un selector por los alumnos de la tabla (los del grupo y los que vinieron en asistencia especial). Administración
  * añade, cambia y quita cualquiera.
  */
-export function GroupClassComments({ groupId, month }: { groupId: string; month: string }) {
+export function GroupClassComments({
+  groupId,
+  month,
+  className = '',
+}: {
+  groupId: string;
+  month: string;
+  /** Relleno de la tarjeta, como el de la tarjeta de asistencia de encima. */
+  className?: string;
+}) {
   const attendance = useGroupAttendance(groupId, month);
   const comments = useGroupComments(groupId, month);
   const toast = useToast();
@@ -58,76 +68,75 @@ export function GroupClassComments({ groupId, month }: { groupId: string; month:
   };
 
   return (
-    <section
-      aria-label="Comentarios"
-      className="mt-6 flex flex-col gap-4 border-t border-line pt-4"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-          Comentarios
-        </h3>
-        {classDays.length > 0 && !adding && (
-          <Button variant="secondary" onClick={() => setAdding(true)}>
-            <MessageSquarePlus aria-hidden size={16} />
-            Añadir comentario
-          </Button>
-        )}
-      </div>
-      {adding && (
-        <NewCommentForm
-          days={classDays}
-          students={students}
-          onSave={(comment) =>
-            add.mutateAsync(comment).then(() => {
-              toast('Comentario guardado');
-              setAdding(false);
-            })
-          }
-          onCancel={() => setAdding(false)}
-        />
-      )}
-      <div className="flex flex-col gap-1">
-        <h4 className="text-sm font-semibold text-ink-strong">De la clase</h4>
-        {general.length === 0 ? (
-          <p className="text-sm text-ink-muted">Sin comentarios de la clase este mes.</p>
-        ) : (
-          <CommentList
-            label="Comentarios de la clase"
-            comments={general}
-            show={{ date: true }}
-            {...actions}
-          />
-        )}
-      </div>
-      <div className="flex flex-col gap-2">
-        <h4 className="text-sm font-semibold text-ink-strong">De los alumnos</h4>
-        <div className="max-w-sm">
-          <Select
-            label="Alumno"
-            options={[
-              { value: ALL_STUDENTS, label: 'Todos los alumnos' },
-              ...students.map((s) => ({ value: s.id, label: s.name })),
-            ]}
-            value={studentFilter}
-            onChange={setStudentFilter}
-          />
+    <Card className={className}>
+      <section aria-label="Comentarios" className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+            Comentarios
+          </h3>
+          {classDays.length > 0 && !adding && (
+            <Button variant="secondary" onClick={() => setAdding(true)}>
+              <MessageSquarePlus aria-hidden size={16} />
+              Añadir comentario
+            </Button>
+          )}
         </div>
-        {aboutStudents.length === 0 ? (
-          <p className="text-sm text-ink-muted">
-            {filteredName
-              ? `${filteredName} no tiene comentarios este mes.`
-              : 'Sin comentarios de alumnos este mes.'}
-          </p>
-        ) : (
-          <CommentList
-            label="Comentarios de los alumnos"
-            comments={aboutStudents}
-            show={{ date: true, student: studentFilter === ALL_STUDENTS }}
-            {...actions}
+        {adding && (
+          <NewCommentForm
+            days={classDays}
+            students={students}
+            onSave={(comment) =>
+              add.mutateAsync(comment).then(() => {
+                toast('Comentario guardado');
+                setAdding(false);
+              })
+            }
+            onCancel={() => setAdding(false)}
           />
         )}
-      </div>
-    </section>
+        <div className="flex flex-col gap-1">
+          <h4 className="text-sm font-semibold text-ink-strong">De la clase</h4>
+          {general.length === 0 ? (
+            <p className="text-sm text-ink-muted">Sin comentarios de la clase este mes.</p>
+          ) : (
+            <CommentList
+              label="Comentarios de la clase"
+              comments={general}
+              show={{ date: true }}
+              {...actions}
+            />
+          )}
+        </div>
+        <div className="flex flex-col gap-2">
+          <h4 className="text-sm font-semibold text-ink-strong">De los alumnos</h4>
+          <div className="max-w-sm">
+            <Select
+              label="Alumno"
+              options={[
+                { value: ALL_STUDENTS, label: 'Todos los alumnos' },
+                ...students.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+              value={studentFilter}
+              onChange={setStudentFilter}
+            />
+          </div>
+          {aboutStudents.length === 0 ? (
+            <p className="text-sm text-ink-muted">
+              {filteredName
+                ? `${filteredName} no tiene comentarios este mes.`
+                : 'Sin comentarios de alumnos este mes.'}
+            </p>
+          ) : (
+            <CommentList
+              label="Comentarios de los alumnos"
+              comments={aboutStudents}
+              show={{ date: true, student: studentFilter === ALL_STUDENTS }}
+              {...actions}
+            />
+          )}
+        </div>
+      </section>
+    </Card>
   );
 }
 

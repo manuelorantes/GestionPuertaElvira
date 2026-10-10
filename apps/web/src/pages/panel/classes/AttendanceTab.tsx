@@ -27,13 +27,9 @@ export function AttendanceTab({ groups }: { groups: ClassGroup[] }) {
         <SeasonMonths month={month} selected={month} label="Mes" onChange={setMonth} />
       </div>
       <Card className="p-5">
-        {groupId && (
-          <>
-            <GroupAttendanceTable groupId={groupId} month={month} />
-            <GroupClassComments groupId={groupId} month={month} />
-          </>
-        )}
+        {groupId && <GroupAttendanceTable groupId={groupId} month={month} />}
       </Card>
+      {groupId && <GroupClassComments groupId={groupId} month={month} className="p-5" />}
     </div>
   );
 }
