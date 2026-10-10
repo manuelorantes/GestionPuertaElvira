@@ -131,7 +131,9 @@ Deno.test('groups should reject classroom conflicts, invalid fields, unknown ids
   await createUser('profe@club.es', 'teacher');
   const teacher = new ApiClient();
   await teacher.logIn('profe@club.es');
-  assertError(await teacher.get('/api/admin/groups'), 403, 'forbidden');
+  // El profesorado consulta los grupos, pero no los cambia.
+  assertEquals((await teacher.get('/api/admin/groups')).status, 200);
+  assertError(await teacher.json('POST', '/api/admin/groups', {}), 403, 'forbidden');
 });
 
 Deno.test('groups without a name take the default one and follow their day, time, level and classroom', async () => {

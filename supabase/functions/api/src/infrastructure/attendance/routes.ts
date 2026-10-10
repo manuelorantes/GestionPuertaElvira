@@ -385,7 +385,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
   );
 
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/attendance/groups/:groupId', access: 'admin' },
+    { method: 'GET', path: '/api/admin/attendance/groups/:groupId', access: 'clubReader' },
     async (c, scope) => {
       return c.json(
         await new GroupAttendance(new SqlGroupAttendanceQuery(scope.tx), api.deps.clock)
@@ -395,7 +395,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
   );
 
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/students/:id/attendance', access: 'admin' },
+    { method: 'GET', path: '/api/admin/students/:id/attendance', access: 'clubReader' },
     async (c, scope) => {
       return c.json(
         await new StudentAttendance(new SqlStudentAttendanceQuery(scope.tx), api.deps.clock)
@@ -423,7 +423,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
 
   // ---- Administración: comentarios de las clases ------------------------------------------------
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/attendance/groups/:groupId/comments', access: 'admin' },
+    { method: 'GET', path: '/api/admin/attendance/groups/:groupId/comments', access: 'clubReader' },
     async (c, scope) => {
       return c.json({
         items: await new GroupClassComments(new SqlClassCommentQuery(scope.tx)).execute(
@@ -467,7 +467,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
   );
 
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/students/:id/class-comments', access: 'admin' },
+    { method: 'GET', path: '/api/admin/students/:id/class-comments', access: 'clubReader' },
     async (c, scope) => {
       return c.json({
         items: await new StudentClassComments(new SqlClassCommentQuery(scope.tx)).execute(

@@ -385,10 +385,10 @@ Deno.test('a teacher should take the roll call of their class, all present by de
       404,
       'not_found',
     );
-    assertError(
-      await teacher.get(`/api/admin/attendance/groups/${group}?month=2026-10`),
-      403,
-      'forbidden',
+    // La asistencia de cualquier grupo la consulta también el profesorado (Clases → Asistencia).
+    assertEquals(
+      (await teacher.get(`/api/admin/attendance/groups/${group}?month=2026-10`)).status,
+      200,
     );
   });
 });
