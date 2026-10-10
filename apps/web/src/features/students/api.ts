@@ -37,9 +37,12 @@ export interface StudentDetail {
   federationLicence: string | null;
   imageConsent: boolean;
   missingData: MissingDatum[];
+  /** Su última alta y su última baja (el periodo actual). */
   joinedOn: string;
   withdrawnOn: string | null;
   status: 'active' | 'withdrawn';
+  /** Todos sus periodos de alta, del más antiguo al actual. */
+  membership: { joinedOn: string; withdrawnOn: string | null }[];
   groups: StudentGroup[];
   siblings: { id: string; fullName: string }[];
 }
@@ -121,6 +124,25 @@ export async function registerStudent(
 
 export function updateStudent(id: string, payload: StudentPayload): Promise<void> {
   return apiSend('PUT', `/api/admin/students/${id}`, payload);
+}
+
+/** Vuelve a dar de alta a un alumno de baja, desde un día y en unos grupos (sin grupos, como socio). */
+export function rejoinStudent(
+  id: string,
+  date: string,
+  groupIds: string[],
+  confirmOverCapacity: boolean,
+): Promise<void> {
+  return apiSend('POST', `/api/admin/students/${id}/rejoin`, {
+    date,
+    groupIds,
+    confirmOverCapacity,
+  });
+}
+
+/** Corrige su última alta (los grupos que empezaban ese día se mueven con ella). */
+export function changeJoinDate(id: string, date: string): Promise<void> {
+  return apiSend('PUT', `/api/admin/students/${id}/joined-on`, { date });
 }
 
 export function withdrawStudent(id: string, date: string): Promise<void> {

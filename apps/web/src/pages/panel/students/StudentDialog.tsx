@@ -8,6 +8,7 @@ import type { Attendance } from '@/features/students/api';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import {
   type Registration,
+  changeJoinDate,
   registerStudent,
   type StudentDetail,
   updateStudent,
@@ -65,7 +66,8 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
   const [overrides, setOverrides] = useState<Record<string, Attendance | null>>({});
   const [editingAttendance, setEditingAttendance] = useState<string | null>(null);
   const groups = useGroups();
-  const [joinedOn, setJoinedOn] = useState(todayIso());
+  // En el alta, desde cuándo; al editar, su última alta (los grupos que empezaban ese día se mueven con ella).
+  const [joinedOn, setJoinedOn] = useState(detail?.joinedOn ?? todayIso());
   const enrolments: Registration['enrolments'] = (resolution.data?.enrolments ?? []).map((e) => ({
     groupId: e.groupId,
     attendance: e.groupId in overrides ? (overrides[e.groupId] ?? null) : e.attendance,
@@ -74,9 +76,10 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
     ({ values, confirm }: { values: StudentFormValues; confirm: boolean }) =>
       registerStudent({ ...toRegistration(values, enrolments), joinedOn }, confirm),
   );
-  const update = useStudentMutation((values: StudentFormValues) =>
-    updateStudent(detail?.id ?? '', toPayload(values)),
-  );
+  const update = useStudentMutation(async (values: StudentFormValues) => {
+    if (detail && joinedOn !== detail.joinedOn) await changeJoinDate(detail.id, joinedOn);
+    await updateStudent(detail?.id ?? '', toPayload(values));
+  });
 
   const form = useStudentForm(detail, async (values) => {
     if (detail) {
@@ -145,12 +148,16 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                 toYear={CURRENT_YEAR}
                 error={fieldErrors.birthDate}
               />
-              {!detail && (
+              {(!detail || detail.status === 'active') && (
                 <DateField
-                  label="Fecha de alta"
+                  label={
+                    detail && detail.membership.length > 1
+                      ? 'Última alta en el club'
+                      : 'Fecha de alta'
+                  }
                   value={joinedOn}
                   onChange={setJoinedOn}
-                  fromYear={CURRENT_YEAR - 1}
+                  fromYear={CURRENT_YEAR - 5}
                   toYear={CURRENT_YEAR}
                 />
               )}

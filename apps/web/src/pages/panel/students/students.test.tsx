@@ -72,6 +72,7 @@ const DETAIL = {
   joinedOn: '2026-09-15',
   withdrawnOn: null,
   status: 'active',
+  membership: [{ joinedOn: '2026-09-15', withdrawnOn: null }],
   groups: [
     {
       id: 'g1',
@@ -236,6 +237,75 @@ describe('Alumnos', () => {
     await waitFor(() =>
       expect(postBodyFor(spy, 'PUT', '/api/admin/students/s1/enrolments/g1/start')).toEqual({
         from: '2026-09-01',
+      }),
+    );
+  });
+
+  it('should join a withdrawn student again in a group and show their periods', async () => {
+    const user = userEvent.setup();
+    const WITHDRAWN = {
+      ...DETAIL,
+      status: 'withdrawn',
+      withdrawnOn: '2026-10-02',
+      groups: [],
+      membership: [{ joinedOn: '2026-09-15', withdrawnOn: '2026-10-02' }],
+    };
+    const REJOINED = {
+      ...DETAIL,
+      joinedOn: '2026-11-15',
+      membership: [
+        { joinedOn: '2026-09-15', withdrawnOn: '2026-10-02' },
+        { joinedOn: '2026-11-15', withdrawnOn: null },
+      ],
+    };
+    const spy = api({
+      'GET /api/admin/students/s1': [
+        [200, WITHDRAWN],
+        [200, REJOINED],
+      ],
+      'POST /api/admin/students/s1/rejoin': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    expect(within(card).queryByRole('button', { name: /Dar de baja/ })).not.toBeInTheDocument();
+    await user.click(await within(card).findByRole('button', { name: /Dar de alta de nuevo/ }));
+    const dialog = await screen.findByRole('dialog', { name: 'Dar de alta de nuevo a Martina' });
+    await user.click(within(dialog).getByRole('checkbox', { name: /Peques B/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Dar de alta' }));
+
+    await waitFor(() =>
+      expect(postBody(spy, '/api/admin/students/s1/rejoin')).toEqual({
+        date: todayIso(),
+        groupIds: ['g2'],
+        confirmOverCapacity: false,
+      }),
+    );
+    expect(await within(card).findByText('Última alta en el club')).toBeVisible();
+    expect(within(card).getByText('Última baja en el club')).toBeVisible();
+    expect(within(card).getByRole('list', { name: 'Altas y bajas' })).toHaveTextContent(
+      'Desde el 15/11/2026Del 15/09/2026 al 02/10/2026',
+    );
+  });
+
+  it('should change the join date from «Editar»', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'PUT /api/admin/students/s1/joined-on': [204],
+      'PUT /api/admin/students/s1': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    await user.click(await within(card).findByRole('button', { name: 'Editar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar alumno' });
+    const joined = within(within(dialog).getByRole('group', { name: 'Fecha de alta' }));
+    await user.selectOptions(joined.getByLabelText('Día'), '1');
+    await user.click(within(dialog).getByRole('button', { name: /Guardar/ }));
+
+    await waitFor(() =>
+      expect(postBodyFor(spy, 'PUT', '/api/admin/students/s1/joined-on')).toEqual({
+        date: '2026-09-01',
       }),
     );
   });
