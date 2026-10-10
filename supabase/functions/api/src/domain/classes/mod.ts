@@ -401,10 +401,22 @@ export class Enrolment {
     readonly id: EnrolmentId,
     readonly student: StudentReference,
     readonly group: ClassGroupId,
-    readonly enrolledOn: LocalDate,
+    private starts: LocalDate,
     private ends: LocalDate | null,
     private attending: Attendance,
   ) {}
+
+  get enrolledOn(): LocalDate {
+    return this.starts;
+  }
+
+  /** Corrige desde cuándo está en el grupo (p. ej. venía antes de que se le inscribiera). */
+  startOn(day: LocalDate): void {
+    if (this.ends !== null && !day.isBefore(this.ends)) {
+      throw new InvalidValue('from', 'La inscripción tiene que empezar antes de terminar.');
+    }
+    this.starts = day;
+  }
 
   static start(
     id: EnrolmentId,
@@ -436,14 +448,14 @@ export class Enrolment {
   }
 
   endOn(day: LocalDate): void {
-    if (day.isBefore(this.enrolledOn)) {
+    if (day.isBefore(this.starts)) {
       throw new InvalidValue('date', 'La inscripción no puede terminar antes de empezar.');
     }
     this.ends = day;
   }
 
   isActiveOn(day: LocalDate): boolean {
-    const hasStarted = day.isAfterOrEqual(this.enrolledOn);
+    const hasStarted = day.isAfterOrEqual(this.starts);
     const hasEnded = this.ends !== null && day.isAfterOrEqual(this.ends);
     return hasStarted && !hasEnded;
   }

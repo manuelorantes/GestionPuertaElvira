@@ -61,6 +61,8 @@ export interface StudentGroup {
   attendance: { days: string[]; start: string; end: string } | null;
   /** «Lun · 18:30–19:00», o null si va a todo el grupo. */
   attendanceLabel: string | null;
+  /** Desde cuándo está en el grupo. */
+  since: string;
 }
 
 export interface StudentSummary {

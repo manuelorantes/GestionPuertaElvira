@@ -133,6 +133,7 @@ export class SqlEnrolmentRepository implements EnrolmentRepository {
       ON CONFLICT (id) DO UPDATE SET ${
       this.sql(
         record,
+        'enrolled_on',
         'ends_on',
         'attendance_days',
         'attendance_start_minutes',
@@ -158,6 +159,12 @@ export class SqlEnrolmentRepository implements EnrolmentRepository {
         AND enrolled_on <= ${on.toString()} AND (ends_on IS NULL OR ends_on > ${on.toString()})
       LIMIT 1`;
     return rows[0] ? toEnrolment(new Row(rows[0])) : null;
+  }
+
+  async ofStudentInGroup(student: StudentReference, group: ClassGroupId): Promise<Enrolment[]> {
+    const rows = await this.sql`SELECT * FROM classes_enrolment
+      WHERE student_id = ${student.value} AND class_group_id = ${group.value} ORDER BY enrolled_on, id`;
+    return Row.all(rows).map(toEnrolment);
   }
 
   async activeInGroup(group: ClassGroupId, on: LocalDate): Promise<Enrolment[]> {

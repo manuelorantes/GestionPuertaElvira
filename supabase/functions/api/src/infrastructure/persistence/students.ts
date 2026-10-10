@@ -263,7 +263,7 @@ export class SqlStudentQuery implements StudentQuery {
     const day = on.toString();
     const forStudent = studentId ? this.sql`AND student_id = ${studentId}` : this.sql``;
     // Orden estable: primero el grupo en el que se inscribió antes (el id es UUIDv7, ordenado por tiempo).
-    const rows = await this.sql`SELECT student_id, class_group_id,
+    const rows = await this.sql`SELECT student_id, class_group_id, enrolled_on::text AS since,
              attendance_days, attendance_start_minutes, attendance_end_minutes
         FROM classes_enrolment
       WHERE enrolled_on <= ${day} AND (ends_on IS NULL OR ends_on > ${day}) ${forStudent}
@@ -286,6 +286,7 @@ export class SqlStudentQuery implements StudentQuery {
           HalfHour.fromString(attendance.start),
           HalfHour.fromString(attendance.end),
         ).label(),
+        since: row.string('since'),
       });
       byStudent.set(row.string('student_id'), list);
     }
