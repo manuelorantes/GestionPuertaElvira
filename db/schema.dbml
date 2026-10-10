@@ -142,16 +142,17 @@ Table billing_account {
 Table billing_charge {
   id uuid [pk, note: 'UUIDv7']
   student_id uuid [not null]
-  kind varchar(12) [not null, note: 'monthly | membership']
-  period varchar(7) [not null, note: 'AAAA-MM; en las de socio, septiembre de la temporada']
+  kind varchar(12) [not null, note: 'monthly | membership | material']
+  period varchar(7) [not null, note: 'AAAA-MM; en las de socio, septiembre de la temporada; en las de material, el mes en que se pidió']
   amount_cents int [not null, note: 'fijado al generarla']
   paid_by uuid [note: 'billing_payment.id; nulo = sin pagar']
   reminded_on date [note: 'último aviso por WhatsApp']
   cancelled_on date [note: 'día en que se canceló; nulo = no cancelada']
   kept_cents int [note: 'lo que se conserva al cancelarla (lo cobrado; 0 = cancelada entera); se debe LEAST(amount_cents, kept_cents)']
+  concept text [note: 'en las de material, el producto pedido']
 
   indexes {
-    (student_id, kind, period) [unique, name: 'billing_charge_unique']
+    (student_id, kind, period) [unique, name: 'billing_charge_unique', note: 'salvo kind = material']
     period [name: 'billing_charge_period_idx']
   }
 }
@@ -169,6 +170,7 @@ Table billing_payment {
   periods json [not null, note: 'meses cubiertos AAAA-MM']
   invoice_number varchar(16) [unique, note: 'F-AAAA-NNNN si se emitió factura']
   invoice json [note: 'cliente, base, IVA 21 % incluido y total']
+  charge_id uuid [note: 'solo en los de material: la cuota del pedido que cubre']
 
   indexes {
     student_id [name: 'billing_payment_student_idx']
@@ -186,6 +188,56 @@ Table billing_document_sequence {
 }
 
 Ref: billing_charge.paid_by > billing_payment.id
+Ref: billing_payment.charge_id > billing_charge.id
+
+// --- Material deportivo (Equipment) ---------------------------------------
+
+Table equipment_product {
+  id uuid [pk, note: 'UUIDv7']
+  name varchar(60) [not null]
+  price_cents int [not null, note: 'precio de venta por defecto']
+  fields jsonb [not null, note: '[{id, name, kind: options | text, options}]']
+  active boolean [not null, note: 'false = ya no se ofrece para pedidos nuevos']
+}
+
+Table equipment_order {
+  id uuid [pk, note: 'UUIDv7']
+  student_id uuid [not null]
+  product_id uuid [not null]
+  quantity int [not null]
+  field_values jsonb [not null, note: 'valor por id de campo']
+  variant_key text [not null, note: 'JSON canónico de los campos de lista: la variante del stock']
+  variant_label text [not null, note: 'Talla 10 · Color azul']
+  detail text [not null, note: 'variante y textos elegidos']
+  note varchar(300)
+  status varchar(10) [not null, note: 'reserved | ordered | cancelled; pagado = su cuota cubierta']
+  price_cents int [note: 'nulo mientras está reservado']
+  charge_id uuid [note: 'la cuota de material generada al pasar a pedido']
+  created_on date [not null]
+  ordered_on date
+  delivered_on date [note: 'entregado (descuenta stock)']
+  cancelled_on date
+  returned_to_stock boolean [not null, note: 'cancelado entregado y devuelto al stock']
+
+  indexes {
+    student_id [name: 'equipment_order_student']
+    (product_id, variant_key) [name: 'equipment_order_product']
+  }
+}
+
+Table equipment_purchase {
+  id uuid [pk, note: 'UUIDv7']
+  product_id uuid [not null]
+  bought_on date [not null]
+  cost_cents int [not null, note: 'lo que costó el lote entero']
+  lines jsonb [not null, note: '[{variantKey, variantLabel, values, quantity}]']
+  note varchar(300)
+}
+
+Ref: equipment_order.student_id > students_student.id [delete: cascade]
+Ref: equipment_order.product_id > equipment_product.id
+Ref: equipment_order.charge_id > billing_charge.id
+Ref: equipment_purchase.product_id > equipment_product.id
 
 // --- Profesorado (Payroll) ------------------------------------------------
 

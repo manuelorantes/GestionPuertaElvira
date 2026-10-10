@@ -161,8 +161,24 @@ export class BillingFixture
   creditFor(student: StudentRef, kind: ChargeKind): Promise<Money> {
     return Promise.resolve(
       [...this.payments.values()]
-        .filter((p) => p.student.equals(student) && p.kind === kind)
+        .filter((p) => p.student.equals(student) && p.kind === kind && p.charge === null)
         .reduce((sum, p) => sum.plus(p.credit), Money.zero()),
+    );
+  }
+
+  creditForCharge(charge: ChargeId): Promise<Money> {
+    return Promise.resolve(
+      [...this.payments.values()]
+        .filter((p) => p.charge?.equals(charge) === true)
+        .reduce((sum, p) => sum.plus(p.credit), Money.zero()),
+    );
+  }
+
+  paidTotal(student: StudentRef, kind: ChargeKind): Promise<Money> {
+    return Promise.resolve(
+      [...this.payments.values()]
+        .filter((p) => p.student.equals(student) && p.kind === kind)
+        .reduce((sum, p) => sum.plus(p.total), Money.zero()),
     );
   }
 

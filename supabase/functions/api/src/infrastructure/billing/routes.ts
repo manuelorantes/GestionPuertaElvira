@@ -112,6 +112,7 @@ function paymentRequest(body: JsonBody): PaymentRequest {
     specialAmountCents: special?.optionalInt('amountCents') ?? null,
     specialConcept: special?.requiredString('concept') ?? null,
     redeemPoints: body.optionalInt('redeemPoints') ?? 0,
+    chargeId: body.optionalString('chargeId'),
   };
 }
 

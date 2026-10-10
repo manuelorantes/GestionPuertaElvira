@@ -92,6 +92,10 @@ export interface ChargeRepository {
   allFor(student: StudentRef, kind: ChargeKind): Promise<Charge[]>;
   /** Lo que cubren todos los cobros de ese tipo del alumno (en importes de cuota, antes de descuentos). */
   creditFor(student: StudentRef, kind: ChargeKind): Promise<Money>;
+  /** Lo que cubren los cobros que apuntan a esa cuota (los de material). */
+  creditForCharge(charge: ChargeId): Promise<Money>;
+  /** Lo cobrado de verdad (importe de los recibos) de ese tipo al alumno. */
+  paidTotal(student: StudentRef, kind: ChargeKind): Promise<Money>;
   saveCharge(charge: Charge): Promise<void>;
 }
 
@@ -140,6 +144,8 @@ export interface ChargeView {
   /** Si se canceló la parte pendiente: el importe que tenía y lo cancelado (0 si no). */
   fullAmountCents: number;
   cancelledCents: number;
+  /** Concepto propio (el producto, en las de material); null en las demás. */
+  concept: string | null;
 }
 
 export interface PaymentSummary {
@@ -230,10 +236,31 @@ export async function pendingCharges(
   kind: ChargeKind,
 ): Promise<{ charge: Charge; pending: Money }[]> {
   const all = await charges.allFor(student, kind);
+  if (kind === 'material') {
+    const result: { charge: Charge; pending: Money }[] = [];
+    for (const charge of all) {
+      result.push({ charge, pending: charge.amount.minus(await coveredOf(charges, charge)) });
+    }
+    return result.filter((p) => p.pending.cents > 0);
+  }
   const allocation = allocateCredit(all, await charges.creditFor(student, kind));
   return all
     .map((charge) => ({ charge, pending: allocation.pending(charge) }))
     .filter((p) => p.pending.cents > 0);
+}
+
+/**
+ * Lo que tiene cubierto una cuota: las de material, lo que cubren los cobros que apuntan a ella; las demás, su parte del
+ * reparto de los cobros de su tipo.
+ */
+export async function coveredOf(charges: ChargeRepository, charge: Charge): Promise<Money> {
+  if (charge.kind === 'material') {
+    const credit = await charges.creditForCharge(charge.id);
+    return credit.cents >= charge.amount.cents ? charge.amount : credit;
+  }
+  const all = await charges.allFor(charge.student, charge.kind);
+  const allocation = allocateCredit(all, await charges.creditFor(charge.student, charge.kind));
+  return allocation.covered(all.find((c) => c.id.equals(charge.id)) ?? charge);
 }
 
 export class GenerateMonthlyCharges {
@@ -381,7 +408,10 @@ export class ListMonthlyCharges {
     // Las cuotas de socio cuelgan del primer mes de la temporada.
     const period = kind === 'membership' ? Season.containing(requested).firstMonth() : requested;
     const all = await this.query.charges(period, today);
-    const stored = kind === 'all' ? all : all.filter((c) => c.kind === kind);
+    // El material cuelga del mes en que se pidió: sale con las cuotas del mes.
+    const stored = kind === 'all'
+      ? all
+      : all.filter((c) => c.kind === kind || (kind === 'monthly' && c.kind === 'material'));
     // En los meses futuros, además de lo cobrado por adelantado, lo previsto de quien aún no lo ha pagado.
     const expected: ChargeView[] = kind === 'membership'
       ? []
@@ -403,6 +433,7 @@ export class ListMonthlyCharges {
         note: null,
         fullAmountCents: amount.cents,
         cancelledCents: 0,
+        concept: null,
       }));
     const items = [...stored, ...expected].sort((a, b) =>
       a.studentName.localeCompare(b.studentName, 'es') || b.kind.localeCompare(a.kind)
@@ -431,13 +462,11 @@ export class CancelCharge {
   async execute(chargeId: string): Promise<void> {
     const charge = await this.charges.charge(ChargeId.fromString(chargeId));
     if (charge === null) throw new ChargeNotFound();
-    const all = await this.charges.allFor(charge.student, charge.kind);
-    const allocation = allocateCredit(
-      all,
-      await this.charges.creditFor(charge.student, charge.kind),
+    if (charge.kind === 'material') throw materialOnlyFromOrder();
+    charge.cancel(
+      await coveredOf(this.charges, charge),
+      LocalDate.fromInstant(this.clock.now()),
     );
-    const same = all.find((c) => c.id.equals(charge.id)) ?? charge;
-    charge.cancel(allocation.covered(same), LocalDate.fromInstant(this.clock.now()));
     await this.charges.saveCharge(charge);
   }
 }
@@ -449,9 +478,17 @@ export class ReactivateCharge {
   async execute(chargeId: string): Promise<void> {
     const charge = await this.charges.charge(ChargeId.fromString(chargeId));
     if (charge === null) throw new ChargeNotFound();
+    if (charge.kind === 'material') throw materialOnlyFromOrder();
     charge.reactivate();
     await this.charges.saveCharge(charge);
   }
+}
+
+function materialOnlyFromOrder(): InvalidValue {
+  return new InvalidValue(
+    'id',
+    'El cobro del material se cancela o se reactiva desde su pedido, en «Material deportivo».',
+  );
 }
 
 /** Cuota cancelada (entera o la parte pendiente) tal como se lista en «Cuotas canceladas». */
@@ -508,6 +545,8 @@ export interface PaymentRequest {
   specialConcept: string | null;
   /** Puntos a canjear (0 = ninguno; como mucho 5 y solo en cuotas mensuales). */
   redeemPoints: number;
+  /** Solo en los cobros de material: el cobro del pedido que se paga. */
+  chargeId?: string | null;
 }
 
 function specialDiscountOf(request: PaymentRequest): SpecialDiscount | null {
@@ -538,6 +577,8 @@ export interface PaymentQuote {
   prepaymentPercent: number;
   /** Descuento familiar que ya lleva cada cuota mensual (el adelantado se suma a él sobre la base). */
   familyPercent: number;
+  /** El cobro del pedido de material que se paga (null en los demás). */
+  charge: Charge | null;
 }
 
 function concept(periods: readonly YearMonth[]): string {
@@ -584,11 +625,18 @@ export class QuotePayment {
     const ref = StudentRef.fromString(request.studentId);
     const student = await this.directory.find(ref, date);
     if (student === null) throw new BillingStudentNotFound();
-    if (request.kind !== 'monthly' && request.kind !== 'membership') {
-      throw new InvalidValue('kind', 'Tipo de cobro desconocido: usa monthly o membership.');
+    if (!['monthly', 'membership', 'material'].includes(request.kind)) {
+      throw new InvalidValue(
+        'kind',
+        'Tipo de cobro desconocido: usa monthly, membership o material.',
+      );
+    }
+    const special = specialDiscountOf(request);
+    if (request.kind === 'material') {
+      if (request.redeemPoints > 0) throw InvalidPaymentRequest.pointsOnlyMonthly();
+      return await this.material(student, ref, date, request.chargeId ?? null, special);
     }
     const settings = await this.settings.get();
-    const special = specialDiscountOf(request);
     if (request.kind === 'membership') {
       if (request.redeemPoints > 0) throw InvalidPaymentRequest.pointsOnlyMonthly();
       return await this.membership(student, ref, date, settings, special);
@@ -636,6 +684,40 @@ export class QuotePayment {
       // Con la cuota de hoy los descuentos se suman sobre la base (como en el presupuesto); con importes pendientes
       // distintos, el adelantado se aplica sobre cada importe.
       familyPercent: sameAsToday && student.hasSiblings ? settings.tariff.familyPercent : 0,
+      charge: null,
+    };
+  }
+
+  /** Lo que le falta al cobro de un pedido de material (con descuento especial, si se quiere). */
+  private async material(
+    student: BillingStudent,
+    ref: StudentRef,
+    date: LocalDate,
+    chargeId: string | null,
+    special: SpecialDiscount | null,
+  ): Promise<PaymentQuote> {
+    if (chargeId === null || chargeId === '') {
+      throw new InvalidValue('chargeId', 'Elige el pedido de material que se cobra.');
+    }
+    const charge = await this.charges.charge(ChargeId.fromString(chargeId));
+    if (charge === null || charge.kind !== 'material' || !charge.student.equals(ref)) {
+      throw new ChargeNotFound();
+    }
+    const pending = charge.amount.minus(await coveredOf(this.charges, charge));
+    if (pending.cents <= 0) throw InvalidPaymentRequest.nothingToPay();
+    const label = charge.concept() ?? 'Material deportivo';
+    return {
+      student,
+      kind: 'material',
+      date,
+      quote: new FeeCalculator().quoteMembership(label, pending, special),
+      periods: [charge.period],
+      concept: label,
+      monthlyCharge: charge.amount,
+      credit: pending,
+      prepaymentPercent: 0,
+      familyPercent: 0,
+      charge,
     };
   }
 
@@ -710,6 +792,7 @@ export class QuotePayment {
       credit: pendingFee,
       prepaymentPercent: 0,
       familyPercent: 0,
+      charge: null,
     };
   }
 }
@@ -743,9 +826,9 @@ export class RegisterPayment {
           p.pending,
         ]),
       );
-      const covered: Charge[] = [];
+      const covered: Charge[] = quote.charge === null ? [] : [quote.charge];
       let credit = Money.zero();
-      for (const period of quote.periods) {
+      for (const period of quote.charge === null ? quote.periods : []) {
         const charge = (await this.charges.chargeFor(ref, quote.kind, period)) ??
           Charge.create(ChargeId.generate(), ref, quote.kind, period, quote.monthlyCharge);
         const already = charge.amount.minus(pendingBefore.get(period.toString()) ?? charge.amount);
@@ -768,7 +851,8 @@ export class RegisterPayment {
         lines: quote.quote.lines,
         total: quote.quote.total,
         periods: quote.periods,
-        credit: quote.kind === 'membership' ? quote.credit : credit,
+        credit: quote.kind === 'monthly' ? credit : quote.credit,
+        charge: quote.charge?.id ?? null,
       });
       await this.payments.savePayment(payment);
       for (const charge of covered) {
@@ -945,6 +1029,10 @@ export interface AccountView {
   membershipCharge: { id: string; pendingCents: number } | null;
   /** Lo que sobra de los cobros tras cubrir todas las cuotas mensuales. */
   balanceCents: number;
+  /** Cobros de material con algo pendiente (para cobrarlos desde «Registrar cobro»). */
+  materialCharges: { id: string; concept: string; pendingCents: number }[];
+  /** Todo lo que mueve en el club, por tipo: lo cobrado (recibos) y lo pendiente. */
+  totals: { kind: ChargeKind; paidCents: number; pendingCents: number }[];
 }
 
 export interface AccountCharge {
@@ -989,6 +1077,21 @@ export class GetStudentAccount {
     const monthlyCharges = await this.charges.allFor(ref, 'monthly');
     const allocation = allocateCredit(monthlyCharges, await this.charges.creditFor(ref, 'monthly'));
     const months = await this.quotes.months(studentId);
+    const materialLeft = await pendingCharges(this.charges, ref, 'material');
+    const totals: AccountView['totals'] = [];
+    for (const kind of ['monthly', 'membership', 'material'] as const) {
+      const pending = kind === 'monthly'
+        ? allocation.pendingTotal
+        : (kind === 'membership' ? membershipLeft : materialLeft).reduce(
+          (sum, p) => sum.plus(p.pending),
+          Money.zero(),
+        );
+      totals.push({
+        kind,
+        paidCents: (await this.charges.paidTotal(ref, kind)).cents,
+        pendingCents: Math.max(0, pending.cents),
+      });
+    }
     return {
       preferredPlan: account?.preferredPlan() ?? 'monthly',
       member: account?.isMember() === true,
@@ -1025,6 +1128,12 @@ export class GetStudentAccount {
           membershipLeft.find((p) => p.charge.id.equals(membership.id))?.pending.cents ?? 0,
       },
       balanceCents: allocation.balance.cents,
+      materialCharges: materialLeft.map((p) => ({
+        id: p.charge.id.value,
+        concept: p.charge.concept() ?? 'Material deportivo',
+        pendingCents: p.pending.cents,
+      })),
+      totals,
     };
   }
 }

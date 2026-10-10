@@ -16,13 +16,13 @@ Cambios respecto al diseño, por decisiones de la spec:
 ```
 BillingPage (/panel/cobros)
 ├── SectionHeader: «Plazo: del 1 al 5 de <mes>» | «Cobros y cuotas» | acción «Registrar cobro» (icono wallet)
-├── Tabs: «Cuotas» · «Cobros registrados» · «Tarifas y ajustes» (?pestana=cuotas|registro|tarifas)
+├── Tabs: «Cuotas» · «Material deportivo» · «Cobros registrados» · «Tarifas y ajustes» (?pestana=cuotas|material|registro|tarifas; Material en ../material/layout.md)
 ├── ChargesTab
 │   ├── Botones «Cuotas de socio · Sep · Oct · … · Jun» de la temporada (?mes=socio | ?mes=AAAA-MM; el mes en curso subrayado)
 │   ├── Tarjeta de progreso: «N de M cuotas cobradas · X € de Y €» + barra de progreso (brand) + «N vencidas»
 │   └── ChargesTable (escritorio: cabecera Alumno | Concepto | Importe | «Estado ▾» | acciones; móvil: tarjetas con «Estado ▾» arriba)
 │       ├── Menú «Estado»: Ordenar (Por alumno · Lo pendiente primero · Lo cobrado primero) · Mostrar (casillas de los estados presentes con su número) · «Ver todos»
-│       └── Fila: avatar con iniciales + nombre | «Cuota de octubre» o «Cuota de socio 2026/27» | importe |
+│       └── Fila: avatar con iniciales + nombre | «Cuota de octubre», «Cuota de socio 2026/27» o el producto del material | importe |
 │           badge Cobrada/Pagada en parte (+ «Faltan X»)/En plazo/Vencida (+ «Avisado») | acciones:
 │           - pendiente: «Registrar cobro»
 │           - vencida: «WhatsApp» (outline, icono message-circle) + «Cobrar»
@@ -38,7 +38,7 @@ BillingPage (/panel/cobros)
 │   └── Tarjeta «Datos fiscales del club»: Nombre · NIF · Dirección (salen en recibos y facturas)
 ├── PaymentDialog («Registrar cobro»)
 │   ├── Select «Alumno» (alumnos activos) + texto con sus grupos
-│   ├── Chips «Concepto»: Mes · 3 meses · 6 meses · Todo el año (solo con 9 o 10 meses por pagar; cobra todos los que quedan) · Cuota de socio (propuesto según la preferencia de la ficha)
+│   ├── Chips «Concepto»: Mes · 3 meses · 6 meses · Todo el año (solo con 9 o 10 meses por pagar; cobra todos los que quedan) · Cuota de socio (propuesto según la preferencia de la ficha) · Material (solo si tiene pedidos de material pendientes; añade el select «Pedido de material»)
 │   ├── Forma de pago (Efectivo / Transferencia, ToggleButton con icono) | DateField «Fecha»
 │   ├── Switch «Descuento especial» → % y «Motivo» (p. ej. «Canje de 5 puntos»)
 │   ├── Desglose (fondo arena): líneas de la cotización + «Total a cobrar» grande; «Cubre: septiembre – noviembre 2026»

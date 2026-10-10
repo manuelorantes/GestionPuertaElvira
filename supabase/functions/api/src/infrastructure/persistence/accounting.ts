@@ -177,7 +177,7 @@ export class SqlLedgerQuery implements LedgerQuery {
     const rows = await this.sql`
       SELECT 'payment' AS source, p.id::text AS source_id, p.paid_on::text AS date, 'income' AS kind,
              p.concept || ' · ' || s.full_name AS concept,
-             CASE p.kind WHEN 'membership' THEN 'membership' ELSE 'fees' END AS category, p.method, p.total_cents AS amount
+             CASE p.kind WHEN 'membership' THEN 'membership' WHEN 'material' THEN 'material_sales' ELSE 'fees' END AS category, p.method, p.total_cents AS amount
         FROM billing_payment p JOIN students_student s ON s.id = p.student_id
        WHERE p.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
