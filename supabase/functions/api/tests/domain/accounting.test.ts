@@ -153,3 +153,47 @@ Deno.test('SeasonClosing should close a season with its result', () => {
   assertEquals(closing.result().cents, 400000);
   assert(closing.year.includes(LocalDate.fromString('2027-01-15')));
 });
+
+Deno.test('the club expenses have their own categories: president, cleaning and each utility', () => {
+  assertEquals(
+    (['president', 'cleaning', 'water', 'electricity', 'internet'] as const).map((c) => [
+      categoryLabel(c),
+      categoryKind(c),
+    ]),
+    [
+      ['Presidente', 'expense'],
+      ['Limpieza', 'expense'],
+      ['Agua', 'expense'],
+      ['Electricidad', 'expense'],
+      ['Wifi', 'expense'],
+    ],
+  );
+});
+
+Deno.test('entries and invoices belong to the month of their date unless another one is given', () => {
+  const date = LocalDate.fromString('2026-10-03');
+  const entry = (period?: YearMonth) =>
+    ManualEntry.record(
+      ManualEntryId.generate(),
+      date,
+      'expense',
+      'Luz de septiembre',
+      'electricity',
+      'transfer',
+      Money.euros(80),
+      period ?? null,
+    );
+  assertEquals(entry().period.toString(), '2026-10');
+  assertEquals(entry(YearMonth.fromString('2026-09')).period.toString(), '2026-09');
+  const invoice = SupplierInvoice.register(
+    SupplierInvoiceId.generate(),
+    date,
+    'A-1',
+    'Propietario del local',
+    'Alquiler de septiembre',
+    'rent',
+    Money.euros(950),
+    YearMonth.fromString('2026-09'),
+  );
+  assertEquals(invoice.period.toString(), '2026-09');
+});

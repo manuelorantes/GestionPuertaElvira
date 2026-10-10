@@ -35,6 +35,7 @@ function setUp() {
       method: 'cash',
       amountCents: 4500,
       studentId: 'martina',
+      period: '2026-10',
     },
     {
       source: 'settlement',
@@ -46,6 +47,7 @@ function setUp() {
       method: 'transfer',
       amountCents: 41600,
       studentId: null,
+      period: '2026-09',
     },
   ];
   const registerInvoice = (
@@ -182,6 +184,7 @@ Deno.test('CloseSeason should refuse while an older season with movements is ope
     method: 'cash',
     amountCents: 4500,
     studentId: 'martina',
+    period: '2024-10',
   }];
   await assertRejects(() => close().execute(2026), PreviousSeasonOpen);
   const fresh = setUp();

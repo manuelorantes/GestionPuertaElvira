@@ -45,6 +45,20 @@ Deno.test({
       })).status,
       201,
     );
+    // La luz del mes anterior, pagada hoy: gasto de hoy en caja, del mes anterior en lo que corresponde a cada mes.
+    const previousMonth = YearMonth.fromString(today.slice(0, 7)).previous().toString();
+    assertEquals(
+      (await client.json('POST', '/api/admin/accounting/entries', {
+        date: today,
+        kind: 'expense',
+        concept: 'Luz',
+        category: 'electricity',
+        method: 'transfer',
+        amount: '30',
+        period: previousMonth,
+      })).status,
+      201,
+    );
 
     const response = await client.get('/api/admin/dashboard');
     assertEquals(response.status, 200);
@@ -54,20 +68,35 @@ Deno.test({
     assertEquals(summary.expectedCents, 4500);
     assertEquals(summary.pendingCents, 0);
     assertEquals(summary.membershipPendingCents, 5000);
-    assertEquals(summary.expensesCents, 2000);
+    assertEquals(summary.expensesCents, 5000);
     assertEquals(summary.activeStudents, 1);
     assertEquals(summary.registeredStudents, 1);
-    // La temporada, de septiembre a agosto, con cada cuota en el mes al que corresponde.
-    const chart = summary.chart as { month: string; incomeCents: number; expenseCents: number }[];
+    // Dos gráficas de la temporada, de septiembre a agosto.
+    type Chart = { month: string; incomeCents: number; expenseCents: number }[];
+    const cash = summary.cashChart as Chart;
+    const ofMonth = summary.monthChart as Chart;
     const season = Season.containing(YearMonth.fromString(today.slice(0, 7)));
-    assertEquals(chart.length, 12);
-    assertEquals(chart[0]?.month, season.firstMonth().toString());
-    assertEquals(chart[11]?.month, `${season.startYear + 1}-08`);
-    assertEquals(chart.find((m) => m.month === today.slice(0, 7)), {
+    for (const chart of [cash, ofMonth]) {
+      assertEquals(chart.length, 12);
+      assertEquals(chart[0]?.month, season.firstMonth().toString());
+      assertEquals(chart[11]?.month, `${season.startYear + 1}-08`);
+    }
+    const at = (chart: Chart, month: string) => chart.find((m) => m.month === month);
+    // Lo que entra y sale en el mes: todo, por fecha.
+    assertEquals(at(cash, today.slice(0, 7)), {
       month: today.slice(0, 7),
       incomeCents: 4500,
-      expenseCents: 2000,
+      expenseCents: 5000,
     });
+    // Lo que corresponde a cada mes: solo las categorías del mes (las cuotas y la luz, no el material).
+    assertEquals(at(ofMonth, today.slice(0, 7)), {
+      month: today.slice(0, 7),
+      incomeCents: 4500,
+      expenseCents: 0,
+    });
+    if (season.includes(YearMonth.fromString(previousMonth))) {
+      assertEquals(at(ofMonth, previousMonth)?.expenseCents, 3000);
+    }
     assertEquals(summary.occupancy, {
       percent: 25,
       fullGroups: 0,
@@ -79,7 +108,7 @@ Deno.test({
         capacity: 4,
       }],
     });
-    assertEquals((summary.latest as unknown[]).length, 2);
+    assertEquals((summary.latest as unknown[]).length, 3);
     assertEquals(summary.overdue, []);
   },
 });
@@ -116,8 +145,8 @@ Deno.test({
     assertEquals(paid.status, 201, JSON.stringify(paid.body));
     // 3 × 45 € con un 10 % = 121,50 €: 40,50 € en cada uno de los tres meses.
     const chart = ((await client.get('/api/admin/dashboard')).body as {
-      chart: { month: string; incomeCents: number }[];
-    }).chart;
+      monthChart: { month: string; incomeCents: number }[];
+    }).monthChart;
     let month = YearMonth.fromString(today.slice(0, 7));
     const shares: number[] = [];
     for (let i = 0; i < 3; i++, month = month.next()) {

@@ -7,11 +7,13 @@ import {
   ManualEntry,
   ManualEntryId,
   methodFromName,
+  MonthlyCategories,
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
 } from '../../domain/accounting/mod.ts';
 import type {
+  AccountingSettingsRepository,
   InvoiceQuery,
   InvoiceView,
   LedgerLine,
@@ -24,8 +26,24 @@ import { Row, type Sql } from './sql.ts';
 
 /** Repositorios de Accounting: apuntes manuales, facturas de proveedores y cierres. */
 export class SqlAccountingRepository
-  implements ManualEntryRepository, SupplierInvoiceRepository, SeasonClosingRepository {
+  implements
+    ManualEntryRepository,
+    SupplierInvoiceRepository,
+    SeasonClosingRepository,
+    AccountingSettingsRepository {
   constructor(private readonly sql: Sql) {}
+
+  async monthlyCategories(): Promise<MonthlyCategories> {
+    const rows = await this.sql`SELECT monthly_categories FROM accounting_settings WHERE id = 1`;
+    if (!rows[0]) return MonthlyCategories.defaults();
+    return MonthlyCategories.of(new Row(rows[0]).json('monthly_categories') as string[]);
+  }
+
+  async saveMonthlyCategories(categories: MonthlyCategories): Promise<void> {
+    const list = this.sql.json(categories.list());
+    await this.sql`INSERT INTO accounting_settings (id, monthly_categories) VALUES (1, ${list})
+      ON CONFLICT (id) DO UPDATE SET monthly_categories = EXCLUDED.monthly_categories`;
+  }
 
   async entry(id: ManualEntryId): Promise<ManualEntry | null> {
     const rows = await this.sql`SELECT * FROM accounting_entry WHERE id = ${id.value}`;
@@ -39,13 +57,14 @@ export class SqlAccountingRepository
       categoryFromName(r.string('category')),
       methodFromName(r.string('method')),
       Money.cents(r.int('amount_cents')),
+      periodOf(r.nullableString('period')),
     );
   }
 
   async saveEntry(e: ManualEntry): Promise<void> {
     await this
-      .sql`INSERT INTO accounting_entry (id, entry_date, kind, concept, category, method, amount_cents)
-      VALUES (${e.id.value}, ${e.date.toString()}, ${e.kind}, ${e.concept}, ${e.category}, ${e.method}, ${e.amount.cents})
+      .sql`INSERT INTO accounting_entry (id, entry_date, kind, concept, category, method, amount_cents, period)
+      VALUES (${e.id.value}, ${e.date.toString()}, ${e.kind}, ${e.concept}, ${e.category}, ${e.method}, ${e.amount.cents}, ${e.period.toString()})
       ON CONFLICT (id) DO NOTHING`;
   }
 
@@ -68,6 +87,7 @@ export class SqlAccountingRepository
       concept: r.string('concept'),
       category: categoryFromName(r.string('category')),
       amount: Money.cents(r.int('amount_cents')),
+      period: periodOf(r.nullableString('period')),
       paidOn: paidOn === null ? null : LocalDate.fromString(paidOn),
       method: method === null ? null : methodFromName(method),
       attachment: key === null ? null : new Attachment(
@@ -89,6 +109,7 @@ export class SqlAccountingRepository
       concept: i.concept,
       category: i.category,
       amount_cents: i.amount.cents,
+      period: i.period.toString(),
       paid_on: i.paidOn()?.toString() ?? null,
       method: i.method() ?? null,
       attachment_key: a?.key ?? null,
@@ -133,6 +154,10 @@ export class SqlAccountingRepository
   }
 }
 
+function periodOf(value: string | null): YearMonth | null {
+  return value === null ? null : YearMonth.fromString(value);
+}
+
 function toClosing(r: Row): SeasonClosing {
   return SeasonClosing.close(
     new FiscalYear(r.int('start_year')),
@@ -159,6 +184,7 @@ export class SqlInvoiceQuery implements InvoiceQuery {
       paidOn: r.nullableString('paid_on'),
       method: r.nullableString('method'),
       attachmentName: r.nullableString('attachment_name'),
+      period: r.nullableString('period') ?? r.string('invoice_date').slice(0, 7),
     }));
   }
 }
@@ -178,7 +204,7 @@ export class SqlLedgerQuery implements LedgerQuery {
       SELECT 'payment' AS source, p.id::text AS source_id, p.paid_on::text AS date, 'income' AS kind,
              p.concept || ' · ' || s.full_name AS concept,
              CASE p.kind WHEN 'membership' THEN 'membership' WHEN 'material' THEN 'material_sales' ELSE 'fees' END AS category, p.method, p.total_cents AS amount,
-             p.student_id::text AS student_id
+             p.student_id::text AS student_id, to_char(p.paid_on, 'YYYY-MM') AS period
         FROM billing_payment p JOIN students_student s ON s.id = p.student_id
        WHERE p.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
@@ -186,21 +212,23 @@ export class SqlLedgerQuery implements LedgerQuery {
              'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', 'transfer',
              -- Lo adelantado a cuenta de ese mes ya salió como anticipo.
              st.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM payroll_advance a
-                WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0), NULL
+                WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0), NULL, st.month
         FROM payroll_settlement st JOIN teachers_teacher t ON t.id = st.teacher_id
        WHERE st.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
       SELECT 'advance', a.teacher_id::text || '/' || a.id::text, a.paid_on::text, 'expense',
              'Anticipo a cuenta de ' || a.month || ' · ' || t.full_name || COALESCE(' · ' || a.note, ''),
-             'teachers', 'transfer', a.amount_cents, NULL
+             'teachers', 'transfer', a.amount_cents, NULL, a.month
         FROM payroll_advance a JOIN teachers_teacher t ON t.id = a.teacher_id
        WHERE a.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
-      SELECT 'invoice', i.id::text, i.paid_on::text, 'expense', i.supplier || ' · ' || i.concept, i.category, i.method, i.amount_cents, NULL
+      SELECT 'invoice', i.id::text, i.paid_on::text, 'expense', i.supplier || ' · ' || i.concept, i.category, i.method, i.amount_cents, NULL,
+             COALESCE(i.period, to_char(i.invoice_date, 'YYYY-MM'))
         FROM accounting_invoice i
        WHERE i.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
-      SELECT 'manual', e.id::text, e.entry_date::text, e.kind, e.concept, e.category, e.method, e.amount_cents, NULL
+      SELECT 'manual', e.id::text, e.entry_date::text, e.kind, e.concept, e.category, e.method, e.amount_cents, NULL,
+             COALESCE(e.period, to_char(e.entry_date, 'YYYY-MM'))
         FROM accounting_entry e
        WHERE e.entry_date BETWEEN ${from} AND ${to}`;
     return Row.all(rows).map((r) => ({
@@ -213,6 +241,7 @@ export class SqlLedgerQuery implements LedgerQuery {
       method: r.string('method'),
       amountCents: r.int('amount'),
       studentId: r.nullableString('student_id'),
+      period: r.string('period'),
     }));
   }
 }
