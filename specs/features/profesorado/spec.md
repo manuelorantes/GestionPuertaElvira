@@ -190,7 +190,16 @@ lo suyo:
 - **Mis clases**: las de hoy y las de la semana, día a día, según el horario: las suyas salvo las que le sustituyen,
   más las que da sustituyendo a otro (marcadas «Sustitución»), sin festivos; con hora, aula, alumnos que van ese día y
   el estado de la lista (pasada, por pasar o sin pasar). Desde ahí pasa lista (ver la spec de asistencia).
-- **Mis alumnos**: los alumnos de cada una de sus clases y los días que vienen si no son todos, sin datos de contacto.
+- **Mis grupos**: los grupos de los que es titular y, marcados «Sustitución», aquellos en los que tiene una
+  sustitución a 7 días o menos (antes o después). Cada grupo lleva a su página, de solo lectura, con:
+  - los **comentarios de las clases** (ver la spec de asistencia), primero los de la clase y debajo los de los alumnos
+    con un selector por alumno (los del grupo y los que vinieron en asistencia especial), del más reciente al más
+    antiguo: los de las últimas 4 semanas y, con «Ver más», los 4 anteriores cada vez, hasta el inicio de la temporada;
+  - sus **alumnos**, con los días que vienen si no son todos y su asistencia de la temporada en ese grupo (porcentaje de
+    las clases con lista; por debajo del 75 % en rojo; «—» sin clases con lista), sin datos de contacto;
+  - la **asistencia del grupo** mes a mes, como la ve administración (ver la spec de asistencia), desde septiembre hasta
+    el mes en curso, sin enlace a la ficha del alumno.
+  No puede ver así ningún otro grupo.
 - **Mis pagos**: el mes a mes de la temporada hasta el mes en curso (horas, importe, anticipos, a pagar y estado:
   pagada y cuándo, pendiente o en curso) y los totales (lo que se le debe, lo cobrado, horas e importe), sin ingresos
   ni márgenes del club.
@@ -199,6 +208,15 @@ No MUST poder apuntar ni cambiar horas, sustituciones, turnos ni pagos.
 #### Scenario: Una sustitución en su semana
 - **WHEN** Lucía da el martes la clase de Carlos y consulta su semana
 - **THEN** ve esa clase el martes marcada «Sustitución», y Carlos no la ve en la suya
+
+#### Scenario: Lo que se comentó el jueves
+- **WHEN** Lucía comenta el jueves 1 «Hemos dado mates de torres» al pasar lista y el martes 6 abre su grupo en
+  Mis grupos
+- **THEN** ve el comentario con el día y su nombre, encima de los más antiguos, y la asistencia de cada alumno
+
+#### Scenario: El grupo que sustituye
+- **WHEN** Lucía sustituye a Carlos el martes 13
+- **THEN** ve el grupo de Carlos en Mis grupos, marcado «Sustitución», del martes 6 al martes 20, y no después
 
 #### Scenario: Sus pagos
 - **WHEN** Lucía abre Mis pagos con septiembre pagado y octubre en curso

@@ -192,19 +192,19 @@ describe('barra de actualización', () => {
   it('shows while club data loads and goes away when it arrives', async () => {
     const spy = mockApi({
       'GET /api/auth/me': [200, { user: TEACHER }],
-      'GET /api/teacher/students': [200, { items: [] }],
+      'GET /api/teacher/groups': [200, { items: [] }],
     });
     // La respuesta de los alumnos se retiene hasta que el test la suelta.
     const reply = spy.getMockImplementation();
     let release: () => void = () => undefined;
     spy.mockImplementation((input, init) =>
-      String(input) === '/api/teacher/students'
+      String(input) === '/api/teacher/groups'
         ? new Promise((resolve) => {
             release = () => resolve(reply?.(input, init) as Promise<Response>);
           })
         : (reply?.(input, init) as Promise<Response>),
     );
-    renderApp('/panel/mis-alumnos');
+    renderApp('/panel/mis-grupos');
 
     expect(await screen.findByRole('progressbar', { name: 'Actualizando datos' })).toBeVisible();
     release();
@@ -233,7 +233,7 @@ describe('administración que también da clases', () => {
     await user.click(sidebarButton('Cambiar a profesor'));
 
     expect(await screen.findByRole('heading', { name: 'Mis clases' })).toBeVisible();
-    expect(within(nav).getByRole('link', { name: /Mis alumnos/ })).toBeVisible();
+    expect(within(nav).getByRole('link', { name: /Mis grupos/ })).toBeVisible();
     expect(within(nav).queryByRole('link', { name: /Cobros y cuotas/ })).not.toBeInTheDocument();
     expect(screen.getByText('Profesorado')).toBeVisible();
 

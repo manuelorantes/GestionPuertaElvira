@@ -1,3 +1,4 @@
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
@@ -50,7 +51,25 @@ const percent = (s: Student) =>
  * vacío si ese día no le tocaba) y el porcentaje de las clases con lista. Se ordena por nombre o por porcentaje.
  */
 export function GroupAttendanceTable({ groupId, month }: { groupId: string; month: string }) {
-  const attendance = useGroupAttendance(groupId, month);
+  return (
+    <GroupAttendanceGrid
+      attendance={useGroupAttendance(groupId, month)}
+      month={month}
+      studentHref={(id) => `/panel/alumnos/${id}`}
+    />
+  );
+}
+
+/** La tabla de asistencia de un mes ya pedida; sin `studentHref`, los nombres no llevan a ninguna parte. */
+export function GroupAttendanceGrid({
+  attendance,
+  month,
+  studentHref,
+}: {
+  attendance: UseQueryResult<GroupAttendance>;
+  month: string;
+  studentHref?: (studentId: string) => string;
+}) {
   const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({
     key: 'name',
     descending: false,
@@ -129,9 +148,13 @@ export function GroupAttendanceTable({ groupId, month }: { groupId: string; mont
             return (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <th scope="row" className="py-2 pr-3 font-medium">
-                  <Link to={`/panel/alumnos/${s.id}`} className="hover:underline">
-                    {s.name}
-                  </Link>
+                  {studentHref ? (
+                    <Link to={studentHref(s.id)} className="hover:underline">
+                      {s.name}
+                    </Link>
+                  ) : (
+                    s.name
+                  )}
                   {specialDays(s, data.days).length > 0 && (
                     <AsteriskNote label={`Asistencia especial de ${s.name}`}>
                       {s.member ? 'Además de sus clases, vino' : 'No es de este grupo: vino'} en

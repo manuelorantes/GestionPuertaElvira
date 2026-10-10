@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import * as api from './api';
 
@@ -9,8 +9,25 @@ export function useTeacherClasses(from: string, to: string) {
   });
 }
 
-export function useTeacherStudents() {
-  return useQuery({ queryKey: ['teacher-students'], queryFn: api.fetchStudents });
+export function useTeacherGroups() {
+  return useQuery({ queryKey: ['teacher-groups'], queryFn: api.fetchGroups });
+}
+
+export function useTeacherGroupAttendance(groupId: string, month: string) {
+  return useQuery({
+    queryKey: ['teacher-group-attendance', groupId, month],
+    queryFn: () => api.fetchTeacherGroupAttendance(groupId, month),
+  });
+}
+
+/** Los comentarios del grupo: las últimas 4 semanas y, con `fetchNextPage`, las 4 anteriores. */
+export function useTeacherGroupComments(groupId: string) {
+  return useInfiniteQuery({
+    queryKey: ['teacher-group-comments', groupId],
+    queryFn: ({ pageParam }) => api.fetchTeacherGroupComments(groupId, pageParam),
+    initialPageParam: null as string | null,
+    getNextPageParam: (last) => last.nextBefore ?? undefined,
+  });
 }
 
 export function useRollCall(groupId: string, date: string) {
