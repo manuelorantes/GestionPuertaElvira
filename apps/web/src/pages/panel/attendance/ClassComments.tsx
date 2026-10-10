@@ -1,5 +1,5 @@
 import { Pencil, Trash2 } from 'lucide-react';
-import { useId, useState, type FormEvent } from 'react';
+import { Fragment, useId, useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import type { ClassComment } from '@/features/class-comments/api';
@@ -7,6 +7,7 @@ import { formatDate } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const MAX_LENGTH = 1000;
 
@@ -113,12 +114,18 @@ function CommentItem({
   const [removing, setRemoving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const student =
+    comment.studentId === null ? (
+      'Toda la clase'
+    ) : (
+      <StudentLink id={comment.studentId}>{comment.studentName}</StudentLink>
+    );
   const meta = [
     show.date ? formatDate(comment.date) : null,
     show.group ? comment.groupName : null,
-    show.student ? (comment.studentName ?? 'Toda la clase') : null,
+    show.student ? student : null,
     comment.author,
-  ].filter(Boolean);
+  ].filter((part) => part !== null && part !== '');
 
   function remove() {
     setBusy(true);
@@ -144,7 +151,14 @@ function CommentItem({
     <li className="flex items-start gap-2 py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-sm whitespace-pre-line text-ink">{comment.text}</p>
-        <p className="mt-0.5 text-[13px] text-ink-muted">{meta.join(' · ')}</p>
+        <p className="mt-0.5 text-[13px] text-ink-muted">
+          {meta.map((part, index) => (
+            <Fragment key={index}>
+              {index > 0 && ' · '}
+              {part}
+            </Fragment>
+          ))}
+        </p>
       </div>
       {editable && (
         <span className="flex shrink-0 gap-1">

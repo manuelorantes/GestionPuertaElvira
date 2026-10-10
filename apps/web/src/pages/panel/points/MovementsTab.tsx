@@ -10,6 +10,7 @@ import { Card } from '@/shared/ui/Card';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
 import { KIND_LABEL, signed } from './labels';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const KINDS: (PointsKind | 'all')[] = ['all', 'friday', 'tournament', 'manual', 'redemption'];
 
@@ -66,7 +67,9 @@ export function MovementsTab({ month, kind }: { month: string; kind?: PointsKind
               {movements.data.map((m) => (
                 <tr key={m.id} className="border-b border-line-soft last:border-b-0">
                   <td className="px-5 py-2.5 tabular-nums">{formatDate(m.date)}</td>
-                  <td className="px-5 py-2.5 font-medium">{m.studentName}</td>
+                  <td className="px-5 py-2.5 font-medium">
+                    <StudentLink id={m.studentId}>{m.studentName}</StudentLink>
+                  </td>
                   <td className="px-5 py-2.5 text-ink-muted">{KIND_LABEL[m.kind]}</td>
                   <td className="px-5 py-2.5">{m.concept}</td>
                   <td

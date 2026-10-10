@@ -16,6 +16,7 @@ import { DateField } from '@/shared/ui/DateField';
 import { Dialog } from '@/shared/ui/Dialog';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 /**
  * Fotos con la equipación oficial en los torneos: la galería del mes y «Añadir foto» (se busca al alumno y se adjunta
@@ -65,7 +66,9 @@ export function PhotosTab({ month }: { month: string }) {
                 </a>
                 <div className="flex items-start gap-2 px-3 py-2.5">
                   <div className="min-w-0 flex-1 text-sm">
-                    <p className="truncate font-semibold">{photo.studentName}</p>
+                    <p className="truncate font-semibold">
+                      <StudentLink id={photo.studentId}>{photo.studentName}</StudentLink>
+                    </p>
                     <p className="truncate text-[13px] text-ink-muted">
                       {formatDate(photo.date)}
                       {photo.note ? ` · ${photo.note}` : ''}

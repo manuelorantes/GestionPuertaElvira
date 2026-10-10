@@ -190,6 +190,10 @@ describe('Cobros y cuotas', () => {
     expect(within(martina).getByText('40,50 €')).toBeInTheDocument();
     expect(within(martina).getByText('Vencida')).toBeInTheDocument();
     expect(within(martina).getByRole('button', { name: 'WhatsApp' })).toBeInTheDocument();
+    expect(within(martina).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s1',
+    );
     expect(within(table).getByRole('row', { name: /Hugo/ })).toHaveTextContent('Cobrada');
     expect(screen.getByText('1 de 2 cuotas cobradas · 55 € de 95,50 €')).toBeInTheDocument();
     expect(screen.getByText('1 vencida')).toBeInTheDocument();
@@ -464,8 +468,13 @@ describe('Cobros y cuotas', () => {
       'row',
       { name: /R-2026-0002/ },
     );
+    expect(within(row).getByRole('link', { name: RECEIPT.studentName })).toHaveAttribute(
+      'href',
+      `/panel/alumnos/${RECEIPT.studentId}`,
+    );
     await userEvent.click(within(row).getByRole('button', { name: 'Ver recibo' }));
     const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
+    expect(within(receipt).getByRole('link', { name: RECEIPT.studentName })).toBeVisible();
     await userEvent.click(within(receipt).getByRole('button', { name: 'Emitir factura' }));
     const invoice = await screen.findByRole('dialog', { name: 'Emitir factura' });
     expect(within(invoice).getByLabelText('Nombre o razón social')).toHaveValue('Rocío Herrera');

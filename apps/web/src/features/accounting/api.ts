@@ -11,6 +11,8 @@ export interface LedgerItem {
   category: string;
   method: string;
   amountCents: number;
+  /** El alumno de un cobro; el resto de movimientos no tiene. */
+  studentId: string | null;
   categoryLabel: string;
   methodLabel: string;
 }

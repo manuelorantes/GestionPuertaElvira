@@ -24,6 +24,8 @@ import { useToast } from '@/shared/ui/Toast';
 
 import { EntryDialog } from './EntryDialog';
 
+import { MovementConcept } from './MovementConcept';
+
 const ROW_ACTION =
   'flex size-9 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted';
 
@@ -182,7 +184,9 @@ function LedgerTable({
                 )}
               </td>
               <td className="px-3 py-3 text-ink-muted">{formatDate(item.date)}</td>
-              <td className="px-3 py-3 font-medium">{item.concept}</td>
+              <td className="px-3 py-3 font-medium">
+                <MovementConcept concept={item.concept} studentId={item.studentId} />
+              </td>
               <td className="px-3 py-3">
                 <span className="rounded-full bg-line-soft px-2 py-0.5 text-xs whitespace-nowrap">
                   {item.categoryLabel}

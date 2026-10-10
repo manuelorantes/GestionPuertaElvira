@@ -8,6 +8,7 @@ import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Card } from '@/shared/ui/Card';
 import { useToast } from '@/shared/ui/Toast';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 /** «Cuotas canceladas» de la temporada: lo cancelado de cada una y «Reactivar» para que vuelva a deberse. */
 export function CancelledCharges() {
@@ -39,7 +40,9 @@ export function CancelledCharges() {
           <li key={charge.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
             <Avatar name={charge.studentName} size={32} />
             <span className="min-w-40 flex-1">
-              <span className="block font-medium">{charge.studentName}</span>
+              <StudentLink id={charge.studentId} className="block font-medium">
+                {charge.studentName}
+              </StudentLink>
               <span className="text-ink-muted">
                 {charge.kind === 'membership'
                   ? 'Cuota de socio'

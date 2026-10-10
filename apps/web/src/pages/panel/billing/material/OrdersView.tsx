@@ -24,6 +24,7 @@ import { useToast } from '@/shared/ui/Toast';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
 import type { MaterialDialog } from './MaterialTab';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const ACTION =
   'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm px-3 text-[13px] font-semibold disabled:opacity-60';
@@ -230,7 +231,9 @@ export function OrdersView({ onDialog }: { onDialog: (dialog: MaterialDialog) =>
             <span className="flex min-w-0 flex-1 items-center gap-3">
               <Avatar name={order.studentName} size={32} />
               <span className="min-w-0">
-                <span className="block font-medium">{order.studentName}</span>
+                <StudentLink id={order.studentId} className="block font-medium">
+                  {order.studentName}
+                </StudentLink>
                 <span className="block text-ink-soft">{orderLabel(order)}</span>
                 <span className="block text-[12px] text-ink-muted">
                   Apuntado el {formatDate(order.createdOn)}
