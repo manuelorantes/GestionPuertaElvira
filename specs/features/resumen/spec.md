@@ -5,8 +5,10 @@ Portada del panel para administración con las cifras reales del club. Se compon
 ### Requirement: Cifras clave del mes
 El resumen MUST mostrar:
 
-- lo cobrado en el mes frente a lo previsto (cuotas del mes);
-- lo pendiente de cobro, con el plazo del día 5;
+- lo cobrado en el mes frente a lo previsto: solo las cuotas del mes (y el material), las mismas cifras que «Cuotas» de
+  ese mes en Cobros;
+- lo pendiente de cobro de esas cuotas, con el plazo del día 5 y, aparte en la misma línea, lo que falta por cobrar de
+  cuotas de socio de la temporada (p. ej. «Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio»);
 - los gastos del mes (liquidaciones, facturas y otros gastos);
 - los alumnos activos frente a los registrados.
 
