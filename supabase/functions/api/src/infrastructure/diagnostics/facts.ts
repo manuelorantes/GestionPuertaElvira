@@ -39,7 +39,6 @@ import {
 } from '../persistence/payroll.ts';
 import { SqlPointsQuery } from '../persistence/points.ts';
 import { Row, type Sql } from '../persistence/sql.ts';
-import { SqlStudentQuery } from '../persistence/students.ts';
 
 /** El cálculo de las cuotas previstas no escribe nada: no necesita transacción ni cerrojo. */
 const READ_ONLY = {
@@ -109,61 +108,82 @@ export class SqlDiagnosticsFacts implements FactsSource {
     return months;
   }
 
+  /** Todos los alumnos en pocas consultas: ficha, grupos de hoy y la tarifa de hoy de los activos. */
   private async students(today: LocalDate): Promise<FactStudent[]> {
-    const query = new SqlStudentQuery(this.sql, new SqlClassQuery(this.sql));
-    const directory = new SqlStudentDirectory(this.sql);
+    const day = today.toString();
+    const rows = Row.all(
+      await this
+        .sql`SELECT id, member_number, full_name, birth_date::text AS birth_date, contact_email,
+          guardians, own_phone, joined_on::text AS joined_on, withdrawn_on::text AS withdrawn_on, sibling_ids
+        FROM students_student ORDER BY search_name`,
+    );
+    const groupNames = new Map(
+      (await new SqlClassQuery(this.sql).groups(today)).map((g) => [g.id, g.name]),
+    );
+    const groupsByStudent = new Map<string, FactStudent['groups']>();
+    for (
+      const row of Row.all(
+        await this.sql`SELECT student_id, class_group_id, enrolled_on::text AS since
+          FROM classes_enrolment
+         WHERE enrolled_on <= ${day} AND (ends_on IS NULL OR ends_on > ${day})
+         ORDER BY enrolled_on, id`,
+      )
+    ) {
+      const list = groupsByStudent.get(row.string('student_id')) ?? [];
+      const id = row.string('class_group_id');
+      list.push({ id, name: groupNames.get(id) ?? id, since: row.string('since') });
+      groupsByStudent.set(row.string('student_id'), list);
+    }
     const settings = await new SqlBillingSettingsRepository(this.sql).get();
-    const accounts = new SqlStudentAccountRepository(this.sql);
-    const summaries = await query.list('all', null, today);
-    const accountsById = await accounts.accountsOf(
-      summaries.map((s) => StudentRef.fromString(s.id)),
+    const profiles = new Map(
+      (await new SqlStudentDirectory(this.sql).activeOn(today)).map((p) => [p.id, p]),
+    );
+    const accounts = await new SqlStudentAccountRepository(this.sql).accountsOf(
+      [...profiles.keys()].map((id) => StudentRef.fromString(id)),
     );
     const calculator = new FeeCalculator();
-    const result: FactStudent[] = [];
-    for (const summary of summaries) {
-      const detail = await query.detail(summary.id, today);
-      if (detail === null) continue;
-      let weeklyHours = 0;
+    return rows.map((row) => {
+      const id = row.string('id');
+      const withdrawnOn = row.nullableString('withdrawn_on');
+      const birthDate = row.nullableString('birth_date');
+      const profile = profiles.get(id) ?? null;
       let tierCents = 0;
       let privateLessonsCents = 0;
       let feeCents = 0;
-      let familyDiscount = false;
-      if (detail.status === 'active') {
-        const profile = await directory.find(StudentRef.fromString(summary.id), today);
-        if (profile !== null) {
-          weeklyHours = profile.regularWeeklyHours;
-          tierCents = settings.tariff.forWeeklyHours(profile.regularWeeklyHours).cents;
-          const feeProfile = feeProfileOf(profile, accountsById.get(summary.id) ?? null, settings);
-          privateLessonsCents = feeProfile.privateLessons.reduce(
-            (sum, lesson) => sum + lesson.monthlyPrice().cents,
-            0,
-          );
-          feeCents = calculator.quote(feeProfile, settings, 1).total.cents;
-          familyDiscount = profile.hasSiblings;
-        }
+      if (profile !== null) {
+        const feeProfile = feeProfileOf(profile, accounts.get(id) ?? null, settings);
+        tierCents = settings.tariff.forWeeklyHours(profile.regularWeeklyHours).cents;
+        privateLessonsCents = feeProfile.privateLessons.reduce(
+          (sum, lesson) => sum + lesson.monthlyPrice().cents,
+          0,
+        );
+        feeCents = calculator.quote(feeProfile, settings, 1).total.cents;
       }
-      result.push({
-        id: detail.id,
-        memberNumber: detail.memberNumber,
-        fullName: detail.fullName,
-        status: detail.status === 'active' ? 'active' : 'withdrawn',
-        age: detail.age,
-        contactEmail: detail.contactEmail,
-        guardians: detail.guardians,
-        ownPhone: detail.ownPhone,
-        joinedOn: detail.joinedOn,
-        withdrawnOn: detail.withdrawnOn,
-        groups: detail.groups.map((g) => ({ id: g.id, name: g.name, since: g.since })),
-        siblingIds: detail.siblings.map((s) => s.id),
-        weeklyHours,
+      const guardians = row.json('guardians') as { name?: unknown; phone?: unknown }[];
+      return {
+        id,
+        memberNumber: row.int('member_number'),
+        fullName: row.string('full_name'),
+        status: withdrawnOn !== null && withdrawnOn <= day ? 'withdrawn' : 'active',
+        age: birthDate === null ? null : LocalDate.fromString(birthDate).ageOn(today),
+        contactEmail: row.nullableString('contact_email'),
+        guardians: guardians.map((g) => ({
+          name: typeof g.name === 'string' ? g.name : '',
+          phone: typeof g.phone === 'string' ? g.phone : null,
+        })),
+        ownPhone: row.nullableString('own_phone'),
+        joinedOn: row.string('joined_on'),
+        withdrawnOn,
+        groups: groupsByStudent.get(id) ?? [],
+        siblingIds: row.stringList('sibling_ids'),
+        weeklyHours: profile?.regularWeeklyHours ?? 0,
         tierCents,
         privateLessonsCents,
         feeCents,
-        familyDiscount,
+        familyDiscount: profile?.hasSiblings ?? false,
         familyPercent: settings.tariff.familyPercent,
-      });
-    }
-    return result;
+      };
+    });
   }
 
   /** Las cuotas guardadas de la temporada (sin las previstas, que no existen aún) con lo que tienen cubierto. */
