@@ -8,6 +8,7 @@ import { currentMonth } from '@/features/billing/money';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
 
+import { DiagnosticsTab } from './DiagnosticsTab';
 import { InvoiceDialog } from './InvoiceDialog';
 import { InvoicesTab } from './InvoicesTab';
 import { LedgerTab } from './LedgerTab';
@@ -19,6 +20,7 @@ const TABS = [
   { id: 'facturas', label: 'Facturas' },
   { id: 'cierre', label: 'Mes a mes y cierre' },
   { id: 'ajustes', label: 'Ajustes' },
+  { id: 'diagnostico', label: 'Diagnóstico' },
 ];
 
 export function AccountingPage() {
@@ -41,6 +43,7 @@ export function AccountingPage() {
   function renderTab() {
     if (tab === 'facturas') return <InvoicesTab />;
     if (tab === 'ajustes') return <MonthlyCategoriesTab />;
+    if (tab === 'diagnostico') return <DiagnosticsTab />;
     if (tab === 'cierre')
       return (
         <YearTab startYear={season} onChange={(year) => setParam('temporada', String(year))} />
