@@ -976,3 +976,81 @@ describe('ficha de grupo', () => {
     );
   });
 });
+
+describe('alumnos parecidos al dar de alta', () => {
+  const PABLO_WITHDRAWN = {
+    ...HUGO,
+    id: 's2',
+    fullName: 'Pablo Gil Ruiz',
+    memberNumber: 12,
+    withdrawnOn: '2026-06-30',
+  };
+  const PABLO_ACTIVE = { ...MARTINA, id: 's4', fullName: 'Pablo Gil Martín', memberNumber: 20 };
+
+  it('suggests rejoining a withdrawn student with the same name and first surname', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'GET /api/admin/students/similar?name=Pablo%20Gil%20Ruiz': [
+        200,
+        { items: [PABLO_WITHDRAWN, PABLO_ACTIVE] },
+      ],
+      'GET /api/admin/students/s2': [
+        200,
+        {
+          ...DETAIL,
+          id: 's2',
+          fullName: 'Pablo Gil Ruiz',
+          status: 'withdrawn',
+          withdrawnOn: '2026-06-30',
+          membership: [{ joinedOn: '2025-09-15', withdrawnOn: '2026-06-30' }],
+          groups: [],
+          siblings: [],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
+    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Pablo');
+    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), ' Gil Ruiz');
+
+    const notice = await within(dialog).findByRole('region', {
+      name: 'Alumnos con un nombre parecido',
+    });
+    expect(notice).toHaveTextContent('¿Es este alumno, que está de baja?');
+    expect(notice).toHaveTextContent('socio nº 12 · 14 años · de baja desde el 30/06/2026');
+    expect(notice).toHaveTextContent('Ya hay un alumno de alta con un nombre parecido:');
+    expect(
+      within(notice).getByRole('button', { name: 'Ver la ficha de Pablo Gil Martín' }),
+    ).toBeVisible();
+    // Con una sola palabra no se busca.
+    expect(spy.mock.calls.map(([url]) => String(url))).not.toContain(
+      '/api/admin/students/similar?name=Pablo',
+    );
+
+    await user.click(
+      within(notice).getByRole('button', { name: 'Es este: darle de alta de nuevo' }),
+    );
+    expect(screen.queryByRole('dialog', { name: 'Nuevo alumno' })).not.toBeInTheDocument();
+    expect(await screen.findByRole('dialog', { name: /Dar de alta de nuevo a/ })).toBeVisible();
+  });
+
+  it('says nothing when nobody has that name', async () => {
+    const user = userEvent.setup();
+    const spy = api({ 'GET /api/admin/students/similar?name=Lola%20Ruiz': [200, { items: [] }] });
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
+    await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Lola Ruiz');
+    await waitFor(() =>
+      expect(spy.mock.calls.map(([url]) => String(url))).toContain(
+        '/api/admin/students/similar?name=Lola%20Ruiz',
+      ),
+    );
+    expect(
+      within(dialog).queryByRole('region', { name: 'Alumnos con un nombre parecido' }),
+    ).not.toBeInTheDocument();
+  });
+});
