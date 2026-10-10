@@ -35,11 +35,28 @@ dirección de la página.
 Administración MUST poder anotar ingresos o gastos con fecha, concepto, categoría de su tipo, forma de pago (efectivo, transferencia o tarjeta)
 e importe mayor que cero, y quitarlos.
 
+### Requirement: Mes al que corresponde
+Cada apunte y cada factura MUST tener un mes al que corresponde (la luz de septiembre pagada en octubre corresponde a
+septiembre). Al anotarlos se puede elegir; por defecto es el mes de su fecha (la de la factura, en las facturas). En los
+movimientos, el mes al que corresponde MUST ser el de la liquidación o el anticipo para el profesorado y el del cobro en
+los cobros. Los movimientos de otro mes MUST indicarlo («Corresponde a septiembre 2026»).
+
+#### Scenario: Luz pagada al mes siguiente
+- **WHEN** administración anota el 3 de octubre la luz y elige «Septiembre 2026» como mes al que corresponde
+- **THEN** el movimiento sale en octubre con «Corresponde a septiembre 2026», y en el resumen cuenta como gasto de
+  septiembre en «Lo que corresponde a cada mes»
+
+### Requirement: Categorías del mes
+En la pestaña «Ajustes», administración MUST poder marcar qué categorías de ingresos y gastos cuentan como «del mes»
+(las que salen en la gráfica «Lo que corresponde a cada mes» del resumen). Por defecto: en ingresos, Cuotas; en gastos,
+Profesores, Presidente, Alquiler, Limpieza, Agua, Electricidad y Wifi.
+
 ### Requirement: Gastos por categoría
-El sistema MUST mostrar los gastos del mes agrupados por categoría (Profesores, Alquiler, Material, Federación, Torneos, Suministros, Otros gastos), de mayor a menor, con su total.
+El sistema MUST mostrar los gastos del mes agrupados por categoría (Profesores, Alquiler, Material, Federación, Torneos, Suministros, Presidente, Limpieza, Agua, Electricidad, Wifi,
+Otros gastos), de mayor a menor, con su total.
 
 ### Requirement: Facturas de proveedores
-Una factura MUST tener fecha, número, proveedor, concepto, categoría de gasto e importe, y MAY llevar un documento (PDF, JPG, PNG o WEBP de hasta 10 MB),
+Una factura MUST tener fecha, número, proveedor, concepto, categoría de gasto, importe y mes al que corresponde, y MAY llevar un documento (PDF, JPG, PNG o WEBP de hasta 10 MB),
 que se puede abrir o sustituir. Se marca como pagada con fecha y forma de pago; solo una factura pendiente se puede quitar.
 
 #### Scenario: Documento no válido
