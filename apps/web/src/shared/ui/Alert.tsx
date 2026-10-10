@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 const TONES = {
   danger: 'bg-danger-bg text-danger-fg',
   info: 'bg-surface-muted text-ink-soft',
+  warning: 'bg-warning-bg text-warning-fg',
 } as const;
 
 interface AlertProps {
