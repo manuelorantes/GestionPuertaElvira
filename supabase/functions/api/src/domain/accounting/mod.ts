@@ -59,9 +59,88 @@ const CATEGORIES: Record<LedgerCategory, { kind: EntryKind; label: string }> = {
   other_income: { kind: 'income', label: 'Otros ingresos' },
 };
 
-/** Todas las categorías, en el orden en que se muestran. */
-export function allCategories(): LedgerCategory[] {
-  return Object.keys(CATEGORIES) as LedgerCategory[];
+/** Una categoría del libro: de serie o creada por el club (`custom`). */
+export interface Category {
+  code: string;
+  kind: EntryKind;
+  label: string;
+  custom: boolean;
+}
+
+/**
+ * Las categorías del libro: las de serie, que no cambian, y las que crea el club, que se pueden renombrar. Sin nombres
+ * repetidos dentro de los ingresos ni dentro de los gastos.
+ */
+export class CategoryCatalog {
+  private static readonly MAX_LABEL = 40;
+
+  private constructor(private readonly custom: Category[]) {}
+
+  static of(custom: readonly Category[]): CategoryCatalog {
+    return new CategoryCatalog(custom.map((c) => ({ ...c, custom: true })));
+  }
+
+  /** De serie primero y las del club después, cada tipo con su orden. */
+  all(): Category[] {
+    const builtIn = (Object.keys(CATEGORIES) as LedgerCategory[]).map((code) => ({
+      code,
+      kind: CATEGORIES[code].kind,
+      label: CATEGORIES[code].label,
+      custom: false,
+    }));
+    return [...builtIn, ...this.custom];
+  }
+
+  find(code: string): Category | null {
+    return this.all().find((c) => c.code === code) ?? null;
+  }
+
+  /** La categoría, que debe existir (y ser de ese tipo, si se indica). */
+  require(code: string, kind?: EntryKind): Category {
+    const category = this.find(code);
+    if (category === null) throw new InvalidValue('category', 'Categoría desconocida.');
+    if (kind !== undefined && category.kind !== kind) {
+      throw new InvalidValue(
+        'category',
+        `La categoría no corresponde a un ${kind === 'income' ? 'ingreso' : 'gasto'}.`,
+      );
+    }
+    return category;
+  }
+
+  label(code: string): string {
+    return this.find(code)?.label ?? code;
+  }
+
+  add(code: string, kind: EntryKind, label: string): Category {
+    const category = { code, kind, label: this.checkedLabel(kind, label, null), custom: true };
+    this.custom.push(category);
+    return { ...category };
+  }
+
+  rename(code: string, label: string): Category {
+    const category = this.custom.find((c) => c.code === code);
+    if (!category) {
+      throw new InvalidValue(
+        'category',
+        'Solo se pueden renombrar las categorías creadas por el club.',
+      );
+    }
+    category.label = this.checkedLabel(category.kind, label, code);
+    return { ...category };
+  }
+
+  private checkedLabel(kind: EntryKind, label: string, except: string | null): string {
+    const clean = label.replace(/\s+/gu, ' ').trim();
+    if (clean === '' || clean.length > CategoryCatalog.MAX_LABEL) {
+      throw new InvalidValue('label', 'Indica un nombre de hasta 40 caracteres.');
+    }
+    const same = (a: string) => a.toLocaleLowerCase('es') === clean.toLocaleLowerCase('es');
+    if (this.all().some((c) => c.kind === kind && c.code !== except && same(c.label))) {
+      throw new InvalidValue('label', 'Ya hay una categoría con ese nombre.');
+    }
+    return clean;
+  }
 }
 
 export function categoryFromName(name: string): LedgerCategory {
@@ -93,23 +172,29 @@ export class MonthlyCategories {
     'internet',
   ];
 
-  private constructor(private readonly chosen: ReadonlySet<LedgerCategory>) {}
+  private constructor(private readonly chosen: ReadonlySet<string>) {}
 
   static defaults(): MonthlyCategories {
     return new MonthlyCategories(new Set(MonthlyCategories.DEFAULTS));
   }
 
-  static of(names: readonly string[]): MonthlyCategories {
-    return new MonthlyCategories(new Set(names.map(categoryFromName)));
+  /** Las elegidas, que deben existir. */
+  static of(codes: readonly string[], catalog: CategoryCatalog): MonthlyCategories {
+    return new MonthlyCategories(new Set(codes.map((c) => catalog.require(c).code)));
+  }
+
+  /** Tal como se guardaron. */
+  static restore(codes: readonly string[]): MonthlyCategories {
+    return new MonthlyCategories(new Set(codes));
   }
 
   includes(category: string): boolean {
-    return this.chosen.has(category as LedgerCategory);
+    return this.chosen.has(category);
   }
 
-  /** En el orden de las categorías. */
-  list(): LedgerCategory[] {
-    return allCategories().filter((c) => this.chosen.has(c));
+  /** En el orden de las categorías (las que ya no existen, fuera). */
+  list(catalog: CategoryCatalog): string[] {
+    return catalog.all().map((c) => c.code).filter((c) => this.chosen.has(c));
   }
 }
 
@@ -168,7 +253,7 @@ export class ManualEntry {
     readonly date: LocalDate,
     readonly kind: EntryKind,
     readonly concept: string,
-    readonly category: LedgerCategory,
+    readonly category: string,
     readonly method: Method,
     readonly amount: Money,
     readonly period: YearMonth,
@@ -179,14 +264,14 @@ export class ManualEntry {
     date: LocalDate,
     kind: EntryKind,
     concept: string,
-    category: LedgerCategory,
+    category: Category,
     method: Method,
     amount: Money,
     period: YearMonth | null = null,
   ): ManualEntry {
     if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
     if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
-    if (categoryKind(category) !== kind) {
+    if (category.kind !== kind) {
       throw new InvalidValue(
         'category',
         `La categoría no corresponde a un ${kind === 'income' ? 'ingreso' : 'gasto'}.`,
@@ -197,10 +282,32 @@ export class ManualEntry {
       date,
       kind,
       concept.trim(),
-      category,
+      category.code,
       method,
       amount,
       period ?? YearMonth.of(date),
+    );
+  }
+
+  static restore(fields: {
+    id: ManualEntryId;
+    date: LocalDate;
+    kind: EntryKind;
+    concept: string;
+    category: string;
+    method: Method;
+    amount: Money;
+    period: YearMonth | null;
+  }): ManualEntry {
+    return new ManualEntry(
+      fields.id,
+      fields.date,
+      fields.kind,
+      fields.concept,
+      fields.category,
+      fields.method,
+      fields.amount,
+      fields.period ?? YearMonth.of(fields.date),
     );
   }
 }
@@ -248,7 +355,7 @@ export class SupplierInvoice {
     readonly number: string,
     readonly supplier: string,
     readonly concept: string,
-    readonly category: LedgerCategory,
+    readonly category: string,
     readonly amount: Money,
     readonly period: YearMonth,
     private paid: LocalDate | null,
@@ -262,14 +369,14 @@ export class SupplierInvoice {
     number: string,
     supplier: string,
     concept: string,
-    category: LedgerCategory,
+    category: Category,
     amount: Money,
     period: YearMonth | null = null,
   ): SupplierInvoice {
     if (supplier.trim() === '' || concept.trim() === '') {
       throw new InvalidValue('supplier', 'Indica el proveedor y el concepto.');
     }
-    if (categoryKind(category) !== 'expense') {
+    if (category.kind !== 'expense') {
       throw new InvalidValue('category', 'Una factura de proveedor es un gasto.');
     }
     if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
@@ -279,7 +386,7 @@ export class SupplierInvoice {
       number.trim(),
       supplier.trim(),
       concept.trim(),
-      category,
+      category.code,
       amount,
       period ?? YearMonth.of(date),
       null,
@@ -294,7 +401,7 @@ export class SupplierInvoice {
     number: string;
     supplier: string;
     concept: string;
-    category: LedgerCategory;
+    category: string;
     amount: Money;
     period: YearMonth | null;
     paidOn: LocalDate | null;

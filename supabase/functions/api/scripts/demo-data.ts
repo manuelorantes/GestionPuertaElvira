@@ -439,9 +439,9 @@ function useCases(tx: TransactionSql, clock: Clock) {
       locks,
     ),
     paySettlement: new PaySettlement(timesheets, settlements, rates, closed, transactions, locks),
-    registerInvoice: new RegisterInvoice(accounting, noDocuments, closed),
+    registerInvoice: new RegisterInvoice(accounting, noDocuments, closed, accounting),
     payInvoice: new PayInvoice(accounting, closed),
-    recordEntry: new RecordEntry(accounting, closed),
+    recordEntry: new RecordEntry(accounting, closed, accounting),
   };
 }
 

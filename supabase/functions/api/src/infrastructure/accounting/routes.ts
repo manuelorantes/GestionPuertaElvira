@@ -1,12 +1,7 @@
 import { InvalidValue } from '../../domain/common/mod.ts';
+import { methodFromName, methodLabel, SupplierInvoiceId } from '../../domain/accounting/mod.ts';
 import {
-  categoryFromName,
-  categoryLabel,
-  methodFromName,
-  methodLabel,
-  SupplierInvoiceId,
-} from '../../domain/accounting/mod.ts';
-import {
+  AddCategory,
   AttachDocument,
   CloseSeason,
   DeleteEntry,
@@ -15,10 +10,13 @@ import {
   type DocumentStorage,
   FiscalYearSummary,
   GetMonthlyCategories,
+  ListCategories,
   MonthLedger,
   PayInvoice,
   RecordEntry,
   RegisterInvoice,
+  RemoveCategory,
+  RenameCategory,
   SetMonthlyCategories,
   SupplierInvoiceNotFound,
   type UploadedDocument,
@@ -83,6 +81,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     PreviousSeasonOpen: [409, 'previous_season_open'],
     InvoiceAlreadyPaid: [409, 'invoice_paid'],
     InvoiceAlreadyPaidCannotBeDeleted: [409, 'invoice_paid'],
+    CategoryInUse: [409, 'category_in_use'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, upload = false) => ({
     method,
@@ -104,7 +103,9 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   api.defineRoute(admin('GET', '/api/admin/accounting/ledger'), async (c, scope) => {
     const month = c.req.query('month');
     if (!month) throw new InvalidValue('month', 'Indica el mes (AAAA-MM).');
-    const view = await new MonthLedger(repos(scope).ledger).execute(month);
+    const { ledger, accounting } = repos(scope);
+    const view = await new MonthLedger(ledger, accounting).execute(month);
+    const catalog = await accounting.catalog();
     return c.json({
       month: view.month,
       incomeCents: view.incomeCents,
@@ -112,7 +113,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
       expensesByCategory: view.expensesByCategory,
       items: view.lines.map((l) => ({
         ...l,
-        categoryLabel: categoryLabel(categoryFromName(l.category)),
+        categoryLabel: catalog.label(l.category),
         methodLabel: methodLabel(methodFromName(l.method)),
       })),
     });
@@ -121,7 +122,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   api.defineRoute(admin('POST', '/api/admin/accounting/entries'), async (c, scope) => {
     const b = await JsonBody.from(c.req.raw);
     const { accounting, closed } = repos(scope);
-    const id = await new RecordEntry(accounting, closed).execute({
+    const id = await new RecordEntry(accounting, closed, accounting).execute({
       date: b.requiredString('date'),
       kind: b.requiredString('kind'),
       concept: b.requiredString('concept'),
@@ -139,21 +140,51 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     return c.body(null, 204);
   });
 
+  api.defineRoute(admin('GET', '/api/admin/accounting/categories'), async (c, scope) => {
+    return c.json({ items: await new ListCategories(repos(scope).accounting).execute() });
+  });
+
+  api.defineRoute(admin('POST', '/api/admin/accounting/categories'), async (c, scope) => {
+    const b = await JsonBody.from(c.req.raw);
+    const category = await new AddCategory(repos(scope).accounting).execute(
+      b.requiredString('kind'),
+      b.requiredString('label'),
+    );
+    return c.json(category, 201);
+  });
+
+  api.defineRoute(admin('PUT', '/api/admin/accounting/categories/:code'), async (c, scope) => {
+    const b = await JsonBody.from(c.req.raw);
+    await new RenameCategory(repos(scope).accounting).execute(
+      param(c, 'code'),
+      b.requiredString('label'),
+    );
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('DELETE', '/api/admin/accounting/categories/:code'), async (c, scope) => {
+    await new RemoveCategory(repos(scope).accounting).execute(param(c, 'code'));
+    return c.body(null, 204);
+  });
+
   api.defineRoute(admin('GET', '/api/admin/accounting/monthly-categories'), async (c, scope) => {
-    const categories = await new GetMonthlyCategories(repos(scope).accounting).execute();
+    const { accounting } = repos(scope);
+    const categories = await new GetMonthlyCategories(accounting, accounting).execute();
     return c.json({ categories });
   });
 
   api.defineRoute(admin('PUT', '/api/admin/accounting/monthly-categories'), async (c, scope) => {
     const b = await JsonBody.from(c.req.raw);
-    await new SetMonthlyCategories(repos(scope).accounting).execute(b.stringList('categories'));
+    const { accounting } = repos(scope);
+    await new SetMonthlyCategories(accounting, accounting).execute(b.stringList('categories'));
     return c.body(null, 204);
   });
 
   api.defineRoute(admin('GET', '/api/admin/accounting/invoices'), async (c, scope) => {
+    const catalog = await repos(scope).accounting.catalog();
     const items = (await new SqlInvoiceQuery(scope.tx).all()).map((i) => ({
       ...i,
-      categoryLabel: categoryLabel(categoryFromName(i.category)),
+      categoryLabel: catalog.label(i.category),
     }));
     return c.json({ items });
   });
@@ -161,7 +192,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   api.defineRoute(admin('POST', '/api/admin/accounting/invoices', true), async (c, scope) => {
     const form = await c.req.raw.formData();
     const { accounting, closed } = repos(scope);
-    const id = await new RegisterInvoice(accounting, storage, closed).execute(
+    const id = await new RegisterInvoice(accounting, storage, closed, accounting).execute(
       {
         date: field(form, 'date'),
         number: field(form, 'number'),

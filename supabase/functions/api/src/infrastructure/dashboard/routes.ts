@@ -16,7 +16,7 @@ export function registerDashboardRoutes(api: ApiApp): void {
       const summary = new ClubSummary(
         b.list,
         b.query,
-        new MonthLedger(new SqlLedgerQuery(scope.tx)),
+        new MonthLedger(new SqlLedgerQuery(scope.tx), new SqlAccountingRepository(scope.tx)),
         new SqlStudentQuery(scope.tx, new SqlClassQuery(scope.tx)),
         new SqlClassQuery(scope.tx),
         api.deps.clock,

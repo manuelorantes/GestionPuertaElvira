@@ -1,18 +1,23 @@
 import { assertEquals, assertRejects } from '@std/assert';
 
-import { LocalDate, Money } from '../../src/domain/common/mod.ts';
+import { InvalidValue, LocalDate, Money } from '../../src/domain/common/mod.ts';
 import { FiscalYear, SeasonClosing, SupplierInvoiceId } from '../../src/domain/accounting/mod.ts';
 import {
+  AddCategory,
   AttachDocument,
+  CategoryInUse,
   CloseSeason,
   DeleteEntry,
   DeleteInvoice,
   FiscalYearSummary,
+  ListCategories,
   MonthLedger,
   PayInvoice,
   PreviousSeasonOpen,
   RecordEntry,
   RegisterInvoice,
+  RemoveCategory,
+  RenameCategory,
   SeasonAlreadyClosed,
   SeasonNotFinished,
   type UploadedDocument,
@@ -57,7 +62,7 @@ function setUp() {
     amount: string,
     document: UploadedDocument | null = null,
   ) =>
-    new RegisterInvoice(fx, fx, fx).execute({
+    new RegisterInvoice(fx, fx, fx, fx).execute({
       date,
       number: 'F-1',
       supplier: 'Proveedor',
@@ -71,7 +76,7 @@ function setUp() {
 
 Deno.test('MonthLedger should list the month with income, expenses and spending by category', async () => {
   const { fx, registerInvoice } = setUp();
-  await new RecordEntry(fx, fx).execute({
+  await new RecordEntry(fx, fx, fx).execute({
     date: '2026-10-10',
     kind: 'income',
     concept: 'Subvención municipal',
@@ -81,7 +86,7 @@ Deno.test('MonthLedger should list the month with income, expenses and spending 
   });
   const invoice = await registerInvoice('2026-10-01', 'Alquiler octubre', 'rent', '950');
   await new PayInvoice(fx, fx).execute(invoice, '2026-10-01', 'transfer');
-  const ledger = await new MonthLedger(fx).execute('2026-10');
+  const ledger = await new MonthLedger(fx, fx).execute('2026-10');
   assertEquals(ledger.lines.map((l) => l.date), [
     '2026-10-10',
     '2026-10-02',
@@ -128,7 +133,7 @@ Deno.test('FiscalYearSummary should summarise the year month by month with the o
       LocalDate.fromString('2026-09-01'),
     ),
   );
-  await new RecordEntry(fx, fx).execute({
+  await new RecordEntry(fx, fx, fx).execute({
     date: '2027-02-10',
     kind: 'expense',
     concept: 'Comisión banco',
@@ -159,7 +164,7 @@ Deno.test('CloseSeason should close a finished season once and lock it', async (
   assertEquals((await fx.closing(new FiscalYear(2026)))?.result().cents, -37100);
   await assertRejects(
     () =>
-      new RecordEntry(fx, fx).execute({
+      new RecordEntry(fx, fx, fx).execute({
         date: '2027-03-01',
         kind: 'income',
         concept: 'Tarde',
@@ -193,7 +198,7 @@ Deno.test('CloseSeason should refuse while an older season with movements is ope
 
 Deno.test('DeleteEntry should only delete manual entries of open seasons', async () => {
   const { fx } = setUp();
-  const id = await new RecordEntry(fx, fx).execute({
+  const id = await new RecordEntry(fx, fx, fx).execute({
     date: '2027-08-10',
     kind: 'expense',
     concept: 'Comisión banco',
@@ -203,4 +208,29 @@ Deno.test('DeleteEntry should only delete manual entries of open seasons', async
   });
   await new DeleteEntry(fx, fx).execute(id);
   assertEquals(fx.entries.size, 0);
+});
+
+Deno.test('the club adds and renames its own categories, and removes them only while unused', async () => {
+  const fx = new AccountingFixture();
+  const seguro = await new AddCategory(fx).execute('expense', 'Seguro');
+  assertEquals(
+    (await new ListCategories(fx).execute()).filter((c) => c.custom).map((c) => c.label),
+    ['Seguro'],
+  );
+  await new RenameCategory(fx).execute(seguro.code, 'Seguro del local');
+  await new RecordEntry(fx, fx, fx).execute({
+    date: '2026-10-10',
+    kind: 'expense',
+    concept: 'Póliza anual',
+    category: seguro.code,
+    method: 'transfer',
+    amount: '300',
+  });
+  const ledger = await new MonthLedger(fx, fx).execute('2026-10');
+  assertEquals(ledger.expensesByCategory.map((c) => c.label), ['Seguro del local']);
+  await assertRejects(() => new RemoveCategory(fx).execute(seguro.code), CategoryInUse);
+  await assertRejects(() => new RemoveCategory(fx).execute('rent'), InvalidValue);
+  const unused = await new AddCategory(fx).execute('income', 'Rifa');
+  await new RemoveCategory(fx).execute(unused.code);
+  assertEquals((await new ListCategories(fx).execute()).filter((c) => c.custom).length, 1);
 });

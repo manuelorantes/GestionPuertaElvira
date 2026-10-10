@@ -1,7 +1,8 @@
 import { LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
 import {
   Attachment,
-  categoryFromName,
+  type Category,
+  CategoryCatalog,
   type EntryKind,
   FiscalYear,
   ManualEntry,
@@ -13,6 +14,7 @@ import {
   SupplierInvoiceId,
 } from '../../domain/accounting/mod.ts';
 import type {
+  AccountingCategoryRepository,
   AccountingSettingsRepository,
   InvoiceQuery,
   InvoiceView,
@@ -30,17 +32,47 @@ export class SqlAccountingRepository
     ManualEntryRepository,
     SupplierInvoiceRepository,
     SeasonClosingRepository,
-    AccountingSettingsRepository {
+    AccountingSettingsRepository,
+    AccountingCategoryRepository {
   constructor(private readonly sql: Sql) {}
+
+  async catalog(): Promise<CategoryCatalog> {
+    const rows = await this.sql`SELECT code, kind, label FROM accounting_category ORDER BY label`;
+    return CategoryCatalog.of(
+      Row.all(rows).map((r) => ({
+        code: r.string('code'),
+        kind: r.string('kind') === 'income' ? 'income' : 'expense',
+        label: r.string('label'),
+        custom: true,
+      })),
+    );
+  }
+
+  async saveCategory(c: Category): Promise<void> {
+    await this.sql`INSERT INTO accounting_category (code, kind, label)
+      VALUES (${c.code}, ${c.kind}, ${c.label})
+      ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label`;
+  }
+
+  async categoryInUse(code: string): Promise<boolean> {
+    const rows = await this.sql`SELECT
+      EXISTS (SELECT 1 FROM accounting_entry WHERE category = ${code})
+      OR EXISTS (SELECT 1 FROM accounting_invoice WHERE category = ${code}) AS used`;
+    return new Row(rows[0] ?? {}).bool('used');
+  }
+
+  async removeCategory(code: string): Promise<void> {
+    await this.sql`DELETE FROM accounting_category WHERE code = ${code}`;
+  }
 
   async monthlyCategories(): Promise<MonthlyCategories> {
     const rows = await this.sql`SELECT monthly_categories FROM accounting_settings WHERE id = 1`;
     if (!rows[0]) return MonthlyCategories.defaults();
-    return MonthlyCategories.of(new Row(rows[0]).json('monthly_categories') as string[]);
+    return MonthlyCategories.restore(new Row(rows[0]).json('monthly_categories') as string[]);
   }
 
   async saveMonthlyCategories(categories: MonthlyCategories): Promise<void> {
-    const list = this.sql.json(categories.list());
+    const list = this.sql.json(categories.list(await this.catalog()));
     await this.sql`INSERT INTO accounting_settings (id, monthly_categories) VALUES (1, ${list})
       ON CONFLICT (id) DO UPDATE SET monthly_categories = EXCLUDED.monthly_categories`;
   }
@@ -49,16 +81,16 @@ export class SqlAccountingRepository
     const rows = await this.sql`SELECT * FROM accounting_entry WHERE id = ${id.value}`;
     if (!rows[0]) return null;
     const r = new Row(rows[0]);
-    return ManualEntry.record(
-      ManualEntryId.fromString(r.string('id')),
-      LocalDate.fromString(r.string('entry_date')),
-      r.string('kind') as EntryKind,
-      r.string('concept'),
-      categoryFromName(r.string('category')),
-      methodFromName(r.string('method')),
-      Money.cents(r.int('amount_cents')),
-      periodOf(r.nullableString('period')),
-    );
+    return ManualEntry.restore({
+      id: ManualEntryId.fromString(r.string('id')),
+      date: LocalDate.fromString(r.string('entry_date')),
+      kind: r.string('kind') as EntryKind,
+      concept: r.string('concept'),
+      category: r.string('category'),
+      method: methodFromName(r.string('method')),
+      amount: Money.cents(r.int('amount_cents')),
+      period: periodOf(r.nullableString('period')),
+    });
   }
 
   async saveEntry(e: ManualEntry): Promise<void> {
@@ -85,7 +117,7 @@ export class SqlAccountingRepository
       number: r.string('number'),
       supplier: r.string('supplier'),
       concept: r.string('concept'),
-      category: categoryFromName(r.string('category')),
+      category: r.string('category'),
       amount: Money.cents(r.int('amount_cents')),
       period: periodOf(r.nullableString('period')),
       paidOn: paidOn === null ? null : LocalDate.fromString(paidOn),
