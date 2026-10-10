@@ -154,10 +154,20 @@ Un alumno MUST poder darse de baja con una fecha igual o posterior a hoy y no an
 Desde esa fecha deja de contar en la ocupación de todos sus grupos y aparece «De baja», sin perder su historial.
 El diálogo de baja MUST ofrecer cancelar sus cuotas pendientes (ver «Cancelar una cuota» en la spec de cobros): las
 lista, con las de los meses posteriores a la baja ya marcadas, y se puede marcar o desmarcar cada una.
+Al darse de baja, el alumno MUST dejar de ser familia directa de quien lo era. Si alguno se queda sin ningún familiar
+directo de alta en el club, el diálogo de baja MUST avisar antes de confirmar de que ese alumno pierde el descuento
+familiar; al confirmar, sus cuotas MUST recalcularse sin descuento desde el mes siguiente a la baja (lo ya cobrado no
+cambia y el mes de la baja se queda como estaba).
 
 #### Scenario: Baja hoy
 - **WHEN** administración da de baja a un alumno con fecha de hoy
 - **THEN** el alumno aparece como «De baja» y sus grupos tienen una plaza libre más
+
+#### Scenario: Su hermana se queda sin familia directa
+- **WHEN** administración da de baja a Pablo el 10 de octubre y Lola, su única familia directa en el club, tenía pagados
+  octubre, noviembre y diciembre con descuento familiar
+- **THEN** el diálogo avisa de que Lola pierde el descuento familiar; al confirmar, Lola ya no tiene familia directa,
+  octubre se queda igual y noviembre y diciembre pasan a la cuota sin descuento (lo que falte, pendiente)
 
 #### Scenario: Volver a darse de alta
 - **WHEN** Martina, de baja desde el 2 de octubre, vuelve el 15 de noviembre y administración pulsa «Dar de alta de
