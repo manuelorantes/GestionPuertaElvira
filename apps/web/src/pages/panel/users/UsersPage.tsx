@@ -38,8 +38,9 @@ const FILTERS: { id: StatusFilter; label: string }[] = [
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[];
 
+/** Acciones de cada cuenta: solo el icono; lo que hacen sale al pasar por encima. */
 const ROW_ACTION =
-  'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-2.5 text-[13px] font-semibold whitespace-nowrap hover:bg-surface-muted';
+  'inline-flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted';
 
 type Pending =
   | { type: 'reset'; user: ClubUser }
@@ -263,39 +264,39 @@ export function UsersPage() {
                               type="button"
                               className={ROW_ACTION}
                               onClick={() => setPending({ type: 'impersonate', user })}
+                              title="Entrar como"
                               aria-label={`Entrar como ${user.fullName}`}
                             >
                               <LogIn aria-hidden size={15} />
-                              Entrar como
                             </button>
                           )}
                           <button
                             type="button"
                             className={ROW_ACTION}
                             onClick={() => setEmailsOf(user.id)}
+                            title="Emails"
                             aria-label={`Emails de ${user.fullName}`}
                           >
                             <Mail aria-hidden size={15} />
-                            Emails
                           </button>
                           <button
                             type="button"
                             className={ROW_ACTION}
                             onClick={() => setPending({ type: 'reset', user })}
+                            title="Contraseña"
                             aria-label={`Restablecer la contraseña de ${user.fullName}`}
                           >
                             <KeyRound aria-hidden size={15} />
-                            Contraseña
                           </button>
                           {!self && (
                             <button
                               type="button"
                               className={ROW_ACTION}
                               onClick={() => setPending({ type: 'toggle', user })}
+                              title={user.status === 'active' ? 'Desactivar' : 'Reactivar'}
                               aria-label={`${user.status === 'active' ? 'Desactivar' : 'Reactivar'} a ${user.fullName}`}
                             >
                               <Power aria-hidden size={15} />
-                              {user.status === 'active' ? 'Desactivar' : 'Reactivar'}
                             </button>
                           )}
                         </span>

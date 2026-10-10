@@ -250,6 +250,24 @@ describe('Usuarios', () => {
   });
 });
 
+describe('acciones de cada cuenta', () => {
+  it('shows only icons, with what each one does on hover', async () => {
+    api();
+    renderApp('/panel/usuarios');
+
+    const table = await screen.findByRole('table', { name: 'Cuentas de usuario' });
+    const row = within(table).getByRole('row', { name: /club@ejemplo.com/ });
+    const actions = within(row).getAllByRole('button');
+    expect(actions.map((b) => b.getAttribute('title'))).toEqual([
+      'Entrar como',
+      'Emails',
+      'Contraseña',
+      'Desactivar',
+    ]);
+    expect(actions.every((b) => b.textContent === '')).toBe(true);
+  });
+});
+
 describe('emails adicionales', () => {
   it('adds and removes extra emails of an account from its row', async () => {
     const spy = api({
