@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { todayIso } from '@/features/students/format';
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
 const GROUPS = [
@@ -78,6 +79,7 @@ const DETAIL = {
       slotLabel: 'Lun y Mié · 17:00–18:00',
       teacherName: 'Lucía Moreno Gil',
       classroom: 'alfil',
+      since: '2026-09-15',
     },
   ],
   siblings: [{ id: 's3', fullName: 'Pablo López Herrera' }],
@@ -214,6 +216,27 @@ describe('Alumnos', () => {
     // La asistencia especial (otra clase), aparte.
     expect(within(card).getByRole('list', { name: 'Asistencia especial' })).toHaveTextContent(
       'Vino el 08/10/2026 · Avanzado B',
+    );
+  });
+
+  it('should change since when the student is in a group from their sheet', async () => {
+    const user = userEvent.setup();
+    const spy = api({ 'PUT /api/admin/students/s1/enrolments/g1/start': [204] });
+    renderApp('/panel/alumnos/s1');
+
+    const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    expect(await within(card).findByText('En el grupo desde 15/09/2026')).toBeVisible();
+    await user.click(
+      within(card).getByRole('button', { name: 'Desde cuándo está en Iniciación A' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Desde cuándo está en Iniciación A' });
+    await user.selectOptions(within(dialog).getByLabelText('Día'), '1');
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() =>
+      expect(postBodyFor(spy, 'PUT', '/api/admin/students/s1/enrolments/g1/start')).toEqual({
+        from: '2026-09-01',
+      }),
     );
   });
 
@@ -494,6 +517,8 @@ describe('Alumnos', () => {
         groupId: 'g2',
         confirmOverCapacity: false,
         attendance: { days: ['tue'], start: '16:30', end: '17:00' },
+        // Por defecto, desde hoy.
+        from: todayIso(),
       }),
     );
   });
@@ -541,9 +566,10 @@ describe('Alumnos', () => {
     await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
     const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
     await user.type(within(dialog).getByLabelText('Nombre y apellidos'), 'Lucía Fernández Ortiz');
-    await user.selectOptions(within(dialog).getByLabelText('Día'), '7');
-    await user.selectOptions(within(dialog).getByLabelText('Mes'), 'marzo');
-    await user.selectOptions(within(dialog).getByLabelText('Año'), '2015');
+    const birth = within(within(dialog).getByRole('group', { name: 'Fecha de nacimiento' }));
+    await user.selectOptions(birth.getByLabelText('Día'), '7');
+    await user.selectOptions(birth.getByLabelText('Mes'), 'marzo');
+    await user.selectOptions(birth.getByLabelText('Año'), '2015');
     await user.type(within(dialog).getByLabelText('Tutor 1'), 'Carmen Ortiz');
     await user.type(within(dialog).getByLabelText('Teléfono tutor 1'), '612000111');
     // El horario se traduce a grupos: martes 16:00–17:00 es «Peques B».
@@ -569,6 +595,8 @@ describe('Alumnos', () => {
       guardians: [{ name: 'Carmen Ortiz', phone: '612000111' }],
       enrolments: [{ groupId: 'g2', attendance: null }],
       confirmOverCapacity: true,
+      // Por defecto, de alta hoy.
+      joinedOn: todayIso(),
     });
   });
 

@@ -50,7 +50,7 @@ La ficha MUST mostrar:
 - autorización de imagen;
 - fechas de alta y de baja;
 - familia directa en el club;
-- todos sus grupos con horario, aula y profesor;
+- todos sus grupos con horario, aula, profesor y desde cuándo está en cada uno;
 - abajo del todo, los comentarios sobre él en sus clases (ver la spec de asistencia).
 
 #### Scenario: Consultar una ficha
@@ -67,6 +67,7 @@ cubre todo su horario o con horario especial si solo cubre parte (o solo algunos
 hay clase en varias aulas, MUST pedirse el aula; si no hay clase, MUST avisarse y no se puede dar de alta
 hasta corregirlo. Se puede indicar familia directa ya inscrita. Un alumno MAY darse de alta sin ningún horario:
 es un socio sin clases, queda marcado como socio (se le pedirá la cuota de socio) y se podrá inscribir más adelante.
+La fecha de alta MUST poder elegirse (por defecto hoy, nunca futura): sus grupos empiezan ese día.
 
 #### Scenario: Alta en dos grupos
 - **WHEN** administración da de alta a un alumno con horario lunes 17:00–18:00 (aula Alfil) y viernes 16:30–17:30
@@ -128,6 +129,15 @@ Desde esa fecha deja de contar en la ocupación de todos sus grupos y aparece «
 Un alumno MAY estar en varios grupos, pero MUST NOT estar en dos cuyos horarios reales coincidan en algún día y hora,
 ni dos veces en el mismo grupo.
 Un alumno con grupos MUST conservar al menos uno (quitarle el último se impide; un socio sin clases no tiene ninguno).
+Cada inscripción tiene la fecha desde la que el alumno está en el grupo, que es la que cuenta para sus listas y sus
+cuotas. Al añadir un grupo MUST poder elegirse «Desde» (por defecto hoy), y la ficha MUST mostrar «En el grupo desde» en
+cada grupo y permitir corregirla (por ejemplo, si venía antes de que se le inscribiera). Esa fecha nunca puede ser futura,
+anterior a su alta en el club ni pisar otra inscripción suya en el mismo grupo.
+
+#### Scenario: Venía antes de inscribirle
+- **WHEN** Hugo, de alta desde el 1 de octubre, se inscribió el día 7 en el grupo de los viernes y administración cambia
+  «En el grupo desde» al 1 de octubre
+- **THEN** sale en la lista del viernes 2 y su asistencia de ese día cuenta como de su grupo
 
 ### Requirement: Horario especial
 Una inscripción MAY llevar un horario especial dentro del grupo: solo algunos de sus días, o solo parte de
