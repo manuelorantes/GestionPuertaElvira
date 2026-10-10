@@ -201,6 +201,8 @@ export class User {
   private events: UserEvent[] = [];
   private teacher: TeacherLink | null = null;
   private teacherLinkedAt: Date | null = null;
+  /** Correos adicionales (opcionales) con los que también se entra en esta misma cuenta. */
+  private extraEmails: EmailAddress[] = [];
 
   private constructor(
     readonly id: UserId,
@@ -241,6 +243,7 @@ export class User {
     passwordChangedAt: Date;
     teacher?: TeacherLink | null;
     teacherLinkedAt?: Date | null;
+    otherEmails?: readonly EmailAddress[];
   }): User {
     const user = new User(
       fields.id,
@@ -255,7 +258,29 @@ export class User {
     );
     user.teacher = fields.teacher ?? null;
     user.teacherLinkedAt = user.teacher === null ? null : (fields.teacherLinkedAt ?? null);
+    user.extraEmails = [...(fields.otherEmails ?? [])];
     return user;
+  }
+
+  /** Si se entra con ese correo: el principal o uno de los adicionales. */
+  hasEmail(email: EmailAddress): boolean {
+    return email.equals(this.email) || this.extraEmails.some((e) => e.equals(email));
+  }
+
+  addEmail(email: EmailAddress): void {
+    if (this.hasEmail(email)) throw new InvalidValue('email', 'La cuenta ya tiene ese email.');
+    this.extraEmails.push(email);
+  }
+
+  removeEmail(email: EmailAddress): void {
+    if (email.equals(this.email)) {
+      throw new InvalidValue('email', 'El email principal de la cuenta no se puede quitar.');
+    }
+    this.extraEmails = this.extraEmails.filter((e) => !e.equals(email));
+  }
+
+  otherEmails(): EmailAddress[] {
+    return [...this.extraEmails];
   }
 
   changePassword(newPassword: PasswordHash, now: Date): void {

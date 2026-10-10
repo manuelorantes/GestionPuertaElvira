@@ -169,3 +169,17 @@ Deno.test('User should keep the teacher link between roles that teach and drop i
   user.changeRole('assistant');
   assertEquals(user.linkedTeacher(), null);
 });
+
+Deno.test('User should have optional extra emails to sign in with, never repeated', () => {
+  const user = registeredUser();
+  const extra = EmailAddress.fromString('Lucia.Personal@Gmail.com');
+  user.addEmail(extra);
+  assertEquals(user.otherEmails().map((e) => e.value), ['lucia.personal@gmail.com']);
+  assert(user.hasEmail(EmailAddress.fromString('lucia.personal@gmail.com')));
+  assert(user.hasEmail(user.email));
+  assertThrows(() => user.addEmail(extra), InvalidValue, 'ya');
+  assertThrows(() => user.addEmail(user.email), InvalidValue, 'ya');
+  user.removeEmail(extra);
+  assertEquals(user.otherEmails(), []);
+  assertThrows(() => user.removeEmail(user.email), InvalidValue, 'principal');
+});

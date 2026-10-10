@@ -2,6 +2,7 @@ import { assert, assertEquals, assertFalse, assertRejects } from '@std/assert';
 
 import { EmailAddress, InvalidValue } from '../../../src/domain/common/mod.ts';
 import {
+  AddUserEmail,
   AuthenticateSession,
   ChangeOwnPassword,
   ChangeUserRole,
@@ -14,6 +15,7 @@ import {
   LogIn,
   LogOut,
   RegisterUser,
+  RemoveUserEmail,
   ResetUserPassword,
   SessionNotValid,
   type TeacherAccounts,
@@ -303,4 +305,37 @@ Deno.test('LinkTeacher should refuse unknown teachers, teachers with another acc
   await link.execute(IdentityFixture.EMAIL, LUCIA);
   await assertRejects(() => link.execute('asistente@club.es', free), InvalidValue, 'asistente');
   await link.execute('admin@club.es', free);
+});
+
+Deno.test('AddUserEmail should let an account sign in with another email that no account has', async () => {
+  const fx = new IdentityFixture();
+  const user = await fx.existingUser();
+  await fx.existingUser({ email: 'otra@club.es' });
+  const add = new AddUserEmail(fx.users, fx.log);
+  await add.execute(user.id.value, 'Lucia.Personal@Gmail.com');
+
+  const result = await logIn(fx).execute(
+    'lucia.personal@gmail.com',
+    IdentityFixture.PASSWORD,
+    '1.1.1.1',
+  );
+  assertEquals(result.user.id, user.id.value);
+  assertEquals(result.user.email, IdentityFixture.EMAIL);
+
+  await assertRejects(() => add.execute(user.id.value, 'otra@club.es'), EmailAlreadyRegistered);
+  await assertRejects(
+    () =>
+      new RegisterUser(fx.users, fx.hasher, fx.temporaryPasswords, fx.log, fx.clock).execute(
+        'lucia.personal@gmail.com',
+        'Otra persona',
+        'administrator',
+      ),
+    EmailAlreadyRegistered,
+  );
+
+  await new RemoveUserEmail(fx.users, fx.log).execute(user.id.value, 'lucia.personal@gmail.com');
+  await assertRejects(
+    () => logIn(fx).execute('lucia.personal@gmail.com', IdentityFixture.PASSWORD, '1.1.1.1'),
+    InvalidCredentials,
+  );
 });
