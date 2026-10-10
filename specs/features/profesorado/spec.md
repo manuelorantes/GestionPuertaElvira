@@ -198,7 +198,7 @@ y, de solo lectura, lo del club que se indica:
   - sus **alumnos**, con los días que vienen si no son todos y su asistencia de la temporada en ese grupo (porcentaje de
     las clases con lista; por debajo del 75 % en rojo; «—» sin clases con lista);
   - la **asistencia del grupo** mes a mes, como la ve administración (ver la spec de asistencia), desde septiembre hasta
-    el mes en curso, sin enlace a la ficha del alumno.
+    el mes en curso; cada nombre lleva a la ficha del alumno, como en el resto del panel.
   No puede ver así ningún otro grupo.
 - **Clases** y **Alumnos** del club, de solo lectura (ver las specs de clases y alumnos).
 - **Mis pagos**: el mes a mes de la temporada hasta el mes en curso (horas, importe, anticipos, a pagar y estado:

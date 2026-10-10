@@ -15,6 +15,8 @@ El resumen MUST mostrar un gráfico de barras de ingresos y gastos de la tempora
 el mes en curso destacado y una descripción accesible con las cifras de cada mes. Las cuotas mensuales MUST contar en el
 mes al que corresponden (cada cobro repartido a partes iguales entre los meses que paga), no en el mes en que se
 cobran; el resto de ingresos (cuota de socio, subvenciones, promociones, apuntes) y los gastos, en su fecha.
+Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cuánto dinero equivale, p. ej. «Ingresos de
+octubre 2026: 4120 €».
 
 #### Scenario: Un pago trimestral
 - **WHEN** un alumno paga en octubre tres meses por 121,50 €
