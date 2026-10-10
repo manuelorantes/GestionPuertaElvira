@@ -10,6 +10,8 @@ export interface ClubSummaryView {
   collectedCents: number;
   expectedCents: number;
   pendingCents: number;
+  /** Cuotas de socio de la temporada sin cobrar: aparte de las cifras del mes. */
+  membershipPendingCents: number;
   expensesCents: number;
   activeStudents: number;
   registeredStudents: number;
@@ -60,7 +62,9 @@ export class ClubSummary {
   async execute(): Promise<ClubSummaryView> {
     const today = LocalDate.fromInstant(this.clock.now());
     const month = YearMonth.of(today);
-    const charges = await this.charges.execute(month.toString());
+    // Las cifras del mes, solo con sus cuotas (y el material); las de socio pendientes, aparte.
+    const charges = await this.charges.execute(month.toString(), 'monthly');
+    const memberships = await this.charges.execute(month.toString(), 'membership');
     const first = Season.containing(month).firstMonth();
     let last = first;
     for (let i = 1; i < ClubSummary.CHART_MONTHS; i++) last = last.next();
@@ -94,6 +98,7 @@ export class ClubSummary {
       collectedCents: charges.collectedCents,
       expectedCents: charges.expectedCents,
       pendingCents: charges.expectedCents - charges.collectedCents,
+      membershipPendingCents: memberships.expectedCents - memberships.collectedCents,
       expensesCents: current?.expenseCents ?? 0,
       activeStudents: (await this.students.list('active', null, today)).length,
       registeredStudents: await this.students.total(),
