@@ -87,6 +87,7 @@ Deno.test('accounting should register an invoice with its document, pay it and s
   assertEquals(ledger.expenseCents, 95000);
   assertEquals(ledger.items[1]?.categoryLabel, 'Alquiler');
   assertEquals(ledger.items[1]?.methodLabel, 'Transferencia');
+  assertEquals(ledger.items[1]?.studentId, null);
   const invoices =
     body<{ items: Record<string, unknown>[] }>(await client.get('/api/admin/accounting/invoices'))
       .items;
