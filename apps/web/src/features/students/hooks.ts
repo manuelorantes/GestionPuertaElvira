@@ -37,6 +37,14 @@ export function useStudent(id: string | undefined) {
   });
 }
 
+/** Quién se queda sin familia directa en el club (y sin descuento familiar) si el alumno se da de baja. */
+export function useFamilyLeftAlone(id: string) {
+  return useQuery({
+    queryKey: ['student', id, 'family-left-alone'],
+    queryFn: () => api.fetchFamilyLeftAlone(id),
+  });
+}
+
 /** Mutación de Alumnado que refresca listas, fichas y ocupación de grupos. */
 export function useStudentMutation<Variables, Result = void>(
   mutationFn: (variables: Variables) => Promise<Result>,

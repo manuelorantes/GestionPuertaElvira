@@ -851,11 +851,23 @@ describe('Alumnos', () => {
 
   it('should withdraw a student with a date', async () => {
     const user = userEvent.setup();
-    const spy = api({ 'POST /api/admin/students/s1/withdrawal': [204] });
+    const spy = api({
+      'POST /api/admin/students/s1/withdrawal': [204],
+      'GET /api/admin/students/s1/family-left-alone': [
+        200,
+        { items: [{ id: 's3', fullName: 'Pablo López Herrera' }] },
+      ],
+    });
     renderApp('/panel/alumnos/s1');
 
     await user.click(await screen.findByRole('button', { name: 'Dar de baja' }));
     const dialog = screen.getByRole('dialog', { name: /dar de baja a martina/i });
+    // Avisa de quién se queda sin familia directa en el club (y sin su descuento).
+    expect(
+      await within(dialog).findByText(
+        /Pablo López Herrera se queda sin familia directa en el club: pierde el descuento familiar/,
+      ),
+    ).toBeVisible();
     await user.click(within(dialog).getByRole('button', { name: 'Dar de baja' }));
 
     await waitFor(() =>
