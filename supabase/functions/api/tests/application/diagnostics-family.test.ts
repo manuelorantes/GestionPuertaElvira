@@ -56,6 +56,20 @@ Deno.test('family_unlinked should pair active students with the same two surname
   assertStringIncludes(found[0]?.explanation ?? '', 'apellidos');
 });
 
+Deno.test('family_unlinked should ignore notes in brackets when comparing surnames', () => {
+  const facts = factsWith({
+    students: [
+      student({ id: 'a', fullName: 'Candela Rodríguez Sánchez (Huétor)' }),
+      student({ id: 'b', fullName: 'Claudia Cobo Sánchez (Huétor)' }),
+      student({ id: 'c', fullName: 'Luna González Puche (Huétor)' }),
+      student({ id: 'd', fullName: 'Mario González Puche (Huétor)' }),
+    ],
+  });
+  assertEquals(ofRule(facts, 'family_unlinked').map((c) => c.data), [
+    { a: 'c', b: 'd', reason: 'surnames' },
+  ]);
+});
+
 Deno.test('family_unlinked should report each pair once even when several clues coincide', () => {
   const facts = factsWith({
     students: [
