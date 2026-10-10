@@ -518,6 +518,18 @@ export class SqlStudentDirectory implements StudentDirectory {
     return await this.build(Row.all(rows), from, to);
   }
 
+  /** Todos los alumnos con alta ese día, con los grupos que tienen ese día (como `find`, pero de una vez). */
+  async activeOn(day: LocalDate): Promise<BillingStudent[]> {
+    const date = day.toString();
+    const rows = await this.sql.unsafe(
+      `${this.columns()} FROM students_student s
+        WHERE student_active_between(s.id, $1::date, $1::date)
+        ORDER BY s.search_name`,
+      [date],
+    );
+    return await this.build(Row.all(rows), date, date);
+  }
+
   async find(student: StudentRef, day: LocalDate): Promise<BillingStudent | null> {
     const date = day.toString();
     const rows = await this.sql.unsafe(
