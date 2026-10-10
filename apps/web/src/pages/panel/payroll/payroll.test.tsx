@@ -227,6 +227,57 @@ describe('Profesorado', () => {
     });
   });
 
+  it('records the hours of a club activity, with its teacher and its hours proposed', async () => {
+    const fetch = api({
+      'GET /api/admin/payroll/duties': [
+        200,
+        {
+          items: [
+            {
+              id: 'd1',
+              teacherId: 't2',
+              teacherName: 'Carlos Ruiz Márquez',
+              weekday: 5,
+              start: '17:00',
+              end: '20:00',
+              label: 'Viernes',
+              kind: 'fridays',
+            },
+          ],
+        },
+      ],
+      'POST /api/admin/payroll/sessions': [201, { id: 's9' }],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=horas');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Registrar horas' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar horas' });
+    const what = within(dialog).getByLabelText('Clase');
+    await waitFor(() =>
+      expect(
+        within(what).getByRole('option', {
+          name: 'Viernes · Carlos Ruiz Márquez · Vie 17:00–20:00',
+        }),
+      ).toBeInTheDocument(),
+    );
+    await userEvent.selectOptions(what, 'Viernes · Carlos Ruiz Márquez · Vie 17:00–20:00');
+    expect(within(dialog).getByLabelText('Profesor')).toHaveValue('t2');
+    expect(within(dialog).getByText('3 h')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar horas' }));
+
+    expect(await screen.findByText('Horas registradas')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/admin/payroll/sessions' && init?.method === 'POST',
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({
+      teacherId: 't2',
+      groupId: null,
+      dutyId: 'd1',
+      activity: null,
+      hours: 3,
+    });
+  });
+
   it('lists sessions, locks paid ones and removes a session after confirming', async () => {
     const fetch = api({ 'DELETE /api/admin/payroll/sessions/s1': [204] });
     renderApp('/panel/profesores?mes=2026-09&pestana=horas');
