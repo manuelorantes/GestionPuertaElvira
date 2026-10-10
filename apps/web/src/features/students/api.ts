@@ -155,6 +155,17 @@ export function changeJoinDate(id: string, date: string): Promise<void> {
   return apiSend('PUT', `/api/admin/students/${id}/joined-on`, { date });
 }
 
+/** Familia directa que se quedaría sin nadie de alta en el club si este alumno se diera de baja. */
+export async function fetchFamilyLeftAlone(
+  id: string,
+): Promise<{ id: string; fullName: string }[]> {
+  return (
+    await apiGet<{ items: { id: string; fullName: string }[] }>(
+      `/api/admin/students/${id}/family-left-alone`,
+    )
+  ).items;
+}
+
 export function withdrawStudent(id: string, date: string): Promise<void> {
   return apiSend('POST', `/api/admin/students/${id}/withdrawal`, { date });
 }
