@@ -108,8 +108,9 @@ MUST quedar en el historial a su nombre, como el resto de cuentas.
 - **THEN** el sistema se lo impide indicando que no tiene permiso, y en la aplicación vuelve a sus clases
 
 ### Requirement: Cuenta de profesorado vinculada a su profesor
-Una cuenta de profesorado MUST vincularse a la ficha de un profesor para ver lo suyo, y solo lo suyo: sus clases,
-sus alumnos y sus pagos (ver la spec de profesorado). Su menú tiene solo esas secciones. Un profesor MUST tener
+Una cuenta de profesorado MUST vincularse a la ficha de un profesor para ver lo suyo: sus clases, sus grupos y sus
+pagos (ver la spec de profesorado); además consulta, de solo lectura, «Clases» y «Alumnos» del club (ver las specs de
+clases y alumnos). Su menú tiene solo esas secciones. Un profesor MUST tener
 como mucho una cuenta vinculada. Se vinculan las cuentas de profesorado, administración y superadministración,
 nunca la de asistente; al cambiar una cuenta a asistente se desvincula. Una cuenta de profesorado sin vincular
 entra y ve un aviso para que administración la vincule, sin ningún dato.
