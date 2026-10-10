@@ -186,6 +186,11 @@ function LedgerTable({
               <td className="px-3 py-3 text-ink-muted">{formatDate(item.date)}</td>
               <td className="px-3 py-3 font-medium">
                 <MovementConcept concept={item.concept} studentId={item.studentId} />
+                {item.period && item.period !== item.date.slice(0, 7) && (
+                  <span className="block text-[12px] font-normal text-ink-muted">
+                    Corresponde a {monthLabel(item.period).toLowerCase()}
+                  </span>
+                )}
               </td>
               <td className="px-3 py-3">
                 <span className="rounded-full bg-line-soft px-2 py-0.5 text-xs whitespace-nowrap">

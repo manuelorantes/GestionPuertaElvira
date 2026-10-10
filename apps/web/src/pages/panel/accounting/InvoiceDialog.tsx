@@ -15,6 +15,8 @@ import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
+import { PeriodSelect } from './PeriodSelect';
+
 /** «Añadir factura»: datos del proveedor y, si se tiene, el PDF o la foto. */
 export function InvoiceDialog({ onClose }: { onClose: () => void }) {
   const [file, setFile] = useState<File | null>(null);
@@ -26,6 +28,8 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
     amount: '',
     category: '',
     date: todayIso(),
+    // Mes al que corresponde; vacío, el de la factura.
+    period: '',
   });
   const [paid, setPaid] = useState(true);
   // Si la factura ya se registró pero falló el pago, reintentar no debe registrarla otra vez.
@@ -156,6 +160,12 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
             onChange={set('date')}
             fromYear={year - 2}
             toYear={year + 1}
+          />
+          <PeriodSelect
+            date={values.date}
+            value={values.period}
+            onChange={set('period')}
+            defaultLabel="El de la factura"
           />
           <Switch
             label="Ya está pagada (por transferencia, en esa fecha)"

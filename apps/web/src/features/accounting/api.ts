@@ -13,6 +13,8 @@ export interface LedgerItem {
   amountCents: number;
   /** El alumno de un cobro; el resto de movimientos no tiene. */
   studentId: string | null;
+  /** Mes al que corresponde («AAAA-MM»). */
+  period: string;
   categoryLabel: string;
   methodLabel: string;
 }
@@ -37,6 +39,7 @@ export interface Invoice {
   paidOn: string | null;
   method: string | null;
   attachmentName: string | null;
+  period: string;
 }
 
 export interface FiscalYear {
@@ -64,6 +67,8 @@ export interface EntryPayload {
   category: string;
   method: string;
   amount: string;
+  /** Mes al que corresponde; sin él, el de la fecha. */
+  period: string | null;
 }
 
 const BASE = '/api/admin/accounting';
@@ -102,6 +107,15 @@ export function deleteInvoice(id: string): Promise<void> {
 
 export function attachmentUrl(id: string): string {
   return `${BASE}/invoices/${id}/attachment`;
+}
+
+/** Categorías que cuentan como ingresos y gastos «del mes» en el resumen. */
+export async function fetchMonthlyCategories(): Promise<string[]> {
+  return (await apiGet<{ categories: string[] }>(`${BASE}/monthly-categories`)).categories;
+}
+
+export function saveMonthlyCategories(categories: string[]): Promise<void> {
+  return apiSend('PUT', `${BASE}/monthly-categories`, { categories });
 }
 
 export function closeSeason(startYear: number): Promise<void> {
