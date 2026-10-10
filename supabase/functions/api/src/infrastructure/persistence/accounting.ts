@@ -177,7 +177,8 @@ export class SqlLedgerQuery implements LedgerQuery {
     const rows = await this.sql`
       SELECT 'payment' AS source, p.id::text AS source_id, p.paid_on::text AS date, 'income' AS kind,
              p.concept || ' · ' || s.full_name AS concept,
-             CASE p.kind WHEN 'membership' THEN 'membership' WHEN 'material' THEN 'material_sales' ELSE 'fees' END AS category, p.method, p.total_cents AS amount
+             CASE p.kind WHEN 'membership' THEN 'membership' WHEN 'material' THEN 'material_sales' ELSE 'fees' END AS category, p.method, p.total_cents AS amount,
+             p.student_id::text AS student_id
         FROM billing_payment p JOIN students_student s ON s.id = p.student_id
        WHERE p.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
@@ -185,21 +186,21 @@ export class SqlLedgerQuery implements LedgerQuery {
              'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', 'transfer',
              -- Lo adelantado a cuenta de ese mes ya salió como anticipo.
              st.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM payroll_advance a
-                WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0)
+                WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0), NULL
         FROM payroll_settlement st JOIN teachers_teacher t ON t.id = st.teacher_id
        WHERE st.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
       SELECT 'advance', a.teacher_id::text || '/' || a.id::text, a.paid_on::text, 'expense',
              'Anticipo a cuenta de ' || a.month || ' · ' || t.full_name || COALESCE(' · ' || a.note, ''),
-             'teachers', 'transfer', a.amount_cents
+             'teachers', 'transfer', a.amount_cents, NULL
         FROM payroll_advance a JOIN teachers_teacher t ON t.id = a.teacher_id
        WHERE a.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
-      SELECT 'invoice', i.id::text, i.paid_on::text, 'expense', i.supplier || ' · ' || i.concept, i.category, i.method, i.amount_cents
+      SELECT 'invoice', i.id::text, i.paid_on::text, 'expense', i.supplier || ' · ' || i.concept, i.category, i.method, i.amount_cents, NULL
         FROM accounting_invoice i
        WHERE i.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
-      SELECT 'manual', e.id::text, e.entry_date::text, e.kind, e.concept, e.category, e.method, e.amount_cents
+      SELECT 'manual', e.id::text, e.entry_date::text, e.kind, e.concept, e.category, e.method, e.amount_cents, NULL
         FROM accounting_entry e
        WHERE e.entry_date BETWEEN ${from} AND ${to}`;
     return Row.all(rows).map((r) => ({
@@ -211,6 +212,7 @@ export class SqlLedgerQuery implements LedgerQuery {
       category: r.string('category'),
       method: r.string('method'),
       amountCents: r.int('amount'),
+      studentId: r.nullableString('student_id'),
     }));
   }
 }
