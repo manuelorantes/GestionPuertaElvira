@@ -5,8 +5,9 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { formatCents } from '@/features/billing/money';
 import type { Teacher } from '@/features/classes/api';
 import { useGroups } from '@/features/classes/hooks';
+import { WEEKDAYS } from '@/features/classes/schedule';
 import { recordSession, updateSession, type Session } from '@/features/payroll/api';
-import { usePayrollMutation } from '@/features/payroll/hooks';
+import { useDuties, usePayrollMutation } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
 import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
@@ -18,6 +19,13 @@ import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
 const OTHER = 'other';
+/** Las actividades del club van en el mismo selector que las clases, con este prefijo. */
+const DUTY = 'duty:';
+
+const minutesOf = (hhmm: string) => {
+  const [h = 0, m = 0] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
 
 interface SessionDialogProps {
   session: Session | null;
@@ -28,6 +36,7 @@ interface SessionDialogProps {
 /** «Registrar horas» (nueva sesión) o «Editar sesión» (sustitución o cambio de horas). */
 export function SessionDialog({ session, teachers, onClose }: SessionDialogProps) {
   const groups = useGroups();
+  const duties = useDuties();
   const [chosenTeacher, setTeacherId] = useState(session?.teacherId ?? '');
   // Si los profesores llegan después de abrir el diálogo, se usa el primero.
   const teacherId = chosenTeacher || teachers[0]?.id || '';
@@ -40,17 +49,28 @@ export function SessionDialog({ session, teachers, onClose }: SessionDialogProps
   const [date, setDate] = useState(todayIso());
   const [minutes, setMinutes] = useState(session?.minutes ?? 60);
   const toast = useToast();
+  const dutyId = groupId.startsWith(DUTY) ? groupId.slice(DUTY.length) : null;
   const save = usePayrollMutation(async (): Promise<void> => {
     await (session
       ? updateSession(session.id, teacherId, minutes / 60)
       : recordSession({
           teacherId,
           date,
-          groupId: groupId === OTHER || groupId === '' ? null : groupId,
+          groupId: groupId === OTHER || groupId === '' || dutyId !== null ? null : groupId,
+          dutyId,
           activity: groupId === OTHER ? activity.trim() : null,
           hours: minutes / 60,
         }));
   });
+
+  /** Al elegir una actividad del club se proponen su encargado y sus horas (se pueden cambiar). */
+  function choose(value: string) {
+    setGroupId(value);
+    const duty = (duties.data ?? []).find((d) => `${DUTY}${d.id}` === value);
+    if (!duty) return;
+    setTeacherId(duty.teacherId);
+    setMinutes(minutesOf(duty.end) - minutesOf(duty.start));
+  }
   const teacher = teachers.find((t) => t.id === teacherId);
   const rateCents = Math.round(Number(teacher?.hourlyRate ?? 0) * 100);
   const year = new Date().getFullYear();
@@ -97,12 +117,16 @@ export function SessionDialog({ session, teachers, onClose }: SessionDialogProps
               <Select
                 label="Clase"
                 value={groupId}
-                onChange={setGroupId}
+                onChange={choose}
                 options={[
                   { value: '', label: 'Elige una clase' },
                   ...(groups.data ?? []).map((g) => ({
                     value: g.id,
                     label: `${g.name} · ${g.slotLabel}`,
+                  })),
+                  ...(duties.data ?? []).map((d) => ({
+                    value: `${DUTY}${d.id}`,
+                    label: `${d.label} · ${d.teacherName} · ${WEEKDAYS[d.weekday - 1]?.short ?? ''} ${d.start}–${d.end}`,
                   })),
                   { value: OTHER, label: 'Otra actividad' },
                 ]}
