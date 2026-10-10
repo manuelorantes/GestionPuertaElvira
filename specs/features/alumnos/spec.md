@@ -51,6 +51,8 @@ La ficha MUST mostrar:
 - fechas de alta y de baja;
 - familia directa en el club;
 - todos sus grupos con horario, aula, profesor y desde cuándo está en cada uno;
+- sus cuotas y cobros (ver la spec de cobros) y sus pedidos de material deportivo con su estado, desde donde se puede
+  apuntar uno nuevo o cobrarlo (ver la spec de material);
 - abajo del todo, los comentarios sobre él en sus clases (ver la spec de asistencia).
 
 #### Scenario: Consultar una ficha

@@ -74,6 +74,10 @@ cuotas o el resumen no crea nada.
 Los socios MUST tener una cuota de socio por temporada (50 € por defecto, sin descuentos salvo el especial).
 Cualquier alumno que no haya pagado la cuota de socio de la temporada MUST poder pagarla desde «Registrar cobro»
 (concepto «Cuota de socio»); al pagarla pasa a ser socio.
+Los pedidos de [material deportivo](../material/spec.md) con precio MUST generar un cobro que sale con las cuotas del
+mes en que se pidió (y de los meses siguientes mientras quede algo pendiente), con el producto como concepto, y se cobra
+con el concepto «Material» de «Registrar cobro» eligiendo el pedido. Ese cobro no se cancela desde «Cuotas»: se cancela
+cancelando el pedido.
 Cobros y cuotas son cosas distintas (ver [cuotas separadas de los cobros](../../decisions/cuotas-separadas-de-los-cobros.md)):
 el estado de cada cuota MUST salir de repartir lo que cubren todos los cobros del alumno entre sus cuotas, de la más
 antigua a la más reciente. Lo que cubre un cobro es su importe en cuotas antes de descuentos. Lo que sobra es saldo a
@@ -203,7 +207,9 @@ La ficha del alumno MUST mostrar:
 - si se le aplica el descuento familiar;
 - si la cuota de socio de la temporada está pagada o pendiente (y su importe);
 - sus puntos del mes (se gestionan en la sección Puntos; aquí solo se ven y se canjean al cobrar);
-- si tiene particulares, el precio por hora pactado, que MUST poder cambiarse.
+- si tiene particulares, el precio por hora pactado, que MUST poder cambiarse;
+- el total de lo que mueve en el club: lo cobrado y lo pendiente de cuotas, cuota de socio y material deportivo, y la
+  suma de todo.
 
 Los meses a cobrar (1, 3, 6 o resto de temporada) se eligen en cada cobro; no hay forma de pago preferida.
 

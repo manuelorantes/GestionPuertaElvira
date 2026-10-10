@@ -14,7 +14,8 @@ export class PaymentId extends Uuid {}
 export class StudentRef extends Uuid {}
 export class TeacherRef extends Uuid {}
 
-export type ChargeKind = 'monthly' | 'membership';
+/** `material`: el cobro de un pedido de material deportivo (ver material-deportivo-como-cobro.md). */
+export type ChargeKind = 'monthly' | 'membership' | 'material';
 /** `expected`: cuota prevista de un mes futuro que aún no existe (lo que se espera cobrar con la tarifa de hoy). */
 export type ChargeStatus =
   | 'paid'
@@ -287,6 +288,8 @@ export class Charge {
      * pendiente deja de deberse; al reactivarla, vuelve a deberse entera.
      */
     private cancellation: { on: LocalDate; kept: Money } | null = null,
+    /** Concepto propio (las de material: el producto pedido); las demás lo sacan de su tipo y mes. */
+    private label: string | null = null,
   ) {}
 
   static create(
@@ -297,6 +300,33 @@ export class Charge {
     amount: Money,
   ): Charge {
     return new Charge(id, student, kind, period, amount, null, null, false, null, 0);
+  }
+
+  /** Cobro de un pedido de material: su importe y el producto como concepto. */
+  static material(
+    id: ChargeId,
+    student: StudentRef,
+    period: YearMonth,
+    amount: Money,
+    concept: string,
+  ): Charge {
+    if (amount.isNegative()) {
+      throw new InvalidValue('priceCents', 'El precio no puede ser negativo.');
+    }
+    return new Charge(
+      id,
+      student,
+      'material',
+      period,
+      amount,
+      null,
+      null,
+      false,
+      null,
+      0,
+      null,
+      concept,
+    );
   }
 
   static restore(fields: {
@@ -311,6 +341,7 @@ export class Charge {
     note: string | null;
     discountPercent?: number;
     cancellation?: { on: LocalDate; kept: Money } | null;
+    concept?: string | null;
   }): Charge {
     return new Charge(
       fields.id,
@@ -324,7 +355,25 @@ export class Charge {
       fields.note,
       fields.discountPercent ?? 0,
       fields.cancellation ?? null,
+      fields.concept ?? null,
     );
+  }
+
+  /** Concepto propio (el producto de un pedido de material), o null si sale del tipo y el mes. */
+  concept(): string | null {
+    return this.label;
+  }
+
+  /** Corrige el precio de un pedido de material (la aplicación comprueba que no tenga nada cobrado). */
+  changePrice(amount: Money, concept: string): void {
+    if (this.kind !== 'material') {
+      throw new InvalidValue('id', 'Solo se cambia así el precio del material.');
+    }
+    if (amount.isNegative()) {
+      throw new InvalidValue('priceCents', 'El precio no puede ser negativo.');
+    }
+    this.value = amount;
+    this.label = concept;
   }
 
   /** Lo que se debe de esta cuota: su importe o, si se canceló, lo que se conservó (lo cobrado). */
@@ -380,7 +429,7 @@ export class Charge {
     if (this.isWhollyCancelled()) return 'cancelled';
     if (!covered.isNegative() && covered.cents >= this.amount.cents) return 'paid';
     if (covered.cents > 0) return 'partial';
-    if (this.kind === 'membership') return 'due';
+    if (this.kind !== 'monthly') return 'due';
     const current = YearMonth.of(today);
     if (current.isBefore(this.period)) return 'upcoming';
     if (this.period.isBefore(current)) return 'overdue';
@@ -842,6 +891,8 @@ export class Payment {
     private issued: Invoice | null,
     /** Lo que cubre en importes de cuota, antes de descuentos (ver cuotas-separadas-de-los-cobros.md). */
     private covering: Money,
+    /** La cuota que cubre un cobro de material (las demás se reparten por tipo). */
+    readonly charge: ChargeId | null,
   ) {}
 
   static register(fields: {
@@ -857,7 +908,12 @@ export class Payment {
     periods: readonly YearMonth[];
     /** Por defecto, el total cobrado. */
     credit?: Money;
+    /** Solo en los cobros de material: la cuota del pedido que cubre. */
+    charge?: ChargeId | null;
   }): Payment {
+    if ((fields.kind === 'material') !== Boolean(fields.charge)) {
+      throw new InvalidValue('chargeId', 'Un cobro de material cubre el cobro de un pedido.');
+    }
     return new Payment(
       fields.id,
       fields.student,
@@ -871,6 +927,7 @@ export class Payment {
       fields.periods,
       null,
       fields.credit ?? fields.total,
+      fields.charge ?? null,
     );
   }
 

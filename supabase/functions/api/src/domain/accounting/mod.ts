@@ -28,6 +28,7 @@ export type LedgerCategory =
   | 'other_expenses'
   | 'fees'
   | 'membership'
+  | 'material_sales'
   | 'grants'
   | 'tournament_income'
   | 'other_income';
@@ -42,6 +43,7 @@ const CATEGORIES: Record<LedgerCategory, { kind: EntryKind; label: string }> = {
   other_expenses: { kind: 'expense', label: 'Otros gastos' },
   fees: { kind: 'income', label: 'Cuotas' },
   membership: { kind: 'income', label: 'Cuota de socio' },
+  material_sales: { kind: 'income', label: 'Venta de material' },
   grants: { kind: 'income', label: 'Subvenciones' },
   tournament_income: { kind: 'income', label: 'Torneos' },
   other_income: { kind: 'income', label: 'Otros ingresos' },

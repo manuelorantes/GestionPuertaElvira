@@ -11,6 +11,7 @@ import {
 import { registerAuditRoutes } from './infrastructure/audit/routes.ts';
 import { registerUserRoutes } from './infrastructure/identity/users-routes.ts';
 import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
+import { registerEquipmentRoutes } from './infrastructure/equipment/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
 import { registerDashboardRoutes } from './infrastructure/dashboard/routes.ts';
 import { registerImportRoutes } from './infrastructure/import/routes.ts';
@@ -97,6 +98,7 @@ export function buildApp(
   registerClassRoutes(api);
   registerStudentRoutes(api);
   registerBillingRoutes(api);
+  registerEquipmentRoutes(api);
   registerPayrollRoutes(api);
   const storage = config.documents.kind === 'local'
     ? new LocalDocumentStorage(config.documents.directory)

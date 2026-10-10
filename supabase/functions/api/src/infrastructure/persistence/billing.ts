@@ -178,6 +178,7 @@ function toCharge(row: Row): Charge {
       on: LocalDate.fromString(cancelledOn),
       kept: Money.cents(row.int('kept_cents')),
     },
+    concept: row.nullableString('concept'),
   });
 }
 
@@ -187,17 +188,22 @@ const DUE =
 
 /**
  * Cuotas con lo que tienen cubierto: lo que cubren los cobros del alumno (por tipo) se reparte entre sus cuotas de la
- * más antigua a la más reciente (ver cuotas-separadas-de-los-cobros.md). Se usa como CTE `allocated`.
+ * más antigua a la más reciente (ver cuotas-separadas-de-los-cobros.md); las de material, solo con los cobros que
+ * apuntan a cada una (ver material-deportivo-como-cobro.md). Se usa como CTE `allocated`.
  */
-const ALLOCATED = `allocated AS (
+export const ALLOCATED = `allocated AS (
   SELECT c.*, c.cancelled_on::text AS cancelled_day, (${DUE})::integer AS due_cents,
          LEAST(${DUE}, GREATEST(0,
-           COALESCE(cr.credit, 0) - COALESCE(SUM(${DUE}) OVER (
-             PARTITION BY c.student_id, c.kind ORDER BY c.period
+           COALESCE(CASE WHEN c.kind = 'material' THEN mc.credit ELSE cr.credit END, 0)
+           - COALESCE(SUM(${DUE}) OVER (
+             PARTITION BY c.student_id, c.kind, CASE WHEN c.kind = 'material' THEN c.id END ORDER BY c.period
              ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)))::integer AS covered_cents
     FROM billing_charge c
     LEFT JOIN (SELECT student_id, kind, SUM(credit_cents) AS credit FROM billing_payment
-                GROUP BY student_id, kind) cr ON cr.student_id = c.student_id AND cr.kind = c.kind
+                WHERE charge_id IS NULL GROUP BY student_id, kind) cr
+      ON cr.student_id = c.student_id AND cr.kind = c.kind
+    LEFT JOIN (SELECT charge_id, SUM(credit_cents) AS credit FROM billing_payment
+                WHERE charge_id IS NOT NULL GROUP BY charge_id) mc ON mc.charge_id = c.id
 )`;
 
 export class SqlChargeRepository implements ChargeRepository {
@@ -236,6 +242,18 @@ export class SqlChargeRepository implements ChargeRepository {
     return Money.cents(rows[0] ? new Row(rows[0]).int('credit') : 0);
   }
 
+  async creditForCharge(charge: ChargeId): Promise<Money> {
+    const rows = await this.sql`SELECT COALESCE(SUM(credit_cents), 0) AS credit FROM billing_payment
+      WHERE charge_id = ${charge.value}`;
+    return Money.cents(rows[0] ? new Row(rows[0]).int('credit') : 0);
+  }
+
+  async paidTotal(student: StudentRef, kind: ChargeKind): Promise<Money> {
+    const rows = await this.sql`SELECT COALESCE(SUM(total_cents), 0) AS total FROM billing_payment
+      WHERE student_id = ${student.value} AND kind = ${kind}`;
+    return Money.cents(rows[0] ? new Row(rows[0]).int('total') : 0);
+  }
+
   async saveCharge(charge: Charge): Promise<void> {
     const record = {
       id: charge.id.value,
@@ -250,12 +268,13 @@ export class SqlChargeRepository implements ChargeRepository {
       discount_percent: charge.discountPercent(),
       cancelled_on: charge.cancelledOn()?.toString() ?? null,
       kept_cents: charge.keptOnCancellation()?.cents ?? null,
+      concept: charge.concept(),
     };
     await this.sql`INSERT INTO billing_charge ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET amount_cents = EXCLUDED.amount_cents, paid_by = EXCLUDED.paid_by,
         reminded_on = EXCLUDED.reminded_on, manual = EXCLUDED.manual, note = EXCLUDED.note,
         discount_percent = EXCLUDED.discount_percent, cancelled_on = EXCLUDED.cancelled_on,
-        kept_cents = EXCLUDED.kept_cents`;
+        kept_cents = EXCLUDED.kept_cents, concept = EXCLUDED.concept`;
   }
 }
 
@@ -290,6 +309,7 @@ function toInvoice(d: Record<string, unknown>): Invoice {
 function toPayment(row: Row): Payment {
   const lines = row.json('lines') as { label: string; amountCents: number }[];
   const invoice = row.json('invoice') as Record<string, unknown> | null;
+  const chargeId = row.nullableString('charge_id');
   return Payment.restore({
     id: PaymentId.fromString(row.string('id')),
     student: StudentRef.fromString(row.string('student_id')),
@@ -303,6 +323,7 @@ function toPayment(row: Row): Payment {
     periods: row.stringList('periods').map((p) => YearMonth.fromString(p)),
     invoice: invoice === null || invoice === undefined ? null : toInvoice(invoice),
     credit: Money.cents(row.int('credit_cents')),
+    charge: chargeId === null ? null : ChargeId.fromString(chargeId),
   });
 }
 
@@ -332,6 +353,7 @@ export class SqlPaymentRepository implements PaymentRepository {
       periods: this.sql.json(payment.periods.map((p) => p.toString())),
       invoice_number: invoice?.number.toString() ?? null,
       invoice: invoice === null ? null : this.sql.json(invoiceData(invoice)),
+      charge_id: payment.charge?.value ?? null,
     };
     await this.sql`INSERT INTO billing_payment ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET method = EXCLUDED.method, paid_on = EXCLUDED.paid_on,
@@ -379,6 +401,7 @@ function toChargeView(row: Row, today: LocalDate): ChargeView {
     remindedOn: row.nullableString('reminded_on'),
     fullAmountCents: charge.fullAmount().cents,
     cancelledCents: charge.cancelledAmount().cents,
+    concept: charge.concept(),
   };
 }
 
@@ -409,9 +432,10 @@ export class SqlBillingQuery implements BillingQuery {
          JOIN students_student s ON s.id = c.student_id
          LEFT JOIN billing_payment p ON p.id = c.paid_by
         WHERE ((c.kind = 'monthly' AND c.period = $1)
-           OR (c.kind = 'membership' AND c.period = $2 AND (c.covered_cents < c.due_cents OR $1 = $2)))
+           OR (c.kind = 'membership' AND c.period = $2 AND (c.covered_cents < c.due_cents OR $1 = $2))
+           OR (c.kind = 'material' AND (c.period = $1 OR (c.period < $1 AND c.covered_cents < c.due_cents))))
           AND NOT (c.cancelled_on IS NOT NULL AND c.due_cents = 0)
-        ORDER BY s.search_name, c.kind DESC`,
+        ORDER BY s.search_name, c.kind DESC, c.period`,
       [month.toString(), seasonStart],
     );
     return Row.all(rows).map((row) => toChargeView(row, today));
@@ -434,7 +458,7 @@ export class SqlBillingQuery implements BillingQuery {
       SELECT c.id, c.student_id, s.full_name, c.kind, c.period, c.amount_cents, c.cancelled_on::text AS cancelled_day,
              LEAST(c.amount_cents, c.kept_cents) AS kept
         FROM billing_charge c JOIN students_student s ON s.id = c.student_id
-       WHERE c.cancelled_on IS NOT NULL
+       WHERE c.cancelled_on IS NOT NULL AND c.kind <> 'material'
          AND c.period BETWEEN ${season.firstMonth().toString()} AND ${season.lastMonth().toString()}
        ORDER BY s.search_name, c.kind DESC, c.period`;
     return Row.all(rows).map((r) => ({
