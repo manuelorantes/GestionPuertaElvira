@@ -65,6 +65,8 @@ export interface OrderView {
   values: Record<string, string>;
   detail: string;
   variantLabel: string;
+  /** Campos de lista aún sin elegir (solo en reservas): hay que elegirlos para pasarlo a pedido. */
+  missing: string[];
   note: string | null;
   status: OrderState;
   priceCents: number | null;
@@ -301,7 +303,7 @@ class Orders {
       price,
       order.concept(product.name),
     );
-    order.place(price, ChargeRef.fromString(charge.id.value), today);
+    order.place(product, price, ChargeRef.fromString(charge.id.value), today);
     await this.charges.saveCharge(charge);
   }
 

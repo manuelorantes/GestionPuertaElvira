@@ -210,3 +210,19 @@ Deno.test('SaveProduct should keep the options in use and retire a product from 
   await assertRejects(() => reserve({ talla: '14' }), InvalidValue, 'ya no se ofrece');
   assertEquals(fx.products.get(product)?.price.equals(Money.euros(50)), true);
 });
+
+Deno.test('ManageOrders should reserve with the size still to choose and ask for it before ordering', async () => {
+  const { fx, reserve } = await setUp();
+  const id = await reserve({ nombre: 'Pepe' });
+  assertEquals(orderOf(fx, id).selection.variantKey, '');
+  await assertRejects(() => fx.manageOrders().place(id, 4500), InvalidValue, 'elige talla');
+  assertEquals(fx.billing.charges.size, 0);
+  await assertRejects(() => reserve({}, 4500), InvalidValue, 'elige talla');
+  await fx.manageOrders().edit(id, {
+    quantity: 1,
+    values: { talla: '8', nombre: 'Pepe' },
+    note: null,
+  });
+  await fx.manageOrders().place(id, 4500);
+  assertEquals((await chargeOf(fx, id)).concept(), 'Chándal · Talla 8 · Nombre a estampar: Pepe');
+});

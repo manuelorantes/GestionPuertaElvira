@@ -207,6 +207,24 @@ Deno.test('equipment should cancel only the pending part of an order and refuse 
   order = body<OrderRow>(await c.get(`/api/admin/equipment/orders/${id}`));
   assertEquals([order.status, order.dueCents], ['ordered', 9000]);
 
+  // Una reserva con la talla sin elegir: no pasa a pedido hasta elegirla.
+  const loose = body<{ id: string }>(
+    await c.json('POST', '/api/admin/equipment/orders', {
+      studentId: fx.student,
+      productId: fx.product,
+      values: {},
+    }),
+  ).id;
+  assertEquals(
+    body<{ missing: string[] }>(await c.get(`/api/admin/equipment/orders/${loose}`)).missing,
+    ['Talla'],
+  );
+  await assertError(
+    await c.json('POST', `/api/admin/equipment/orders/${loose}/place`, { priceCents: 4500 }),
+    422,
+    'unprocessable',
+  );
+
   await assertError(
     await c.json('PUT', `/api/admin/equipment/products/${fx.product}`, {
       name: 'Chándal',
