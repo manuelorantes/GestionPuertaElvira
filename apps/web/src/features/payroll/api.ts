@@ -67,6 +67,8 @@ export interface SessionPayload {
   teacherId: string;
   date: string;
   groupId: string | null;
+  /** Actividad del club (turno o viernes): queda ligada a ella, como su sesión automática. */
+  dutyId: string | null;
   activity: string | null;
   hours: number;
 }
