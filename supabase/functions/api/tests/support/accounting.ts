@@ -117,6 +117,7 @@ export class AccountingFixture
           category: e.category,
           method: e.method,
           amountCents: e.amount.cents,
+          studentId: null,
         });
       }
     }
@@ -132,6 +133,7 @@ export class AccountingFixture
           category: i.category,
           method: i.method() ?? '',
           amountCents: i.amount.cents,
+          studentId: null,
         });
       }
     }

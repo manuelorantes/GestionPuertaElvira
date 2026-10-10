@@ -298,10 +298,14 @@ Deno.test({
       await fx.client.get(`/api/admin/billing/payments/${payment}`),
     );
     assertEquals(receipt.methodLabel, 'Efectivo');
-    const ledger = body<{ items: { sourceId: string; method: string }[] }>(
+    const ledger = body<
+      { items: { sourceId: string; method: string; studentId: string | null }[] }
+    >(
       await fx.client.get(`/api/admin/accounting/ledger?month=${today.slice(0, 7)}`),
     );
     assertEquals(ledger.items.find((i) => i.sourceId === payment)?.method, 'cash');
+    // El movimiento de un cobro lleva al alumno, para ir a su ficha.
+    assertEquals(ledger.items.find((i) => i.sourceId === payment)?.studentId, fx.student);
 
     const firstOfMonth = `${today.slice(0, 7)}-01`;
     const moved = await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/date`, {
