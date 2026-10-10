@@ -109,7 +109,7 @@ export class SqlPointsStudents implements PointsStudents {
   async isActive(student: string, on: LocalDate): Promise<boolean> {
     const day = on.toString();
     const rows = await this.sql`SELECT 1 FROM students_student WHERE id::text = ${student}
-      AND joined_on <= ${day} AND (withdrawn_on IS NULL OR withdrawn_on > ${day})`;
+      AND student_active_between(id, ${day}, ${day})`;
     return rows.length > 0;
   }
 }
@@ -132,7 +132,7 @@ export class SqlPointsQuery implements PointsQuery {
                                                          AND ${to.toString()}), 0)::int AS redeemed
         FROM students_student s
         LEFT JOIN points_movement m ON m.student_id = s.id
-       WHERE (s.joined_on <= ${day} AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${day}))
+       WHERE student_active_between(s.id, ${day}, ${day})
           OR m.movement_date BETWEEN ${from.toString()} AND ${to.toString()}
        GROUP BY s.id, s.full_name, s.member_number, s.search_name
        ORDER BY s.search_name`;
@@ -195,7 +195,7 @@ export class SqlPointsQuery implements PointsQuery {
         FROM students_student s
         LEFT JOIN points_movement m ON m.student_id = s.id AND m.kind = 'friday'
              AND m.movement_date BETWEEN ${from} AND ${to}
-       WHERE s.joined_on <= ${to} AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${from})
+       WHERE student_active_between(s.id, ${from}, ${to})
        GROUP BY s.id, s.full_name, s.member_number, s.search_name
        ORDER BY s.search_name`;
     return {

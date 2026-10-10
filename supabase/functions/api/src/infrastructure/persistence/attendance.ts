@@ -44,7 +44,7 @@ export class SqlClassRoster implements ClassRoster {
   async clubStudentsOn(date: LocalDate): Promise<RosterStudent[]> {
     const day = date.toString();
     const rows = await this.sql`SELECT id, full_name FROM students_student
-      WHERE joined_on <= ${day} AND (withdrawn_on IS NULL OR withdrawn_on > ${day}) ORDER BY search_name`;
+      WHERE student_active_between(id, ${day}, ${day}) ORDER BY search_name`;
     return Row.all(rows).map((r) => ({ id: r.string('id'), name: r.string('full_name') }));
   }
 
@@ -250,7 +250,7 @@ export class SqlFridayRoster {
   async everyone(date: LocalDate): Promise<RosterStudent[]> {
     const day = date.toString();
     const rows = await this.sql`SELECT id, full_name FROM students_student
-      WHERE joined_on <= ${day} AND (withdrawn_on IS NULL OR withdrawn_on > ${day}) ORDER BY search_name`;
+      WHERE student_active_between(id, ${day}, ${day}) ORDER BY search_name`;
     return Row.all(rows).map((r) => ({ id: r.string('id'), name: r.string('full_name') }));
   }
 }

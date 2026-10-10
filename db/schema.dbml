@@ -49,8 +49,8 @@ Table students_student {
   own_phone varchar(12)
   federation_licence varchar(20) [note: 'su presencia indica federado']
   image_consent boolean [not null]
-  joined_on date [not null]
-  withdrawn_on date [note: 'baja (no activo desde ese día)']
+  joined_on date [not null, note: 'última alta (la del periodo actual)']
+  withdrawn_on date [note: 'última baja (no activo desde ese día)']
   sibling_ids json [not null, note: 'ids de hermanos; relación mutua']
 
   indexes {
@@ -59,6 +59,19 @@ Table students_student {
 }
 
 Ref: classes_enrolment.student_id > students_student.id
+
+Table students_past_membership {
+  student_id uuid [not null]
+  joined_on date [not null]
+  withdrawn_on date [not null]
+
+  indexes {
+    (student_id, joined_on) [pk]
+  }
+  Note: 'Periodos de alta anteriores, ya cerrados, de un alumno que volvió a darse de alta. La función student_active_between(alumno, desde, hasta) dice si estuvo de alta algún día entre dos fechas en cualquiera de sus periodos.'
+}
+
+Ref: students_past_membership.student_id > students_student.id [delete: cascade]
 
 // --- Profesorado ---------------------------------------------------------
 

@@ -463,3 +463,68 @@ Deno.test('students can join and be in a group from an earlier day, changed late
   assertError(await start(fx.tiny, day(-20)), 404, 'not_enrolled');
   assertEquals(await since(), [[fx.groupA, day(-30)], [fx.groupB, day(-20)]]);
 });
+
+Deno.test('a withdrawn student can join again, keeping each period and going back to a group', async () => {
+  const fx = await fixture();
+  const today = LocalDate.fromInstant(new Date());
+  const day = (offset: number) => today.plusDays(offset).toString();
+  const id = await register(fx, { joinedOn: day(-40) });
+  assertError(
+    await fx.client.json('POST', `/api/admin/students/${id}/rejoin`, { date: day(0) }),
+    422,
+    'unprocessable',
+  );
+  assertEquals(
+    (await fx.client.json('POST', `/api/admin/students/${id}/withdrawal`, { date: day(0) })).status,
+    204,
+  );
+  const detail = async () =>
+    body<{
+      status: string;
+      joinedOn: string;
+      withdrawnOn: string | null;
+      membership: { joinedOn: string; withdrawnOn: string | null }[];
+      groups: { id: string; since: string }[];
+    }>(await fx.client.get(`/api/admin/students/${id}`));
+  assertEquals((await detail()).status, 'withdrawn');
+
+  // Vuelve hoy al mismo grupo.
+  const rejoined = await fx.client.json('POST', `/api/admin/students/${id}/rejoin`, {
+    date: day(0),
+    groupIds: [fx.groupA],
+  });
+  assertEquals(rejoined.status, 204, JSON.stringify(rejoined.body));
+  const after = await detail();
+  assertEquals([after.status, after.joinedOn, after.withdrawnOn], ['active', day(0), null]);
+  assertEquals(after.membership, [
+    { joinedOn: day(-40), withdrawnOn: day(0) },
+    { joinedOn: day(0), withdrawnOn: null },
+  ]);
+  assertEquals(after.groups.map((g) => [g.id, g.since]), [[fx.groupA, day(0)]]);
+  // Su última alta no puede ir antes de su baja anterior.
+  assertError(
+    await fx.client.json('PUT', `/api/admin/students/${id}/joined-on`, { date: day(-1) }),
+    422,
+    'unprocessable',
+  );
+});
+
+Deno.test('changing the join date moves the groups that started with it', async () => {
+  const fx = await fixture();
+  const today = LocalDate.fromInstant(new Date());
+  const day = (offset: number) => today.plusDays(offset).toString();
+  const id = await register(fx, { joinedOn: day(-10) });
+  assertEquals(
+    (await fx.client.json('PUT', `/api/admin/students/${id}/joined-on`, { date: day(-20) })).status,
+    204,
+  );
+  const detail = body<{ joinedOn: string; groups: { since: string }[] }>(
+    await fx.client.get(`/api/admin/students/${id}`),
+  );
+  assertEquals([detail.joinedOn, detail.groups.map((g) => g.since)], [day(-20), [day(-20)]]);
+  assertError(
+    await fx.client.json('PUT', `/api/admin/students/${id}/joined-on`, { date: day(1) }),
+    422,
+    'unprocessable',
+  );
+});

@@ -39,6 +39,10 @@ export interface Enrolments {
     from?: LocalDate,
   ): Promise<void>;
   endAll(student: StudentId, on: LocalDate): Promise<void>;
+  /** Inicio de sus inscripciones que seguían vigentes ese día o empezaron después. */
+  currentStarts(student: StudentId, since: LocalDate): Promise<LocalDate[]>;
+  /** Las inscripciones que empezaban un día pasan a empezar otro (al corregir su alta). */
+  moveStarts(student: StudentId, from: LocalDate, to: LocalDate): Promise<void>;
 }
 
 /** `no_classes`: socios activos sin ningún grupo (pagan la cuota de socio, se podrán inscribir más adelante). */
@@ -91,9 +95,12 @@ export interface StudentDetail {
   ownPhone: string | null;
   federationLicence: string | null;
   imageConsent: boolean;
+  /** Su última alta y su última baja (el periodo actual). */
   joinedOn: string;
   withdrawnOn: string | null;
   status: string;
+  /** Todos sus periodos de alta, del más antiguo al actual. */
+  membership: { joinedOn: string; withdrawnOn: string | null }[];
   groups: StudentGroup[];
   siblings: { id: string; fullName: string }[];
 }
@@ -263,6 +270,69 @@ export class UpdateStudent {
     const student = await lookUp(this.students, id);
     student.updateDetails(studentDetails(input), LocalDate.fromInstant(this.clock.now()));
     await this.students.save(student);
+  }
+}
+
+/**
+ * Vuelve a dar de alta a un alumno de baja, desde un día (hasta hoy): conserva su número de socio, su familia y su
+ * historial, y entra en los grupos indicados desde ese día o, sin grupos, como socio.
+ */
+export class RejoinStudent {
+  constructor(
+    private readonly students: StudentRepository,
+    private readonly enrolments: Enrolments,
+    private readonly transactions: TransactionRunner,
+    private readonly clock: Clock,
+    private readonly membership: Membership | null = null,
+  ) {}
+
+  async execute(
+    id: string,
+    date: string,
+    requests: EnrolmentRequest[],
+    confirmOverCapacity: boolean,
+  ): Promise<void> {
+    const student = await lookUp(this.students, id);
+    const on = LocalDate.fromString(date);
+    student.rejoin(on, LocalDate.fromInstant(this.clock.now()));
+    await this.transactions.run(async () => {
+      await this.students.save(student);
+      if (requests.length > 0) {
+        await this.enrolments.enrol(student.id, requests, confirmOverCapacity, on);
+      } else if (this.membership !== null) {
+        await this.membership.makeMember(student.id);
+      }
+    });
+  }
+}
+
+/**
+ * Corrige su última alta. Los grupos que empezaban ese mismo día se mueven con ella; ninguno de sus grupos actuales puede
+ * empezar antes (hay que cambiar antes su «En el grupo desde»).
+ */
+export class ChangeJoinDate {
+  constructor(
+    private readonly students: StudentRepository,
+    private readonly enrolments: Enrolments,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(id: string, date: string): Promise<void> {
+    const student = await lookUp(this.students, id);
+    const previous = student.joinedOn;
+    const on = LocalDate.fromString(date);
+    const others = (await this.enrolments.currentStarts(student.id, previous)).filter((d) =>
+      !d.equals(previous)
+    );
+    if (others.some((start) => start.isBefore(on))) {
+      throw new InvalidValue(
+        'joinedOn',
+        'Tiene un grupo desde antes de esa fecha: cambia antes desde cuándo está en él.',
+      );
+    }
+    student.changeJoinedOn(on, LocalDate.fromInstant(this.clock.now()));
+    await this.students.save(student);
+    await this.enrolments.moveStarts(student.id, previous, on);
   }
 }
 
