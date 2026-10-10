@@ -3,6 +3,8 @@ import { assertEquals, assertRejects } from '@std/assert';
 
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
+  ClubDuty,
+  DutyRef,
   SettlementAlreadyPaid,
   Substitution,
   TeacherRef,
@@ -163,8 +165,8 @@ Deno.test('substitutions give the class to another teacher and need a reason whe
 });
 
 Deno.test('RecordSession should record group sessions and other activities for known teachers only', async () => {
-  const { fx, lucia, carlos } = setUp();
-  const record = new RecordSession(fx, fx, fx, fx);
+  const { fx, lucia, carlos, duties } = setUp();
+  const record = new RecordSession(fx, fx, fx, fx, duties);
   await assertRejects(
     () =>
       record.execute({
@@ -203,6 +205,48 @@ Deno.test('RecordSession should record group sessions and other activities for k
         hours: 1,
       }),
     InvalidValue,
+  );
+});
+
+Deno.test('RecordSession should record a club activity tied to it, once per day', async () => {
+  const { fx, lucia, carlos, duties } = setUp();
+  const fridays = new ClubDuty(
+    DutyRef.generate(),
+    TeacherRef.fromString(lucia),
+    5,
+    17 * 60,
+    20 * 60,
+    'Viernes',
+    'fridays',
+  );
+  await duties.save(fridays);
+  const record = new RecordSession(fx, fx, fx, fx, duties);
+  const input = {
+    teacherId: lucia,
+    date: '2026-10-02',
+    groupId: null,
+    dutyId: fridays.id.value,
+    activity: null,
+    hours: 3,
+  };
+  const id = await record.execute(input);
+  const entry = fx.entries.get(id);
+  // Como la sesión automática: con su origen y su hora de inicio, para los solapes y para no duplicarla.
+  assertEquals([entry?.label, entry?.source, entry?.start, entry?.fromSchedule], [
+    'Viernes',
+    `duty:${fridays.id.value}`,
+    17 * 60,
+    false,
+  ]);
+  await assertRejects(
+    () => record.execute({ ...input, teacherId: carlos }),
+    InvalidValue,
+    'ya está apuntada',
+  );
+  await assertRejects(
+    () => record.execute({ ...input, dutyId: DutyRef.generate().value }),
+    InvalidValue,
+    'no existe',
   );
 });
 
@@ -454,7 +498,7 @@ Deno.test('Substitutions should cover club duty shifts too, alone or with all th
 Deno.test('Profitability should use the hours actually recorded in a month already over', async () => {
   const { fx, lucia, carlos, duties } = setUp();
   // Hoy es 31 de octubre: septiembre ya pasó. Lucía tiene apuntadas 3 h (un torneo); Carlos, ninguna.
-  await new RecordSession(fx, fx, fx, fx).execute({
+  await new RecordSession(fx, fx, fx, fx, duties).execute({
     teacherId: lucia,
     date: '2026-09-15',
     groupId: null,

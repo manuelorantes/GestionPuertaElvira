@@ -93,11 +93,19 @@ asistencia).
 - **THEN** ese día se le pagan 3 horas
 
 ### Requirement: Registro de horas
-Administración MUST poder añadir sesiones de un grupo u otras actividades (con descripción), cambiar su profesor y sus horas
-(de 0,5 a 12, en medias horas) y quitarlas (por ejemplo, un cambio de última hora o una falta), viendo el coste de cada una.
+Administración MUST poder añadir sesiones de un grupo, de una actividad del club (turno o viernes) u otras actividades (con
+descripción), cambiar su profesor y sus horas (de 0,5 a 12, en medias horas) y quitarlas (por ejemplo, un cambio de última hora o una falta), viendo el coste de cada una.
 El registro MUST ir de lo más reciente a lo más antiguo y mostrar en cada sesión las horas que cuentan de verdad y su
 coste (ver los solapes en la liquidación): si otra sesión del mismo día se queda con parte de sus horas, un asterisco
 explica cuántas eran y con qué se pisa. El total de arriba suma lo que cuenta.
+Al elegir una actividad del club se proponen su encargado y sus horas, y la sesión queda ligada a la actividad como si la
+hubiera apuntado la tarea de cada noche (cuenta los solapes con su hora de inicio y no se duplica): cada actividad se
+apunta como mucho una vez por día.
+
+#### Scenario: Apuntar a mano los viernes de Ángel
+- **WHEN** administración registra horas, elige «Viernes · Ángel Castillo Rodriguez · Vie 17:00–20:00» y el viernes 2
+- **THEN** se proponen Ángel y 3 h; al guardar, la sesión sale como su «Viernes», con los solapes con su clase descontados,
+  y volver a apuntarla ese día se rechaza
 
 #### Scenario: Una clase dentro de la actividad de los viernes
 - **WHEN** Ángel tiene «Viernes» de 17:00 a 20:00 y clase de 17:00 a 18:30
