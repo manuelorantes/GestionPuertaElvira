@@ -35,6 +35,22 @@ dirección de la página.
 Administración MUST poder anotar ingresos o gastos con fecha, concepto, categoría de su tipo, forma de pago (efectivo, transferencia o tarjeta)
 e importe mayor que cero, y quitarlos.
 
+### Requirement: Editar movimientos
+Cada movimiento del libro MUST tener un botón de editar (lápiz) junto a los demás, para cambiar su concepto, categoría
+(de su mismo tipo), forma de pago, importe y mes al que corresponde. Antes de guardar MUST pedirse confirmación con la
+lista de lo que cambia («Importe: 45 € → 40 €»). No se pueden editar los de una temporada cerrada.
+
+- En apuntes manuales y facturas se cambia el apunte o la factura.
+- En cobros, liquidaciones y anticipos se corrige solo cómo salen en contabilidad (el libro, sus totales y las gráficas
+  del resumen): el recibo, las cuotas del alumno y la nómina del profesor no cambian, y el movimiento queda marcado como
+  «Corregido en contabilidad». La confirmación MUST avisar de ello. La forma de pago de un cobro es la excepción: cambia
+  también en el cobro y en su recibo.
+
+#### Scenario: Corregir un cobro en contabilidad
+- **WHEN** administración edita un cobro de 45 € en efectivo y lo deja en 40 € por transferencia, y confirma
+- **THEN** el libro muestra 40 € por transferencia y «Corregido en contabilidad»; el recibo sigue siendo de 45 €, ahora
+  por transferencia, y las cuotas del alumno no cambian
+
 ### Requirement: Mes al que corresponde
 Cada apunte y cada factura MUST tener un mes al que corresponde (la luz de septiembre pagada en octubre corresponde a
 septiembre). Al anotarlos se puede elegir; por defecto es el mes de su fecha (la de la factura, en las facturas). En los
