@@ -11,6 +11,8 @@ import { fetchDashboard, type Dashboard } from '@/features/dashboard/api';
 import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Avatar } from '@/shared/ui/Avatar';
+import { MovementConcept } from '@/pages/panel/accounting/MovementConcept';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 import { Card } from '@/shared/ui/Card';
 
 import { MonthlyChart } from './MonthlyChart';
@@ -156,7 +158,9 @@ function Summary({ data }: { data: Dashboard }) {
               >
                 <Avatar name={charge.studentName} size={36} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">{charge.studentName}</p>
+                  <p className="text-sm font-medium">
+                    <StudentLink id={charge.studentId}>{charge.studentName}</StudentLink>
+                  </p>
                   <p className="text-[13px] text-ink-muted">
                     Cuota de {monthName(charge.period)} · {formatCents(charge.amountCents)}
                   </p>
@@ -204,7 +208,9 @@ function Summary({ data }: { data: Dashboard }) {
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">{line.concept}</p>
+                    <p className="truncate font-medium">
+                      <MovementConcept concept={line.concept} studentId={line.studentId} />
+                    </p>
                     <p className="text-xs text-ink-muted">{formatDate(line.date)}</p>
                   </div>
                   <span

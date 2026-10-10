@@ -15,6 +15,7 @@ import { ToggleButton } from '@/shared/ui/ToggleButton';
 
 import type { BillingDialog } from './BillingPage';
 import { CancelledCharges } from './CancelledCharges';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 /** Lo que se ve en Cuotas: las de un mes, las de socio de la temporada o las canceladas. */
 export type ChargesView = 'month' | 'membership' | 'cancelled';
@@ -202,7 +203,9 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
             >
               <div className="flex items-center gap-3">
                 <Avatar name={charge.studentName} size={32} />
-                <span className="flex-1 font-medium">{charge.studentName}</span>
+                <span className="flex-1 font-medium">
+                  <StudentLink id={charge.studentId}>{charge.studentName}</StudentLink>
+                </span>
                 <span className="font-semibold">
                   <Amount charge={charge} />
                 </span>
@@ -247,7 +250,9 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
                   <td className="px-5 py-2.5">
                     <span className="flex items-center gap-3">
                       <Avatar name={charge.studentName} size={32} />
-                      <span className="font-medium">{charge.studentName}</span>
+                      <span className="font-medium">
+                        <StudentLink id={charge.studentId}>{charge.studentName}</StudentLink>
+                      </span>
                     </span>
                   </td>
                   <td className="px-5 py-2.5">{concept(charge)}</td>

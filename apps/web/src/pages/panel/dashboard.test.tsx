@@ -62,6 +62,7 @@ const SUMMARY = {
       category: 'fees',
       method: 'transfer',
       amountCents: 4500,
+      studentId: 's9',
     },
   ],
 };
@@ -85,14 +86,26 @@ describe('Resumen', () => {
     expect(chartFigure).toHaveAccessibleName(
       expect.stringContaining('octubre 2026: ingresos 4120 €, gastos 1180 €'),
     );
+    await userEvent.hover(screen.getByTestId('barra-2026-10-income'));
+    expect(screen.getByText('Ingresos de octubre 2026: 4120 €')).toBeVisible();
+    await userEvent.hover(screen.getByTestId('barra-2026-10-expense'));
+    expect(screen.getByText('Gastos de octubre 2026: 1180 €')).toBeVisible();
+    expect(screen.queryByText('Ingresos de octubre 2026: 4120 €')).not.toBeInTheDocument();
     expect(screen.getByText('86 %')).toBeInTheDocument();
     expect(screen.getByText('3 grupos completos')).toBeInTheDocument();
     expect(screen.getByText('Adultos II')).toBeInTheDocument();
     const overdue = screen.getByRole('region', { name: 'Recibos vencidos' });
-    expect(within(overdue).getByText('Irene Moreno Salas')).toBeInTheDocument();
+    expect(within(overdue).getByRole('link', { name: 'Irene Moreno Salas' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s1',
+    );
     expect(within(overdue).getByText(/Cuota de septiembre · 45 €/)).toBeInTheDocument();
     const latest = screen.getByRole('region', { name: 'Últimos movimientos' });
     expect(within(latest).getByText('+45 €')).toBeInTheDocument();
+    expect(within(latest).getByRole('link', { name: 'Sofía Ramírez Vílchez' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s9',
+    );
   });
 
   it('opens the payment dialog from an overdue charge', async () => {

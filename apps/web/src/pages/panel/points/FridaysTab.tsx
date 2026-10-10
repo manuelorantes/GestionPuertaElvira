@@ -9,6 +9,7 @@ import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
 import { useRefreshClubData } from '@/shared/useRefreshClubData';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const normalise = (text: string) =>
   text
@@ -122,7 +123,7 @@ export function FridaysTab({ month }: { month: string }) {
             {students.map((s) => (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <th scope="row" className="px-5 py-2 font-medium">
-                  {s.name}
+                  <StudentLink id={s.id}>{s.name}</StudentLink>
                   {s.memberNumber !== null && (
                     <span className="ml-2 text-[12px] font-normal text-ink-muted">
                       nº {s.memberNumber}

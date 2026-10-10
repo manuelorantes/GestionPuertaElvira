@@ -10,8 +10,10 @@ import { ClubLogo } from '@/shared/ui/ClubLogo';
 import { Dialog } from '@/shared/ui/Dialog';
 
 import { InvoiceDialog } from './InvoiceDialog';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
+import type { ReactNode } from 'react';
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-3 py-1.5">
       <span className="text-ink-muted">{label}</span>
@@ -61,7 +63,10 @@ export function ReceiptDialog({ paymentId, onClose }: { paymentId: string; onClo
                 </p>
               </div>
             </header>
-            <Row label="Alumno" value={p.studentName} />
+            <Row
+              label="Alumno"
+              value={<StudentLink id={p.studentId}>{p.studentName}</StudentLink>}
+            />
             <Row label="Pagado por" value={p.guardianName} />
             <div className="border-b border-line pb-2">
               <Row label="Concepto" value={p.concept} />

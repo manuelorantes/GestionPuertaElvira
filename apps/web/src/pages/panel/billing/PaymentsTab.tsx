@@ -6,6 +6,7 @@ import { formatCents } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 export function PaymentsTab({ onOpenReceipt }: { onOpenReceipt: (paymentId: string) => void }) {
   const payments = usePayments();
@@ -66,7 +67,9 @@ export function PaymentsTab({ onOpenReceipt }: { onOpenReceipt: (paymentId: stri
                   )}
                 </span>
               </td>
-              <td className="px-5 py-3 font-medium">{payment.studentName}</td>
+              <td className="px-5 py-3 font-medium">
+                <StudentLink id={payment.studentId}>{payment.studentName}</StudentLink>
+              </td>
               <td className="px-5 py-3">{payment.concept}</td>
               <td className="px-5 py-3 text-ink-soft">
                 <span className="inline-flex items-center gap-2">

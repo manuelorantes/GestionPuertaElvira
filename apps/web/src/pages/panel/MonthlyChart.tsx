@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 import { formatCents, monthLabel, monthName } from '@/features/billing/money';
 
 interface MonthlyChartProps {
@@ -13,8 +15,24 @@ function axisMax(cents: number): number {
   return step * power * 4 * 100;
 }
 
+/** En los extremos, el aviso se abre hacia dentro para no salirse de la tarjeta. */
+function tooltipSide(index: number, count: number): string {
+  if (index < 2) return 'left-0';
+  if (index >= count - 2) return 'right-0';
+  return 'left-1/2 -translate-x-1/2';
+}
+
+type BarKind = 'income' | 'expense';
+
+const BAR_STYLE: Record<BarKind, { label: string; color: string }> = {
+  income: { label: 'Ingresos', color: 'bg-brand' },
+  expense: { label: 'Gastos', color: 'bg-ink-strong' },
+};
+
 /** Barras de ingresos y gastos por mes (sin dependencias de gráficos). */
 export function MonthlyChart({ months, current }: MonthlyChartProps) {
+  // La barra señalada (al pasar el ratón o al tocarla) muestra su importe.
+  const [pointed, setPointed] = useState<string | null>(null);
   const max = axisMax(Math.max(...months.flatMap((m) => [m.incomeCents, m.expenseCents])));
   const ticks = [4, 3, 2, 1, 0].map((i) => (max * i) / 4);
   const description = months
@@ -41,23 +59,34 @@ export function MonthlyChart({ months, current }: MonthlyChartProps) {
         ))}
       </div>
       <div aria-hidden className="flex flex-1 items-stretch gap-1 border-l border-line sm:gap-2">
-        {months.map((m) => (
-          <div
-            key={m.month}
-            className="flex min-w-0 flex-1 flex-col"
-            title={`${monthLabel(m.month)}: ${formatCents(m.incomeCents)} / ${formatCents(m.expenseCents)}`}
-          >
+        {months.map((m, index) => (
+          <div key={m.month} className="flex min-w-0 flex-1 flex-col">
             <div
               className={`flex flex-1 items-end justify-center gap-[3px] border-b border-line-strong ${m.month === current ? '' : 'opacity-90'}`}
             >
-              <div
-                className="w-[42%] max-w-4 rounded-t-[3px] bg-brand"
-                style={{ height: `${(m.incomeCents / max) * 100}%` }}
-              />
-              <div
-                className="w-[42%] max-w-4 rounded-t-[3px] bg-ink-strong"
-                style={{ height: `${(m.expenseCents / max) * 100}%` }}
-              />
+              {(['income', 'expense'] as const).map((kind) => {
+                const id = `${m.month}-${kind}`;
+                const cents = kind === 'income' ? m.incomeCents : m.expenseCents;
+                return (
+                  <div
+                    key={kind}
+                    data-testid={`barra-${id}`}
+                    className={`relative w-[42%] max-w-4 rounded-t-[3px] ${BAR_STYLE[kind].color}`}
+                    style={{ height: `${(cents / max) * 100}%` }}
+                    onPointerEnter={() => setPointed(id)}
+                    onPointerLeave={() => setPointed((p) => (p === id ? null : p))}
+                    onClick={() => setPointed((p) => (p === id ? null : id))}
+                  >
+                    {pointed === id && (
+                      <span
+                        className={`pointer-events-none absolute bottom-full z-10 mb-1.5 whitespace-nowrap ${tooltipSide(index, months.length)} rounded-sm bg-ink-strong px-2 py-1 text-xs font-medium text-paper shadow-overlay`}
+                      >
+                        {`${BAR_STYLE[kind].label} de ${monthLabel(m.month).toLowerCase()}: ${formatCents(cents)}`}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <span
               className={`h-7 truncate pt-1.5 text-center text-xs ${m.month === current ? 'font-semibold text-brand-strong' : 'text-ink-muted'}`}

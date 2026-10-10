@@ -26,6 +26,8 @@ import { Select } from '@/shared/ui/Select';
 
 import { CommentList } from '../attendance/ClassComments';
 import { GroupAttendanceGrid } from '../classes/GroupAttendanceTable';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
+import { studentPath } from '@/features/students/links';
 
 const SECTION_TITLE = 'text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase';
 
@@ -187,7 +189,9 @@ function GroupStudents({ group }: { group: TeacherGroup }) {
                   className="flex items-center justify-between gap-3 border-b border-line-soft px-4 py-2.5 text-sm last:border-b-0"
                 >
                   <span className="min-w-0">
-                    <span className="block">{s.name}</span>
+                    <StudentLink id={s.id} className="block">
+                      {s.name}
+                    </StudentLink>
                     {s.days.join() !== group.days.join() && (
                       <span className="block text-[13px] text-ink-muted">
                         Solo {daysLabel(s.days)}
@@ -242,7 +246,7 @@ function GroupMonthAttendance({ groupId }: { groupId: string }) {
             onNext={month < thisMonth ? () => setMonth(shiftMonth(month, 1)) : undefined}
           />
         </div>
-        <GroupAttendanceGrid attendance={attendance} month={month} />
+        <GroupAttendanceGrid attendance={attendance} month={month} studentHref={studentPath} />
       </section>
     </Card>
   );

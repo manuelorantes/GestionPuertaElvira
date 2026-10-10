@@ -397,6 +397,10 @@ describe('Clases', () => {
     const ofStudents = () => screen.getByRole('list', { name: 'Comentarios de los alumnos' });
     expect(ofStudents()).toHaveTextContent('Ha roto un reloj');
     expect(ofStudents()).toHaveTextContent('Ha llegado a mitad de clase');
+    expect(within(ofStudents()).getByRole('link', { name: 'Pablo Gil Ruiz' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s2',
+    );
     const who = screen.getByRole('combobox', { name: 'Alumno' });
     await user.selectOptions(who, 'Pablo Gil Ruiz');
     expect(ofStudents()).toHaveTextContent('Ha roto un reloj');
