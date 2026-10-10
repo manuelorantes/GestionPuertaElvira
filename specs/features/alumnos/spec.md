@@ -215,8 +215,17 @@ La relación MUST ser mutua.
 - **THEN** la ficha de A muestra a B y la de B muestra a A, y ambos aparecen con el filtro «Familia directa»
 
 ### Requirement: Acceso restringido
-Las operaciones de alumnos MUST estar reservadas a cuentas de administración.
+Dar de alta, cambiar, inscribir, dar de baja, cobrar o apuntar pedidos MUST estar reservado a cuentas de
+administración. El profesorado MUST poder consultar «Alumnos» de solo lectura: la lista y la ficha completa de cualquier
+alumno (datos personales y de contacto, familia, cuotas y cobros con sus recibos, material, asistencia y comentarios),
+sin ningún botón de gestión ni «Datos pendientes» (ver
+[la decisión](../../decisions/profesorado-lee-datos-del-club.md)).
 
-#### Scenario: Profesorado o anónimo
-- **WHEN** una cuenta de profesorado o alguien sin sesión intenta consultar o modificar alumnos
+#### Scenario: Profesorado
+- **WHEN** Lucía, de profesorado, abre la ficha de Martina, que no es alumna suya
+- **THEN** ve su DNI, los teléfonos de su familia y si tiene cuotas pendientes, pero no «Editar», «Dar de baja»,
+  «Registrar cobro» ni «Apuntar pedido», y el sistema rechaza cualquier cambio que intente
+
+#### Scenario: Anónimo
+- **WHEN** alguien sin sesión intenta consultar o modificar alumnos
 - **THEN** el sistema lo rechaza

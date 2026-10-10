@@ -185,8 +185,8 @@ Contabilidad al pagarla). Administración MUST poder corregir el día en que se 
 
 ### Requirement: Espacio del profesorado
 Una cuenta de profesorado vinculada a un profesor (o la administración vinculada, en su espacio de profesor; ver la spec
-de autenticación) MUST ver, pensado para el móvil, solo
-lo suyo:
+de autenticación) MUST ver, pensado para el móvil, lo suyo
+y, de solo lectura, lo del club que se indica:
 - **Mis clases**: las de hoy y las de la semana, día a día, según el horario: las suyas salvo las que le sustituyen,
   más las que da sustituyendo a otro (marcadas «Sustitución»), sin festivos; con hora, aula, alumnos que van ese día y
   el estado de la lista (pasada, por pasar o sin pasar). Desde ahí pasa lista (ver la spec de asistencia).
@@ -196,10 +196,11 @@ lo suyo:
     con un selector por alumno (los del grupo y los que vinieron en asistencia especial), del más reciente al más
     antiguo: los de las últimas 4 semanas y, con «Ver más», los 4 anteriores cada vez, hasta el inicio de la temporada;
   - sus **alumnos**, con los días que vienen si no son todos y su asistencia de la temporada en ese grupo (porcentaje de
-    las clases con lista; por debajo del 75 % en rojo; «—» sin clases con lista), sin datos de contacto;
+    las clases con lista; por debajo del 75 % en rojo; «—» sin clases con lista);
   - la **asistencia del grupo** mes a mes, como la ve administración (ver la spec de asistencia), desde septiembre hasta
     el mes en curso, sin enlace a la ficha del alumno.
   No puede ver así ningún otro grupo.
+- **Clases** y **Alumnos** del club, de solo lectura (ver las specs de clases y alumnos).
 - **Mis pagos**: el mes a mes de la temporada hasta el mes en curso (horas, importe, anticipos, a pagar y estado:
   pagada y cuándo, pendiente o en curso) y los totales (lo que se le debe, lo cobrado, horas e importe), sin ingresos
   ni márgenes del club.
