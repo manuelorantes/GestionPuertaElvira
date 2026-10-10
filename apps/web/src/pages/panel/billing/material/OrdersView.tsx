@@ -56,6 +56,9 @@ export function OrderBadges({ order }: { order: Order }) {
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       <Badge tone={ORDER_STATE[order.status].tone}>{ORDER_STATE[order.status].label}</Badge>
+      {order.status === 'reserved' && order.missing.length > 0 && (
+        <Badge tone="warning">Falta {order.missing.map((m) => m.toLowerCase()).join(' y ')}</Badge>
+      )}
       {order.deliveredOn && (
         <Badge tone="success">
           {order.status === 'cancelled' && order.returnedToStock
@@ -68,11 +71,17 @@ export function OrderBadges({ order }: { order: Order }) {
 }
 
 /** Temporadas para filtrar: la actual y las tres anteriores. */
+/** El material se lleva desde la temporada 2026/27: no hay temporadas anteriores que filtrar. */
+const FIRST_SEASON = 2026;
+
+/** Temporadas para filtrar: de la actual hacia atrás, hasta la primera con material. */
 function seasons(): { value: string; label: string }[] {
   const current = fiscalYearOf(currentMonth());
-  return [0, 1, 2, 3].map((back) => ({
-    value: String(current - back),
-    label: `Temporada ${fiscalYearLabel(current - back)}`,
+  const years: number[] = [];
+  for (let year = current; year >= FIRST_SEASON; year--) years.push(year);
+  return years.map((year) => ({
+    value: String(year),
+    label: `Temporada ${fiscalYearLabel(year)}`,
   }));
 }
 

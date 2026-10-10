@@ -5,6 +5,7 @@ import {
   cancelOrder,
   changeOrderPrice,
   deliverOrder,
+  editOrder,
   type Order,
   placeOrder,
 } from '@/features/equipment/api';
@@ -18,6 +19,7 @@ import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
 import { FormDialog } from './FormDialog';
+import { ProductFields } from './OrderDialog';
 
 /** Pasar a pedido (pone precio y genera el cobro) o corregir el precio de uno sin nada cobrado. */
 export function PriceDialog({
@@ -35,6 +37,9 @@ export function PriceDialog({
   const product = products.data?.find((p) => p.id === order.productId);
   const proposed = order.priceCents ?? (product ? product.priceCents * order.quantity : null);
   const [price, setPrice] = useState(proposed === null ? '' : centsToText(proposed));
+  // Una reserva con campos de lista sin elegir: se eligen aquí antes de pasarla a pedido.
+  const [values, setValues] = useState(order.values);
+  const missing = mode === 'place' ? order.missing : [];
   const shown = price === '' && proposed !== null ? centsToText(proposed) : price;
 
   return (
@@ -45,18 +50,36 @@ export function PriceDialog({
       onSubmit={() => {
         const priceCents = centsFromText(shown);
         if (priceCents === null) return 'Indica el precio con hasta dos decimales.';
+        const unchosen = product?.fields.find(
+          (f) => missing.includes(f.name) && !f.options.includes(values[f.id] ?? ''),
+        );
+        if (unchosen) return `Antes de pasarlo a pedido, elige ${unchosen.name.toLowerCase()}.`;
         const request = mode === 'place' ? placeOrder : changeOrderPrice;
-        return request({ id: order.id, priceCents }).then(() => {
-          refresh();
-          toast(
-            mode === 'place' ? `Cobro de ${formatCents(priceCents)} generado` : 'Precio cambiado',
-          );
-        });
+        const completed =
+          missing.length > 0
+            ? editOrder(order.id, { quantity: order.quantity, values, note: order.note })
+            : Promise.resolve();
+        return completed
+          .then(() => request({ id: order.id, priceCents }))
+          .then(() => {
+            refresh();
+            toast(
+              mode === 'place' ? `Cobro de ${formatCents(priceCents)} generado` : 'Precio cambiado',
+            );
+          });
       }}
     >
       <p className="text-sm">
         <span className="font-semibold">{order.studentName}</span> · {orderLabel(order)}
       </p>
+      {product && missing.length > 0 && (
+        <>
+          <p className="text-sm text-ink-soft">
+            Falta elegir {missing.map((m) => m.toLowerCase()).join(' y ')}:
+          </p>
+          <ProductFields product={product} values={values} onChange={setValues} only={missing} />
+        </>
+      )}
       <TextField
         label="Precio total (€)"
         inputMode="decimal"

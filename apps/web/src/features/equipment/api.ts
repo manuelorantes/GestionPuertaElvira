@@ -34,6 +34,8 @@ export interface Order {
   values: Record<string, string>;
   detail: string;
   variantLabel: string;
+  /** Campos de lista aún sin elegir (reservas): hay que elegirlos para pasarlo a pedido. */
+  missing: string[];
   note: string | null;
   status: OrderState;
   priceCents: number | null;

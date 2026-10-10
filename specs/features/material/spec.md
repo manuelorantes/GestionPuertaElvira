@@ -10,7 +10,8 @@ Decisión de diseño: [material deportivo como cobro](../../decisions/material-d
 Administración MUST poder crear y editar productos sin tocar el código. Cada producto tiene nombre, precio de venta por
 defecto y los campos que se le quieran poner:
 
-- de lista: una lista cerrada de opciones (p. ej. «Talla»: 8, 10, 12, S, M, L); al apuntar un pedido hay que elegir una;
+- de lista: una lista cerrada de opciones (p. ej. «Talla»: 8, 10, 12, S, M, L); un pedido necesita una de cada campo
+  de lista, aunque una reserva puede quedar con alguno sin elegir todavía;
 - de texto: texto libre y opcional (p. ej. «Nombre a estampar»).
 
 Un producto MUST poder retirarse (deja de ofrecerse para pedidos nuevos) y volver a ofrecerse. No se puede quitar un
@@ -27,7 +28,10 @@ campo de lista ni una opción que ya usan pedidos o compras.
 ### Requirement: Pedidos de un alumno
 Cada pedido MUST ser de un producto para un alumno, con cantidad y los valores de sus campos. Sus estados:
 
-- **Reservado**: se apunta lo que necesita (talla, nombre…); no tiene precio ni cobro;
+- **Reservado**: se apunta lo que necesita (talla, nombre…); no tiene precio ni cobro. Los campos de lista MAY quedar
+  sin elegir («Falta talla»): para pasarlo a pedido hay que elegirlos antes (el diálogo de «Pasar a pedido» los pide).
+  Como entregar y cobrar exigen que esté pedido, tampoco se puede sin elegirlos. Una reserva a medias no cuenta en el
+  stock de ninguna variante;
 - **Pedido**: tiene precio (se propone el del producto × cantidad y se puede cambiar) y genera un cobro al alumno por
   ese importe;
 - **Pagado**: su cobro está cubierto; pasa solo al registrar el cobro;
@@ -44,6 +48,10 @@ corregir mientras no esté entregado ni cancelado.
 #### Scenario: De reserva a pagado
 - **WHEN** se reserva un chándal de talla 10 para un alumno, se pasa a pedido por 45 € y se registra el cobro
 - **THEN** el alumno tuvo un cobro de 45 € que aparece en «Cuotas» y en su ficha, y el pedido queda pagado
+
+#### Scenario: Reserva sin talla
+- **WHEN** se reserva un chándal sin elegir la talla y se intenta pasar a pedido
+- **THEN** se pide elegir la talla antes; una vez elegida, pasa a pedido con su cobro
 
 #### Scenario: Entrega sin stock
 - **WHEN** se intenta entregar un chándal de talla 10 y no queda ninguno de esa talla
@@ -62,7 +70,8 @@ El cobro de material solo se cancela cancelando su pedido.
 
 ### Requirement: Listado de pedidos
 Por defecto MUST verse los pedidos abiertos de cualquier fecha (reservados, pedidos sin pagar o sin entregar), con
-filtro por estado, producto y temporada para ver también los cerrados.
+filtro por estado, producto y temporada para ver también los cerrados. El filtro de temporada empieza en la 2026/27, la
+primera con material: no ofrece temporadas anteriores.
 
 ### Requirement: Compras al proveedor y stock
 Administración MUST poder registrar compras por lotes: un producto, la fecha, lo que costó el lote entero y cuántas

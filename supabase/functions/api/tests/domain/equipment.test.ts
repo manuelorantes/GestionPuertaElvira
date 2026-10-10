@@ -24,7 +24,11 @@ function tracksuit(): Product {
   ]);
 }
 
-function reserve(product: Product, quantity = 1, values = { talla: '10' }): Order {
+function reserve(
+  product: Product,
+  quantity = 1,
+  values: Record<string, string> = { talla: '10' },
+): Order {
   return Order.reserve({
     id: OrderId.generate(),
     student: StudentRef.generate(),
@@ -86,17 +90,20 @@ Deno.test('Order should go from reserved to ordered and describe its charge', ()
   const order = reserve(product, 2, { talla: '10' });
   assertEquals(order.status, 'reserved');
   assertThrows(() => order.changePrice(Money.euros(80)), InvalidValue, 'aún no tiene precio');
-  order.place(Money.euros(90), ChargeRef.generate(), today);
+  order.place(tracksuit(), Money.euros(90), ChargeRef.generate(), today);
   assertEquals(order.status, 'ordered');
   assertEquals(order.price?.cents, 9000);
   assertEquals(order.concept(product.name), '2 × Chándal · Talla 10');
-  assertThrows(() => order.place(Money.euros(90), ChargeRef.generate(), today), InvalidValue);
+  assertThrows(
+    () => order.place(tracksuit(), Money.euros(90), ChargeRef.generate(), today),
+    InvalidValue,
+  );
 });
 
 Deno.test('Order should deliver only with a price and enough stock, and undo it', () => {
   const order = reserve(tracksuit(), 2);
   assertThrows(() => order.deliver(today, today, 5), InvalidValue, 'pedido');
-  order.place(Money.euros(90), ChargeRef.generate(), today);
+  order.place(tracksuit(), Money.euros(90), ChargeRef.generate(), today);
   const error = assertThrows(() => order.deliver(today, today, 1), NotEnoughStock);
   assertEquals(error.available, 1);
   assertThrows(() => order.deliver(today.plusDays(1), today, 5), InvalidValue, 'futura');
@@ -109,7 +116,7 @@ Deno.test('Order should deliver only with a price and enough stock, and undo it'
 
 Deno.test('Order should be cancelled, return to stock only when asked, and be reactivated', () => {
   const order = reserve(tracksuit());
-  order.place(Money.euros(45), ChargeRef.generate(), today);
+  order.place(tracksuit(), Money.euros(45), ChargeRef.generate(), today);
   order.deliver(today, today, 1);
   order.cancel(today, false);
   assertEquals(order.takesStock(), true);
@@ -164,4 +171,22 @@ Deno.test('ProductMargin should use the average cost of everything bought', () =
   assertEquals(margin.margin?.cents, 15000);
   assertEquals(margin.marginPerUnit?.cents, 1500);
   assertEquals(new ProductMargin(0, Money.zero(), 2, Money.euros(90)).margin, null);
+});
+
+Deno.test('Order should be reserved with list fields still to choose, but not ordered until they are chosen', () => {
+  const product = tracksuit();
+  const order = reserve(product, 1, {});
+  assertEquals(order.selection.variantKey, '');
+  assertEquals(product.missingIn(order.selection.values), ['Talla']);
+  assertThrows(
+    () => order.place(product, Money.euros(45), ChargeRef.generate(), today),
+    InvalidValue,
+    'Antes de pasarlo a pedido, elige talla',
+  );
+  assertThrows(() => order.deliver(today, today, 5), InvalidValue, 'pedido');
+  order.edit(product, 1, { talla: '12' }, null);
+  order.place(product, Money.euros(45), ChargeRef.generate(), today);
+  assertEquals(order.selection.variantKey, product.variant({ talla: '12' }).variantKey);
+  // Ya con precio, no se puede volver a dejar sin elegir.
+  assertThrows(() => order.edit(product, 1, {}, null), InvalidValue, 'Elige talla');
 });
