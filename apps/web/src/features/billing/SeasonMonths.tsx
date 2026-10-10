@@ -6,7 +6,8 @@ import { currentMonth, monthLabel, monthName, seasonMonths } from './money';
 
 /**
  * Un botón por mes de la temporada, todos a la vista; el mes en curso va subrayado. `selected` null: ninguno marcado
- * (p. ej. cuando se ve otra cosa, como las cuotas de socio). `before`: botones extra al principio.
+ * (p. ej. cuando se ve otra cosa, como las cuotas de socio). `before`: botones extra al principio; `after`: otros,
+ * apartados a la derecha.
  */
 export function SeasonMonths({
   month,
@@ -14,12 +15,14 @@ export function SeasonMonths({
   label,
   onChange,
   before,
+  after,
 }: {
   month: string;
   selected: string | null;
   label: string;
   onChange: (month: string) => void;
   before?: ReactNode;
+  after?: ReactNode;
 }) {
   return (
     <div role="group" aria-label={label} className="flex flex-wrap gap-1.5">
@@ -37,6 +40,7 @@ export function SeasonMonths({
           {monthName(m).slice(0, 3)}
         </ToggleButton>
       ))}
+      {after && <span className="ml-auto flex gap-1.5">{after}</span>}
     </div>
   );
 }

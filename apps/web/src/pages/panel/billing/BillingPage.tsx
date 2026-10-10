@@ -7,7 +7,8 @@ import { currentMonth, monthName } from '@/features/billing/money';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
 
-import { ChargesTab } from './ChargesTab';
+import { CancelChargeDialog } from './CancelChargeDialog';
+import { ChargesTab, type ChargesView } from './ChargesTab';
 import { PaymentDialog } from './PaymentDialog';
 import { PaymentsTab } from './PaymentsTab';
 import { ReceiptDialog } from './ReceiptDialog';
@@ -18,12 +19,18 @@ export type BillingDialog =
   | { type: 'payment'; studentId?: string; kind?: ChargeKind }
   | { type: 'receipt'; paymentId: string }
   | { type: 'whatsapp'; charge: Charge }
+  | { type: 'cancel'; charge: Charge }
   | null;
 
 export function BillingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  // ?mes=AAAA-MM (cuotas de ese mes) o ?mes=socio (cuotas de socio de la temporada).
-  const membership = searchParams.get('mes') === 'socio';
+  // ?mes=AAAA-MM (cuotas de ese mes), ?mes=socio (cuotas de socio de la temporada) o ?mes=canceladas.
+  const view: ChargesView =
+    searchParams.get('mes') === 'socio'
+      ? 'membership'
+      : searchParams.get('mes') === 'canceladas'
+        ? 'cancelled'
+        : 'month';
   const month = /^\d{4}-\d{2}$/.test(searchParams.get('mes') ?? '')
     ? (searchParams.get('mes') as string)
     : currentMonth();
@@ -55,9 +62,9 @@ export function BillingPage() {
     if (tab === 'tarifas') return <SettingsTab />;
     return (
       <ChargesTab
-        key={membership ? 'socio' : month}
+        key={view === 'month' ? month : view}
         month={month}
-        membership={membership}
+        view={view}
         onMonthChange={(m) => setParam('mes', m)}
         onAction={setDialog}
       />
@@ -109,5 +116,7 @@ export function BillingDialogs({
     return <ReceiptDialog paymentId={dialog.paymentId} onClose={() => onChange(null)} />;
   if (dialog?.type === 'whatsapp')
     return <WhatsAppDialog charge={dialog.charge} onClose={() => onChange(null)} />;
+  if (dialog?.type === 'cancel')
+    return <CancelChargeDialog charge={dialog.charge} onClose={() => onChange(null)} />;
   return null;
 }

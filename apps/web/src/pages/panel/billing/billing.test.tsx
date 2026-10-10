@@ -16,6 +16,9 @@ const charge = (overrides: Record<string, unknown>) => ({
   paymentId: null,
   receiptNumber: null,
   remindedOn: null,
+  coveredCents: 0,
+  fullAmountCents: 4050,
+  cancelledCents: 0,
   ...overrides,
 });
 
@@ -218,6 +221,7 @@ describe('Cobros y cuotas', () => {
       'abr',
       'may',
       'jun',
+      'Cuotas canceladas',
     ]);
     await userEvent.click(within(months).getByRole('button', { name: 'Septiembre 2026' }));
     expect(await screen.findByText('No hay cuotas este mes.')).toBeInTheDocument();
@@ -498,5 +502,92 @@ describe('Cobros y cuotas', () => {
       threeHours: '60',
       privateRates: { t1: '32' },
     });
+  });
+});
+
+describe('cuotas canceladas', () => {
+  it('cancels a pending charge after confirming it', async () => {
+    const spy = api({ 'POST /api/admin/billing/charges/c1/cancel': [204] });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const table = await screen.findByRole('table', { name: 'Cuotas de octubre 2026' });
+    expect(
+      within(table).queryByRole('button', { name: 'Cancelar cuota de Hugo Martín Castillo' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      within(table).getByRole('button', { name: 'Cancelar cuota de Martina López Herrera' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Cancelar cuota' });
+    expect(dialog).toHaveTextContent(
+      '¿Seguro que quieres cancelar la cuota de octubre de Martina López Herrera (40,50 €)?',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sí, cancelarla' }));
+
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.some(
+          ([u, init]) => u === '/api/admin/billing/charges/c1/cancel' && init?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+  });
+
+  it('explains a partly cancelled charge and lists the cancelled ones to reactivate them', async () => {
+    const spy = api({
+      'GET /api/admin/billing/charges?month=2026-10&kind=monthly': [
+        200,
+        {
+          ...OCTOBER,
+          items: [
+            charge({
+              status: 'paid',
+              amountCents: 3000,
+              fullAmountCents: 4050,
+              cancelledCents: 1050,
+            }),
+          ],
+        },
+      ],
+      'GET /api/admin/billing/charges/cancelled': [
+        200,
+        {
+          items: [
+            {
+              id: 'c1',
+              studentId: 's1',
+              studentName: 'Martina López Herrera',
+              kind: 'monthly',
+              period: '2026-10',
+              fullAmountCents: 4050,
+              keptCents: 3000,
+              cancelledCents: 1050,
+              cancelledOn: '2026-10-20',
+            },
+          ],
+        },
+      ],
+      'POST /api/admin/billing/charges/c1/reactivate': [204],
+    });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const table = await screen.findByRole('table', { name: 'Cuotas de octubre 2026' });
+    expect(
+      within(table).getByRole('button', { name: 'Cuota cancelada en parte' }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cuotas canceladas' }));
+    const list = await screen.findByRole('list', { name: 'Cuotas canceladas' });
+    expect(list).toHaveTextContent('Cuota de octubre · cancelada el 20/10/2026');
+    expect(list).toHaveTextContent('10,50 €');
+    await userEvent.click(within(list).getByRole('button', { name: 'Reactivar' }));
+
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.some(
+          ([u, init]) =>
+            u === '/api/admin/billing/charges/c1/reactivate' && init?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
   });
 });

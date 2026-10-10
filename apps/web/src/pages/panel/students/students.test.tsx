@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
 import { todayIso } from '@/features/students/format';
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
@@ -744,6 +745,61 @@ describe('Alumnos', () => {
       ),
     );
     expect(postBody(spy, '/api/admin/students/s1/withdrawal').date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('should offer to cancel the pending charges when withdrawing, ticking the later months', async () => {
+    const user = userEvent.setup();
+    const now = currentMonth();
+    const next = shiftMonth(now, 1);
+    const pendingCharge = (id: string, period: string) => ({
+      id,
+      period,
+      amountCents: 4500,
+      coveredCents: 0,
+      pendingCents: 4500,
+      status: 'due',
+      manual: false,
+      note: null,
+      discountPercent: 0,
+      fullAmountCents: 4500,
+      cancelledCents: 0,
+    });
+    const spy = api({
+      'GET /api/admin/billing/accounts/s1': [
+        200,
+        {
+          charges: [pendingCharge('c-now', now), pendingCharge('c-next', next)],
+          membershipCharge: { id: 'c-socio', pendingCents: 5000 },
+          balanceCents: 0,
+        },
+      ],
+      'POST /api/admin/students/s1/withdrawal': [204],
+      'POST /api/admin/billing/charges/c-now/cancel': [204],
+      'POST /api/admin/billing/charges/c-next/cancel': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    await user.click(await screen.findByRole('button', { name: 'Dar de baja' }));
+    const dialog = screen.getByRole('dialog', { name: /dar de baja a martina/i });
+    const later = await within(dialog).findByRole('checkbox', {
+      name: new RegExp(monthLabel(next), 'i'),
+    });
+    expect(later).toBeChecked();
+    const current = within(dialog).getByRole('checkbox', {
+      name: new RegExp(monthLabel(now), 'i'),
+    });
+    expect(current).not.toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /Cuota de socio/ })).not.toBeChecked();
+    await user.click(current);
+    await user.click(within(dialog).getByRole('button', { name: 'Dar de baja' }));
+
+    await waitFor(() =>
+      expect(spy.mock.calls.filter(([, init]) => init?.method === 'POST').map(([u]) => u)).toEqual([
+        '/api/admin/students/s1/withdrawal',
+        '/api/admin/billing/charges/c-now/cancel',
+        '/api/admin/billing/charges/c-next/cancel',
+      ]),
+    );
   });
 
   it('should explain why the only group cannot be removed', async () => {

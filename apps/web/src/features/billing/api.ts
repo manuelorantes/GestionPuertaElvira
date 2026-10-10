@@ -1,7 +1,8 @@
 import { apiGet, apiSend } from '@/shared/api/client';
 
 /** `expected`: cuota prevista de un mes futuro (aún no existe; lo que se espera cobrar). */
-export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming' | 'expected';
+export type ChargeStatus =
+  'paid' | 'partial' | 'due' | 'overdue' | 'upcoming' | 'expected' | 'cancelled';
 export type ChargeKind = 'monthly' | 'membership';
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 
@@ -30,6 +31,9 @@ export interface Charge {
   /** Fijada a mano, con su motivo. */
   manual: boolean;
   note: string | null;
+  /** Si se canceló lo pendiente: su importe sin cancelar y lo cancelado (0 si no). */
+  fullAmountCents: number;
+  cancelledCents: number;
 }
 
 export interface MonthlyCharges {
@@ -121,6 +125,8 @@ export interface Account {
   membershipFeeCents: number;
   /** Cuotas mensuales de la temporada con lo cubierto y lo que falta. */
   charges: AccountCharge[];
+  /** Su cuota de socio de la temporada con lo pendiente, o null si no tiene. */
+  membershipCharge: { id: string; pendingCents: number } | null;
   /** Lo que sobra de los cobros tras cubrir todas las cuotas. */
   balanceCents: number;
 }
@@ -136,6 +142,9 @@ export interface AccountCharge {
   note: string | null;
   /** Descuento por pago adelantado fijado en este mes (0 si no tiene). */
   discountPercent: number;
+  /** Si se canceló (entera o la parte pendiente): su importe sin cancelar y lo cancelado. */
+  fullAmountCents: number;
+  cancelledCents: number;
 }
 
 export interface BillingSettings {
@@ -186,6 +195,34 @@ export function issueInvoice(
   customer: { name: string; taxId: string; address: string },
 ): Promise<void> {
   return apiSend('POST', `${BASE}/payments/${id}/invoice`, customer);
+}
+
+/** Cuota cancelada (entera o solo lo pendiente), en «Cuotas canceladas». */
+export interface CancelledCharge {
+  id: string;
+  studentId: string;
+  studentName: string;
+  kind: ChargeKind;
+  period: string;
+  fullAmountCents: number;
+  /** Lo que se conservó (lo cobrado) y lo cancelado. */
+  keptCents: number;
+  cancelledCents: number;
+  cancelledOn: string;
+}
+
+export async function fetchCancelledCharges(): Promise<CancelledCharge[]> {
+  return (await apiGet<{ items: CancelledCharge[] }>(`${BASE}/charges/cancelled`)).items;
+}
+
+/** Cancela lo pendiente de una cuota (entera, o lo que falta si está pagada en parte). */
+export function cancelCharge(chargeId: string): Promise<void> {
+  return apiSend('POST', `${BASE}/charges/${chargeId}/cancel`);
+}
+
+/** Vuelve a deberse entera. */
+export function reactivateCharge(chargeId: string): Promise<void> {
+  return apiSend('POST', `${BASE}/charges/${chargeId}/reactivate`);
 }
 
 export function markReminded(chargeId: string): Promise<void> {

@@ -13,6 +13,10 @@ export function useMonthlyCharges(month: string, kind: api.ChargesKind) {
   });
 }
 
+export function useCancelledCharges() {
+  return useQuery({ queryKey: ['charges', 'cancelled'], queryFn: api.fetchCancelledCharges });
+}
+
 export function usePayments(studentId?: string) {
   return useQuery({
     queryKey: ['payments', studentId ?? 'all'],
