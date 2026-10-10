@@ -119,6 +119,8 @@ empezaban el mismo día que el alta se mueven con ella; si otro de sus grupos em
 ### Requirement: Baja
 Un alumno MUST poder darse de baja con una fecha igual o posterior a hoy y no anterior a su alta.
 Desde esa fecha deja de contar en la ocupación de todos sus grupos y aparece «De baja», sin perder su historial.
+El diálogo de baja MUST ofrecer cancelar sus cuotas pendientes (ver «Cancelar una cuota» en la spec de cobros): las
+lista, con las de los meses posteriores a la baja ya marcadas, y se puede marcar o desmarcar cada una.
 
 #### Scenario: Baja hoy
 - **WHEN** administración da de baja a un alumno con fecha de hoy

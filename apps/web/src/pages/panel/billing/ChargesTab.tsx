@@ -1,4 +1,4 @@
-import { ArrowDownUp, Check, ChevronDown, MessageCircle, Printer } from 'lucide-react';
+import { ArrowDownUp, Ban, Check, ChevronDown, MessageCircle, Printer } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Charge, ChargeStatus } from '@/features/billing/api';
@@ -7,12 +7,17 @@ import { SeasonMonths } from '@/features/billing/SeasonMonths';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { formatCents, monthLabel, monthName } from '@/features/billing/money';
 import { Alert } from '@/shared/ui/Alert';
+import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
 import type { BillingDialog } from './BillingPage';
+import { CancelledCharges } from './CancelledCharges';
+
+/** Lo que se ve en Cuotas: las de un mes, las de socio de la temporada o las canceladas. */
+export type ChargesView = 'month' | 'membership' | 'cancelled';
 
 const STATUS: Record<
   ChargeStatus,
@@ -24,26 +29,35 @@ const STATUS: Record<
   overdue: { label: 'Vencida', tone: 'danger' },
   upcoming: { label: 'Próxima', tone: 'neutral' },
   expected: { label: 'Prevista', tone: 'neutral' },
+  cancelled: { label: 'Cancelada', tone: 'neutral' },
 };
 
 const ACTION =
   'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm px-3 text-[13px] font-semibold';
 
 /** Orden de urgencia del estado: lo que hay que reclamar primero, lo cobrado al final. */
-const URGENCY: ChargeStatus[] = ['overdue', 'partial', 'due', 'upcoming', 'expected', 'paid'];
+const URGENCY: ChargeStatus[] = [
+  'overdue',
+  'partial',
+  'due',
+  'upcoming',
+  'expected',
+  'paid',
+  'cancelled',
+];
 
 type StatusSort = 'none' | 'urgent' | 'paid';
 
 /** Meses con clase de la temporada que contiene `month`: de septiembre a junio. */
 interface ChargesTabProps {
   month: string;
-  /** Muestra las cuotas de socio de la temporada en vez de las del mes. */
-  membership: boolean;
+  view: ChargesView;
   onMonthChange: (month: string) => void;
   onAction: (dialog: BillingDialog) => void;
 }
 
-export function ChargesTab({ month, membership, onMonthChange, onAction }: ChargesTabProps) {
+export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabProps) {
+  const membership = view === 'membership';
   const charges = useMonthlyCharges(month, membership ? 'membership' : 'monthly');
   const data = charges.data;
   const [statusFilter, setStatusFilter] = useState<ChargeStatus[]>([]);
@@ -98,6 +112,18 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
     const pay = () => onAction({ type: 'payment', studentId: charge.studentId, kind: charge.kind });
     return (
       <>
+        {charge.status !== 'expected' && (
+          <button
+            type="button"
+            aria-label={`Cancelar cuota de ${charge.studentName}`}
+            title="Cancelar cuota"
+            onClick={() => onAction({ type: 'cancel', charge })}
+            className={`${ACTION} border border-line-strong text-ink-soft hover:bg-surface-muted`}
+          >
+            <Ban aria-hidden size={16} />
+            Cancelar
+          </button>
+        )}
         {charge.status === 'overdue' && !charge.remindedOn && (
           <button
             type="button"
@@ -170,7 +196,9 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
               <div className="flex items-center gap-3">
                 <Avatar name={charge.studentName} size={32} />
                 <span className="flex-1 font-medium">{charge.studentName}</span>
-                <span className="font-semibold">{formatCents(charge.amountCents)}</span>
+                <span className="font-semibold">
+                  <Amount charge={charge} />
+                </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
                 {concept(charge)}
@@ -216,7 +244,9 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
                     </span>
                   </td>
                   <td className="px-5 py-2.5">{concept(charge)}</td>
-                  <td className="px-5 py-2.5 font-medium">{formatCents(charge.amountCents)}</td>
+                  <td className="px-5 py-2.5 font-medium">
+                    <Amount charge={charge} />
+                  </td>
                   <td className="px-5 py-2.5">
                     <span className="flex flex-wrap items-center gap-2">
                       <Badge tone={STATUS[charge.status].tone}>{STATUS[charge.status].label}</Badge>
@@ -245,7 +275,7 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
     <div className="flex flex-col gap-6">
       <SeasonMonths
         month={month}
-        selected={membership ? null : month}
+        selected={view === 'month' ? month : null}
         label="Cuotas a ver"
         onChange={onMonthChange}
         before={
@@ -258,8 +288,19 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
             Cuotas de socio
           </ToggleButton>
         }
+        after={
+          <ToggleButton
+            tone="ink"
+            pressed={view === 'cancelled'}
+            onClick={() => onMonthChange('canceladas')}
+            className="h-9 rounded-full font-medium"
+          >
+            Cuotas canceladas
+          </ToggleButton>
+        }
       />
-      {data && items.length > 0 && (
+      {view === 'cancelled' && <CancelledCharges />}
+      {view !== 'cancelled' && data && items.length > 0 && (
         <Card className="flex flex-col gap-2 px-6 py-5">
           <div className="flex flex-wrap justify-between gap-2 text-sm">
             <span className="font-semibold">
@@ -283,8 +324,24 @@ export function ChargesTab({ month, membership, onMonthChange, onAction }: Charg
           </div>
         </Card>
       )}
-      <Card>{renderBody()}</Card>
+      {view !== 'cancelled' && <Card>{renderBody()}</Card>}
     </div>
+  );
+}
+
+/** Importe de la cuota y, si se canceló lo pendiente, un asterisco que lo explica. */
+function Amount({ charge }: { charge: Charge }) {
+  return (
+    <>
+      {formatCents(charge.amountCents)}
+      {charge.cancelledCents > 0 && (
+        <AsteriskNote label="Cuota cancelada en parte">
+          Era de {formatCents(charge.fullAmountCents)}: se cancelaron los{' '}
+          {formatCents(charge.cancelledCents)} que faltaban y queda lo cobrado. Se puede reactivar
+          en «Cuotas canceladas».
+        </AsteriskNote>
+      )}
+    </>
   );
 }
 
