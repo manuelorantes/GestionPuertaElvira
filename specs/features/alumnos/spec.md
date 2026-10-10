@@ -102,6 +102,10 @@ cierra el alta y abre su ficha con «Dar de alta de nuevo» (ver «Volver a dars
 - **WHEN** administración escribe «Pablo Gil Ruiz» y hay un Pablo Gil Martín de alta
 - **THEN** le avisa de que ya hay un alumno de alta con un nombre parecido, y puede dar de alta al nuevo igualmente
 
+#### Scenario: Toda alta es socia
+- **WHEN** administración da de alta a un alumno en un grupo
+- **THEN** queda marcado como socio y se le crea la cuota de socio de la temporada, además de su cuota mensual
+
 #### Scenario: Socio sin clases
 - **WHEN** administración da de alta a un alumno sin elegir ningún grupo
 - **THEN** el alumno queda activo, marcado como socio, aparece en «Socios sin clases» y no ocupa plaza en ningún grupo
