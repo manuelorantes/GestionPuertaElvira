@@ -120,6 +120,12 @@ export class Row {
     return value;
   }
 
+  nullableDate(column: string): Date | null {
+    return this.values[column] === null || this.values[column] === undefined
+      ? null
+      : this.date(column);
+  }
+
   json(column: string): unknown {
     const value = this.values[column];
     return typeof value === 'string' ? JSON.parse(value) : value;
