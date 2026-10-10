@@ -8,6 +8,8 @@ export interface Dashboard {
   collectedCents: number;
   expectedCents: number;
   pendingCents: number;
+  /** Cuotas de socio de la temporada sin cobrar, aparte de las del mes. */
+  membershipPendingCents: number;
   expensesCents: number;
   activeStudents: number;
   registeredStudents: number;
