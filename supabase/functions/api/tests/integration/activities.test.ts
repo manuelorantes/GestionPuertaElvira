@@ -34,6 +34,8 @@ async function fixture() {
     ids.push(body<{ id: string }>(created).id);
   }
   await db()`UPDATE students_student SET joined_on = '2026-09-01'`;
+  // La asistencia cuenta desde el 1 de octubre (sin esta fila contaría desde hoy, y el test caducaría).
+  await db()`INSERT INTO attendance_settings (id, since) VALUES (1, '2026-10-01')`;
   for (const [email, teacherId] of [['angel@club.es', angel], ['lucia@club.es', lucia]] as const) {
     await createUser(email, 'teacher');
     await db()`UPDATE identity_user SET teacher_id = ${teacherId}, teacher_linked_at = '2026-10-01T00:00:00+02:00'
