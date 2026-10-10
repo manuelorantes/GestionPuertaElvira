@@ -229,7 +229,8 @@ export class OpenRollCall {
     const roll = await this.rollCalls.find(groupId, day);
     // Sin pasar, nadie está marcado (el profesor marca a quien viene); pasada, se ve lo que se guardó.
     const absent = roll?.absent() ?? students.map((s) => s.id);
-    const guestIds = roll?.guests() ?? [];
+    // Quien ya es de la lista ese día no es asistencia especial (p. ej. si se le inscribió después con fecha anterior).
+    const guestIds = (roll?.guests() ?? []).filter((id) => !students.some((s) => s.id === id));
     const now = this.clock.now();
     const inClass = new Set([...students.map((s) => s.id), ...guestIds]);
     return {
@@ -653,9 +654,11 @@ export class GroupAttendance {
         if (mark === 'present') student.attended++;
       });
     }
+    // Asistencia especial de quien no era del grupo ese día (si ya lo era, cuenta como su asistencia normal).
     for (const g of data.guests) {
       const i = days.findIndex((d) => d.date === g.date);
-      if (i >= 0) row(g.studentId, g.name).marks[i] = 'special';
+      const student = row(g.studentId, g.name);
+      if (i >= 0 && student.marks[i] === null) student.marks[i] = 'special';
     }
     return {
       groupId,

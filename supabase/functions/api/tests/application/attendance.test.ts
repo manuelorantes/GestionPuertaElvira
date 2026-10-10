@@ -244,12 +244,15 @@ Deno.test('GroupAttendance should show each class day of the month until today a
       // Pablo solo los jueves y se fue el 14; Luis entró el 10.
       { studentId: 'pablo', name: 'Pablo', from: '2026-09-01', until: '2026-10-14', days: [4] },
       { studentId: 'luis', name: 'Luis', from: '2026-10-10', until: null, days: null },
+      // Hugo se inscribió con fecha del 1 después de que el martes 6 le añadieran en asistencia especial.
+      { studentId: 'hugo', name: 'Hugo', from: '2026-10-01', until: null, days: null },
     ],
     absences: [{ date: '2026-10-06', studentId: 'ana' }],
     // Sara no es del grupo y vino el martes 6; Pablo (solo jueves) vino también ese martes.
     guests: [
       { date: '2026-10-06', studentId: 'sara', name: 'Sara' },
       { date: '2026-10-06', studentId: 'pablo', name: 'Pablo' },
+      { date: '2026-10-06', studentId: 'hugo', name: 'Hugo' },
     ],
   };
   const query: GroupAttendanceQuery = {
@@ -266,6 +269,8 @@ Deno.test('GroupAttendance should show each class day of the month until today a
   ]);
   assertEquals(view.students.map((s) => [s.name, s.marks, s.attended, s.classes, s.member]), [
     ['Ana', ['unknown', 'absent', null, 'unknown', 'unknown'], 0, 1, true],
+    // Ya era del grupo ese día: su asistencia especial cuenta como asistencia normal.
+    ['Hugo', ['unknown', 'present', null, 'unknown', 'unknown'], 1, 1, true],
     ['Luis', [null, null, null, 'unknown', 'unknown'], 0, 0, true],
     ['Pablo', ['unknown', 'special', null, null, null], 0, 0, true],
     ['Sara', [null, 'special', null, null, null], 0, 0, false],

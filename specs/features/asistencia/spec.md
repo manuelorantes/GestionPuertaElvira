@@ -36,11 +36,19 @@ que no son de esa clase ese día y han venido (a recuperar o por otro motivo), b
 asistencia MUST salir indicada aparte, con asterisco, en la ficha del alumno (las clases de otros grupos a las que vino,
 que no cuentan en su porcentaje) y en la asistencia del grupo (una fila para ese alumno en ese mes, con ✓* los días que
 vino y un asterisco que explica que no es de ese grupo).
+Si ese día el alumno ya estaba inscrito en esa clase (por ejemplo, porque se le inscribió después con fecha anterior),
+su asistencia especial MUST contar como asistencia normal: ✓ en la asistencia del grupo, una clase más en su ficha (y en
+su porcentaje), y en la lista sale entre los alumnos de la clase, marcado como que vino.
 
 #### Scenario: Recuperar una clase
 - **WHEN** Lola, del grupo de Carlos, viene el martes a la clase de Lucía y Lucía la añade en «Asistencia especial»
 - **THEN** la asistencia de octubre del grupo de Lucía tiene una fila para Lola con ✓* el martes y su asterisco, y la
   ficha de Lola dice que vino ese día a esa clase, sin contar en su porcentaje
+
+#### Scenario: Inscrito después con fecha anterior
+- **WHEN** Hugo vino el viernes 2 antes de estar inscrito, Ángel le añadió en «Asistencia especial», y después se le
+  inscribe en el grupo de Ángel desde el día 1
+- **THEN** la asistencia del grupo muestra ✓ (sin asterisco) el día 2 y le cuenta en su porcentaje
 
 ### Requirement: Comentarios de las clases
 Al pasar lista, quien da la clase MUST poder añadir, de forma opcional, comentarios sobre cada alumno de la lista y sobre
