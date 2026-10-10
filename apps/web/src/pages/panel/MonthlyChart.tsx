@@ -60,7 +60,11 @@ export function MonthlyChart({ months, current, label, id: chartId }: MonthlyCha
       </div>
       <div aria-hidden className="flex flex-1 items-stretch gap-1 border-l border-line sm:gap-2">
         {months.map((m, index) => (
-          <div key={m.month} className="flex min-w-0 flex-1 flex-col">
+          <div
+            key={m.month}
+            // La columna señalada, por encima de las demás: su aviso no queda tapado por las barras de al lado.
+            className={`relative flex min-w-0 flex-1 flex-col ${pointed?.startsWith(`${m.month}-`) ? 'z-20' : ''}`}
+          >
             <div
               className={`flex flex-1 items-end justify-center gap-[3px] border-b border-line-strong ${m.month === current ? '' : 'opacity-90'}`}
             >
