@@ -1,4 +1,4 @@
-import { KeyRound, LogIn, Power, UserPlus } from 'lucide-react';
+import { KeyRound, LogIn, Mail, Power, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Navigate } from 'react-router';
 
@@ -23,6 +23,7 @@ import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
 
+import { EmailsDialog } from './EmailsDialog';
 import { NewUserDialog } from './NewUserDialog';
 import { TeacherLinkSelect } from './TeacherLinkSelect';
 import { TemporaryPasswordDialog } from './TemporaryPasswordDialog';
@@ -84,6 +85,8 @@ export function UsersPage() {
   const [filter, setFilter] = useState<StatusFilter>('active');
   const [creating, setCreating] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
+  /** Cuenta cuyos emails adicionales se están gestionando (se lee de la lista para ver los cambios al momento). */
+  const [emailsOf, setEmailsOf] = useState<string | null>(null);
   const [temporary, setTemporary] = useState<{ user: string; password: string } | null>(null);
   const reset = useUserMutation(resetPassword);
   const toggle = useUserMutation((u: ClubUser) => setEnabled(u.id, u.status === 'disabled'));
@@ -194,6 +197,11 @@ export function UsersPage() {
                           {self && <span className="text-ink-muted"> (tú)</span>}
                         </span>
                         <span className="block text-[13px] text-ink-muted">{user.email}</span>
+                        {user.otherEmails.map((other) => (
+                          <span key={other} className="block text-[13px] text-ink-muted">
+                            {other}
+                          </span>
+                        ))}
                       </td>
                       <td className="px-5 py-3">
                         {self ? (
@@ -264,6 +272,15 @@ export function UsersPage() {
                           <button
                             type="button"
                             className={ROW_ACTION}
+                            onClick={() => setEmailsOf(user.id)}
+                            aria-label={`Emails de ${user.fullName}`}
+                          >
+                            <Mail aria-hidden size={15} />
+                            Emails
+                          </button>
+                          <button
+                            type="button"
+                            className={ROW_ACTION}
                             onClick={() => setPending({ type: 'reset', user })}
                             aria-label={`Restablecer la contraseña de ${user.fullName}`}
                           >
@@ -291,6 +308,12 @@ export function UsersPage() {
           </div>
         )}
       </Card>
+      {emailsOf && users.data?.find((u) => u.id === emailsOf) && (
+        <EmailsDialog
+          user={users.data.find((u) => u.id === emailsOf) as ClubUser}
+          onClose={() => setEmailsOf(null)}
+        />
+      )}
       {creating && (
         <NewUserDialog
           onClose={() => setCreating(false)}
