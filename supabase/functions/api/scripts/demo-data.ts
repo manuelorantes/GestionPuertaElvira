@@ -321,6 +321,10 @@ const INVOICES: [number, number, string, string, string, string, string, boolean
 
 /** Tablas que se vacían con `--reset` (en orden seguro para las claves ajenas). */
 const RESET_TABLES = [
+  // El material apunta a cuotas y los cobros de material a su cuota: van antes.
+  'equipment_order',
+  'equipment_purchase',
+  'equipment_product',
   'points_movement',
   'points_photo',
   'attendance_absence',
@@ -335,8 +339,8 @@ const RESET_TABLES = [
   'payroll_substitution',
   'payroll_duty',
   'payroll_holiday',
-  'billing_charge',
   'billing_payment',
+  'billing_charge',
   'billing_account',
   'billing_settings',
   'billing_document_sequence',

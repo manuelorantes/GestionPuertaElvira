@@ -202,6 +202,7 @@ export function auditTarget(
     case 'teachers_teacher':
       return own('teacher');
     case 'billing_account':
+    case 'equipment_order':
     case 'classes_enrolment': {
       const id = text('student_id');
       return id === null ? null : { kind: 'student', id };

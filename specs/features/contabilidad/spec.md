@@ -11,7 +11,7 @@ El ejercicio MUST ir de septiembre a agosto. Su acumulado MUST empezar en el sal
 El sistema MUST mostrar los movimientos del mes, del más reciente al más antiguo, con fecha, concepto, categoría, forma de pago e importe,
 y los totales de ingresos, gastos y resultado. Los movimientos MUST salir de:
 
-- los cobros de Cobros (ingresos «Cuotas» o «Cuota de socio»);
+- los cobros de Cobros (ingresos «Cuotas», «Cuota de socio» o «Venta de material»);
 - las liquidaciones pagadas al profesorado (gasto «Profesores», en la fecha de pago);
 - las facturas de proveedores pagadas (gasto de su categoría, en la fecha de pago);
 - los apuntes manuales.

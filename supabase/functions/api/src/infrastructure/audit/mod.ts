@@ -88,6 +88,19 @@ export class AuditLabels {
     'POST /api/admin/attendance/pending/:groupId/:date/confirm':
       'Dar por buena una clase sin lista',
     'POST /api/admin/import/rows': 'Importar fila de la hoja',
+    'POST /api/admin/equipment/products': 'Crear producto de material',
+    'PUT /api/admin/equipment/products/:id': 'Editar producto de material',
+    'POST /api/admin/equipment/orders': 'Apuntar pedido de material',
+    'PUT /api/admin/equipment/orders/:id': 'Corregir pedido de material',
+    'POST /api/admin/equipment/orders/:id/place': 'Pasar a pedido el material',
+    'PUT /api/admin/equipment/orders/:id/price': 'Cambiar el precio de un pedido de material',
+    'POST /api/admin/equipment/orders/:id/deliver': 'Entregar material',
+    'POST /api/admin/equipment/orders/:id/undo-delivery': 'Deshacer la entrega de material',
+    'POST /api/admin/equipment/orders/:id/cancel': 'Cancelar pedido de material',
+    'POST /api/admin/equipment/orders/:id/reactivate': 'Reactivar pedido de material',
+    'POST /api/admin/equipment/purchases': 'Registrar compra de material',
+    'PUT /api/admin/equipment/purchases/:id': 'Corregir compra de material',
+    'DELETE /api/admin/equipment/purchases/:id': 'Borrar compra de material',
   };
 
   private static readonly TABLES: Record<string, string> = {
@@ -107,6 +120,9 @@ export class AuditLabels {
     billing_payment: 'Cobro',
     billing_settings: 'Tarifas y ajustes',
     classes_enrolment: 'Inscripción',
+    equipment_order: 'Pedido de material',
+    equipment_product: 'Producto de material',
+    equipment_purchase: 'Compra de material',
     classes_group: 'Grupo',
     identity_user: 'Usuario',
     payroll_proposed_month: 'Mes de horas propuesto',
