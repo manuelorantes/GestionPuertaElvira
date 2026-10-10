@@ -2,8 +2,8 @@ import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { recordEntry } from '@/features/accounting/api';
-import { CATEGORIES, METHODS, type EntryKind } from '@/features/accounting/categories';
-import { useAccountingMutation } from '@/features/accounting/hooks';
+import { METHODS, type EntryKind } from '@/features/accounting/categories';
+import { useAccountingMutation, useCategoryOptions } from '@/features/accounting/hooks';
 import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -26,6 +26,7 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
   const [amount, setAmount] = useState('');
   const [period, setPeriod] = useState('');
   const save = useAccountingMutation(recordEntry);
+  const categories = useCategoryOptions(kind);
   const toast = useToast();
   const year = new Date().getFullYear();
   const invalid = !concept.trim() || !category || !amount.trim();
@@ -95,7 +96,7 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
           label="Categoría"
           value={category}
           onChange={setCategory}
-          options={[{ value: '', label: 'Elige una categoría' }, ...CATEGORIES[kind]]}
+          options={[{ value: '', label: 'Elige una categoría' }, ...categories]}
         />
         <div className="grid gap-4 sm:grid-cols-2">
           <Select label="Forma de pago" value={method} onChange={setMethod} options={METHODS} />

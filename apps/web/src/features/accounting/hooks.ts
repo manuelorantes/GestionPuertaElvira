@@ -25,6 +25,18 @@ export function useFiscalYear(startYear: number) {
   });
 }
 
+/** Las categorías del libro (de serie y del club). */
+export function useCategories() {
+  return useQuery({ queryKey: ['accounting-categories'], queryFn: api.fetchCategories });
+}
+
+/** Las de un tipo, como opciones de un desplegable. */
+export function useCategoryOptions(kind: 'income' | 'expense', except: string[] = []) {
+  return (useCategories().data ?? [])
+    .filter((c) => c.kind === kind && !except.includes(c.code))
+    .map((c) => ({ value: c.code, label: c.label }));
+}
+
 export function useMonthlyCategories() {
   return useQuery({ queryKey: ['monthly-categories'], queryFn: api.fetchMonthlyCategories });
 }
