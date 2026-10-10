@@ -166,10 +166,17 @@ export class SqlStudentAttendanceQuery implements StudentAttendanceQuery {
         FROM attendance_absence a JOIN classes_group g ON g.id = a.group_id
        WHERE a.student_id = ${studentId} AND a.roll_date BETWEEN ${from.toString()} AND ${to.toString()}
        ORDER BY a.roll_date DESC`;
+    // Asistencia especial solo en grupos de los que no era ese día (si ya lo era, ya cuenta entre sus clases).
     const specials = await this.sql`
       SELECT a.roll_date::text AS date, g.name
         FROM attendance_guest a JOIN classes_group g ON g.id = a.group_id
        WHERE a.student_id = ${studentId} AND a.roll_date BETWEEN ${from.toString()} AND ${to.toString()}
+         AND NOT EXISTS (
+               SELECT 1 FROM classes_enrolment e
+                WHERE e.student_id = a.student_id AND e.class_group_id = a.group_id
+                  AND e.enrolled_on <= a.roll_date AND (e.ends_on IS NULL OR e.ends_on > a.roll_date)
+                  AND (e.attendance_days IS NULL
+                       OR e.attendance_days::jsonb @> jsonb_build_array(EXTRACT(ISODOW FROM a.roll_date)::int)))
        ORDER BY a.roll_date DESC`;
     return {
       classes: count ? new Row(count).int('classes') : 0,

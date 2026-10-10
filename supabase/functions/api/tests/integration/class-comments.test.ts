@@ -143,3 +143,33 @@ Deno.test('class comments are written from the roll call and seen in the group a
     );
   });
 });
+
+Deno.test('special attendance counts as normal attendance when the student was already in the group that day', async () => {
+  const { admin, teacher, group, lola } = await atTime(TUESDAY_EVENING, fixture);
+  const roll = `/api/teacher/roll-calls/${group}/2026-10-13`;
+  await atTime(TUESDAY_EVENING, async () => {
+    // Lola vino el martes antes de estar inscrita: Lucía la añadió en asistencia especial.
+    await teacher.json('PUT', roll, { absent: [], guests: [lola] });
+    // Después la inscriben en el grupo de Lucía con fecha del día 1 (ya venía desde entonces).
+    await db()`INSERT INTO classes_enrolment (id, student_id, class_group_id, enrolled_on)
+               VALUES (gen_random_uuid(), ${lola}, ${group}, '2026-10-01')`;
+
+    assertEquals(body(await admin.get(`/api/admin/students/${lola}/attendance`)), {
+      season: 2026,
+      classes: 1,
+      absences: [],
+      specials: [],
+      attended: 1,
+    });
+    const view = body<
+      { list: { id: string; name: string; present: boolean }[]; guests: unknown[] }
+    >(
+      await teacher.get(roll),
+    );
+    assertEquals(view.guests, []);
+    assertEquals(
+      view.list.find((s) => s.name === 'Lola Ruiz Pardo'),
+      { id: lola, name: 'Lola Ruiz Pardo', present: true },
+    );
+  });
+});
