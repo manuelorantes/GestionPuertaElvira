@@ -1,4 +1,13 @@
-import { ArrowRightLeft, ChevronRight, Clock, Pencil, Plus, UserMinus, X } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  CalendarDays,
+  ChevronRight,
+  Clock,
+  Pencil,
+  Plus,
+  UserMinus,
+  X,
+} from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router';
 
@@ -25,6 +34,7 @@ import { StudentBillingCard } from './StudentBillingCard';
 import { EnrolmentDialog } from './EnrolmentDialog';
 import { PickerDialog } from './PickerDialog';
 import { StudentDialog } from './StudentDialog';
+import { DateDialog } from './DateDialog';
 import { WithdrawDialog } from './WithdrawDialog';
 
 type Action =
@@ -32,6 +42,7 @@ type Action =
   | { kind: 'withdraw' }
   | { kind: 'addGroup' }
   | { kind: 'attendance'; groupId: string }
+  | { kind: 'since'; groupId: string; groupName: string; since: string }
   | { kind: 'move'; groupId: string; groupName: string }
   | { kind: 'sibling' };
 
@@ -184,9 +195,28 @@ export function StudentPanel() {
                   <p className="text-[13px] text-ink-muted">
                     {classroomLabel(g.classroom)} · {g.teacherName}
                   </p>
+                  <p className="text-[13px] text-ink-muted">
+                    En el grupo desde {formatDate(g.since)}
+                  </p>
                 </div>
                 {!isWithdrawn && (
                   <>
+                    <button
+                      type="button"
+                      aria-label={`Desde cuándo está en ${g.name}`}
+                      title="Desde cuándo está en el grupo"
+                      onClick={() =>
+                        setAction({
+                          kind: 'since',
+                          groupId: g.id,
+                          groupName: g.name,
+                          since: g.since,
+                        })
+                      }
+                      className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                    >
+                      <CalendarDays aria-hidden size={16} />
+                    </button>
                     <button
                       type="button"
                       aria-label={`Horario en ${g.name}`}
@@ -317,13 +347,29 @@ export function StudentPanel() {
         <EnrolmentDialog
           title="Añadir grupo"
           confirmLabel="Añadir"
+          startLabel="Desde"
           groups={(groups.data ?? []).filter((g) => !s.groups.some((mine) => mine.id === g.id))}
           onClose={() => setAction(null)}
-          onConfirm={(groupId, attendance) =>
+          onConfirm={(groupId, attendance, from) =>
             enrolWithConfirm(
-              (confirm) => api.addGroup(s.id, groupId, confirm, attendance),
+              (confirm) => api.addGroup(s.id, groupId, confirm, attendance, from),
               'Grupo añadido',
             )
+          }
+        />
+      )}
+      {action?.kind === 'since' && (
+        <DateDialog
+          title={`Desde cuándo está en ${action.groupName}`}
+          label="En el grupo desde"
+          initial={action.since}
+          help="Por ejemplo, si venía antes de que se le inscribiera. Cuenta para sus listas y sus cuotas."
+          confirmLabel="Guardar"
+          onClose={() => setAction(null)}
+          onConfirm={(from) =>
+            mutate
+              .mutateAsync(() => api.changeEnrolmentStart(s.id, action.groupId, from))
+              .then(() => done('Fecha guardada'))
           }
         />
       )}

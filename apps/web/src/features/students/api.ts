@@ -60,6 +60,8 @@ interface StudentGroup {
   attendance: Attendance | null;
   /** «Lun · 18:30–19:00», o null si va a todo el grupo. */
   attendanceLabel: string | null;
+  /** Desde cuándo está en el grupo. */
+  since: string;
 }
 
 export interface StudentPayload {
@@ -78,6 +80,8 @@ export interface Registration extends StudentPayload {
   /** Grupos (completos o con horario especial) que salen del horario del alumno. */
   enrolments: { groupId: string; attendance: Attendance | null }[];
   siblingIds: string[];
+  /** Fecha de alta en el club (por defecto hoy): sus grupos empiezan ese día. */
+  joinedOn?: string;
 }
 
 export async function fetchStudents(
@@ -128,12 +132,19 @@ export function addGroup(
   groupId: string,
   confirmOverCapacity: boolean,
   attendance: Attendance | null = null,
+  from?: string,
 ): Promise<void> {
   return apiSend('POST', `/api/admin/students/${id}/enrolments`, {
     groupId,
     confirmOverCapacity,
     attendance,
+    ...(from ? { from } : {}),
   });
+}
+
+/** Corrige desde cuándo está el alumno en uno de sus grupos. */
+export function changeEnrolmentStart(id: string, groupId: string, from: string): Promise<void> {
+  return apiSend('PUT', `/api/admin/students/${id}/enrolments/${groupId}/start`, { from });
 }
 
 /** Cambia (o quita, con null) el horario especial del alumno en un grupo. */
