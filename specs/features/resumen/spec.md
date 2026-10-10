@@ -13,16 +13,21 @@ El resumen MUST mostrar:
 - los alumnos activos frente a los registrados.
 
 ### Requirement: Mes a mes
-El resumen MUST mostrar un gráfico de barras de ingresos y gastos de la temporada en curso, de septiembre a agosto, con
-el mes en curso destacado y una descripción accesible con las cifras de cada mes. Las cuotas mensuales MUST contar en el
-mes al que corresponden (cada cobro repartido a partes iguales entre los meses que paga), no en el mes en que se
-cobran; el resto de ingresos (cuota de socio, subvenciones, promociones, apuntes) y los gastos, en su fecha.
+El resumen MUST mostrar dos gráficos de barras de ingresos y gastos de la temporada en curso, de septiembre a agosto,
+con el mes en curso destacado y una descripción accesible con las cifras de cada mes:
+
+- **Ingresos y gastos de cada mes**: todo lo que entra y sale en cada mes, por fecha (cuadra con los totales de
+  Contabilidad de ese mes).
+- **Lo que corresponde a cada mes**: solo las [categorías del mes](../contabilidad/spec.md) de Contabilidad, cada
+  movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas a partes iguales entre los meses que paga
+  cada cobro; lo del profesorado, en el mes de la liquidación; apuntes y facturas, en su mes al que corresponde.
 Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cuánto dinero equivale, p. ej. «Ingresos de
 octubre 2026: 4120 €».
 
 #### Scenario: Un pago trimestral
 - **WHEN** un alumno paga en octubre tres meses por 121,50 €
-- **THEN** el gráfico suma 40,50 € a octubre, a noviembre y a diciembre
+- **THEN** «Ingresos y gastos de cada mes» suma 121,50 € a octubre y «Lo que corresponde a cada mes» suma 40,50 € a
+  octubre, a noviembre y a diciembre
 
 ### Requirement: Ocupación
 El resumen MUST mostrar la ocupación media de los grupos (plazas ocupadas sobre plazas totales), cuántos están completos
