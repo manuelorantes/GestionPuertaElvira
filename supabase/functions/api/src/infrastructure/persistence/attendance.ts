@@ -60,17 +60,32 @@ export class SqlClassRoster implements ClassRoster {
 export class SqlTeacherRosterQuery implements TeacherRosterQuery {
   constructor(private readonly sql: Sql) {}
 
-  async groupsOf(teacherId: string, on: LocalDate): Promise<TeacherGroupRoster[]> {
+  async taughtGroupIds(teacherId: string): Promise<string[]> {
+    const rows = await this.sql`SELECT id FROM classes_group WHERE teacher_id = ${teacherId}`;
+    return Row.all(rows).map((r) => r.string('id'));
+  }
+
+  async substitutedGroupIds(teacherId: string, from: LocalDate, to: LocalDate): Promise<string[]> {
+    const rows = await this.sql`
+      SELECT DISTINCT group_id FROM payroll_substitution
+       WHERE teacher_id = ${teacherId} AND group_id IS NOT NULL
+         AND substitution_date BETWEEN ${from.toString()} AND ${to.toString()}`;
+    return Row.all(rows).map((r) => r.string('group_id'));
+  }
+
+  async rostersOf(groupIds: readonly string[], on: LocalDate): Promise<TeacherGroupRoster[]> {
+    if (groupIds.length === 0) return [];
+    const ids = [...groupIds];
     const day = on.toString();
     const groups = await this.sql`
       SELECT id, name, days, start_minutes, end_minutes, classroom FROM classes_group
-       WHERE teacher_id = ${teacherId} ORDER BY start_minutes, name`;
+       WHERE id::text IN ${this.sql(ids)} ORDER BY start_minutes, name`;
     const students = await this.sql`
       SELECT e.class_group_id, s.id, s.full_name, COALESCE(e.attendance_days, g.days) AS days
         FROM classes_enrolment e
         JOIN classes_group g ON g.id = e.class_group_id
         JOIN students_student s ON s.id = e.student_id
-       WHERE g.teacher_id = ${teacherId}
+       WHERE g.id::text IN ${this.sql(ids)}
          AND e.enrolled_on <= ${day} AND (e.ends_on IS NULL OR e.ends_on > ${day})
        ORDER BY s.search_name`;
     const codes = (days: number[]) => days.map((d) => WEEKDAY_CODES[d - 1] ?? String(d));
