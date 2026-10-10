@@ -50,8 +50,10 @@ Deno.test({
     assertEquals(response.status, 200);
     const summary = response.body as Record<string, unknown>;
     assertEquals(summary.collectedCents, 4500);
-    // Solo queda la cuota de socio, que se pide a todo el que se da de alta.
-    assertEquals(summary.pendingCents, 5000);
+    // Las cifras del mes son solo sus cuotas; la cuota de socio pendiente va aparte.
+    assertEquals(summary.expectedCents, 4500);
+    assertEquals(summary.pendingCents, 0);
+    assertEquals(summary.membershipPendingCents, 5000);
     assertEquals(summary.expensesCents, 2000);
     assertEquals(summary.activeStudents, 1);
     assertEquals(summary.registeredStudents, 1);
