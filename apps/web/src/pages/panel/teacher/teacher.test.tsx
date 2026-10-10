@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { todayIso } from '@/features/students/format';
 import { currentMonth, shiftMonth } from '@/features/billing/money';
 import { addDays, weekOf } from '@/features/teacher-space/dates';
+import { seasonFirstMonth } from '@/features/teacher-space/groups';
 import { TEACHER, mockApi, renderApp } from '@/test/render';
 
 const today = todayIso();
@@ -64,38 +65,149 @@ describe('Mis clases', () => {
   });
 });
 
-describe('Mis alumnos', () => {
-  it('shows the students of each class and the days they come when not every day', async () => {
+const GROUP = {
+  groupId: 'g1',
+  name: 'Iniciación A',
+  days: ['mon', 'wed'],
+  start: '17:00',
+  end: '18:00',
+  classroom: 'alfil',
+  substitution: false,
+  students: [
+    { id: 's1', name: 'Martina López Herrera', days: ['mon', 'wed'], attended: 9, classes: 10 },
+    { id: 's2', name: 'Pablo Gil Ruiz', days: ['mon'], attended: 2, classes: 4 },
+    { id: 's3', name: 'Hugo Sanz Mora', days: ['mon', 'wed'], attended: 0, classes: 0 },
+  ],
+};
+
+const comment = (id: string, date: string, studentId: string | null, text: string) => ({
+  id,
+  groupId: 'g1',
+  groupName: 'Iniciación A',
+  date,
+  studentId,
+  studentName:
+    studentId === 's2' ? 'Pablo Gil Ruiz' : studentId === 's9' ? 'Lola Ruiz Pardo' : null,
+  text,
+  author: 'Lucía Moreno Gil',
+  authorTeacherId: 't1',
+  writtenAt: `${date}T18:00:00Z`,
+});
+
+describe('Mis grupos', () => {
+  it('lists their groups and the ones they substitute, and the old Mis alumnos leads there', async () => {
     mockApi({
       'GET /api/auth/me': [200, { user: TEACHER }],
-      'GET /api/teacher/students': [
+      'GET /api/teacher/groups': [
+        200,
+        { items: [GROUP, { ...GROUP, groupId: 'g2', name: 'Adultos I', substitution: true }] },
+      ],
+    });
+    renderApp('/panel/mis-alumnos');
+
+    const mine = await screen.findByRole('link', { name: 'Ver Iniciación A' });
+    expect(mine).toHaveAttribute('href', '/panel/mis-grupos/g1');
+    expect(mine).toHaveTextContent('Lun, Mié · 17:00–18:00 · Aula Alfil · 3 alumnos');
+    expect(mine).not.toHaveTextContent('Sustitución');
+    expect(screen.getByRole('link', { name: 'Ver Adultos I' })).toHaveTextContent('Sustitución');
+  });
+
+  it("shows Thursday's comments, the students with their attendance and the month, read only", async () => {
+    const month = currentMonth();
+    const spy = mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      'GET /api/teacher/groups': [200, { items: [GROUP] }],
+      'GET /api/teacher/groups/g1/comments': [
         200,
         {
           items: [
+            comment('c1', '2026-10-08', null, 'Hemos dado mates de torres'),
+            comment('c2', '2026-10-08', 's2', 'Ha llegado a mitad de clase'),
+            comment('c3', '2026-10-06', 's9', 'Viene a recuperar'),
+          ],
+          nextBefore: '2026-09-10',
+        },
+      ],
+      'GET /api/teacher/groups/g1/comments?before=2026-09-10': [
+        200,
+        { items: [comment('c4', '2026-09-15', 's2', 'Muy atento')], nextBefore: null },
+      ],
+      [`GET /api/teacher/groups/g1/attendance?month=${month}`]: [
+        200,
+        {
+          groupId: 'g1',
+          name: 'Iniciación A',
+          month,
+          days: [{ date: `${month}-05`, status: 'taken' }],
+          students: [
             {
-              groupId: 'g1',
-              name: 'Iniciación A',
-              days: ['mon', 'wed'],
-              start: '17:00',
-              end: '18:00',
-              classroom: 'alfil',
-              students: [
-                { id: 's1', name: 'Martina López Herrera', days: ['mon', 'wed'] },
-                { id: 's2', name: 'Pablo Gil Ruiz', days: ['mon'] },
-              ],
+              id: 's2',
+              name: 'Pablo Gil Ruiz',
+              marks: ['absent'],
+              attended: 0,
+              classes: 1,
+              member: true,
             },
           ],
         },
       ],
     });
-    renderApp('/panel/mis-alumnos');
+    renderApp('/panel/mis-grupos/g1');
 
-    const group = await screen.findByRole('region', { name: 'Iniciación A' });
-    expect(group).toHaveTextContent('Lun, Mié · 17:00–18:00 · Aula Alfil · 2 alumnos');
-    expect(within(group).getByText('Pablo Gil Ruiz').closest('li')).toHaveTextContent('Solo Lun');
-    expect(within(group).getByText('Martina López Herrera').closest('li')).not.toHaveTextContent(
-      'Solo',
+    expect(await screen.findByRole('heading', { name: 'Iniciación A' })).toBeVisible();
+    const comments = await screen.findByRole('list', { name: 'Comentarios de la clase' });
+    expect(comments).toHaveTextContent('Hemos dado mates de torres');
+    expect(comments).toHaveTextContent('08/10/2026 · Lucía Moreno Gil');
+    expect(screen.queryByRole('button', { name: 'Editar comentario' })).not.toBeInTheDocument();
+
+    // El alumno que vino a recuperar también se puede elegir en el filtro.
+    const aboutStudents = screen.getByRole('list', { name: 'Comentarios de los alumnos' });
+    expect(within(aboutStudents).getAllByRole('listitem')).toHaveLength(2);
+    await userEvent.selectOptions(screen.getByLabelText('Alumno'), 'Lola Ruiz Pardo');
+    expect(
+      within(screen.getByRole('list', { name: 'Comentarios de los alumnos' })).getAllByRole(
+        'listitem',
+      ),
+    ).toHaveLength(1);
+    await userEvent.selectOptions(screen.getByLabelText('Alumno'), 'Pablo Gil Ruiz');
+    await userEvent.click(screen.getByRole('button', { name: 'Ver más' }));
+    expect(await screen.findByText('Muy atento')).toBeVisible();
+    expect(spy).toHaveBeenCalledWith(
+      '/api/teacher/groups/g1/comments?before=2026-09-10',
+      expect.anything(),
     );
+    expect(screen.queryByRole('button', { name: 'Ver más' })).not.toBeInTheDocument();
+    expect(screen.getByText('Ya se ven todos los de la temporada.')).toBeVisible();
+
+    const students = screen.getByRole('region', { name: 'Alumnos' });
+    expect(
+      within(students).getByLabelText('Martina López Herrera: vino a 9 de 10 clases'),
+    ).toHaveTextContent('90 %');
+    const pablo = within(students).getByLabelText('Pablo Gil Ruiz: vino a 2 de 4 clases');
+    expect(pablo).toHaveTextContent('50 %');
+    expect(pablo).toHaveClass('text-danger-fg');
+    expect(
+      within(students).getByLabelText('Hugo Sanz Mora: sin clases con lista'),
+    ).toHaveTextContent('—');
+    expect(within(students).getByText('Solo Lun')).toBeVisible();
+
+    const attendance = screen.getByRole('region', { name: 'Asistencia' });
+    expect(await within(attendance).findByLabelText(/Pablo Gil Ruiz faltó/)).toBeVisible();
+    expect(within(attendance).queryByRole('link')).not.toBeInTheDocument();
+    expect(within(attendance).getByRole('button', { name: 'Mes siguiente' })).toBeDisabled();
+    // Hacia atrás, hasta septiembre.
+    const previous = within(attendance).getByRole('button', { name: 'Mes anterior' });
+    if (month === seasonFirstMonth(month)) expect(previous).toBeDisabled();
+    else expect(previous).toBeEnabled();
+  });
+
+  it('says so when the group is not theirs', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      'GET /api/teacher/groups': [200, { items: [GROUP] }],
+    });
+    renderApp('/panel/mis-grupos/g9');
+    expect(await screen.findByText('Ese grupo no es tuyo.')).toBeVisible();
   });
 });
 

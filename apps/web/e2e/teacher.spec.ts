@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 const month = new Date().getMonth() + 1;
 test.skip(month === 7 || month === 8, 'En julio y agosto no hay clases');
 
-test('a teacher sees only their classes, students and pay', async ({ page, isMobile }) => {
+test('a teacher sees only their classes, groups and pay', async ({ page, isMobile }) => {
   await page.goto('/?acceso=1');
   await page.getByLabel('Email').fill('profe@puertaelvira.test');
   await page.getByLabel('Contraseña').fill('desarrollo-profe');
@@ -17,8 +17,14 @@ test('a teacher sees only their classes, students and pay', async ({ page, isMob
 
   const nav = page.getByRole('navigation', { name: isMobile ? 'Secciones móvil' : 'Secciones' });
   await expect(nav.getByRole('link', { name: /Cobr/ })).toHaveCount(0);
-  await nav.getByRole('link', { name: /Mis alumnos/ }).click();
-  await expect(page.getByRole('region', { name: /Iniciación A/ })).toBeVisible();
+  await nav.getByRole('link', { name: /Mis grupos/ }).click();
+  await page
+    .getByRole('link', { name: /^Ver Iniciación A/ })
+    .first()
+    .click();
+  await expect(page.getByRole('region', { name: 'Comentarios' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Alumnos' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Asistencia' })).toBeVisible();
   await nav.getByRole('link', { name: /Mis pagos/ }).click();
   await expect(page.getByText('Te debemos')).toBeVisible();
 
