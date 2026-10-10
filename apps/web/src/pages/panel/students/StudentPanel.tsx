@@ -15,6 +15,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { useGroups } from '@/features/classes/hooks';
+import { cancelCharge } from '@/features/billing/api';
 import * as api from '@/features/students/api';
 import { missingSentence } from '@/features/students/pending';
 import { formatDate, telHref } from '@/features/students/format';
@@ -363,12 +364,22 @@ export function StudentPanel() {
       )}
       {action?.kind === 'withdraw' && (
         <WithdrawDialog
+          studentId={s.id}
           name={s.fullName.split(' ')[0] ?? s.fullName}
           onClose={() => setAction(null)}
-          onWithdraw={(date) =>
+          onWithdraw={(date, cancelChargeIds) =>
             mutate
-              .mutateAsync(() => api.withdrawStudent(s.id, date))
-              .then(() => done('Baja registrada'))
+              .mutateAsync(async () => {
+                await api.withdrawStudent(s.id, date);
+                for (const id of cancelChargeIds) await cancelCharge(id);
+              })
+              .then(() =>
+                done(
+                  cancelChargeIds.length > 0
+                    ? `Baja registrada y ${cancelChargeIds.length} ${cancelChargeIds.length === 1 ? 'cuota cancelada' : 'cuotas canceladas'}`
+                    : 'Baja registrada',
+                ),
+              )
           }
         />
       )}

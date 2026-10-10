@@ -10,6 +10,7 @@ import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Card } from '@/shared/ui/Card';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
@@ -160,6 +161,7 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
 }
 
 function chargeState(charge: AccountCharge): { text: string; tone: string } {
+  if (charge.status === 'cancelled') return { text: 'Cancelada', tone: 'text-ink-muted' };
   if (charge.pendingCents <= 0) return { text: 'Cobrada', tone: 'text-success-fg' };
   if (charge.coveredCents > 0)
     return { text: `Faltan ${formatCents(charge.pendingCents)}`, tone: 'text-warning-fg' };
@@ -196,7 +198,19 @@ function SeasonCharges({ studentId, account }: { studentId: string; account: Acc
             <li key={charge.id} className="flex items-center gap-2 py-1 text-sm">
               <span className="w-28 shrink-0">{month}</span>
               <span className="flex-1">
-                <span className="font-medium">{formatCents(charge.amountCents)}</span>
+                <span
+                  className={`font-medium ${charge.status === 'cancelled' ? 'text-ink-muted line-through' : ''}`}
+                >
+                  {formatCents(
+                    charge.status === 'cancelled' ? charge.fullAmountCents : charge.amountCents,
+                  )}
+                </span>
+                {charge.status !== 'cancelled' && charge.cancelledCents > 0 && (
+                  <AsteriskNote label="Cuota cancelada en parte">
+                    Era de {formatCents(charge.fullAmountCents)}: se cancelaron los{' '}
+                    {formatCents(charge.cancelledCents)} que faltaban y queda lo cobrado.
+                  </AsteriskNote>
+                )}
                 {discountsLabel(charge, account) && (
                   <span className="ml-1.5 text-[12px] text-ink-muted">
                     {discountsLabel(charge, account)}
