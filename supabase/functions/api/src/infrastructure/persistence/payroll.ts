@@ -445,7 +445,9 @@ export class SqlMonthlyFees implements MonthlyFees {
 
   async monthlyFees(month: YearMonth): Promise<Map<string, number>> {
     const rows = await this.sql`
-      SELECT student_id, amount_cents FROM billing_charge WHERE kind = 'monthly' AND period = ${month.toString()}`;
+      SELECT student_id,
+             CASE WHEN cancelled_on IS NULL THEN amount_cents ELSE LEAST(amount_cents, kept_cents) END AS amount_cents
+        FROM billing_charge WHERE kind = 'monthly' AND period = ${month.toString()}`;
     const fees = new Map(Row.all(rows).map((r) => [r.string('student_id'), r.int('amount_cents')]));
     for (const { student, amount } of await this.expected(month.toString())) {
       if (!fees.has(student.id)) fees.set(student.id, amount.cents);

@@ -505,3 +505,77 @@ Deno.test({
     assertEquals(await monthly(), [fx.student]);
   },
 });
+
+Deno.test({
+  name: 'charges can be cancelled whole or only what is pending, listed apart and reactivated',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const month = today.slice(0, 7);
+    type Item = { id: string; status: string; amountCents: number; cancelledCents: number };
+    const listed = async () =>
+      body<{ items: Item[] }>(await fx.client.get('/api/admin/billing/charges')).items;
+    const cancelled = async () =>
+      body<{ items: Record<string, unknown>[] }>(
+        await fx.client.get('/api/admin/billing/charges/cancelled'),
+      ).items;
+    const account = async () =>
+      body<{ charges: (Item & { period: string; fullAmountCents: number })[] }>(
+        await fx.client.get(`/api/admin/billing/accounts/${fx.student}`),
+      ).charges.find((c) => c.period === month);
+    const id = (await listed())[0]?.id ?? '';
+
+    // Entera: deja de salir en el mes, sale en canceladas y en su ficha como cancelada.
+    assertEquals(
+      (await fx.client.json('POST', `/api/admin/billing/charges/${id}/cancel`)).status,
+      204,
+    );
+    assertEquals(await listed(), []);
+    assertEquals(
+      (await cancelled()).map((c) => [c.period, c.fullAmountCents, c.keptCents, c.cancelledCents]),
+      [
+        [month, 4500, 0, 4500],
+      ],
+    );
+    assertEquals((await account())?.status, 'cancelled');
+    assertEquals(
+      (await fx.client.json('POST', `/api/admin/billing/charges/${id}/reactivate`)).status,
+      204,
+    );
+    assertEquals((await listed()).map((c) => [c.amountCents, c.cancelledCents]), [[4500, 0]]);
+    assertEquals(await cancelled(), []);
+
+    // Pagada en parte: se cancela solo lo pendiente y queda cobrada por lo que se pagó.
+    const payment = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'monthly',
+      months: 1,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(payment.status, 201, JSON.stringify(payment.body));
+    await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}/charges/${month}`, {
+      amountCents: 6000,
+      reason: 'Material',
+      scope: 'one',
+    });
+    assertEquals(
+      (await fx.client.json('POST', `/api/admin/billing/charges/${id}/cancel`)).status,
+      204,
+    );
+    const partial = await account();
+    assertEquals(
+      [partial?.status, partial?.amountCents, partial?.fullAmountCents, partial?.cancelledCents],
+      ['paid', 4500, 6000, 1500],
+    );
+    assertEquals((await listed()).map((c) => [c.status, c.amountCents, c.cancelledCents]), [
+      ['paid', 4500, 1500],
+    ]);
+    // Una cobrada ya no se cancela.
+    assertError(
+      await fx.client.json('POST', `/api/admin/billing/charges/${id}/cancel`),
+      422,
+      'unprocessable',
+    );
+  },
+});

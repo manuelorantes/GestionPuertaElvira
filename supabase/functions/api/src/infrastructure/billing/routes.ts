@@ -3,17 +3,20 @@ import { paymentMethodFromName, paymentMethodLabel, StudentRef } from '../../dom
 import {
   AdjustCharge,
   BillingStudentNotFound,
+  CancelCharge,
   ChangePaymentMethod,
   CorrectPaymentAmount,
   decimal,
   GenerateMonthlyCharges,
   GetStudentAccount,
   IssueInvoice,
+  ListCancelledCharges,
   ListMonthlyCharges,
   MarkReminded,
   PaymentNotFound,
   type PaymentRequest,
   QuotePayment,
+  ReactivateCharge,
   RegisterPayment,
   ReschedulePayment,
   ResetCharge,
@@ -152,6 +155,28 @@ export function registerBillingRoutes(api: ApiApp): void {
   api.defineRoute(admin('POST', '/api/admin/billing/charges/:id/reminded'), async (c, scope) => {
     await new MarkReminded(billing(api, scope).charges, api.deps.clock).execute(param(c, 'id'));
     return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('POST', '/api/admin/billing/charges/:id/cancel'), async (c, scope) => {
+    await new CancelCharge(billing(api, scope).charges, api.deps.clock).execute(param(c, 'id'));
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('POST', '/api/admin/billing/charges/:id/reactivate'), async (c, scope) => {
+    await new ReactivateCharge(billing(api, scope).charges).execute(param(c, 'id'));
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('GET', '/api/admin/billing/charges/cancelled'), async (c, scope) => {
+    const season = c.req.query('season');
+    if (season !== undefined && !/^\d{4}$/.test(season)) {
+      throw new InvalidValue('season', 'Indica la temporada con el año en que empieza.');
+    }
+    return c.json({
+      items: await new ListCancelledCharges(new SqlBillingQuery(scope.tx), api.deps.clock).execute(
+        season === undefined ? null : Number(season),
+      ),
+    });
   });
 
   api.defineRoute(admin('POST', '/api/admin/billing/quote'), async (c, scope) => {

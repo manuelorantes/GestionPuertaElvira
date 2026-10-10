@@ -20,6 +20,8 @@ export class AuditLabels {
     'DELETE /api/admin/accounting/invoices/:id': 'Quitar factura de proveedor',
     'POST /api/admin/accounting/years/:year/closing': 'Cerrar temporada',
     'POST /api/admin/billing/charges/:id/reminded': 'Avisar por WhatsApp',
+    'POST /api/admin/billing/charges/:id/cancel': 'Cancelar cuota',
+    'POST /api/admin/billing/charges/:id/reactivate': 'Reactivar cuota',
     'POST /api/admin/billing/payments': 'Registrar cobro',
     'POST /api/admin/billing/payments/:id/invoice': 'Emitir factura',
     'PUT /api/admin/billing/accounts/:id': 'Cambiar datos de cobro del alumno',

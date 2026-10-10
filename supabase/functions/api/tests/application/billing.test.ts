@@ -11,6 +11,8 @@ import {
 } from '../../src/domain/billing/mod.ts';
 import {
   AdjustCharge,
+  CancelCharge,
+  ChargeNotFound,
   GenerateMonthlyCharges,
   GetStudentAccount,
   ImportPayment,
@@ -19,6 +21,7 @@ import {
   type PaymentQuote,
   pendingCharges,
   QuotePayment,
+  ReactivateCharge,
   RecalculateCharges,
   RegisterPayment,
   ResetCharge,
@@ -256,6 +259,25 @@ Deno.test('MarkReminded should note when the family was reminded', async () => {
   const first = [...fx.charges.values()][0] as Charge;
   await new MarkReminded(fx, fx.clock).execute(first.id.value);
   assert(first.remindedOn() !== null);
+});
+
+Deno.test('CancelCharge should cancel a pending charge for good, and ReactivateCharge bring it back', async () => {
+  const fx = new BillingFixture();
+  fx.student();
+  await generate(fx, '2026-09');
+  const charge = [...fx.charges.values()][0] as Charge;
+  const amount = charge.amount.cents;
+  await new CancelCharge(fx, fx.clock).execute(charge.id.value);
+  assert(charge.isWhollyCancelled());
+  // La tarea de la noche no la vuelve a crear.
+  await generate(fx, '2026-09');
+  assertEquals(fx.charges.size, 1);
+  await new ReactivateCharge(fx).execute(charge.id.value);
+  assertEquals([charge.isWhollyCancelled(), charge.amount.cents], [false, amount]);
+  await assertRejects(
+    () => new CancelCharge(fx, fx.clock).execute(ChargeId.generate().value),
+    ChargeNotFound,
+  );
 });
 
 Deno.test('ImportPayment should record the exact amount of the sheet, skip paid months and respect closed seasons', async () => {
