@@ -71,33 +71,63 @@ function CardTitle({ children }: { children: ReactNode }) {
   );
 }
 
+/** La ficha como página de Alumnos (`/panel/alumnos/:id`); al cerrarla se vuelve a la lista. */
 export function StudentPanel() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const close = () => {
+    const back = new URLSearchParams(searchParams);
+    back.delete('accion');
+    void navigate(`/panel/alumnos${back.size ? `?${back}` : ''}`);
+  };
+  return (
+    <StudentSheet
+      key={id}
+      id={id}
+      onClose={close}
+      onOpenStudent={(other) => void navigate(`/panel/alumnos/${other}`)}
+      // Desde el aviso de «Nuevo alumno» se llega con «Dar de alta de nuevo» ya abierto.
+      rejoinOpen={searchParams.get('accion') === REJOIN_ACTION}
+    />
+  );
+}
+
+/**
+ * La ficha de un alumno en un panel lateral. `aside` va en la zona gris de fuera (p. ej. «Ir a Alumnos» cuando se abre
+ * encima de otra página).
+ */
+export function StudentSheet({
+  id,
+  onClose,
+  onOpenStudent,
+  rejoinOpen = false,
+  aside,
+}: {
+  id: string;
+  onClose: () => void;
+  onOpenStudent: (id: string) => void;
+  rejoinOpen?: boolean;
+  aside?: ReactNode;
+}) {
   const student = useStudent(id);
   const canManage = useCanManageClub();
   const groups = useGroups();
   const others = useStudents('active', '');
   const toast = useToast();
   const overCapacity = useOverCapacityConfirm();
-  // Desde el aviso de «Nuevo alumno» se llega con «Dar de alta de nuevo» ya abierto.
   const [action, setAction] = useState<Action | null>(() =>
-    searchParams.get('accion') === REJOIN_ACTION ? { kind: 'rejoin' } : null,
+    rejoinOpen ? { kind: 'rejoin' } : null,
   );
   const [error, setError] = useState<string | null>(null);
   const mutate = useStudentMutation(async (work: () => Promise<unknown>) => {
     await work();
   });
-  const close = () => {
-    const back = new URLSearchParams(searchParams);
-    back.delete('accion');
-    void navigate(`/panel/alumnos${back.size ? `?${back}` : ''}`);
-  };
+  const close = onClose;
 
   if (!student.data) {
     return (
-      <SidePanel labelledBy="student-loading" onClose={close}>
+      <SidePanel labelledBy="student-loading" onClose={close} aside={aside}>
         <p id="student-loading" className="p-6 text-ink-muted">
           {student.isError ? 'No se ha encontrado el alumno.' : 'Cargando ficha…'}
         </p>
@@ -140,7 +170,7 @@ export function StudentPanel() {
   }
 
   return (
-    <SidePanel labelledBy="student-name" onClose={close}>
+    <SidePanel labelledBy="student-name" onClose={close} aside={aside}>
       <div className="border-b border-line-soft bg-surface-raised p-6">
         <div className="flex items-start gap-4">
           <Avatar name={s.fullName} size={56} />
@@ -342,7 +372,7 @@ export function StudentPanel() {
               </StudentLink>
               <button
                 type="button"
-                onClick={() => void navigate(`/panel/alumnos/${sibling.id}`)}
+                onClick={() => onOpenStudent(sibling.id)}
                 className="flex cursor-pointer items-center text-brand"
               >
                 Abrir

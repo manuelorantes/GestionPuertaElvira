@@ -197,7 +197,7 @@ describe('Profesorado', () => {
     const shared = screen.getByRole('dialog', { name: 'Alumnos con más de un profesor' });
     expect(within(shared).getByRole('link', { name: 'Ana Pérez' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s7',
+      expect.stringMatching(/[?&]ficha=s7$/),
     );
     expect(shared).not.toHaveTextContent('Carlos');
     expect(within(lucia).getByText('Más rentable')).toHaveClass('whitespace-nowrap');
@@ -577,7 +577,7 @@ describe('Profesorado', () => {
     expect(screen.queryByRole('dialog', { name: /Alumnos por día/ })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ana Pérez' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s1',
+      expect.stringMatching(/[?&]ficha=s1$/),
     );
     expect(screen.getByText(/le sustituyó Carlos Ruiz Márquez/)).toBeInTheDocument();
 
