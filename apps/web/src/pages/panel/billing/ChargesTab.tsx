@@ -112,18 +112,6 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
     const pay = () => onAction({ type: 'payment', studentId: charge.studentId, kind: charge.kind });
     return (
       <>
-        {charge.status !== 'expected' && (
-          <button
-            type="button"
-            aria-label={`Cancelar cuota de ${charge.studentName}`}
-            title="Cancelar cuota"
-            onClick={() => onAction({ type: 'cancel', charge })}
-            className={`${ACTION} border border-line-strong text-ink-soft hover:bg-surface-muted`}
-          >
-            <Ban aria-hidden size={16} />
-            Cancelar
-          </button>
-        )}
         {charge.status === 'overdue' && !charge.remindedOn && (
           <button
             type="button"
@@ -141,6 +129,17 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
         >
           {charge.status === 'overdue' ? 'Cobrar' : 'Registrar cobro'}
         </button>
+        {charge.status !== 'expected' && (
+          <button
+            type="button"
+            aria-label={`Cancelar cuota de ${charge.studentName}`}
+            title="Cancelar cuota"
+            onClick={() => onAction({ type: 'cancel', charge })}
+            className="inline-flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong text-ink-soft hover:bg-surface-muted hover:text-danger-fg"
+          >
+            <Ban aria-hidden size={16} />
+          </button>
+        )}
       </>
     );
   }

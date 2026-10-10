@@ -514,9 +514,19 @@ describe('cuotas canceladas', () => {
     expect(
       within(table).queryByRole('button', { name: 'Cancelar cuota de Hugo Martín Castillo' }),
     ).not.toBeInTheDocument();
-    await userEvent.click(
-      within(table).getByRole('button', { name: 'Cancelar cuota de Martina López Herrera' }),
-    );
+    // Primero WhatsApp, luego cobrar y al final cancelar, solo con su icono (el texto sale al pasar por encima).
+    const row = within(table).getByRole('row', { name: /Martina López Herrera/ });
+    expect(
+      within(row)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label') ?? b.textContent),
+    ).toEqual(['WhatsApp', 'Cobrar', 'Cancelar cuota de Martina López Herrera']);
+    const cancel = within(row).getByRole('button', {
+      name: 'Cancelar cuota de Martina López Herrera',
+    });
+    expect(cancel).toHaveAttribute('title', 'Cancelar cuota');
+    expect(cancel).not.toHaveTextContent('Cancelar');
+    await userEvent.click(cancel);
     const dialog = await screen.findByRole('dialog', { name: 'Cancelar cuota' });
     expect(dialog).toHaveTextContent(
       '¿Seguro que quieres cancelar la cuota de octubre de Martina López Herrera (40,50 €)?',
