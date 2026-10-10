@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router';
+import { Navigate, Route, Routes } from 'react-router';
 
 import { RequireSession } from '@/features/auth/RequireSession';
 import { RequireStaff } from '@/features/auth/RequireStaff';
@@ -21,7 +21,8 @@ import { StudentsPage } from '@/pages/panel/students/StudentsPage';
 import { RollCallPage } from '@/pages/panel/teacher/RollCallPage';
 import { FridayListPage } from '@/pages/panel/teacher/FridayListPage';
 import { TeacherPayPage } from '@/pages/panel/teacher/TeacherPayPage';
-import { TeacherStudentsPage } from '@/pages/panel/teacher/TeacherStudentsPage';
+import { TeacherGroupPage } from '@/pages/panel/teacher/TeacherGroupPage';
+import { TeacherGroupsPage } from '@/pages/panel/teacher/TeacherGroupsPage';
 import { PendingDataPage } from '@/pages/panel/students/PendingDataPage';
 
 export function AppRoutes() {
@@ -32,7 +33,9 @@ export function AppRoutes() {
         <Route path="cambiar-contrasena" element={<ChangePasswordPage />} />
         <Route element={<PanelLayout />}>
           <Route index element={<PanelHomePage />} />
-          <Route path="mis-alumnos" element={<TeacherStudentsPage />} />
+          <Route path="mis-grupos" element={<TeacherGroupsPage />} />
+          <Route path="mis-grupos/:groupId" element={<TeacherGroupPage />} />
+          <Route path="mis-alumnos" element={<Navigate to="/panel/mis-grupos" replace />} />
           <Route path="mis-pagos" element={<TeacherPayPage />} />
           <Route path="lista/:groupId/:date" element={<RollCallPage />} />
           <Route path="viernes/:dutyId/:date" element={<FridayListPage />} />

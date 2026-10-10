@@ -64,6 +64,8 @@ quitarlos:
   por los alumnos de la tabla (los del grupo y los que vinieron en asistencia especial; por defecto, todos);
 - en la ficha del alumno, abajo del todo, en «Comentarios de las clases»: día, clase, comentario y quién lo escribió,
   del más reciente al más antiguo.
+El profesorado MUST verlos también, sin cambiarlos, en la página de cada grupo de «Mis grupos» (ver la spec de
+profesorado): los de las últimas 4 semanas, del más reciente al más antiguo, y los anteriores con «Ver más».
 Quien lo escribió es el profesor (desde su espacio) o, si lo escribió administración, el nombre de su cuenta. Cada
 cambio queda en el historial.
 
@@ -130,12 +132,13 @@ La ficha de un alumno MUST mostrar su asistencia de la temporada: a cuántas cla
 
 ### Requirement: Asistencia de un grupo
 Administración MUST poder ver la asistencia de un grupo en un mes, en la pestaña «Asistencia» de Clases (eligiendo
-grupo y mes) y en la hoja del grupo (debajo de «Inscribir alumno», con el mes en curso y flechas para cambiarlo): una
+grupo y mes) y en la hoja del grupo (debajo de «Inscribir alumno», con el mes en curso y flechas para cambiarlo); y el
+profesorado, la de sus grupos en «Mis grupos», sin poder cambiarla: una
 fila por alumno que estuvo inscrito, una columna por día de clase del mes hasta hoy y el porcentaje de cada alumno.
 Cada casilla dice si vino (✓), si faltó (✗), si no hay lista pasada (?) o queda vacía si ese día no le tocaba (aún no
 estaba inscrito, ya no estaba o tiene horario especial). Los festivos y los días sin lista se indican en la cabecera.
 El porcentaje cuenta solo las clases con lista; por debajo del 75 % sale en rojo. La tabla se ordena por nombre o por
-porcentaje y el nombre lleva a la ficha del alumno.
+porcentaje y, para administración, el nombre lleva a la ficha del alumno.
 
 #### Scenario: Quién falta más
 - **WHEN** administración abre la asistencia de un grupo en octubre y ordena por porcentaje

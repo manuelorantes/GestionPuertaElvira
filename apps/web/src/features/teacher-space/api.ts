@@ -1,3 +1,5 @@
+import type { GroupAttendance } from '@/features/attendance/api';
+import type { ClassComment } from '@/features/class-comments/api';
 import { apiGet, apiSend } from '@/shared/api/client';
 
 /** Lista pasada (o dada por buena), abierta (se puede pasar ya), aún no (no ha empezado) o sin pasar (acabó el plazo). */
@@ -44,14 +46,24 @@ export interface RollCallChanges {
   past: boolean;
 }
 
-export interface TeacherGroupRoster {
+/** Uno de sus grupos (o de los que sustituye esa semana), con sus alumnos y su asistencia de la temporada. */
+export interface TeacherGroup {
   groupId: string;
   name: string;
   days: string[];
   start: string;
   end: string;
   classroom: string;
-  students: { id: string; name: string; days: string[] }[];
+  /** Lo ve porque sustituye en él a 7 días o menos. */
+  substitution: boolean;
+  /** `attended` de `classes`: clases con lista pasada de la temporada en ese grupo. */
+  students: { id: string; name: string; days: string[]; attended: number; classes: number }[];
+}
+
+/** Comentarios de 4 en 4 semanas hacia atrás; `nextBefore` es null al llegar al principio de la temporada. */
+export interface TeacherGroupComments {
+  items: ClassComment[];
+  nextBefore: string | null;
 }
 
 const BASE = '/api/teacher';
@@ -60,8 +72,23 @@ export async function fetchClasses(from: string, to: string): Promise<TeacherCla
   return (await apiGet<{ items: TeacherClass[] }>(`${BASE}/classes?from=${from}&to=${to}`)).items;
 }
 
-export async function fetchStudents(): Promise<TeacherGroupRoster[]> {
-  return (await apiGet<{ items: TeacherGroupRoster[] }>(`${BASE}/students`)).items;
+export async function fetchGroups(): Promise<TeacherGroup[]> {
+  return (await apiGet<{ items: TeacherGroup[] }>(`${BASE}/groups`)).items;
+}
+
+export function fetchTeacherGroupAttendance(
+  groupId: string,
+  month: string,
+): Promise<GroupAttendance> {
+  return apiGet<GroupAttendance>(`${BASE}/groups/${groupId}/attendance?month=${month}`);
+}
+
+export function fetchTeacherGroupComments(
+  groupId: string,
+  before: string | null,
+): Promise<TeacherGroupComments> {
+  const query = before === null ? '' : `?before=${before}`;
+  return apiGet<TeacherGroupComments>(`${BASE}/groups/${groupId}/comments${query}`);
 }
 
 export function fetchRollCall(groupId: string, date: string): Promise<RollCall> {
