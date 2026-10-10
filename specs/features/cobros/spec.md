@@ -121,6 +121,26 @@ no cambian; el reparto se rehace solo.
 - **WHEN** un alumno pagó 50 € por septiembre (debían ser 25 €) y 25 € por octubre, y administración fija septiembre en 25 € y octubre en 50 €
 - **THEN** las dos cuotas quedan cobradas sin tocar los recibos
 
+### Requirement: Cancelar una cuota
+Administración MUST poder cancelar, desde «Cuotas», una cuota mensual o de socio que no esté cobrada, tras confirmar
+«¿Seguro que quieres cancelar…?». Si no tiene nada cobrado, se cancela entera: deja de deberse y es como si no existiera
+(no sale en los meses ni en el resumen, los cobros no la cubren y la tarea de la noche no la vuelve a crear). Si está
+pagada en parte, solo se cancela lo que falta: queda una cuota cobrada por lo que se pagó y lo cancelado aparte, con un
+asterisco que lo explica allí donde sale la cuota. Una cuota cobrada no se cancela.
+Junto a los meses, separado a la derecha, MUST haber un botón «Cuotas canceladas» con las de la temporada (alumno,
+concepto, lo cancelado con su asterisco si fue en parte y el día) y la acción «Reactivar», que la vuelve a deber entera.
+En la ficha del alumno, una cuota cancelada sale como «Cancelada».
+
+#### Scenario: Cancelar una cuota sin cobrar
+- **WHEN** administración cancela la cuota de octubre de Martina (45 €) y lo confirma
+- **THEN** deja de salir en octubre y en lo pendiente, sale en «Cuotas canceladas» y en su ficha como «Cancelada»; al
+  reactivarla, vuelve a deberse
+
+#### Scenario: Cancelar lo que falta de una cuota pagada en parte
+- **WHEN** la cuota de octubre de Martina es de 60 €, tiene 45 € cobrados y administración la cancela
+- **THEN** queda como cobrada por 45 €, con un asterisco que dice que era de 60 € y se cancelaron 15 €, y esos 15 € salen
+  en «Cuotas canceladas»
+
 ### Requirement: Cuotas del alumno
 La tarjeta de cobros del alumno MUST mostrar sus cuotas de la temporada (mes, importe, si está fijada a mano y su
 motivo, lo cubierto y lo pendiente) y su saldo a favor, con la acción de editar cada cuota.

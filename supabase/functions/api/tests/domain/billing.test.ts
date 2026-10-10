@@ -435,3 +435,45 @@ Deno.test('Charge should add the prepayment discount to the family one over the 
   imported.inferDiscount(fee, [10, 15, 20], 10);
   assertEquals([imported.amount.cents, imported.discountPercent()], [2800, 20]);
 });
+
+const monthly = (period: string, euros: number) =>
+  Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString(period),
+    Money.cents(euros * 100),
+  );
+
+Deno.test('Charge should be cancelled whole when nothing is covered, and reactivated as it was', () => {
+  const today = LocalDate.fromString('2026-11-03');
+  const charge = monthly('2026-11', 40);
+  charge.cancel(Money.zero(), today);
+  assertEquals([charge.amount.cents, charge.cancelledAmount().cents], [0, 4000]);
+  assert(charge.isWhollyCancelled());
+  assertEquals(charge.statusOn(today, Money.zero()), 'cancelled');
+  assertEquals(charge.cancelledOn()?.toString(), '2026-11-03');
+  assertThrows(() => charge.cancel(Money.zero(), today), InvalidValue, 'ya está cancelada');
+  charge.reactivate();
+  assertEquals([charge.amount.cents, charge.cancelledAmount().cents], [4000, 0]);
+  assertEquals(charge.cancelledOn(), null);
+});
+
+Deno.test('Charge should cancel only what is pending when part of it is paid, and never a paid one', () => {
+  const today = LocalDate.fromString('2026-11-03');
+  const charge = monthly('2026-10', 40);
+  charge.cancel(Money.cents(1500), today);
+  // Queda una cuota cobrada de 15 € y se cancelan los 25 € pendientes.
+  assertEquals([charge.amount.cents, charge.fullAmount().cents, charge.cancelledAmount().cents], [
+    1500,
+    4000,
+    2500,
+  ]);
+  assertFalse(charge.isWhollyCancelled());
+  assertEquals(charge.statusOn(today, Money.cents(1500)), 'paid');
+  assertThrows(
+    () => monthly('2026-10', 40).cancel(Money.cents(4000), today),
+    InvalidValue,
+    'cobrada',
+  );
+});
