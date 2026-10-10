@@ -1,6 +1,7 @@
 import { FileText, Printer } from 'lucide-react';
 import { useState } from 'react';
 
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { usePayment } from '@/features/billing/hooks';
 import { formatCents } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
@@ -22,6 +23,7 @@ function Row({ label, value }: { label: string; value: string }) {
 export function ReceiptDialog({ paymentId, onClose }: { paymentId: string; onClose: () => void }) {
   const payment = usePayment(paymentId);
   const [invoicing, setInvoicing] = useState(false);
+  const canManage = useCanManageClub();
   const p = payment.data;
 
   if (invoicing && p)
@@ -106,7 +108,7 @@ export function ReceiptDialog({ paymentId, onClose }: { paymentId: string; onClo
         <Button variant="secondary" onClick={onClose}>
           Cerrar
         </Button>
-        {p && !p.invoice && (
+        {p && !p.invoice && canManage && (
           <Button variant="secondary" onClick={() => setInvoicing(true)}>
             Emitir factura
           </Button>

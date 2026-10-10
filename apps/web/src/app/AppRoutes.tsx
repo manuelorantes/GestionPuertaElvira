@@ -39,8 +39,12 @@ export function AppRoutes() {
           <Route path="mis-pagos" element={<TeacherPayPage />} />
           <Route path="lista/:groupId/:date" element={<RollCallPage />} />
           <Route path="viernes/:dutyId/:date" element={<FridayListPage />} />
+          {/* Clases y Alumnos: el profesorado también las consulta, de solo lectura. */}
+          <Route path="clases" element={<ClassesPage />} />
+          <Route path="alumnos" element={<StudentsPage />}>
+            <Route path=":id" element={<StudentPanel />} />
+          </Route>
           <Route element={<RequireStaff />}>
-            <Route path="clases" element={<ClassesPage />} />
             <Route path="cobros" element={<BillingPage />} />
             <Route path="profesores" element={<TeachersPayPage />} />
             <Route path="profesores/:id" element={<TeacherPage />} />
@@ -51,9 +55,6 @@ export function AppRoutes() {
             <Route path="puntos" element={<PointsPage />} />
             <Route path="importar" element={<ImportPage />} />
             <Route path="alumnos/pendientes" element={<PendingDataPage />} />
-            <Route path="alumnos" element={<StudentsPage />}>
-              <Route path=":id" element={<StudentPanel />} />
-            </Route>
           </Route>
         </Route>
       </Route>

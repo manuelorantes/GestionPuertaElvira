@@ -2,6 +2,7 @@ import { ClipboardList, FileSpreadsheet, Search, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Outlet, useNavigate, useSearchParams } from 'react-router';
 
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { useSession } from '@/features/auth/useSession';
 import type { StudentFilter } from '@/features/students/api';
 import { usePendingData, useStudents } from '@/features/students/hooks';
@@ -30,7 +31,8 @@ export function StudentsPage() {
   const debouncedSearch = useDebouncedValue(search, 250);
   const [creating, setCreating] = useState(false);
   const students = useStudents(current.filter, debouncedSearch);
-  const pendingCount = usePendingData().data?.items.length ?? 0;
+  const canManage = useCanManageClub();
+  const pendingCount = usePendingData(canManage).data?.items.length ?? 0;
   const canImport = useSession().data?.role === 'superadministrator';
   const items = students.data?.items ?? [];
   const total = students.data?.total ?? 0;
@@ -72,11 +74,13 @@ export function StudentsPage() {
       <SectionHeader
         eyebrow={activeCount === null ? 'Alumnos del club' : `${activeCount} alumnos activos`}
         title="Alumnos"
-        action={{
-          label: 'Nuevo alumno',
-          icon: <UserPlus aria-hidden size={18} />,
-          onClick: () => setCreating(true),
-        }}
+        {...(canManage && {
+          action: {
+            label: 'Nuevo alumno',
+            icon: <UserPlus aria-hidden size={18} />,
+            onClick: () => setCreating(true),
+          },
+        })}
       />
       <Card>
         <div className="flex flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-center">
@@ -111,13 +115,15 @@ export function StudentsPage() {
           <p className="shrink-0 text-sm text-ink-muted">
             {items.length} de {total} mostrados
           </p>
-          <Link
-            to="/panel/alumnos/pendientes"
-            className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
-          >
-            <ClipboardList aria-hidden size={16} />
-            Datos pendientes{pendingCount > 0 ? ` (${pendingCount})` : ''}
-          </Link>
+          {canManage && (
+            <Link
+              to="/panel/alumnos/pendientes"
+              className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-surface-muted"
+            >
+              <ClipboardList aria-hidden size={16} />
+              Datos pendientes{pendingCount > 0 ? ` (${pendingCount})` : ''}
+            </Link>
+          )}
           {canImport && (
             <Link
               to="/panel/importar"

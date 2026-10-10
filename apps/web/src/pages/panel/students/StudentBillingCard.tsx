@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { updateAccount, type Account, type AccountCharge } from '@/features/billing/api';
 import { useAccount, useBillingMutation, usePayments } from '@/features/billing/hooks';
 import { formatCents, monthLabel } from '@/features/billing/money';
@@ -32,6 +33,7 @@ export function StudentBillingCard({
   const account = useAccount(studentId);
   const payments = usePayments(studentId);
   const [dialog, setDialog] = useState<BillingDialog>(null);
+  const canManage = useCanManageClub();
 
   return (
     <Card className="p-4">
@@ -43,10 +45,16 @@ export function StudentBillingCard({
           {account.isError ? 'No se han podido cargar los datos de cobro.' : 'Cargando…'}
         </p>
       )}
-      <Button className="mt-3" fullWidth onClick={() => setDialog({ type: 'payment', studentId })}>
-        <Wallet aria-hidden size={18} />
-        Registrar cobro
-      </Button>
+      {canManage && (
+        <Button
+          className="mt-3"
+          fullWidth
+          onClick={() => setDialog({ type: 'payment', studentId })}
+        >
+          <Wallet aria-hidden size={18} />
+          Registrar cobro
+        </Button>
+      )}
       <h4 className="mt-4 mb-1 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
         Historial
       </h4>
@@ -99,6 +107,7 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
   );
   const toast = useToast();
   const error = save.error;
+  const canManage = useCanManageClub();
 
   return (
     <div className="flex flex-col">
@@ -117,7 +126,12 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
           ? 'Pagada'
           : `Pendiente · ${formatCents(account.membershipFeeCents)}`}
       </Row>
-      {account.hasPrivateLessons && (
+      {account.hasPrivateLessons && !canManage && (
+        <Row label="Precio por hora de particulares">
+          {account.privateRate ? `${account.privateRate.replace('.', ',')} €` : 'El del profesor'}
+        </Row>
+      )}
+      {account.hasPrivateLessons && canManage && (
         <div className="mt-2 flex items-end gap-2">
           <TextField
             label="Precio por hora de particulares (€)"
@@ -150,12 +164,14 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
             Valen solo este mes; con 5 se descuenta un 5 % de una cuota al cobrar.
           </span>
         </span>
-        <Link
-          to={`/panel/puntos?alumno=${studentId}`}
-          className="shrink-0 text-[13px] font-semibold text-brand"
-        >
-          Ver en Puntos
-        </Link>
+        {canManage && (
+          <Link
+            to={`/panel/puntos?alumno=${studentId}`}
+            className="shrink-0 text-[13px] font-semibold text-brand"
+          >
+            Ver en Puntos
+          </Link>
+        )}
       </div>
     </div>
   );
@@ -239,6 +255,7 @@ function discountsLabel(charge: AccountCharge, account: Account): string | null 
 /** Cuotas de la temporada: importe, si está fijada a mano, lo que falta y la acción de editarla. */
 function SeasonCharges({ studentId, account }: { studentId: string; account: Account }) {
   const [editing, setEditing] = useState<AccountCharge | null>(null);
+  const canManage = useCanManageClub();
   const toast = useToast();
   if (account.charges.length === 0 && account.balanceCents <= 0) return null;
 
@@ -283,15 +300,17 @@ function SeasonCharges({ studentId, account }: { studentId: string; account: Acc
                 )}
               </span>
               <span className={`text-[13px] font-medium ${state.tone}`}>{state.text}</span>
-              <button
-                type="button"
-                aria-label={`Editar la cuota de ${month.toLowerCase()}`}
-                title="Editar cuota"
-                onClick={() => setEditing(charge)}
-                className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
-              >
-                <Pencil aria-hidden size={14} />
-              </button>
+              {canManage && (
+                <button
+                  type="button"
+                  aria-label={`Editar la cuota de ${month.toLowerCase()}`}
+                  title="Editar cuota"
+                  onClick={() => setEditing(charge)}
+                  className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                >
+                  <Pencil aria-hidden size={14} />
+                </button>
+              )}
             </li>
           );
         })}

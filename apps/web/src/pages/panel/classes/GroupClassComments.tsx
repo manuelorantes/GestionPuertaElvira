@@ -1,6 +1,7 @@
 import { MessageSquarePlus } from 'lucide-react';
 import { useState } from 'react';
 
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { useGroupAttendance } from '@/features/attendance/hooks';
 import {
   addGroupComment,
@@ -47,6 +48,7 @@ export function GroupClassComments({
   const remove = useCommentChange(removeComment);
   const [studentFilter, setStudentFilter] = useState(ALL_STUDENTS);
   const [adding, setAdding] = useState(false);
+  const canManage = useCanManageClub();
   if (!attendance.data || !comments.data) return null;
 
   const students = attendance.data.students;
@@ -61,7 +63,7 @@ export function GroupClassComments({
   );
   const filteredName = students.find((s) => s.id === studentFilter)?.name;
   const actions = {
-    canEdit: () => true,
+    canEdit: () => canManage,
     onRewrite: (id: string, text: string) =>
       rewrite.mutateAsync({ id, text }).then(() => toast('Comentario cambiado')),
     onRemove: (id: string) => remove.mutateAsync(id).then(() => toast('Comentario quitado')),
@@ -74,7 +76,7 @@ export function GroupClassComments({
           <h3 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
             Comentarios
           </h3>
-          {classDays.length > 0 && !adding && (
+          {classDays.length > 0 && !adding && canManage && (
             <Button variant="secondary" onClick={() => setAdding(true)}>
               <MessageSquarePlus aria-hidden size={16} />
               Añadir comentario

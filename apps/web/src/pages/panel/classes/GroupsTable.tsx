@@ -14,7 +14,8 @@ export function GroupsTable({
   onOpen,
 }: {
   groups: ClassGroup[];
-  onEdit: (group: ClassGroup) => void;
+  /** Sin él (profesorado), no se puede editar. */
+  onEdit?: ((group: ClassGroup) => void) | undefined;
   onOpen: (group: ClassGroup) => void;
 }) {
   return (
@@ -66,15 +67,17 @@ export function GroupsTable({
                   >
                     Alumnos
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => onEdit(group)}
-                    aria-label={`Editar ${group.name}`}
-                    className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-brand-soft"
-                  >
-                    <Pencil aria-hidden size={16} />
-                    Editar
-                  </button>
+                  {onEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(group)}
+                      aria-label={`Editar ${group.name}`}
+                      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-3 text-[13px] font-semibold hover:bg-brand-soft"
+                    >
+                      <Pencil aria-hidden size={16} />
+                      Editar
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>
