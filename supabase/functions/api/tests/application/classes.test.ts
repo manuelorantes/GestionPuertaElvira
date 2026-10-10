@@ -4,6 +4,8 @@ import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
 import {
   type ClassGroup,
   ClassGroupId,
+  Enrolment,
+  EnrolmentId,
   GroupFull,
   StudentReference,
   StudentScheduleOverlap,
@@ -11,6 +13,7 @@ import {
   type Weekday,
 } from '../../src/domain/classes/mod.ts';
 import {
+  ChangeEnrolmentStart,
   ClassGroupNotFound,
   ClassroomConflict,
   CreateClassGroup,
@@ -116,10 +119,24 @@ function enrolling() {
     await groups.save(g);
     return g;
   };
-  const enrol = new EnrolStudent(groups, enrolments, clock);
+  // El alumno está de alta en el club desde el 1 de septiembre.
+  const joinDates = { joinedOn: () => Promise.resolve(LocalDate.fromString('2026-09-01')) };
+  const enrol = new EnrolStudent(groups, enrolments, clock, joinDates);
+  const changeStart = new ChangeEnrolmentStart(enrolments, joinDates, clock);
   const unenrol = (active = true) =>
     new UnenrolStudent(enrolments, { isActive: () => Promise.resolve(active) }, clock);
-  return { groups, enrolments, clock, transactions, student, today, group, enrol, unenrol };
+  return {
+    groups,
+    enrolments,
+    clock,
+    transactions,
+    student,
+    today,
+    group,
+    enrol,
+    changeStart,
+    unenrol,
+  };
 }
 
 Deno.test('EnrolStudent should enrol today and refuse overlapping groups', async () => {
@@ -129,6 +146,59 @@ Deno.test('EnrolStudent should enrol today and refuse overlapping groups', async
   await enrol.execute(student, first.id.value, false);
   assertEquals(await enrolments.activeCount(first.id, today), 1);
   await assertRejects(() => enrol.execute(student, second.id.value, false), StudentScheduleOverlap);
+});
+
+Deno.test('EnrolStudent should enrol from an earlier day, never in the future nor before joining the club', async () => {
+  const { enrolments, student, group, enrol } = enrolling();
+  const a = await group('Iniciación A', [5], '17:00', '18:30');
+  await assertRejects(
+    () => enrol.execute(student, a.id.value, false, LocalDate.fromString('2026-10-03')),
+    InvalidValue,
+    'futuro',
+  );
+  await assertRejects(
+    () => enrol.execute(student, a.id.value, false, LocalDate.fromString('2026-08-31')),
+    InvalidValue,
+    'alta en el club',
+  );
+  await enrol.execute(student, a.id.value, false, LocalDate.fromString('2026-09-04'));
+  assertEquals(await enrolments.activeCount(a.id, LocalDate.fromString('2026-09-04')), 1);
+});
+
+Deno.test('ChangeEnrolmentStart should move the start of a group within the student membership', async () => {
+  const { enrolments, student, today, group, enrol, changeStart } = enrolling();
+  const a = await group('Viernes', [5], '17:00', '18:30');
+  await enrol.execute(student, a.id.value, false);
+  await changeStart.execute(student, a.id.value, '2026-10-01');
+  assertEquals(await enrolments.activeCount(a.id, LocalDate.fromString('2026-10-01')), 1);
+  await assertRejects(
+    () => changeStart.execute(student, a.id.value, '2026-10-05'),
+    InvalidValue,
+    'futuro',
+  );
+  await assertRejects(
+    () => changeStart.execute(student, a.id.value, '2026-08-15'),
+    InvalidValue,
+    'alta en el club',
+  );
+  const b = await group('Lunes', [1], '17:00', '18:00');
+  await assertRejects(() => changeStart.execute(student, b.id.value, '2026-10-01'), NotEnrolled);
+  // Una inscripción anterior en el mismo grupo no se puede pisar.
+  const old = Enrolment.restore(
+    EnrolmentId.generate(),
+    StudentReference.fromString(student),
+    a.id,
+    LocalDate.fromString('2026-09-01'),
+    LocalDate.fromString('2026-09-20'),
+  );
+  await enrolments.save(old);
+  await assertRejects(
+    () => changeStart.execute(student, a.id.value, '2026-09-10'),
+    InvalidValue,
+    'otra inscripción',
+  );
+  await changeStart.execute(student, a.id.value, '2026-09-20');
+  assertEquals(await enrolments.activeCount(a.id, today), 1);
 });
 
 Deno.test('EnrolStudent should ask for confirmation when full and accept it when confirmed', async () => {

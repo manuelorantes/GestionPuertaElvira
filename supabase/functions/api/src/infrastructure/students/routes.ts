@@ -1,8 +1,9 @@
-import type { LocalDate } from '../../domain/common/mod.ts';
+import { LocalDate } from '../../domain/common/mod.ts';
 import type { StudentId } from '../../domain/students/mod.ts';
 import {
   type AttendanceInput,
   ChangeAttendance,
+  ChangeEnrolmentStart,
   EndStudentEnrolments,
   EnrolStudent,
   MoveStudent,
@@ -23,7 +24,7 @@ import {
   UpdateStudent,
   WithdrawStudent,
 } from '../../application/students/mod.ts';
-import { StudentsStudentStatus, today } from '../classes/routes.ts';
+import { StudentsJoinDates, StudentsStudentStatus, today } from '../classes/routes.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { generatingCharges, recalculatingFees } from '../billing/recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
@@ -207,6 +208,7 @@ export function registerStudentRoutes(api: ApiApp): void {
             requested,
             body.stringList('siblingIds'),
             body.bool('confirmOverCapacity'),
+            body.optionalString('joinedOn'),
           ),
       );
       // Su cuota de este mes, al momento.
@@ -279,15 +281,36 @@ export function registerStudentRoutes(api: ApiApp): void {
         new SqlClassGroupRepository(scope.tx),
         new SqlEnrolmentRepository(scope.tx),
         clock,
+        new StudentsJoinDates(scope.tx),
       );
+      // `from`: desde qué día está en el grupo (por defecto hoy).
+      const from = body.optionalString('from');
       await recalculatingFees(api, scope, [param(c, 'id')], () =>
         enrol.execute(
           param(c, 'id'),
           body.requiredString('groupId'),
           body.bool('confirmOverCapacity'),
-          undefined,
+          from ? LocalDate.fromString(from) : undefined,
           attendanceInput(body),
         ));
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    {
+      method: 'PUT',
+      path: '/api/admin/students/:id/enrolments/:groupId/start',
+      access: 'admin',
+    },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      await recalculatingFees(api, scope, [param(c, 'id')], () =>
+        new ChangeEnrolmentStart(
+          new SqlEnrolmentRepository(scope.tx),
+          new StudentsJoinDates(scope.tx),
+          clock,
+        ).execute(param(c, 'id'), param(c, 'groupId'), body.requiredString('from')));
       return c.body(null, 204);
     },
   );

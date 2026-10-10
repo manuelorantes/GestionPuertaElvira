@@ -54,6 +54,8 @@ export class AuditLabels {
     'DELETE /api/admin/payroll/advances/:id': 'Quitar un anticipo',
     'POST /api/admin/students/:id/enrolments': 'Inscribir en grupo',
     'DELETE /api/admin/students/:id/enrolments/:groupId': 'Quitar de grupo',
+    'PUT /api/admin/students/:id/enrolments/:groupId/start':
+      'Cambiar desde cuándo está en un grupo',
     'POST /api/admin/students/:id/enrolments/:groupId/move': 'Mover de grupo',
     'POST /api/admin/students': 'Dar de alta alumno',
     'PUT /api/admin/students/:id': 'Editar alumno',

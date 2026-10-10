@@ -8,6 +8,7 @@ import {
   type GroupInput,
   type GroupSummary,
   ResolveSchedule,
+  type StudentJoinDates,
   type StudentStatus,
   type TeacherDirectory,
   UpdateClassGroup,
@@ -45,6 +46,18 @@ export class StudentsStudentStatus implements StudentStatus {
       StudentId.fromString(student.value),
     );
     return found?.isActiveOn(this.today) ?? false;
+  }
+}
+
+/** Clases pregunta a Alumnado desde cuándo está de alta un alumno (su alta en curso). */
+export class StudentsJoinDates implements StudentJoinDates {
+  constructor(private readonly sql: Sql) {}
+
+  async joinedOn(student: StudentReference): Promise<LocalDate | null> {
+    const found = await new SqlStudentRepository(this.sql).find(
+      StudentId.fromString(student.value),
+    );
+    return found?.joinedOn ?? null;
   }
 }
 

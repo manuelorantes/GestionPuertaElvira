@@ -101,6 +101,14 @@ export class InMemoryEnrolmentRepository implements EnrolmentRepository {
     return (await this.activeForStudent(student, on)).find((e) => e.group.equals(group)) ?? null;
   }
 
+  ofStudentInGroup(student: StudentReference, group: ClassGroupId): Promise<Enrolment[]> {
+    return Promise.resolve(
+      [...this.enrolments.values()].filter((e) =>
+        e.student.equals(student) && e.group.equals(group)
+      ),
+    );
+  }
+
   activeInGroup(group: ClassGroupId, on: LocalDate): Promise<Enrolment[]> {
     return Promise.resolve(
       [...this.enrolments.values()].filter((e) => e.group.equals(group) && e.isActiveOn(on)),
