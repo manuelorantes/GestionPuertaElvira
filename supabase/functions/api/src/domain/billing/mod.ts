@@ -16,7 +16,14 @@ export class TeacherRef extends Uuid {}
 
 export type ChargeKind = 'monthly' | 'membership';
 /** `expected`: cuota prevista de un mes futuro que aún no existe (lo que se espera cobrar con la tarifa de hoy). */
-export type ChargeStatus = 'paid' | 'partial' | 'due' | 'overdue' | 'upcoming' | 'expected';
+export type ChargeStatus =
+  | 'paid'
+  | 'partial'
+  | 'due'
+  | 'overdue'
+  | 'upcoming'
+  | 'expected'
+  | 'cancelled';
 
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 
@@ -275,6 +282,11 @@ export class Charge {
     private reason: string | null,
     /** Descuento por pago adelantado que tuvo este mes (0, 10, 15, 20…): se mantiene al recalcular. */
     private prepaid: number,
+    /**
+     * Cancelación: el día y lo que se conserva de la cuota (lo que ya estaba cobrado; 0 si se canceló entera). Lo
+     * pendiente deja de deberse; al reactivarla, vuelve a deberse entera.
+     */
+    private cancellation: { on: LocalDate; kept: Money } | null = null,
   ) {}
 
   static create(
@@ -298,6 +310,7 @@ export class Charge {
     manual: boolean;
     note: string | null;
     discountPercent?: number;
+    cancellation?: { on: LocalDate; kept: Money } | null;
   }): Charge {
     return new Charge(
       fields.id,
@@ -310,16 +323,62 @@ export class Charge {
       fields.manual,
       fields.note,
       fields.discountPercent ?? 0,
+      fields.cancellation ?? null,
     );
   }
 
+  /** Lo que se debe de esta cuota: su importe o, si se canceló, lo que se conservó (lo cobrado). */
   get amount(): Money {
+    if (this.cancellation === null) return this.value;
+    return this.cancellation.kept.cents < this.value.cents ? this.cancellation.kept : this.value;
+  }
+
+  /** Su importe sin tener en cuenta la cancelación. */
+  fullAmount(): Money {
     return this.value;
+  }
+
+  /**
+   * Cancela lo pendiente: entera si no tiene nada cubierto o, si está pagada en parte, solo lo que falta (queda una cuota
+   * cobrada menor). Una cuota cobrada no se cancela.
+   */
+  cancel(covered: Money, today: LocalDate): void {
+    if (this.cancellation !== null) throw new InvalidValue('id', 'La cuota ya está cancelada.');
+    const kept = covered.isNegative() ? Money.zero() : covered;
+    if (kept.cents >= this.value.cents) {
+      throw new InvalidValue('id', 'La cuota ya está cobrada: no hay nada que cancelar.');
+    }
+    this.cancellation = { on: today, kept };
+  }
+
+  /** Vuelve a deberse entera. */
+  reactivate(): void {
+    this.cancellation = null;
+  }
+
+  cancelledOn(): LocalDate | null {
+    return this.cancellation?.on ?? null;
+  }
+
+  /** Lo que se canceló (0 si no está cancelada). */
+  cancelledAmount(): Money {
+    return this.value.minus(this.amount);
+  }
+
+  /** Cancelada sin nada cobrado: es como si no existiera. */
+  isWhollyCancelled(): boolean {
+    return this.cancellation !== null && this.amount.cents === 0;
+  }
+
+  /** Lo que se conservó al cancelarla (para guardarlo). */
+  keptOnCancellation(): Money | null {
+    return this.cancellation?.kept ?? null;
   }
 
   /** Estado según la fecha y lo que tiene cubierto por los cobros del alumno. */
   statusOn(today: LocalDate, covered: Money): ChargeStatus {
-    if (!covered.isNegative() && covered.cents >= this.value.cents) return 'paid';
+    if (this.isWhollyCancelled()) return 'cancelled';
+    if (!covered.isNegative() && covered.cents >= this.amount.cents) return 'paid';
     if (covered.cents > 0) return 'partial';
     if (this.kind === 'membership') return 'due';
     const current = YearMonth.of(today);

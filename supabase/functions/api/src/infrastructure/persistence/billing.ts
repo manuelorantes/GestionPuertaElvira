@@ -21,6 +21,7 @@ import type {
   BillingQuery,
   BillingSettingsRepository,
   BillingStudent,
+  CancelledChargeView,
   ChargeRepository,
   ChargeView,
   DocumentSequence,
@@ -161,6 +162,7 @@ export class SqlStudentAccountRepository implements StudentAccountRepository {
 function toCharge(row: Row): Charge {
   const paidBy = row.nullableString('paid_by');
   const remindedOn = row.nullableString('reminded_on');
+  const cancelledOn = row.nullableString('cancelled_on');
   return Charge.restore({
     id: ChargeId.fromString(row.string('id')),
     student: StudentRef.fromString(row.string('student_id')),
@@ -172,16 +174,25 @@ function toCharge(row: Row): Charge {
     manual: row.bool('manual'),
     note: row.nullableString('note'),
     discountPercent: row.int('discount_percent'),
+    cancellation: cancelledOn === null ? null : {
+      on: LocalDate.fromString(cancelledOn),
+      kept: Money.cents(row.int('kept_cents')),
+    },
   });
 }
+
+/** Lo que se debe de una cuota en SQL: su importe o, si se canceló, lo que se conservó. */
+const DUE =
+  `CASE WHEN c.cancelled_on IS NULL THEN c.amount_cents ELSE LEAST(c.amount_cents, c.kept_cents) END`;
 
 /**
  * Cuotas con lo que tienen cubierto: lo que cubren los cobros del alumno (por tipo) se reparte entre sus cuotas de la
  * más antigua a la más reciente (ver cuotas-separadas-de-los-cobros.md). Se usa como CTE `allocated`.
  */
 const ALLOCATED = `allocated AS (
-  SELECT c.*, LEAST(c.amount_cents, GREATEST(0,
-           COALESCE(cr.credit, 0) - COALESCE(SUM(c.amount_cents) OVER (
+  SELECT c.*, c.cancelled_on::text AS cancelled_day, (${DUE})::integer AS due_cents,
+         LEAST(${DUE}, GREATEST(0,
+           COALESCE(cr.credit, 0) - COALESCE(SUM(${DUE}) OVER (
              PARTITION BY c.student_id, c.kind ORDER BY c.period
              ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)))::integer AS covered_cents
     FROM billing_charge c
@@ -231,17 +242,20 @@ export class SqlChargeRepository implements ChargeRepository {
       student_id: charge.student.value,
       kind: charge.kind,
       period: charge.period.toString(),
-      amount_cents: charge.amount.cents,
+      amount_cents: charge.fullAmount().cents,
       paid_by: charge.paidBy()?.value ?? null,
       reminded_on: charge.remindedOn()?.toString() ?? null,
       manual: charge.isManual(),
       note: charge.note(),
       discount_percent: charge.discountPercent(),
+      cancelled_on: charge.cancelledOn()?.toString() ?? null,
+      kept_cents: charge.keptOnCancellation()?.cents ?? null,
     };
     await this.sql`INSERT INTO billing_charge ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET amount_cents = EXCLUDED.amount_cents, paid_by = EXCLUDED.paid_by,
         reminded_on = EXCLUDED.reminded_on, manual = EXCLUDED.manual, note = EXCLUDED.note,
-        discount_percent = EXCLUDED.discount_percent`;
+        discount_percent = EXCLUDED.discount_percent, cancelled_on = EXCLUDED.cancelled_on,
+        kept_cents = EXCLUDED.kept_cents`;
   }
 }
 
@@ -363,6 +377,8 @@ function toChargeView(row: Row, today: LocalDate): ChargeView {
     note: charge.note(),
     receiptNumber: row.nullableString('receipt_number'),
     remindedOn: row.nullableString('reminded_on'),
+    fullAmountCents: charge.fullAmount().cents,
+    cancelledCents: charge.cancelledAmount().cents,
   };
 }
 
@@ -392,8 +408,9 @@ export class SqlBillingQuery implements BillingQuery {
          FROM allocated c
          JOIN students_student s ON s.id = c.student_id
          LEFT JOIN billing_payment p ON p.id = c.paid_by
-        WHERE (c.kind = 'monthly' AND c.period = $1)
-           OR (c.kind = 'membership' AND c.period = $2 AND (c.covered_cents < c.amount_cents OR $1 = $2))
+        WHERE ((c.kind = 'monthly' AND c.period = $1)
+           OR (c.kind = 'membership' AND c.period = $2 AND (c.covered_cents < c.due_cents OR $1 = $2)))
+          AND NOT (c.cancelled_on IS NOT NULL AND c.due_cents = 0)
         ORDER BY s.search_name, c.kind DESC`,
       [month.toString(), seasonStart],
     );
@@ -405,11 +422,32 @@ export class SqlBillingQuery implements BillingQuery {
       `WITH ${ALLOCATED}
        SELECT c.*, s.full_name, ${GUARDIAN} AS guardian_name, ${PHONE} AS guardian_phone, NULL AS receipt_number
          FROM allocated c JOIN students_student s ON s.id = c.student_id
-        WHERE c.kind = 'monthly' AND c.covered_cents < c.amount_cents AND (c.period < $1 OR (c.period = $1 AND $2 > 5))
+        WHERE c.kind = 'monthly' AND c.covered_cents < c.due_cents AND (c.period < $1 OR (c.period = $1 AND $2 > 5))
         ORDER BY c.period, s.search_name`,
       [YearMonth.of(today).toString(), today.day],
     );
     return Row.all(rows).map((row) => toChargeView(row, today));
+  }
+
+  async cancelled(season: Season): Promise<CancelledChargeView[]> {
+    const rows = await this.sql`
+      SELECT c.id, c.student_id, s.full_name, c.kind, c.period, c.amount_cents, c.cancelled_on::text AS cancelled_day,
+             LEAST(c.amount_cents, c.kept_cents) AS kept
+        FROM billing_charge c JOIN students_student s ON s.id = c.student_id
+       WHERE c.cancelled_on IS NOT NULL
+         AND c.period BETWEEN ${season.firstMonth().toString()} AND ${season.lastMonth().toString()}
+       ORDER BY s.search_name, c.kind DESC, c.period`;
+    return Row.all(rows).map((r) => ({
+      id: r.string('id'),
+      studentId: r.string('student_id'),
+      studentName: r.string('full_name'),
+      kind: r.string('kind'),
+      period: r.string('period'),
+      fullAmountCents: r.int('amount_cents'),
+      keptCents: r.int('kept'),
+      cancelledCents: r.int('amount_cents') - r.int('kept'),
+      cancelledOn: r.string('cancelled_day'),
+    }));
   }
 
   async payments(studentId: string | null): Promise<PaymentSummary[]> {

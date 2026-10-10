@@ -138,6 +138,8 @@ Table billing_charge {
   amount_cents int [not null, note: 'fijado al generarla']
   paid_by uuid [note: 'billing_payment.id; nulo = sin pagar']
   reminded_on date [note: 'último aviso por WhatsApp']
+  cancelled_on date [note: 'día en que se canceló; nulo = no cancelada']
+  kept_cents int [note: 'lo que se conserva al cancelarla (lo cobrado; 0 = cancelada entera); se debe LEAST(amount_cents, kept_cents)']
 
   indexes {
     (student_id, kind, period) [unique, name: 'billing_charge_unique']

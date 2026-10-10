@@ -137,6 +137,9 @@ export interface ChargeView {
   /** Fijada a mano y su motivo. */
   manual: boolean;
   note: string | null;
+  /** Si se canceló la parte pendiente: el importe que tenía y lo cancelado (0 si no). */
+  fullAmountCents: number;
+  cancelledCents: number;
 }
 
 export interface PaymentSummary {
@@ -169,6 +172,8 @@ export interface BillingQuery {
   payment(id: string): Promise<PaymentDetail | null>;
   /** Cuotas mensuales vencidas a fecha de hoy, de la más antigua a la más reciente. */
   overdue(today: LocalDate): Promise<ChargeView[]>;
+  /** Cuotas canceladas de una temporada (mensuales y de socio), por alumno y mes. */
+  cancelled(season: Season): Promise<CancelledChargeView[]>;
 }
 
 // ---- Errores ---------------------------------------------------------------------------------
@@ -396,6 +401,8 @@ export class ListMonthlyCharges {
         coveredCents: 0,
         manual: false,
         note: null,
+        fullAmountCents: amount.cents,
+        cancelledCents: 0,
       }));
     const items = [...stored, ...expected].sort((a, b) =>
       a.studentName.localeCompare(b.studentName, 'es') || b.kind.localeCompare(a.kind)
@@ -411,6 +418,67 @@ export class ListMonthlyCharges {
       ),
       overdueCount: items.filter((c) => c.status === 'overdue').length,
     };
+  }
+}
+
+/** Cancela lo pendiente de una cuota (entera o, si está pagada en parte, lo que falta): deja de deberse. */
+export class CancelCharge {
+  constructor(
+    private readonly charges: ChargeRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(chargeId: string): Promise<void> {
+    const charge = await this.charges.charge(ChargeId.fromString(chargeId));
+    if (charge === null) throw new ChargeNotFound();
+    const all = await this.charges.allFor(charge.student, charge.kind);
+    const allocation = allocateCredit(
+      all,
+      await this.charges.creditFor(charge.student, charge.kind),
+    );
+    const same = all.find((c) => c.id.equals(charge.id)) ?? charge;
+    charge.cancel(allocation.covered(same), LocalDate.fromInstant(this.clock.now()));
+    await this.charges.saveCharge(charge);
+  }
+}
+
+/** Vuelve a deberse entera una cuota cancelada. */
+export class ReactivateCharge {
+  constructor(private readonly charges: ChargeRepository) {}
+
+  async execute(chargeId: string): Promise<void> {
+    const charge = await this.charges.charge(ChargeId.fromString(chargeId));
+    if (charge === null) throw new ChargeNotFound();
+    charge.reactivate();
+    await this.charges.saveCharge(charge);
+  }
+}
+
+/** Cuota cancelada (entera o la parte pendiente) tal como se lista en «Cuotas canceladas». */
+export interface CancelledChargeView {
+  id: string;
+  studentId: string;
+  studentName: string;
+  kind: string;
+  period: string;
+  /** Importe de la cuota, lo que se conservó (lo cobrado) y lo cancelado. */
+  fullAmountCents: number;
+  keptCents: number;
+  cancelledCents: number;
+  cancelledOn: string;
+}
+
+export class ListCancelledCharges {
+  constructor(
+    private readonly query: BillingQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  execute(seasonYear: number | null): Promise<CancelledChargeView[]> {
+    const season = seasonYear === null
+      ? Season.containing(YearMonth.of(LocalDate.fromInstant(this.clock.now())))
+      : Season.startingIn(seasonYear);
+    return this.query.cancelled(season);
   }
 }
 
@@ -873,6 +941,8 @@ export interface AccountView {
   membershipFeeCents: number;
   /** Cuotas mensuales de la temporada en curso con lo cubierto y lo que falta. */
   charges: AccountCharge[];
+  /** Su cuota de socio de la temporada (con lo pendiente), o null si no tiene. */
+  membershipCharge: { id: string; pendingCents: number } | null;
   /** Lo que sobra de los cobros tras cubrir todas las cuotas mensuales. */
   balanceCents: number;
 }
@@ -888,6 +958,9 @@ export interface AccountCharge {
   note: string | null;
   /** Descuento por pago adelantado fijado en este mes. */
   discountPercent: number;
+  /** Si se canceló (entera o la parte pendiente): su importe sin cancelar y lo cancelado. */
+  fullAmountCents: number;
+  cancelledCents: number;
 }
 
 export class GetStudentAccount {
@@ -943,7 +1016,14 @@ export class GetStudentAccount {
           manual: c.isManual(),
           note: c.note(),
           discountPercent: c.discountPercent(),
+          fullAmountCents: c.fullAmount().cents,
+          cancelledCents: c.cancelledAmount().cents,
         })),
+      membershipCharge: membership === null ? null : {
+        id: membership.id.value,
+        pendingCents:
+          membershipLeft.find((p) => p.charge.id.equals(membership.id))?.pending.cents ?? 0,
+      },
       balanceCents: allocation.balance.cents,
     };
   }
@@ -1101,10 +1181,11 @@ export class RecalculateCharges {
       if (charge.period.isBefore(from) || !season.includes(charge.period) || charge.isManual()) {
         continue;
       }
-      const before = charge.amount;
+      // Su importe completo: una cuota cancelada también se recalcula (por si se reactiva).
+      const before = charge.fullAmount();
       if (previousFee !== null) charge.inferDiscount(previousFee, percents, family);
       charge.reprice(fee, family);
-      if (!charge.amount.equals(before) || charge.discountPercent() > 0) {
+      if (!charge.fullAmount().equals(before) || charge.discountPercent() > 0) {
         await this.charges.saveCharge(charge);
       }
     }
