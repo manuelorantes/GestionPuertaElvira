@@ -12,6 +12,9 @@ import type { Logger } from '../logging/mod.ts';
 /** Nombres legibles de las acciones (por método y ruta) y de lo que tocan (por tabla). */
 export class AuditLabels {
   private static readonly ROUTES: Record<string, string> = {
+    'POST /api/admin/diagnostics/run': 'Diagnosticar',
+    'POST /api/admin/diagnostics/findings/:id/accept': 'Aceptar hallazgo',
+    'POST /api/admin/diagnostics/findings/:id/dismiss': 'Descartar hallazgo',
     'POST /api/admin/accounting/entries': 'Añadir movimiento',
     'DELETE /api/admin/accounting/entries/:id': 'Quitar movimiento',
     'POST /api/admin/accounting/invoices': 'Registrar factura de proveedor',

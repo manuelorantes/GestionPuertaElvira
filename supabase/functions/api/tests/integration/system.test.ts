@@ -21,6 +21,7 @@ Deno.test('superadministrators should see the scheduled tasks with their last sl
     };
     assertEquals(tasks.items.map((t) => t.id), [
       'horas-automaticas',
+      'diagnostico',
       'copia-seguridad',
       'keep-alive',
     ]);

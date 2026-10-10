@@ -440,6 +440,46 @@ Ref: attendance_comment.student_id > students_student.id [delete: cascade]
 Ref: attendance_comment.written_by_teacher > teachers_teacher.id [delete: set null]
 Ref: attendance_comment.written_by_user > identity_user.id [delete: set null]
 
+// ---- Diagnóstico -------------------------------------------------------------------------------
+
+Table diagnostics_finding {
+  id uuid [pk, note: 'UUIDv7']
+  rule varchar(40) [not null, note: 'código de la regla (catálogo en el código)']
+  severity varchar(10) [not null, note: 'money | club | form']
+  entity_kind varchar(20) [not null, note: 'student | entry | invoice | teacher | receipt | club']
+  entity_id varchar(80) [not null]
+  entity_label varchar(160) [not null, note: 'nombre para mostrar']
+  fingerprint text [unique, not null, note: 'regla|tipo|id|JSON canónico de los datos del caso; un descartado con esta huella no vuelve a salir']
+  explanation text [not null]
+  proposal text [not null]
+  fix jsonb [note: 'arreglo automático {kind, …}; nulo = solo se puede descartar']
+  status varchar(10) [not null, note: 'open | accepted | dismissed | resolved (dejó de reproducirse)']
+  detected_at timestamptz [not null]
+  last_seen_at timestamptz [not null, note: 'último diagnóstico que lo reprodujo']
+  closed_at timestamptz
+  closed_by varchar(120) [note: 'quién aceptó o descartó']
+
+  indexes {
+    status [name: 'diagnostics_finding_status_idx']
+    (entity_kind, entity_id) [name: 'diagnostics_finding_entity_idx']
+  }
+  Note: 'Sin trigger de historial: datos derivados que reescribe cada diagnóstico (ver diagnostico-con-reglas-sobre-hechos.md).'
+}
+
+Table diagnostics_run {
+  id uuid [pk]
+  started_at timestamptz [not null]
+  finished_at timestamptz [not null]
+  launched_by varchar(120) [not null, note: 'la cuenta que pulsó «Diagnosticar» o «Tarea nocturna»']
+  open_count int [not null]
+  new_count int [not null]
+  resolved_count int [not null]
+
+  indexes {
+    started_at [name: 'diagnostics_run_started_idx']
+  }
+}
+
 // ---- Sistema -----------------------------------------------------------------------------------
 
 Table system_task_run {
