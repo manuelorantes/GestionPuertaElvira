@@ -363,6 +363,44 @@ export class LinkTeacher {
   }
 }
 
+/**
+ * Añade a una cuenta otro email con el que también se entra en ella (misma contraseña, mismo perfil). Ninguna otra
+ * cuenta puede tener ese email.
+ */
+export class AddUserEmail {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly log: SecurityEventLog,
+  ) {}
+
+  async execute(userId: string, email: string): Promise<void> {
+    const user = await this.users.find(UserId.fromString(userId));
+    if (user === null) throw new UserNotFound();
+    const address = EmailAddress.fromString(email);
+    const owner = await this.users.findByEmail(address);
+    if (owner !== null && !owner.id.equals(user.id)) throw new EmailAlreadyRegistered();
+    user.addEmail(address);
+    await this.users.save(user);
+    await this.log.record('email_added', 'success', user.id);
+  }
+}
+
+/** Quita uno de los emails adicionales de una cuenta (el principal no se quita). */
+export class RemoveUserEmail {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly log: SecurityEventLog,
+  ) {}
+
+  async execute(userId: string, email: string): Promise<void> {
+    const user = await this.users.find(UserId.fromString(userId));
+    if (user === null) throw new UserNotFound();
+    user.removeEmail(EmailAddress.fromString(email));
+    await this.users.save(user);
+    await this.log.record('email_removed', 'success', user.id);
+  }
+}
+
 /** Cuenta tal y como se ve en la sección Usuarios (nunca con la contraseña). */
 export interface UserListItem {
   id: string;
@@ -372,6 +410,8 @@ export interface UserListItem {
   status: 'active' | 'disabled';
   mustChangePassword: boolean;
   createdAt: string;
+  /** Emails adicionales con los que también se entra en la cuenta. */
+  otherEmails: string[];
   /** Profesor vinculado, o null. */
   teacher: { id: string; name: string } | null;
   /** Último inicio de sesión o actividad, o null si nunca ha entrado. */

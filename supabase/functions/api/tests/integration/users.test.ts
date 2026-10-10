@@ -11,6 +11,7 @@ interface UserRow {
   status: string;
   mustChangePassword: boolean;
   teacher: { id: string; name: string } | null;
+  otherEmails: string[];
   lastSeenAt: string | null;
 }
 
@@ -251,4 +252,38 @@ Deno.test('administration linked to a teacher should use the teacher routes as t
     204,
   );
   assertEquals((await client.get('/api/teacher/classes')).status, 200);
+});
+
+Deno.test('an account can have extra emails to sign in with, set only by superadministration', async () => {
+  const { client } = await superadmin();
+  const junta = await createUser('junta@club.es');
+  const add = (email: string) =>
+    client.json('POST', `/api/admin/users/${junta.id.value}/emails`, { email });
+  assertEquals((await add('Lucia.Personal@Gmail.com')).status, 204);
+  assertError(await add('super@club.es'), 409, 'email_already_registered');
+  assertEquals(
+    items((await client.get('/api/admin/users')).body).find((u) => u.email === 'junta@club.es')
+      ?.otherEmails,
+    ['lucia.personal@gmail.com'],
+  );
+
+  // Con el email adicional se entra en la misma cuenta.
+  const other = new ApiClient();
+  assertEquals((await other.logIn('lucia.personal@gmail.com')).status, 200);
+  const me = (await other.get('/api/auth/me')).body as { user: { id: string; email: string } };
+  assertEquals([me.user.id, me.user.email], [junta.id.value, 'junta@club.es']);
+  // Solo superadministración los gestiona.
+  assertError(
+    await other.json('POST', `/api/admin/users/${junta.id.value}/emails`, { email: 'x@club.es' }),
+    403,
+    'forbidden',
+  );
+
+  assertEquals(
+    (await client.json('DELETE', `/api/admin/users/${junta.id.value}/emails`, {
+      email: 'lucia.personal@gmail.com',
+    })).status,
+    204,
+  );
+  assertError(await new ApiClient().logIn('lucia.personal@gmail.com'), 401, 'invalid_credentials');
 });

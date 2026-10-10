@@ -47,7 +47,7 @@ export class InMemoryUserRepository implements UserRepository {
   }
 
   findByEmail(email: EmailAddress): Promise<User | null> {
-    return Promise.resolve([...this.users.values()].find((u) => u.email.equals(email)) ?? null);
+    return Promise.resolve([...this.users.values()].find((u) => u.hasEmail(email)) ?? null);
   }
 
   save(user: User): Promise<void> {

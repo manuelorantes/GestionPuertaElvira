@@ -1,11 +1,13 @@
 import { EmailAddress } from '../../domain/common/mod.ts';
 import {
+  AddUserEmail,
   ChangeUserRole,
   DisableUser,
   EnableUser,
   LinkTeacher,
   ListUsers,
   RegisterUser,
+  RemoveUserEmail,
   ResetUserPassword,
   StartImpersonation,
   UserNotFound,
@@ -25,7 +27,7 @@ import {
 /** Sección Usuarios (solo superadministración): /api/admin/users */
 export function registerUserRoutes(api: ApiApp): void {
   const { deps } = api;
-  const route = (method: 'GET' | 'POST' | 'PUT', path: string) =>
+  const route = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string) =>
     ({ method, path, access: 'superadmin' }) as const;
   const users = (scope: RequestScope) => new SqlUserRepository(scope.tx);
   const sessions = (scope: RequestScope) => new SqlSessionRepository(scope.tx);
@@ -117,6 +119,25 @@ export function registerUserRoutes(api: ApiApp): void {
     await linkTeacher(scope).execute(
       await emailOf(scope, param(c, 'id')),
       body.optionalString('teacherId'),
+    );
+    return c.body(null, 204);
+  });
+
+  // Emails adicionales con los que también se entra en la cuenta (opcionales).
+  api.defineRoute(route('POST', '/api/admin/users/:id/emails'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await new AddUserEmail(users(scope), log(scope)).execute(
+      param(c, 'id'),
+      body.requiredString('email'),
+    );
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(route('DELETE', '/api/admin/users/:id/emails'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await new RemoveUserEmail(users(scope), log(scope)).execute(
+      param(c, 'id'),
+      body.requiredString('email'),
     );
     return c.body(null, 204);
   });

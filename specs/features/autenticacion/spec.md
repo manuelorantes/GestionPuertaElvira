@@ -160,6 +160,21 @@ desactivar su propia cuenta ni cambiar su propio rol. Cada acción queda en el h
 - **WHEN** superadministración intenta desactivarse o quitarse el rol
 - **THEN** no puede: en su fila no aparece «Desactivar» ni el selector de rol, y la API lo rechaza
 
+### Requirement: Emails adicionales de una cuenta
+Superadministración MUST poder añadir a cualquier cuenta, de forma opcional, otros emails («Emails» en su fila de la
+sección Usuarios) y quitarlos. Con cualquiera de ellos se entra en la misma cuenta, con la misma contraseña y el mismo
+perfil (su email principal no cambia). Ningún email puede ser de dos cuentas, ni como principal ni como adicional. La
+lista de Usuarios muestra los adicionales debajo del principal. Cada cambio queda en el historial.
+
+#### Scenario: Entrar con el email personal
+- **WHEN** superadministración añade «lucia.personal@gmail.com» a la cuenta de Lucía y Lucía entra con ese email y su
+  contraseña
+- **THEN** entra en su cuenta de siempre
+
+#### Scenario: Un email de otra cuenta
+- **WHEN** superadministración intenta añadir a una cuenta el email de otra
+- **THEN** el sistema lo rechaza: ya existe una cuenta con ese email
+
 ### Requirement: Entrar como otra cuenta
 Superadministración MUST poder entrar como otra cuenta desde la sección Usuarios, tras confirmarlo, para ver y
 usar la aplicación como esa persona. No se puede entrar como uno mismo, como otra superadministración ni como

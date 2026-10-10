@@ -76,6 +76,8 @@ export class AuditLabels {
     'POST /api/admin/users/:id/enable': 'Reactivar cuenta',
     'PUT /api/admin/users/:id/role': 'Cambiar rol de cuenta',
     'PUT /api/admin/users/:id/teacher': 'Vincular cuenta a un profesor',
+    'POST /api/admin/users/:id/emails': 'Añadir email a una cuenta',
+    'DELETE /api/admin/users/:id/emails': 'Quitar email de una cuenta',
     'PUT /api/teacher/roll-calls/:groupId/:date': 'Pasar lista',
     'POST /api/teacher/roll-calls/:groupId/:date/comments': 'Comentar una clase',
     'PUT /api/teacher/comments/:id': 'Cambiar comentario de una clase',
@@ -132,6 +134,8 @@ export class AuditLabels {
     'role_changed.success': 'Cambio de rol',
     'user_disabled.success': 'Desactivar usuario',
     'user_enabled.success': 'Activar usuario',
+    'email_added.success': 'Añadir email a una cuenta',
+    'email_removed.success': 'Quitar email de una cuenta',
   };
 
   static route(method: string, path: string): string {
