@@ -1,4 +1,9 @@
-import { type Clock, type HasErrorDetails, LocalDate } from '../../domain/common/mod.ts';
+import {
+  type Clock,
+  type HasErrorDetails,
+  InvalidValue,
+  LocalDate,
+} from '../../domain/common/mod.ts';
 import {
   Attendance,
   Capacity,
@@ -40,8 +45,31 @@ export interface EnrolmentRepository {
     group: ClassGroupId,
     on: LocalDate,
   ): Promise<Enrolment | null>;
+  /** Todas las inscripciones (pasadas y vigentes) de un alumno en un grupo. */
+  ofStudentInGroup(student: StudentReference, group: ClassGroupId): Promise<Enrolment[]>;
   /** Inscripciones vigentes en el grupo ese día. */
   activeInGroup(group: ClassGroupId, on: LocalDate): Promise<Enrolment[]>;
+}
+
+/** Desde cuándo está de alta en el club un alumno (su alta en curso), según Alumnado. */
+export interface StudentJoinDates {
+  joinedOn(student: StudentReference): Promise<LocalDate | null>;
+}
+
+/** Un alumno no puede estar en un grupo en el futuro ni antes de su alta en el club. */
+async function assertValidStart(
+  joinDates: StudentJoinDates | null,
+  student: StudentReference,
+  from: LocalDate,
+  today: LocalDate,
+): Promise<void> {
+  if (today.isBefore(from)) {
+    throw new InvalidValue('from', 'La inscripción no puede empezar en el futuro.');
+  }
+  const joined = joinDates === null ? null : await joinDates.joinedOn(student);
+  if (joined !== null && from.isBefore(joined)) {
+    throw new InvalidValue('from', 'La inscripción no puede empezar antes de su alta en el club.');
+  }
 }
 
 /** Si un profesor existe y está activo (lo responde el contexto de Profesorado). */
@@ -325,6 +353,7 @@ export class EnrolStudent {
     private readonly groups: ClassGroupRepository,
     private readonly enrolments: EnrolmentRepository,
     private readonly clock: Clock,
+    private readonly joinDates: StudentJoinDates | null = null,
   ) {}
 
   /**
@@ -338,13 +367,47 @@ export class EnrolStudent {
     from?: LocalDate,
     attendance: AttendanceInput | null = null,
   ): Promise<void> {
+    const student = StudentReference.fromString(studentId);
+    const today = LocalDate.fromInstant(this.clock.now());
+    if (from !== undefined) await assertValidStart(this.joinDates, student, from, today);
     await new Enrolling(this.groups, this.enrolments).enrol(
-      StudentReference.fromString(studentId),
+      student,
       ClassGroupId.fromString(groupId),
-      from ?? LocalDate.fromInstant(this.clock.now()),
+      from ?? today,
       confirmOverCapacity,
       attendance,
     );
+  }
+}
+
+/**
+ * Corrige desde cuándo está un alumno en uno de sus grupos (p. ej. venía antes de que se le inscribiera): nunca en el
+ * futuro, antes de su alta en el club ni pisando otra inscripción suya en ese grupo.
+ */
+export class ChangeEnrolmentStart {
+  constructor(
+    private readonly enrolments: EnrolmentRepository,
+    private readonly joinDates: StudentJoinDates,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string, groupId: string, from: string): Promise<void> {
+    const student = StudentReference.fromString(studentId);
+    const group = ClassGroupId.fromString(groupId);
+    const today = LocalDate.fromInstant(this.clock.now());
+    const enrolment = await this.enrolments.activeForStudentInGroup(student, group, today);
+    if (enrolment === null) throw new NotEnrolled();
+    const start = LocalDate.fromString(from);
+    await assertValidStart(this.joinDates, student, start, today);
+    const clash = (await this.enrolments.ofStudentInGroup(student, group)).some((other) =>
+      !other.id.equals(enrolment.id) && other.enrolledOn.isBefore(enrolment.enrolledOn) &&
+      (other.endsOn() === null || start.isBefore(other.endsOn() as LocalDate))
+    );
+    if (clash) {
+      throw new InvalidValue('from', 'Esa fecha pisa otra inscripción suya en este grupo.');
+    }
+    enrolment.startOn(start);
+    await this.enrolments.save(enrolment);
   }
 }
 

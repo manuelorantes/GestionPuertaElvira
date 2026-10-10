@@ -435,3 +435,31 @@ Deno.test('students get a unique, increasing member number that is never given a
     'unprocessable',
   );
 });
+
+Deno.test('students can join and be in a group from an earlier day, changed later from their sheet', async () => {
+  const fx = await fixture();
+  const today = LocalDate.fromInstant(new Date());
+  const day = (offset: number) => today.plusDays(offset).toString();
+  // Alta con fecha de hace 30 días: sus grupos empiezan ese día.
+  const id = await register(fx, { joinedOn: day(-30) });
+  const since = async () =>
+    body<{ groups: { id: string; since: string }[] }>(
+      await fx.client.get(`/api/admin/students/${id}`),
+    ).groups.map((g) => [g.id, g.since]);
+  assertEquals(await since(), [[fx.groupA, day(-30)]]);
+
+  // Un grupo nuevo desde hace 10 días; ni en el futuro ni antes de su alta.
+  const enrol = (from: string) =>
+    fx.client.json('POST', `/api/admin/students/${id}/enrolments`, { groupId: fx.groupB, from });
+  assertError(await enrol(day(1)), 422, 'unprocessable');
+  assertError(await enrol(day(-31)), 422, 'unprocessable');
+  assertEquals((await enrol(day(-10))).status, 204);
+
+  // Se corrige desde la ficha: venía desde hace 20 días.
+  const start = (groupId: string, from: string) =>
+    fx.client.json('PUT', `/api/admin/students/${id}/enrolments/${groupId}/start`, { from });
+  assertEquals((await start(fx.groupB, day(-20))).status, 204);
+  assertError(await start(fx.groupB, day(-40)), 422, 'unprocessable');
+  assertError(await start(fx.tiny, day(-20)), 404, 'not_enrolled');
+  assertEquals(await since(), [[fx.groupA, day(-30)], [fx.groupB, day(-20)]]);
+});
