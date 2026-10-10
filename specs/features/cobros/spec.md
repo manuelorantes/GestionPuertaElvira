@@ -211,6 +211,9 @@ La ficha del alumno MUST mostrar:
 - si tiene particulares, el precio por hora pactado, que MUST poder cambiarse;
 - el total de lo que mueve en el club: lo cobrado y lo pendiente de cuotas, cuota de socio y material deportivo, y la
   suma de todo.
+- en «Cuotas de la temporada», la cuota de socio (importe y si está cobrada, a medias o pendiente) antes de las
+  cuotas de cada mes;
+- el historial con todos sus cobros, incluida la cuota de socio, del más reciente al más antiguo.
 
 Los meses a cobrar (1, 3, 6 o resto de temporada) se eligen en cada cobro; no hay forma de pago preferida.
 
