@@ -1,12 +1,12 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router';
 
 import type { AttendanceMark, GroupAttendance } from '@/features/attendance/api';
 import { useGroupAttendance } from '@/features/attendance/hooks';
 import { monthLabel } from '@/features/billing/money';
 import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { SortHeader } from '@/shared/ui/SortHeader';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const WEEKDAYS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 const dayMonth = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -51,24 +51,16 @@ const percent = (s: Student) =>
  * vacío si ese día no le tocaba) y el porcentaje de las clases con lista. Se ordena por nombre o por porcentaje.
  */
 export function GroupAttendanceTable({ groupId, month }: { groupId: string; month: string }) {
-  return (
-    <GroupAttendanceGrid
-      attendance={useGroupAttendance(groupId, month)}
-      month={month}
-      studentHref={(id) => `/panel/alumnos/${id}`}
-    />
-  );
+  return <GroupAttendanceGrid attendance={useGroupAttendance(groupId, month)} month={month} />;
 }
 
-/** La tabla de asistencia de un mes ya pedida; sin `studentHref`, los nombres no llevan a ninguna parte. */
+/** La tabla de asistencia de un mes ya pedida; cada nombre abre la ficha del alumno. */
 export function GroupAttendanceGrid({
   attendance,
   month,
-  studentHref,
 }: {
   attendance: UseQueryResult<GroupAttendance>;
   month: string;
-  studentHref?: (studentId: string) => string;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({
     key: 'name',
@@ -148,13 +140,7 @@ export function GroupAttendanceGrid({
             return (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <th scope="row" className="py-2 pr-3 font-medium">
-                  {studentHref ? (
-                    <Link to={studentHref(s.id)} className="hover:underline">
-                      {s.name}
-                    </Link>
-                  ) : (
-                    s.name
-                  )}
+                  <StudentLink id={s.id}>{s.name}</StudentLink>
                   {specialDays(s, data.days).length > 0 && (
                     <AsteriskNote label={`Asistencia especial de ${s.name}`}>
                       {s.member ? 'Además de sus clases, vino' : 'No es de este grupo: vino'} en

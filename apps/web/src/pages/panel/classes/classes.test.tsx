@@ -342,7 +342,7 @@ describe('Clases', () => {
     expect(within(table).getByText('50 %')).toBeInTheDocument();
     expect(within(table).getByRole('link', { name: 'Ana Ruiz Gil' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s1',
+      expect.stringMatching(/[?&]ficha=s1$/),
     );
   });
 
@@ -399,7 +399,7 @@ describe('Clases', () => {
     expect(ofStudents()).toHaveTextContent('Ha llegado a mitad de clase');
     expect(within(ofStudents()).getByRole('link', { name: 'Pablo Gil Ruiz' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s2',
+      expect.stringMatching(/[?&]ficha=s2$/),
     );
     const who = screen.getByRole('combobox', { name: 'Alumno' });
     await user.selectOptions(who, 'Pablo Gil Ruiz');

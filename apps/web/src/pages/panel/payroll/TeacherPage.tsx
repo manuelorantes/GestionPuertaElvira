@@ -30,6 +30,7 @@ import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const DUTY_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const TH = 'px-4 py-2.5 font-semibold';
@@ -367,12 +368,9 @@ function StudentsSection({ students }: { students: TeacherReport['students'] }) 
             {students.map((s) => (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <td className={TD}>
-                  <Link
-                    to={`/panel/alumnos/${s.id}`}
-                    className="font-medium hover:text-brand hover:underline"
-                  >
+                  <StudentLink id={s.id} className="font-medium hover:text-brand">
                     {s.name}
-                  </Link>
+                  </StudentLink>
                 </td>
                 <td className={TD}>{s.groups.join(' · ')}</td>
                 <td className={TD}>{hoursLabel(s.weeklyMinutes)}</td>

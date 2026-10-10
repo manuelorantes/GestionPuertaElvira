@@ -13,6 +13,27 @@ const chart = Array.from({ length: 12 }, (_, i) => {
   };
 });
 
+const STUDENT = {
+  id: 's1',
+  memberNumber: 7,
+  fullName: 'Irene Moreno Salas',
+  birthDate: null,
+  age: null,
+  nationalId: null,
+  contactEmail: null,
+  guardians: [],
+  ownPhone: null,
+  federationLicence: null,
+  imageConsent: false,
+  missingData: [],
+  joinedOn: '2026-09-01',
+  withdrawnOn: null,
+  status: 'active',
+  membership: [{ joinedOn: '2026-09-01', withdrawnOn: null }],
+  groups: [],
+  siblings: [],
+};
+
 const SUMMARY = {
   month: '2026-10',
   today: '2026-10-03',
@@ -102,15 +123,42 @@ describe('Resumen', () => {
     const overdue = screen.getByRole('region', { name: 'Recibos vencidos' });
     expect(within(overdue).getByRole('link', { name: 'Irene Moreno Salas' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s1',
+      '/panel?ficha=s1',
     );
     expect(within(overdue).getByText(/Cuota de septiembre · 45 €/)).toBeInTheDocument();
     const latest = screen.getByRole('region', { name: 'Últimos movimientos' });
     expect(within(latest).getByText('+45 €')).toBeInTheDocument();
     expect(within(latest).getByRole('link', { name: 'Sofía Ramírez Vílchez' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s9',
+      '/panel?ficha=s9',
     );
+  });
+
+  it("opens a student's sheet over the summary, which stays put, with a way to go to «Alumnos»", async () => {
+    const user = userEvent.setup();
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/dashboard': [200, SUMMARY],
+      'GET /api/admin/students?filter=active': [200, { items: [], total: 0 }],
+      'GET /api/admin/students/s1': [200, STUDENT],
+    });
+    renderApp('/panel');
+
+    const overdue = await screen.findByRole('region', { name: 'Recibos vencidos' });
+    await user.click(within(overdue).getByRole('link', { name: 'Irene Moreno Salas' }));
+    expect(await screen.findByRole('dialog', { name: 'Irene Moreno Salas' })).toBeVisible();
+    expect(screen.getByText('Cobrado en octubre')).toBeInTheDocument();
+
+    // Pulsar en la zona gris, fuera del botón, cierra la ficha y se sigue en el resumen.
+    await user.click(screen.getByTestId('fondo-ficha'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText('Cobrado en octubre')).toBeInTheDocument();
+
+    await user.click(within(overdue).getByRole('link', { name: 'Irene Moreno Salas' }));
+    await screen.findByRole('dialog', { name: 'Irene Moreno Salas' });
+    await user.click(screen.getByRole('link', { name: 'Ir a Alumnos' }));
+    expect(await screen.findByRole('heading', { name: 'Alumnos', level: 1 })).toBeVisible();
+    expect(await screen.findByRole('dialog', { name: 'Irene Moreno Salas' })).toBeVisible();
   });
 
   it('opens the payment dialog from an overdue charge', async () => {

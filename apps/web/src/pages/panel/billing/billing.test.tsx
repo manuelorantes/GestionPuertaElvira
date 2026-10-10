@@ -192,7 +192,7 @@ describe('Cobros y cuotas', () => {
     expect(within(martina).getByRole('button', { name: 'WhatsApp' })).toBeInTheDocument();
     expect(within(martina).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s1',
+      expect.stringMatching(/[?&]ficha=s1$/),
     );
     expect(within(table).getByRole('row', { name: /Hugo/ })).toHaveTextContent('Cobrada');
     expect(screen.getByText('1 de 2 cuotas cobradas · 55 € de 95,50 €')).toBeInTheDocument();
@@ -470,7 +470,7 @@ describe('Cobros y cuotas', () => {
     );
     expect(within(row).getByRole('link', { name: RECEIPT.studentName })).toHaveAttribute(
       'href',
-      `/panel/alumnos/${RECEIPT.studentId}`,
+      expect.stringMatching(new RegExp(`[?&]ficha=${RECEIPT.studentId}$`)),
     );
     await userEvent.click(within(row).getByRole('button', { name: 'Ver recibo' }));
     const receipt = await screen.findByRole('dialog', { name: 'Recibo' });

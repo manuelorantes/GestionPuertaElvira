@@ -1,5 +1,4 @@
 import { useState, type ReactNode } from 'react';
-import { Link } from 'react-router';
 
 import { currentMonth, formatCents, monthLabel } from '@/features/billing/money';
 import type { ProfitabilityReport, ProfitabilityRow } from '@/features/payroll/api';
@@ -10,6 +9,7 @@ import { Card } from '@/shared/ui/Card';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
 import { TeacherLink } from './TeacherLink';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const ORDERS: { id: string; label: string; value: (r: ProfitabilityRow) => number }[] = [
   { id: 'margin', label: 'Margen', value: (r) => r.marginCents },
@@ -266,9 +266,9 @@ function StudentsTotal({ students }: { students: ProfitabilityReport['students']
             Van con más de un profesor: cuentan en la fila de cada uno y una sola vez en el total.
           </span>
           {students.shared.map((s) => (
-            <Link key={s.id} to={`/panel/alumnos/${s.id}`} className="block font-medium text-brand">
+            <StudentLink key={s.id} id={s.id} className="block font-medium text-brand">
               {s.name}
-            </Link>
+            </StudentLink>
           ))}
         </AsteriskNote>
       )}
