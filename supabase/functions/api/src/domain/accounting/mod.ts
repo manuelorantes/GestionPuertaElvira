@@ -25,6 +25,11 @@ export type LedgerCategory =
   | 'federation'
   | 'tournaments'
   | 'utilities'
+  | 'president'
+  | 'cleaning'
+  | 'water'
+  | 'electricity'
+  | 'internet'
   | 'other_expenses'
   | 'fees'
   | 'membership'
@@ -40,6 +45,11 @@ const CATEGORIES: Record<LedgerCategory, { kind: EntryKind; label: string }> = {
   federation: { kind: 'expense', label: 'Federación' },
   tournaments: { kind: 'expense', label: 'Torneos' },
   utilities: { kind: 'expense', label: 'Suministros' },
+  president: { kind: 'expense', label: 'Presidente' },
+  cleaning: { kind: 'expense', label: 'Limpieza' },
+  water: { kind: 'expense', label: 'Agua' },
+  electricity: { kind: 'expense', label: 'Electricidad' },
+  internet: { kind: 'expense', label: 'Wifi' },
   other_expenses: { kind: 'expense', label: 'Otros gastos' },
   fees: { kind: 'income', label: 'Cuotas' },
   membership: { kind: 'income', label: 'Cuota de socio' },
@@ -48,6 +58,11 @@ const CATEGORIES: Record<LedgerCategory, { kind: EntryKind; label: string }> = {
   tournament_income: { kind: 'income', label: 'Torneos' },
   other_income: { kind: 'income', label: 'Otros ingresos' },
 };
+
+/** Todas las categorías, en el orden en que se muestran. */
+export function allCategories(): LedgerCategory[] {
+  return Object.keys(CATEGORIES) as LedgerCategory[];
+}
 
 export function categoryFromName(name: string): LedgerCategory {
   if (!(name in CATEGORIES)) throw new InvalidValue('category', 'Categoría desconocida.');
@@ -60,6 +75,42 @@ export function categoryKind(category: LedgerCategory): EntryKind {
 
 export function categoryLabel(category: LedgerCategory): string {
   return CATEGORIES[category].label;
+}
+
+/**
+ * Categorías que cuentan como ingresos y gastos «del mes» (lo que corresponde a cada mes en el resumen): por defecto, las
+ * cuotas y los gastos fijos del club.
+ */
+export class MonthlyCategories {
+  private static readonly DEFAULTS: readonly LedgerCategory[] = [
+    'fees',
+    'teachers',
+    'president',
+    'rent',
+    'cleaning',
+    'water',
+    'electricity',
+    'internet',
+  ];
+
+  private constructor(private readonly chosen: ReadonlySet<LedgerCategory>) {}
+
+  static defaults(): MonthlyCategories {
+    return new MonthlyCategories(new Set(MonthlyCategories.DEFAULTS));
+  }
+
+  static of(names: readonly string[]): MonthlyCategories {
+    return new MonthlyCategories(new Set(names.map(categoryFromName)));
+  }
+
+  includes(category: string): boolean {
+    return this.chosen.has(category as LedgerCategory);
+  }
+
+  /** En el orden de las categorías. */
+  list(): LedgerCategory[] {
+    return allCategories().filter((c) => this.chosen.has(c));
+  }
 }
 
 /** Ejercicio contable del club: de septiembre a agosto. */
@@ -107,7 +158,10 @@ export class FiscalYear {
   }
 }
 
-/** Ingreso o gasto anotado a mano (subvención, venta de material, comisión del banco…). */
+/**
+ * Ingreso o gasto anotado a mano (subvención, venta de material, comisión del banco…). `period` es el mes al que
+ * corresponde (la luz de septiembre pagada en octubre); por defecto, el de su fecha.
+ */
 export class ManualEntry {
   private constructor(
     readonly id: ManualEntryId,
@@ -117,6 +171,7 @@ export class ManualEntry {
     readonly category: LedgerCategory,
     readonly method: Method,
     readonly amount: Money,
+    readonly period: YearMonth,
   ) {}
 
   static record(
@@ -127,6 +182,7 @@ export class ManualEntry {
     category: LedgerCategory,
     method: Method,
     amount: Money,
+    period: YearMonth | null = null,
   ): ManualEntry {
     if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
     if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
@@ -136,7 +192,16 @@ export class ManualEntry {
         `La categoría no corresponde a un ${kind === 'income' ? 'ingreso' : 'gasto'}.`,
       );
     }
-    return new ManualEntry(id, date, kind, concept.trim(), category, method, amount);
+    return new ManualEntry(
+      id,
+      date,
+      kind,
+      concept.trim(),
+      category,
+      method,
+      amount,
+      period ?? YearMonth.of(date),
+    );
   }
 }
 
@@ -172,7 +237,10 @@ export class Attachment {
   }
 }
 
-/** Factura de un proveedor del club, pendiente o pagada, con su documento. */
+/**
+ * Factura de un proveedor del club, pendiente o pagada, con su documento. `period` es el mes al que corresponde; por
+ * defecto, el de la factura.
+ */
 export class SupplierInvoice {
   private constructor(
     readonly id: SupplierInvoiceId,
@@ -182,6 +250,7 @@ export class SupplierInvoice {
     readonly concept: string,
     readonly category: LedgerCategory,
     readonly amount: Money,
+    readonly period: YearMonth,
     private paid: LocalDate | null,
     private paymentMethod: Method | null,
     private document: Attachment | null,
@@ -195,6 +264,7 @@ export class SupplierInvoice {
     concept: string,
     category: LedgerCategory,
     amount: Money,
+    period: YearMonth | null = null,
   ): SupplierInvoice {
     if (supplier.trim() === '' || concept.trim() === '') {
       throw new InvalidValue('supplier', 'Indica el proveedor y el concepto.');
@@ -211,6 +281,7 @@ export class SupplierInvoice {
       concept.trim(),
       category,
       amount,
+      period ?? YearMonth.of(date),
       null,
       null,
       null,
@@ -225,6 +296,7 @@ export class SupplierInvoice {
     concept: string;
     category: LedgerCategory;
     amount: Money;
+    period: YearMonth | null;
     paidOn: LocalDate | null;
     method: Method | null;
     attachment: Attachment | null;
@@ -237,6 +309,7 @@ export class SupplierInvoice {
       fields.concept,
       fields.category,
       fields.amount,
+      fields.period ?? YearMonth.of(fields.date),
       fields.paidOn,
       fields.method,
       fields.attachment,

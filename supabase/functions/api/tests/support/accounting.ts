@@ -118,6 +118,7 @@ export class AccountingFixture
           method: e.method,
           amountCents: e.amount.cents,
           studentId: null,
+          period: e.period.toString(),
         });
       }
     }
@@ -134,6 +135,7 @@ export class AccountingFixture
           method: i.method() ?? '',
           amountCents: i.amount.cents,
           studentId: null,
+          period: i.period.toString(),
         });
       }
     }
