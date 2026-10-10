@@ -449,7 +449,7 @@ export class SqlStudentDirectory implements StudentDirectory {
     const to = month.lastDay().toString();
     const rows = await this.sql.unsafe(
       `${this.columns()} FROM students_student s
-        WHERE s.joined_on <= $2 AND (s.withdrawn_on IS NULL OR s.withdrawn_on > $1)
+        WHERE student_active_between(s.id, $1::date, $2::date)
         ORDER BY s.search_name`,
       [from, to],
     );

@@ -10,12 +10,14 @@ import {
   UnenrolStudent,
 } from '../../application/classes/mod.ts';
 import {
+  ChangeJoinDate,
   type EnrolmentRequest,
   type Enrolments,
   LinkSiblings,
   ListPendingData,
   type Membership,
   RegisterStudent,
+  RejoinStudent,
   RenumberMembers,
   studentFilterFrom,
   type StudentInput,
@@ -42,6 +44,17 @@ import {
   SqlStudentRepository,
 } from '../persistence/students.ts';
 import { StudentAccount, StudentRef } from '../../domain/billing/mod.ts';
+
+/** `enrolments` (grupo + horario especial) o, más simple, `groupIds` (grupos completos). */
+function enrolmentRequests(body: JsonBody): EnrolmentRequest[] {
+  return [
+    ...body.stringList('groupIds').map((groupId) => ({ groupId, attendance: null })),
+    ...body.objectList('enrolments').map((e) => ({
+      groupId: e.requiredString('groupId'),
+      attendance: attendanceInput(e),
+    })),
+  ];
+}
 
 /** Alumnado pide a Clases que inscriba o termine las inscripciones de un alumno. */
 export class ClassesEnrolments implements Enrolments {
@@ -70,6 +83,18 @@ export class ClassesEnrolments implements Enrolments {
         request.attendance,
       );
     }
+  }
+
+  async currentStarts(student: StudentId, since: LocalDate): Promise<LocalDate[]> {
+    const rows = await this.sql`SELECT enrolled_on::text AS start FROM classes_enrolment
+      WHERE student_id = ${student.value} AND (ends_on IS NULL OR ends_on > ${since.toString()})`;
+    return rows.map((r) => LocalDate.fromString(String(r.start)));
+  }
+
+  async moveStarts(student: StudentId, from: LocalDate, to: LocalDate): Promise<void> {
+    await this.sql`UPDATE classes_enrolment SET enrolled_on = ${to.toString()}
+      WHERE student_id = ${student.value} AND enrolled_on = ${from.toString()}
+        AND (ends_on IS NULL OR ends_on > ${to.toString()})`;
   }
 
   endAll(student: StudentId, on: LocalDate): Promise<void> {
@@ -189,14 +214,7 @@ export function registerStudentRoutes(api: ApiApp): void {
         clock,
         new BillingMembership(scope.tx),
       );
-      // `enrolments` (grupo + horario especial) o, más simple, `groupIds` (grupos completos).
-      const requested: EnrolmentRequest[] = [
-        ...body.stringList('groupIds').map((groupId) => ({ groupId, attendance: null })),
-        ...body.objectList('enrolments').map((e) => ({
-          groupId: e.requiredString('groupId'),
-          attendance: attendanceInput(e),
-        })),
-      ];
+      const requested = enrolmentRequests(body);
       // Su familia directa pasa a tener descuento familiar.
       const id = await recalculatingFees(
         api,
@@ -224,6 +242,49 @@ export function registerStudentRoutes(api: ApiApp): void {
         param(c, 'id'),
         studentInput(await JsonBody.from(c.req.raw)),
       );
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'POST', path: '/api/admin/students/:id/rejoin', access: 'admin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      const id = param(c, 'id');
+      await recalculatingFees(api, scope, [id], () =>
+        new RejoinStudent(
+          students(scope),
+          enrolments(scope),
+          transactions(scope),
+          clock,
+          new BillingMembership(scope.tx),
+        ).execute(
+          id,
+          body.requiredString('date'),
+          enrolmentRequests(body),
+          body.bool('confirmOverCapacity'),
+        ));
+      await generatingCharges(api, scope, [id]);
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/students/:id/joined-on', access: 'admin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      const id = param(c, 'id');
+      await recalculatingFees(
+        api,
+        scope,
+        [id],
+        () =>
+          new ChangeJoinDate(students(scope), enrolments(scope), clock).execute(
+            id,
+            body.requiredString('date'),
+          ),
+      );
+      await generatingCharges(api, scope, [id]);
       return c.body(null, 204);
     },
   );
