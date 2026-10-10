@@ -14,6 +14,7 @@ import {
   ManualEntry,
   ManualEntryId,
   methodFromName,
+  MonthlyCategories,
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
@@ -41,6 +42,11 @@ export interface LedgerLine {
   amountCents: number;
   /** El alumno de un cobro; el resto de movimientos no tiene. */
   studentId: string | null;
+  /**
+   * Mes al que corresponde («AAAA-MM»): el de la liquidación o anticipo para el profesorado, el elegido en apuntes y
+   * facturas y, en los cobros, el del cobro.
+   */
+  period: string;
 }
 
 export interface LedgerQuery {
@@ -77,6 +83,7 @@ export interface InvoiceView {
   paidOn: string | null;
   method: string | null;
   attachmentName: string | null;
+  period: string;
 }
 
 export interface InvoiceQuery {
@@ -94,6 +101,28 @@ export interface SupplierInvoiceRepository {
   invoice(id: SupplierInvoiceId): Promise<SupplierInvoice | null>;
   saveInvoice(invoice: SupplierInvoice): Promise<void>;
   deleteInvoice(id: SupplierInvoiceId): Promise<void>;
+}
+
+export interface AccountingSettingsRepository {
+  monthlyCategories(): Promise<MonthlyCategories>;
+  saveMonthlyCategories(categories: MonthlyCategories): Promise<void>;
+}
+
+/** Las categorías que cuentan como del mes. */
+export class GetMonthlyCategories {
+  constructor(private readonly settings: AccountingSettingsRepository) {}
+
+  async execute(): Promise<string[]> {
+    return (await this.settings.monthlyCategories()).list();
+  }
+}
+
+export class SetMonthlyCategories {
+  constructor(private readonly settings: AccountingSettingsRepository) {}
+
+  async execute(categories: string[]): Promise<void> {
+    await this.settings.saveMonthlyCategories(MonthlyCategories.of(categories));
+  }
 }
 
 export interface SeasonClosingRepository {
@@ -188,6 +217,13 @@ export interface EntryInput {
   category: string;
   method: string;
   amount: string;
+  /** Mes al que corresponde («AAAA-MM»); sin él, el de la fecha. */
+  period?: string | null;
+}
+
+/** Mes opcional de un formulario. */
+function periodOf(value: string | null | undefined): YearMonth | null {
+  return value ? YearMonth.fromString(value) : null;
 }
 
 export class RecordEntry {
@@ -210,6 +246,7 @@ export class RecordEntry {
       categoryFromName(input.category),
       methodFromName(input.method),
       Money.fromDecimal(input.amount),
+      periodOf(input.period),
     );
     await this.entries.saveEntry(entry);
     return entry.id.value;
@@ -237,6 +274,8 @@ export interface InvoiceInput {
   concept: string;
   category: string;
   amount: string;
+  /** Mes al que corresponde («AAAA-MM»); sin él, el de la factura. */
+  period?: string | null;
 }
 
 export class RegisterInvoice {
@@ -257,6 +296,7 @@ export class RegisterInvoice {
       input.concept,
       categoryFromName(input.category),
       Money.fromDecimal(input.amount),
+      periodOf(input.period),
     );
     if (document !== null) {
       invoice.attach(await storeDocument(this.storage, invoice.id.value, document));

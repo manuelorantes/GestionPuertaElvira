@@ -14,10 +14,12 @@ import {
   DocumentNotFound,
   type DocumentStorage,
   FiscalYearSummary,
+  GetMonthlyCategories,
   MonthLedger,
   PayInvoice,
   RecordEntry,
   RegisterInvoice,
+  SetMonthlyCategories,
   SupplierInvoiceNotFound,
   type UploadedDocument,
 } from '../../application/accounting/mod.ts';
@@ -82,7 +84,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     InvoiceAlreadyPaid: [409, 'invoice_paid'],
     InvoiceAlreadyPaidCannotBeDeleted: [409, 'invoice_paid'],
   });
-  const admin = (method: 'GET' | 'POST' | 'DELETE', path: string, upload = false) => ({
+  const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, upload = false) => ({
     method,
     path,
     access: 'admin' as const,
@@ -126,6 +128,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
       category: b.requiredString('category'),
       method: b.requiredString('method'),
       amount: b.requiredString('amount'),
+      period: b.optionalString('period'),
     });
     return c.json({ id }, 201);
   });
@@ -133,6 +136,17 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   api.defineRoute(admin('DELETE', '/api/admin/accounting/entries/:id'), async (c, scope) => {
     const { accounting, closed } = repos(scope);
     await new DeleteEntry(accounting, closed).execute(param(c, 'id'));
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('GET', '/api/admin/accounting/monthly-categories'), async (c, scope) => {
+    const categories = await new GetMonthlyCategories(repos(scope).accounting).execute();
+    return c.json({ categories });
+  });
+
+  api.defineRoute(admin('PUT', '/api/admin/accounting/monthly-categories'), async (c, scope) => {
+    const b = await JsonBody.from(c.req.raw);
+    await new SetMonthlyCategories(repos(scope).accounting).execute(b.stringList('categories'));
     return c.body(null, 204);
   });
 
@@ -155,6 +169,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
         concept: field(form, 'concept'),
         category: field(form, 'category'),
         amount: field(form, 'amount'),
+        period: field(form, 'period') || null,
       },
       await document(form, false),
     );

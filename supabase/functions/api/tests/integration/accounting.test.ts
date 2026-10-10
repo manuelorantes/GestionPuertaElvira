@@ -175,3 +175,76 @@ Deno.test('accounting should summarise and close a past season, then lock it', a
   await teacher.logIn('profe@club.es');
   assertError(await teacher.get('/api/admin/accounting/invoices'), 403, 'forbidden');
 });
+
+Deno.test('entries and invoices keep the month they belong to, shown in the ledger', async () => {
+  const client = await admin();
+  const entry = await client.json('POST', '/api/admin/accounting/entries', {
+    date: '2025-10-03',
+    kind: 'expense',
+    concept: 'Luz de septiembre',
+    category: 'electricity',
+    method: 'transfer',
+    amount: '80',
+    period: '2025-09',
+  });
+  assertEquals(entry.status, 201, JSON.stringify(entry.body));
+  await client.json('POST', '/api/admin/accounting/entries', {
+    date: '2025-10-04',
+    kind: 'expense',
+    concept: 'Wifi',
+    category: 'internet',
+    method: 'card',
+    amount: '30',
+  });
+  const invoice = await client.request('POST', '/api/admin/accounting/invoices', {
+    body: invoiceForm(null, { period: '2025-09' }),
+    headers: { 'X-Requested-With': 'fetch' },
+  });
+  assertEquals(invoice.status, 201, JSON.stringify(invoice.body));
+  const invoiceId = body<{ id: string }>(invoice).id;
+  await client.json('POST', `/api/admin/accounting/invoices/${invoiceId}/payment`, {
+    date: '2025-10-05',
+    method: 'transfer',
+  });
+
+  const ledger = body<{ items: { concept: string; period: string; categoryLabel: string }[] }>(
+    await client.get('/api/admin/accounting/ledger?month=2025-10'),
+  );
+  assertEquals(
+    ledger.items.map((i) => [i.concept, i.categoryLabel, i.period]),
+    [
+      ['Propietario del local · Alquiler octubre', 'Alquiler', '2025-09'],
+      ['Wifi', 'Wifi', '2025-10'],
+      ['Luz de septiembre', 'Electricidad', '2025-09'],
+    ],
+  );
+  const invoices = body<{ items: { period: string }[] }>(
+    await client.get('/api/admin/accounting/invoices'),
+  );
+  assertEquals(invoices.items[0]?.period, '2025-09');
+});
+
+Deno.test('the categories that count as of the month have defaults and can be changed', async () => {
+  const client = await admin();
+  assertEquals(
+    body<{ categories: string[] }>(await client.get('/api/admin/accounting/monthly-categories'))
+      .categories,
+    ['teachers', 'rent', 'president', 'cleaning', 'water', 'electricity', 'internet', 'fees'],
+  );
+  const saved = await client.json('PUT', '/api/admin/accounting/monthly-categories', {
+    categories: ['fees', 'membership', 'rent'],
+  });
+  assertEquals(saved.status, 204, JSON.stringify(saved.body));
+  assertEquals(
+    body<{ categories: string[] }>(await client.get('/api/admin/accounting/monthly-categories'))
+      .categories,
+    ['rent', 'fees', 'membership'],
+  );
+  assertError(
+    await client.json('PUT', '/api/admin/accounting/monthly-categories', {
+      categories: ['nope'],
+    }),
+    422,
+    'unprocessable',
+  );
+});

@@ -606,14 +606,6 @@ export class SqlStudentDirectory implements StudentDirectory {
 export class SqlFeeIncome implements FeeIncome {
   constructor(private readonly sql: Sql) {}
 
-  async collectedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
-    const rows = await this.sql`
-      SELECT to_char(paid_on, 'YYYY-MM') AS month, SUM(total_cents) AS cents FROM billing_payment
-       WHERE kind = 'monthly' AND to_char(paid_on, 'YYYY-MM') BETWEEN ${first.toString()} AND ${last.toString()}
-       GROUP BY 1`;
-    return new Map(Row.all(rows).map((r) => [r.string('month'), r.int('cents')]));
-  }
-
   async earnedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
     // Reparto exacto: cada mes recibe el cociente y los primeros, un céntimo más hasta agotar el resto.
     const rows = await this.sql`

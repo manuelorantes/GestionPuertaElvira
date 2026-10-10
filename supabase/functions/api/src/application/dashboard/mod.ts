@@ -1,8 +1,14 @@
 import { type Clock, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
-import type { LedgerLine, MonthLedger } from '../accounting/mod.ts';
+import type { AccountingSettingsRepository, LedgerLine, MonthLedger } from '../accounting/mod.ts';
 import type { BillingQuery, ChargeView, ListMonthlyCharges } from '../billing/mod.ts';
 import type { ClassQuery, GroupSummary } from '../classes/mod.ts';
 import type { StudentQuery } from '../students/mod.ts';
+
+export interface MonthBars {
+  month: string;
+  incomeCents: number;
+  expenseCents: number;
+}
 
 export interface ClubSummaryView {
   month: string;
@@ -15,7 +21,10 @@ export interface ClubSummaryView {
   expensesCents: number;
   activeStudents: number;
   registeredStudents: number;
-  chart: { month: string; incomeCents: number; expenseCents: number }[];
+  /** Lo que entra y sale cada mes, por fecha (cuadra con Contabilidad). */
+  cashChart: MonthBars[];
+  /** Lo que corresponde a cada mes, solo con las categorías «del mes» de Contabilidad. */
+  monthChart: MonthBars[];
   occupancy: {
     percent: number;
     fullGroups: number;
@@ -35,8 +44,6 @@ export interface ClubSummaryView {
  * Cuotas mensuales para el gráfico de la temporada: no por cuándo se cobran, sino por el mes al que corresponden.
  */
 export interface FeeIncome {
-  /** Lo cobrado en cuotas mensuales, por mes de cobro (céntimos por «AAAA-MM»). */
-  collectedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
   /** Cada cobro de cuotas mensuales repartido a partes iguales entre los meses que paga. */
   earnedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
 }
@@ -57,7 +64,11 @@ export class ClubSummary {
     private readonly classes: ClassQuery,
     private readonly clock: Clock,
     private readonly fees: FeeIncome,
+    private readonly settings: AccountingSettingsRepository,
   ) {}
+
+  /** Meses de margen alrededor de la temporada: un gasto puede pagarse antes o después del mes al que corresponde. */
+  private static readonly MARGIN_MONTHS = 3;
 
   async execute(): Promise<ClubSummaryView> {
     const today = LocalDate.fromInstant(this.clock.now());
@@ -68,21 +79,33 @@ export class ClubSummary {
     const first = Season.containing(month).firstMonth();
     let last = first;
     for (let i = 1; i < ClubSummary.CHART_MONTHS; i++) last = last.next();
-    // Las cuotas mensuales cuentan en el mes al que corresponden; lo demás (socio, subvenciones, promociones…),
-    // en el mes en que se cobra.
-    const collected = await this.fees.collectedByMonth(first, last);
-    const earned = await this.fees.earnedByMonth(first, last);
-    const chart: ClubSummaryView['chart'] = [];
+    let from = first;
+    let to = last;
+    for (let i = 0; i < ClubSummary.MARGIN_MONTHS; i++) {
+      from = from.previous();
+      to = to.next();
+    }
+    const views = await this.ledger.between(from, to);
+    // De septiembre a agosto.
+    const seasonViews = views.filter((v) => {
+      const m = YearMonth.fromString(v.month);
+      return !m.isBefore(first) && !last.isBefore(m);
+    });
+    const cashChart: MonthBars[] = seasonViews.map((v) => ({
+      month: v.month,
+      incomeCents: v.incomeCents,
+      expenseCents: v.expenseCents,
+    }));
+    const monthChart = await this.monthChart(
+      seasonViews.map((v) => v.month),
+      views.flatMap((v) => v.lines),
+      first,
+      last,
+    );
     let current: { expenseCents: number; lines: LedgerLine[] } | null = null;
     let previousLines: LedgerLine[] = [];
-    for (const view of await this.ledger.between(first, last)) {
+    for (const view of seasonViews) {
       const m = YearMonth.fromString(view.month);
-      chart.push({
-        month: m.toString(),
-        incomeCents: view.incomeCents - (collected.get(m.toString()) ?? 0) +
-          (earned.get(m.toString()) ?? 0),
-        expenseCents: view.expenseCents,
-      });
       if (m.equals(month)) current = view;
       else if (m.next().equals(month)) previousLines = view.lines;
     }
@@ -102,7 +125,8 @@ export class ClubSummary {
       expensesCents: current?.expenseCents ?? 0,
       activeStudents: (await this.students.list('active', null, today)).length,
       registeredStudents: await this.students.total(),
-      chart,
+      cashChart,
+      monthChart,
       occupancy: {
         percent: capacity > 0 ? Math.round((occupied * 100) / capacity) : 0,
         fullGroups: groups.filter((g) => g.occupied >= g.capacity).length,
@@ -120,5 +144,33 @@ export class ClubSummary {
         ...[...previousLines].sort((a, b) => b.date.localeCompare(a.date)),
       ].slice(0, ClubSummary.LIST_SIZE),
     };
+  }
+  /**
+   * Las categorías «del mes», cada movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas entre los
+   * meses que paga cada cobro.
+   */
+  private async monthChart(
+    months: string[],
+    lines: LedgerLine[],
+    first: YearMonth,
+    last: YearMonth,
+  ): Promise<MonthBars[]> {
+    const categories = await this.settings.monthlyCategories();
+    const earned = categories.includes('fees')
+      ? await this.fees.earnedByMonth(first, last)
+      : new Map<string, number>();
+    const bars = new Map(months.map((m) => [m, { income: earned.get(m) ?? 0, expense: 0 }]));
+    for (const line of lines) {
+      if (line.category === 'fees' || !categories.includes(line.category)) continue;
+      const bar = bars.get(line.period);
+      if (!bar) continue;
+      if (line.kind === 'income') bar.income += line.amountCents;
+      else bar.expense += line.amountCents;
+    }
+    return months.map((m) => ({
+      month: m,
+      incomeCents: bars.get(m)?.income ?? 0,
+      expenseCents: bars.get(m)?.expense ?? 0,
+    }));
   }
 }

@@ -2,7 +2,7 @@ import { MonthLedger } from '../../application/accounting/mod.ts';
 import { ClubSummary } from '../../application/dashboard/mod.ts';
 import { billing } from '../billing/routes.ts';
 import type { ApiApp } from '../http/app.ts';
-import { SqlLedgerQuery } from '../persistence/accounting.ts';
+import { SqlAccountingRepository, SqlLedgerQuery } from '../persistence/accounting.ts';
 import { SqlFeeIncome } from '../persistence/billing.ts';
 import { SqlClassQuery } from '../persistence/classes.ts';
 import { SqlStudentQuery } from '../persistence/students.ts';
@@ -21,6 +21,7 @@ export function registerDashboardRoutes(api: ApiApp): void {
         new SqlClassQuery(scope.tx),
         api.deps.clock,
         new SqlFeeIncome(scope.tx),
+        new SqlAccountingRepository(scope.tx),
       );
       return c.json(await summary.execute());
     },
