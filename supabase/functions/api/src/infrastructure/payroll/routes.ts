@@ -144,11 +144,18 @@ export function registerPayrollRoutes(api: ApiApp): void {
   api.defineRoute(admin('POST', '/api/admin/payroll/sessions'), async (c, scope) => {
     const p = payroll(api, scope);
     const b = await JsonBody.from(c.req.raw);
-    const id = await new RecordSession(p.timesheets, p.settlements, p.schedule, p.teachers).execute(
+    const id = await new RecordSession(
+      p.timesheets,
+      p.settlements,
+      p.schedule,
+      p.teachers,
+      p.duties,
+    ).execute(
       {
         teacherId: b.requiredString('teacherId'),
         date: b.requiredString('date'),
         groupId: b.optionalString('groupId'),
+        dutyId: b.optionalString('dutyId'),
         activity: b.optionalString('activity'),
         hours: hours(b),
       },

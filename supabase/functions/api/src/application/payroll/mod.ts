@@ -380,23 +380,30 @@ export interface SessionInput {
   teacherId: string;
   date: string;
   groupId: string | null;
+  /** Una actividad del club (turno o viernes): se apunta como su sesión automática. */
+  dutyId?: string | null;
   activity: string | null;
   hours: number;
 }
 
-/** Añade a mano una sesión de un grupo (p. ej. una recuperación) u otra actividad. */
+/**
+ * Añade a mano una sesión de un grupo (p. ej. una recuperación), de una actividad del club (con su origen y su hora,
+ * como la automática, para contar bien los solapes y no duplicarla) u otra actividad.
+ */
 export class RecordSession {
   constructor(
     private readonly timesheets: TimesheetRepository,
     private readonly settlements: SettlementRepository,
     private readonly schedule: ScheduleDirectory,
     private readonly teachers: TeacherRates,
+    private readonly duties: DutyRepository,
   ) {}
 
   async execute(input: SessionInput): Promise<string> {
     const teacher = TeacherRef.fromString(input.teacherId);
     await ensureTeacherExists(this.teachers, teacher);
     const date = LocalDate.fromString(input.date);
+    if (input.dutyId) return await this.recordDuty(teacher, date, input.dutyId, input.hours);
     let group: GroupRef | null = null;
     let label = input.activity ?? '';
     if (input.groupId) {
@@ -414,6 +421,34 @@ export class RecordSession {
       label,
       SessionMinutes.fromHours(input.hours),
       false,
+    );
+    await ensureOpen(this.settlements, teacher, entry.month());
+    await this.timesheets.save(entry);
+    return entry.id.value;
+  }
+
+  private async recordDuty(
+    teacher: TeacherRef,
+    date: LocalDate,
+    dutyId: string,
+    hours: number,
+  ): Promise<string> {
+    const duty = await this.duties.duty(DutyRef.fromString(dutyId));
+    if (duty === null) throw new InvalidValue('dutyId', 'Esa actividad no existe.');
+    const source = `duty:${duty.id.value}`;
+    if ((await this.timesheets.onDate(date)).some((e) => e.source === source)) {
+      throw new InvalidValue('dutyId', 'Esa actividad ya está apuntada ese día.');
+    }
+    const entry = TimesheetEntry.record(
+      TimesheetEntryId.generate(),
+      teacher,
+      date,
+      null,
+      duty.label,
+      SessionMinutes.fromHours(hours),
+      false,
+      duty.start,
+      source,
     );
     await ensureOpen(this.settlements, teacher, entry.month());
     await this.timesheets.save(entry);

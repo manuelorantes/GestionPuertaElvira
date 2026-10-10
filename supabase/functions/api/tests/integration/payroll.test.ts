@@ -237,6 +237,20 @@ Deno.test('payroll should manage holidays, club duties and substitutions over HT
     'unprocessable',
   );
 
+  // Administración apunta a mano el turno de Ángel de un viernes: queda ligado a la actividad, una vez por día.
+  const byHand = { teacherId: other, date: '2026-10-02', dutyId, hours: 3 };
+  assertEquals((await client.json('POST', '/api/admin/payroll/sessions', byHand)).status, 201);
+  assertError(
+    await client.json('POST', '/api/admin/payroll/sessions', byHand),
+    422,
+    'unprocessable',
+  );
+  const october = (await client.get(`/api/admin/payroll/sessions?month=2026-10&teacherId=${other}`))
+    .body as { items: { date: string; label: string; minutes: number }[] };
+  assertEquals(october.items.map((s) => [s.date, s.label, s.minutes]), [
+    ['2026-10-02', 'Encargado del club', 180],
+  ]);
+
   // Grupo de los lunes de 17:00 a 18:00 del profesor titular; un lunes lo da Ángel.
   const group = await newGroup(client, teacher, {
     days: ['mon'],
