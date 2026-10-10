@@ -25,6 +25,7 @@ import { useScheduleResolution } from '@/features/students/useScheduleResolution
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
+import { todayIso } from '@/features/students/format';
 import { DateField } from '@/shared/ui/DateField';
 import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
@@ -64,13 +65,14 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
   const [overrides, setOverrides] = useState<Record<string, Attendance | null>>({});
   const [editingAttendance, setEditingAttendance] = useState<string | null>(null);
   const groups = useGroups();
+  const [joinedOn, setJoinedOn] = useState(todayIso());
   const enrolments: Registration['enrolments'] = (resolution.data?.enrolments ?? []).map((e) => ({
     groupId: e.groupId,
     attendance: e.groupId in overrides ? (overrides[e.groupId] ?? null) : e.attendance,
   }));
   const register = useStudentMutation(
     ({ values, confirm }: { values: StudentFormValues; confirm: boolean }) =>
-      registerStudent(toRegistration(values, enrolments), confirm),
+      registerStudent({ ...toRegistration(values, enrolments), joinedOn }, confirm),
   );
   const update = useStudentMutation((values: StudentFormValues) =>
     updateStudent(detail?.id ?? '', toPayload(values)),
@@ -143,6 +145,15 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                 toYear={CURRENT_YEAR}
                 error={fieldErrors.birthDate}
               />
+              {!detail && (
+                <DateField
+                  label="Fecha de alta"
+                  value={joinedOn}
+                  onChange={setJoinedOn}
+                  fromYear={CURRENT_YEAR - 1}
+                  toYear={CURRENT_YEAR}
+                />
+              )}
               <div className="grid gap-4 sm:grid-cols-2">
                 <TextField
                   label="DNI o NIE (opcional)"

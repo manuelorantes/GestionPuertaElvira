@@ -3,8 +3,10 @@ import { useState, type FormEvent } from 'react';
 import type { ClassGroup, Weekday } from '@/features/classes/api';
 import { WEEKDAYS } from '@/features/classes/schedule';
 import type { Attendance } from '@/features/students/api';
+import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { DateField } from '@/shared/ui/DateField';
 import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { Switch } from '@/shared/ui/Switch';
@@ -18,8 +20,10 @@ interface EnrolmentDialogProps {
   fixedGroup?: ClassGroup | undefined;
   /** Horario especial actual (al editar). */
   current?: Attendance | null;
+  /** Con etiqueta, se elige desde qué día está en el grupo (por defecto hoy). */
+  startLabel?: string;
   onClose: () => void;
-  onConfirm: (groupId: string, attendance: Attendance | null) => Promise<unknown>;
+  onConfirm: (groupId: string, attendance: Attendance | null, from: string) => Promise<unknown>;
 }
 
 /** Medias horas desde `from` hasta `to`, ambas incluidas. */
@@ -42,9 +46,11 @@ export function EnrolmentDialog({
   groups,
   fixedGroup,
   current = null,
+  startLabel,
   onClose,
   onConfirm,
 }: EnrolmentDialogProps) {
+  const [from, setFrom] = useState(todayIso());
   const [groupId, setGroupId] = useState(fixedGroup?.id ?? groups[0]?.id ?? '');
   const group = fixedGroup ?? groups.find((g) => g.id === groupId);
   const [special, setSpecial] = useState(current !== null);
@@ -76,11 +82,13 @@ export function EnrolmentDialog({
       : null;
   const problem = !group
     ? 'Elige un grupo.'
-    : attendance && attendance.days.length === 0
-      ? 'Elige al menos un día del grupo.'
-      : attendance && attendance.start >= attendance.end
-        ? 'La hora de fin debe ser posterior a la de inicio.'
-        : null;
+    : startLabel && !from
+      ? 'Indica desde qué día.'
+      : attendance && attendance.days.length === 0
+        ? 'Elige al menos un día del grupo.'
+        : attendance && attendance.start >= attendance.end
+          ? 'La hora de fin debe ser posterior a la de inicio.'
+          : null;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -88,7 +96,7 @@ export function EnrolmentDialog({
     setBusy(true);
     setError(null);
     try {
-      await onConfirm(group.id, attendance);
+      await onConfirm(group.id, attendance, from);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'No se ha podido guardar.');
     } finally {
@@ -124,6 +132,15 @@ export function EnrolmentDialog({
             }))}
             value={groupId}
             onChange={pickGroup}
+          />
+        )}
+        {group && startLabel && (
+          <DateField
+            label={startLabel}
+            value={from}
+            onChange={setFrom}
+            fromYear={new Date().getFullYear() - 1}
+            toYear={new Date().getFullYear()}
           />
         )}
         {group && (
