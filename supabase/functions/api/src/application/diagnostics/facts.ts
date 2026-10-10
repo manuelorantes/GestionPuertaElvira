@@ -129,6 +129,8 @@ export interface Facts {
   seasonYear: number;
   /** Meses de clase de la temporada (septiembre a junio), en orden. */
   seasonMonths: string[];
+  /** Descuentos de pago adelantado de la tarifa: desde cuántos meses y qué porcentaje (3, 6 y 9 meses). */
+  prepayments: { months: number; percent: number }[];
   students: FactStudent[];
   charges: FactCharge[];
   payments: FactPayment[];

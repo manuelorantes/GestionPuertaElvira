@@ -478,14 +478,13 @@ export class Charge {
   /**
    * Deduce el descuento de una cuota que no lo tiene apuntado (p. ej. importada de la hoja) comparándola con la cuota
    * de un mes que tenía el alumno: si coincide con uno de los porcentajes de pago adelantado, lo fija sin cambiar el
-   * importe.
+   * importe. Vale tanto sumado al familiar sobre la base como aplicado encima de él (como lo hacía la hoja).
    */
   inferDiscount(previousFee: Money, candidates: readonly number[], family = 0): void {
     if (this.prepaid > 0 || this.manual || previousFee.cents <= 0) return;
     if (this.value.cents >= previousFee.cents) return;
-    const percent = (100 - family) * (1 - this.value.cents / previousFee.cents);
-    const match = candidates.find((p) => p > 0 && Math.abs(p - percent) <= 1);
-    if (match !== undefined) this.prepaid = match;
+    const match = prepaymentIn(this.value, previousFee, candidates, family);
+    if (match !== null) this.prepaid = match;
   }
 
   /**
@@ -595,6 +594,22 @@ export function allocateCredit(charges: readonly Charge[], credit: Money): Credi
  * se ofrece si quedan 9 o 10 meses; con menos, el máximo es el de 6 meses.
  */
 export const WHOLE_YEAR_MIN_MONTHS = 9;
+
+/**
+ * El porcentaje de pago adelantado que explica `amount` partiendo de la cuota de un mes `fee` (que ya lleva el
+ * `family` %): sumado al familiar sobre la base o aplicado encima de la cuota. Null si ninguno de `candidates` cuadra.
+ */
+export function prepaymentIn(
+  amount: Money,
+  fee: Money,
+  candidates: readonly number[],
+  family = 0,
+): number | null {
+  if (fee.cents <= 0 || amount.cents >= fee.cents) return null;
+  const share = 1 - amount.cents / fee.cents;
+  const readings = [(100 - family) * share, 100 * share];
+  return candidates.find((p) => p > 0 && readings.some((r) => Math.abs(p - r) <= 1)) ?? null;
+}
 
 function prepaymentLabel(months: number): string {
   return months >= WHOLE_YEAR_MIN_MONTHS

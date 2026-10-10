@@ -436,6 +436,19 @@ Deno.test('Charge should add the prepayment discount to the family one over the 
   assertEquals([imported.amount.cents, imported.discountPercent()], [2800, 20]);
 });
 
+Deno.test('Charge should recognise a prepayment discount applied over the family one, as the sheet did', () => {
+  // 45 € con 10 % familiar = 40,50 €; la hoja aplicó el 20 % de temporada encima: 32,40 €.
+  const imported = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-12'),
+    Money.cents(3240),
+  );
+  imported.inferDiscount(Money.cents(4050), [10, 15, 20], 10);
+  assertEquals([imported.amount.cents, imported.discountPercent()], [3240, 20]);
+});
+
 const monthly = (period: string, euros: number) =>
   Charge.create(
     ChargeId.generate(),

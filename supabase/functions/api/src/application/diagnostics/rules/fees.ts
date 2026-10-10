@@ -1,4 +1,6 @@
 // Reglas de cuotas y tarifas (specs/features/diagnostico/spec.md, reglas 1 a 5).
+import { Money } from '../../../domain/common/mod.ts';
+import { prepaymentIn } from '../../../domain/billing/mod.ts';
 import type { Candidate, FactCharge, Facts, FactStudent, Rule } from '../facts.ts';
 import { discountedFee, euros, hoursLabel, isActive, monthLabel, studentRef } from './support.ts';
 
@@ -12,14 +14,21 @@ const PROPOSAL_FIX_FROM_RECORD =
 
 /**
  * Regla 1: una cuota del mes en curso o futura que no es la que sale hoy de sus horas y descuentos. Los alumnos sin
- * grupos son de la regla 2.
+ * grupos son de la regla 2. Si la diferencia es un pago adelantado sin apuntar (las importadas de la hoja), se propone
+ * apuntarlo, también en los meses ya pasados.
  */
 export const feeMismatch: Rule = (facts) => {
   const found: Candidate[] = [];
   for (const student of facts.students.filter((s) => isActive(s) && s.groups.length > 0)) {
     for (const charge of monthlyOf(facts, student)) {
-      if (charge.manual || !live(charge) || charge.period < facts.currentMonth) continue;
+      if (charge.manual || !live(charge)) continue;
       if (!facts.seasonMonths.includes(charge.period)) continue;
+      const unnoted = unnotedPrepayment(facts, student, charge);
+      if (unnoted !== null) {
+        found.push(unnoted);
+        continue;
+      }
+      if (charge.period < facts.currentMonth) continue;
       const expected = discountedFee(student, charge.discountPercent);
       if (expected === charge.amountCents) continue;
       found.push({
@@ -36,6 +45,45 @@ export const feeMismatch: Rule = (facts) => {
   }
   return found;
 };
+
+/**
+ * La cuota lleva un descuento de pago adelantado de la tarifa que no tiene apuntado: se apunta sin tocar el importe.
+ * Para no confundirlo con un importe equivocado, el alumno tiene que tener al menos los meses que pide ese descuento
+ * con el mismo importe y sin porcentaje apuntado.
+ */
+function unnotedPrepayment(
+  facts: Facts,
+  student: FactStudent,
+  charge: FactCharge,
+): Candidate | null {
+  if (charge.discountPercent > 0) return null;
+  const family = student.familyDiscount ? student.familyPercent : 0;
+  const alike =
+    monthlyOf(facts, student).filter((c) =>
+      live(c) && !c.manual && c.discountPercent === 0 && c.amountCents === charge.amountCents
+    ).length;
+  const percent = prepaymentIn(
+    Money.cents(charge.amountCents),
+    Money.cents(student.feeCents),
+    facts.prepayments.filter((p) => alike >= p.months).map((p) => p.percent),
+    family,
+  );
+  if (percent === null) return null;
+  return {
+    rule: 'fee_mismatch',
+    entity: studentRef(student),
+    data: { month: charge.period, amountCents: charge.amountCents, discountPercent: percent },
+    explanation: `La cuota de ${monthLabel(charge.period)} es de ${
+      euros(charge.amountCents)
+    }: sobre su cuota de ${
+      euros(student.feeCents)
+    } lleva un ${percent} % de pago adelantado que no tiene apuntado${
+      family > 0 ? ', así que en su ficha solo se ve el descuento familiar' : ''
+    }.`,
+    proposal: `Apuntar en la cuota el ${percent} % de pago adelantado, sin cambiar su importe.`,
+    fix: { kind: 'note_discount', studentId: student.id, month: charge.period, percent },
+  };
+}
 
 function feeExplanation(student: FactStudent, charge: FactCharge, expected: number): string {
   const discounts: string[] = [];

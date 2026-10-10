@@ -75,11 +75,16 @@ export class SqlDiagnosticsFacts implements FactsSource {
     const teachers = await this.teachers();
     const teacherMonths = await this.teacherMonths(pastAndCurrent, today);
     const points = await this.points(pastAndCurrent, season);
+    const { tariff } = await new SqlBillingSettingsRepository(this.sql).get();
     return {
       today: today.toString(),
       currentMonth: currentMonth.toString(),
       seasonYear: season.startYear,
       seasonMonths: seasonMonths.map((m) => m.toString()),
+      prepayments: [3, 6, 9].map((months) => ({
+        months,
+        percent: tariff.prepaymentPercent(months),
+      })),
       students,
       charges,
       payments,

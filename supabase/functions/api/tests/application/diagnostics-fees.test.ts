@@ -1,7 +1,7 @@
 import { assertEquals, assertStringIncludes } from '@std/assert';
 
 import { feeRules } from '../../src/application/diagnostics/rules/fees.ts';
-import { charge, factsWith, payment, student } from '../support/diagnostics.ts';
+import { charge, factsWith, payment, SEASON_MONTHS, student } from '../support/diagnostics.ts';
 
 const run = (facts: ReturnType<typeof factsWith>) => feeRules.flatMap((rule) => rule(facts));
 const ofRule = (facts: ReturnType<typeof factsWith>, rule: string) =>
@@ -84,6 +84,49 @@ Deno.test('fee_mismatch should keep the prepayment discount noted in the charge 
     expectedCents: 3150,
   }]);
   assertStringIncludes(found[0]?.explanation ?? '', '20 %');
+});
+
+Deno.test('fee_mismatch should propose noting the prepayment discount that an imported charge carries', () => {
+  const mario = student({
+    id: 'mario',
+    fullName: 'Mario Gómez Ruiz',
+    tierCents: 4500,
+    feeCents: 4050,
+    familyDiscount: true,
+  });
+  const facts = factsWith({
+    students: [mario],
+    // Pagó la temporada: 40,50 € con el 20 % aplicado encima, como en la hoja, de septiembre a junio.
+    charges: SEASON_MONTHS.map((period) =>
+      charge({ studentId: 'mario', period, amountCents: 3240, coveredCents: 3240, status: 'paid' })
+    ),
+  });
+  const found = ofRule(facts, 'fee_mismatch');
+  assertEquals(found.length, 10, 'también los meses ya pasados');
+  assertEquals(found[2]?.fix, {
+    kind: 'note_discount',
+    studentId: 'mario',
+    month: '2026-11',
+    percent: 20,
+  });
+  assertEquals(found[2]?.data, { month: '2026-11', amountCents: 3240, discountPercent: 20 });
+  assertStringIncludes(found[2]?.explanation ?? '', '20 % de pago adelantado');
+  assertStringIncludes(found[2]?.proposal ?? '', 'sin cambiar su importe');
+});
+
+Deno.test('fee_mismatch should not take a wrong amount for a prepayment when too few months share it', () => {
+  const ana = student({ id: 'ana', tierCents: 4500, feeCents: 4500 });
+  // 36 € sobre 45 € sería un 20 %, pero el de temporada pide nueve meses y solo hay dos.
+  const facts = factsWith({
+    students: [ana],
+    charges: ['2026-10', '2026-11'].map((period) =>
+      charge({ studentId: 'ana', period, amountCents: 3600 })
+    ),
+  });
+  assertEquals(ofRule(facts, 'fee_mismatch').map((c) => c.fix?.kind), [
+    'reprice_charge',
+    'reprice_charge',
+  ]);
 });
 
 Deno.test('fee_mismatch should mention the private lessons when the fee includes them', () => {

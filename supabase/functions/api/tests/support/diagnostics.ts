@@ -32,6 +32,10 @@ export function factsWith(overrides: Partial<Facts> = {}): Facts {
     currentMonth: '2026-10',
     seasonYear: 2026,
     seasonMonths: SEASON_MONTHS,
+    prepayments: [{ months: 3, percent: 10 }, { months: 6, percent: 15 }, {
+      months: 9,
+      percent: 20,
+    }],
     students: [],
     charges: [],
     payments: [],
