@@ -97,6 +97,65 @@ Deno.test('Student should stop being active from the withdrawal date and refuse 
   assertThrows(() => student.withdraw(LocalDate.fromString('2026-09-01'), today), InvalidValue);
 });
 
+const day = (iso: string) => LocalDate.fromString(iso);
+const periods = (student: Student) =>
+  student.membership().map((p) => [p.joinedOn.toString(), p.withdrawnOn?.toString() ?? null]);
+
+Deno.test('Student should join again after a withdrawal, keeping every period', () => {
+  const student = Student.register(
+    StudentId.generate(),
+    StudentFactory.details(),
+    today,
+    day('2026-09-01'),
+  );
+  // Aún de alta (o con la baja todavía por llegar), no se puede volver a dar de alta.
+  assertThrows(() => student.rejoin(day('2026-10-02'), today), InvalidValue, 'de alta');
+  student.withdraw(day('2026-10-02'), today);
+  const later = day('2026-12-01');
+  assertThrows(() => student.rejoin(day('2026-10-01'), later), InvalidValue, 'última baja');
+  assertThrows(() => student.rejoin(day('2026-12-02'), later), InvalidValue, 'futura');
+  student.rejoin(day('2026-11-15'), later);
+  assertEquals(periods(student), [['2026-09-01', '2026-10-02'], ['2026-11-15', null]]);
+  assertEquals([student.joinedOn.toString(), student.withdrawnOn()], ['2026-11-15', null]);
+  // Activo en su primer periodo y en el actual, no entre medias.
+  assert(student.isActiveOn(day('2026-09-20')));
+  assertFalse(student.isActiveOn(day('2026-10-20')));
+  assert(student.isActiveOn(day('2026-11-20')));
+  // Y otra vez: baja y alta.
+  student.withdraw(day('2027-01-10'), day('2027-01-10'));
+  student.rejoin(day('2027-01-10'), day('2027-02-01'));
+  assertEquals(periods(student).length, 3);
+});
+
+Deno.test('Student should change the join date of the current period only within its limits', () => {
+  const student = Student.register(
+    StudentId.generate(),
+    StudentFactory.details(),
+    today,
+    day('2026-09-01'),
+  );
+  student.withdraw(day('2026-10-02'), today);
+  student.rejoin(day('2026-11-15'), day('2026-12-01'));
+  student.changeJoinedOn(day('2026-11-01'), day('2026-12-01'));
+  assertEquals(student.joinedOn.toString(), '2026-11-01');
+  assertThrows(
+    () => student.changeJoinedOn(day('2026-10-01'), day('2026-12-01')),
+    InvalidValue,
+    'baja anterior',
+  );
+  assertThrows(
+    () => student.changeJoinedOn(day('2026-12-02'), day('2026-12-01')),
+    InvalidValue,
+    'futura',
+  );
+  student.withdraw(day('2026-11-20'), day('2026-11-20'));
+  assertThrows(
+    () => student.changeJoinedOn(day('2026-11-20'), day('2026-12-01')),
+    InvalidValue,
+    'antes de su baja',
+  );
+});
+
 Deno.test('Student should manage siblings without including itself', () => {
   const student = Student.register(StudentId.generate(), StudentFactory.details(), today);
   const sibling = StudentId.generate();

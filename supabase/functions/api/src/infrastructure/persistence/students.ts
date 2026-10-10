@@ -91,20 +91,31 @@ function toStudent(row: Row): Student {
     LocalDate.fromString(row.string('joined_on')),
     withdrawnOn === null ? null : LocalDate.fromString(withdrawnOn),
     row.stringList('sibling_ids').map((id) => StudentId.fromString(id)),
+    (row.json('past') as { joined: string; withdrawn: string }[]).map((p) => ({
+      joinedOn: LocalDate.fromString(p.joined),
+      withdrawnOn: LocalDate.fromString(p.withdrawn),
+    })),
   );
 }
+
+/** Columnas del alumno más sus periodos de alta anteriores (`past`). */
+const STUDENT_COLUMNS = `s.*, COALESCE((
+    SELECT json_agg(json_build_object('joined', p.joined_on::text, 'withdrawn', p.withdrawn_on::text)
+                    ORDER BY p.joined_on)
+      FROM students_past_membership p WHERE p.student_id = s.id), '[]'::json) AS past`;
 
 export class SqlStudentRepository implements StudentRepository {
   constructor(private readonly sql: Sql) {}
 
   async find(id: StudentId): Promise<Student | null> {
-    const rows = await this.sql`SELECT * FROM students_student WHERE id = ${id.value}`;
+    const rows = await this.sql`SELECT ${this.sql.unsafe(STUDENT_COLUMNS)}
+      FROM students_student s WHERE s.id = ${id.value}`;
     return rows[0] ? toStudent(new Row(rows[0])) : null;
   }
 
   async activeOn(day: LocalDate): Promise<Student[]> {
-    const rows = await this.sql`SELECT * FROM students_student
-      WHERE withdrawn_on IS NULL OR withdrawn_on > ${day.toString()} ORDER BY search_name`;
+    const rows = await this.sql`SELECT ${this.sql.unsafe(STUDENT_COLUMNS)} FROM students_student s
+      WHERE s.withdrawn_on IS NULL OR s.withdrawn_on > ${day.toString()} ORDER BY s.search_name`;
     return Row.all(rows).map(toStudent);
   }
 
@@ -139,11 +150,20 @@ export class SqlStudentRepository implements StudentRepository {
         'own_phone',
         'federation_licence',
         'image_consent',
+        'joined_on',
         'withdrawn_on',
         'sibling_ids',
       )
     } WHERE id = ${record.id}`;
     if (updated.count === 0) await this.sql`INSERT INTO students_student ${this.sql(record)}`;
+    // Los periodos cerrados no cambian: solo se añaden al volver a darse de alta.
+    for (const period of student.membership().slice(0, -1)) {
+      await this.sql`INSERT INTO students_past_membership (student_id, joined_on, withdrawn_on)
+        VALUES (${record.id}, ${period.joinedOn.toString()}, ${
+        period.withdrawnOn?.toString() ?? null
+      })
+        ON CONFLICT DO NOTHING`;
+    }
   }
 }
 
@@ -225,9 +245,11 @@ export class SqlStudentQuery implements StudentQuery {
   }
 
   async detail(id: string, on: LocalDate): Promise<StudentDetail | null> {
-    const rows = await this.sql`SELECT * FROM students_student WHERE id = ${id}`;
+    const rows = await this.sql`SELECT ${this.sql.unsafe(STUDENT_COLUMNS)}
+      FROM students_student s WHERE s.id = ${id}`;
     if (!rows[0]) return null;
     const row = new Row(rows[0]);
+    const student = toStudent(row);
     const siblingIds = row.stringList('sibling_ids');
     const siblings = siblingIds.length === 0 ? [] : Row.all(
       await this.sql`SELECT id, full_name FROM students_student WHERE id IN ${
@@ -243,13 +265,17 @@ export class SqlStudentQuery implements StudentQuery {
       nationalId: row.nullableString('national_id'),
       contactEmail: row.nullableString('contact_email'),
       guardians: guardians(row),
-      missingData: toStudent(row).details().missingData(on),
+      missingData: student.details().missingData(on),
       ownPhone: row.nullableString('own_phone'),
       federationLicence: row.nullableString('federation_licence'),
       imageConsent: row.bool('image_consent'),
       joinedOn: row.string('joined_on'),
       withdrawnOn: row.nullableString('withdrawn_on'),
       status: status(row.nullableString('withdrawn_on'), on),
+      membership: student.membership().map((p) => ({
+        joinedOn: p.joinedOn.toString(),
+        withdrawnOn: p.withdrawnOn?.toString() ?? null,
+      })),
       groups: (await this.activeGroupsByStudent(on, id)).get(id) ?? [],
       siblings: siblings.map((s) => ({ id: s.string('id'), fullName: s.string('full_name') })),
     };

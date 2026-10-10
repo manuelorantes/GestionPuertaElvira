@@ -107,7 +107,10 @@ Como máximo hay dos tutores. La ficha de cada alumno MUST indicar también qué
 - **THEN** el alumno desaparece de «Datos pendientes»
 
 ### Requirement: Edición
-Administración MUST poder modificar los datos personales de un alumno, con las mismas reglas que en el alta.
+Administración MUST poder modificar los datos personales de un alumno, con las mismas reglas que en el alta, y su última
+alta en el club mientras está de alta: nunca futura, antes de su baja anterior ni desde su última baja. Los grupos que
+empezaban el mismo día que el alta se mueven con ella; si otro de sus grupos empieza antes de la fecha nueva, se rechaza
+(hay que cambiar antes su «En el grupo desde»).
 
 #### Scenario: Editar datos
 - **WHEN** administración corrige los datos de un alumno
@@ -121,9 +124,25 @@ Desde esa fecha deja de contar en la ocupación de todos sus grupos y aparece «
 - **WHEN** administración da de baja a un alumno con fecha de hoy
 - **THEN** el alumno aparece como «De baja» y sus grupos tienen una plaza libre más
 
+#### Scenario: Volver a darse de alta
+- **WHEN** Martina, de baja desde el 2 de octubre, vuelve el 15 de noviembre y administración pulsa «Dar de alta de
+  nuevo», elige ese día y su grupo
+- **THEN** vuelve a estar activa, con el mismo número de socio, en su grupo desde el 15 de noviembre; su ficha muestra
+  «Última alta en el club» 15/11, «Última baja en el club» 02/10 y, en «Altas y bajas», los dos periodos
+
 #### Scenario: Baja programada
 - **WHEN** la fecha de baja es futura
 - **THEN** el alumno sigue activo y ocupando plaza hasta ese día
+
+### Requirement: Volver a darse de alta
+Un alumno de baja (con su baja ya llegada) MUST poder volver a darse de alta, tantas veces como haga falta, con
+«Dar de alta de nuevo» en su ficha: fecha de alta (por defecto hoy, nunca futura ni anterior a su última baja) y los
+grupos en los que entra desde ese día; sin grupos, vuelve como socio sin clases. Conserva su número de socio, su familia
+y todo su historial. Cada periodo de alta MUST quedar guardado: mientras está de baja no está en ningún grupo (sus grupos
+terminan con la baja), no sale en las listas ni se le crean cuotas de los meses en que no estuvo de alta ningún día; y
+todo lo que depende de si estaba de alta un día (cuotas, puntos, listas) MUST tener en cuenta todos sus periodos. Si se
+ha dado de alta más de una vez, la ficha MUST mostrar «Última alta en el club» y «Última baja en el club» en vez de
+«Alta en el club» y «Baja», y debajo «Altas y bajas» con cada periodo, del más reciente al más antiguo.
 
 ### Requirement: Inscripciones en grupos
 Un alumno MAY estar en varios grupos, pero MUST NOT estar en dos cuyos horarios reales coincidan en algún día y hora,

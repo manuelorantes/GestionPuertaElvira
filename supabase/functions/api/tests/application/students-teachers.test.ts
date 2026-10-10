@@ -5,9 +5,11 @@ import { GroupFull } from '../../src/domain/classes/mod.ts';
 import { StudentId } from '../../src/domain/students/mod.ts';
 import { TeacherId } from '../../src/domain/teachers/mod.ts';
 import {
+  ChangeJoinDate,
   LinkSiblings,
   ListPendingData,
   RegisterStudent,
+  RejoinStudent,
   type StudentInput,
   StudentNotFound,
   UnlinkSiblings,
@@ -67,7 +69,9 @@ Deno.test('RegisterStudent should register a student and enrol them in their gro
   assertEquals(student?.details().fullName.value, 'Martina López Herrera');
   assertEquals(student?.details().guardians[0]?.name.value, 'Rocío Herrera');
   assertEquals(student?.details().guardians[0]?.phone?.value, '612 48 19 30');
-  assertEquals(enrolments.enrolled, [{ student: id, groups: ['g1', 'g2'], confirmed: false }]);
+  assertEquals(enrolments.enrolled, [
+    { student: id, groups: ['g1', 'g2'], confirmed: false, from: '2026-10-02' },
+  ]);
   assertEquals(transactions.runs, 1);
 });
 
@@ -122,6 +126,56 @@ Deno.test('WithdrawStudent should withdraw and end enrolments on the same date',
     (await repo.find(StudentId.fromString(id)))?.isActiveOn(LocalDate.fromString('2026-10-31')),
   );
   assertEquals(enrolments.ended, [{ student: id, on: '2026-10-31' }]);
+});
+
+Deno.test('RejoinStudent should join a withdrawn student again from a date, in groups or as a member', async () => {
+  const { repo, enrolments, transactions, clock, membership, register } = students();
+  const id = await register(['g1'], [], '2026-09-01');
+  await new WithdrawStudent(repo, enrolments, transactions, clock).execute(id, '2026-10-02');
+  const later = new FrozenClock('2026-11-20T10:00:00+01:00');
+  const rejoin = new RejoinStudent(repo, enrolments, transactions, later, membership);
+  await rejoin.execute(id, '2026-11-15', [{ groupId: 'g2', attendance: null }], false);
+  const student = await repo.find(StudentId.fromString(id));
+  assertEquals(
+    student?.membership().map((p) => [p.joinedOn.toString(), p.withdrawnOn?.toString() ?? null]),
+    [['2026-09-01', '2026-10-02'], ['2026-11-15', null]],
+  );
+  assertEquals(enrolments.enrolled.at(-1), {
+    student: id,
+    groups: ['g2'],
+    confirmed: false,
+    from: '2026-11-15',
+  });
+  await assertRejects(
+    () => rejoin.execute(id, '2026-11-16', [], false),
+    InvalidValue,
+    'sigue de alta',
+  );
+
+  // Sin grupos vuelve como socio.
+  const other = await register(['g1'], [], '2026-09-01');
+  await new WithdrawStudent(repo, enrolments, transactions, clock).execute(other, '2026-10-02');
+  await rejoin.execute(other, '2026-11-20', [], false);
+  assertEquals(membership.members.at(-1), other);
+});
+
+Deno.test('ChangeJoinDate should move the last join date and the groups that started with it', async () => {
+  const { repo, enrolments, clock, register } = students();
+  const id = await register(['g1'], [], '2026-09-15');
+  const change = new ChangeJoinDate(repo, enrolments, clock);
+  await change.execute(id, '2026-09-01');
+  assertEquals((await repo.find(StudentId.fromString(id)))?.joinedOn.toString(), '2026-09-01');
+  assertEquals(enrolments.starts.get(id)?.map(String), ['2026-09-01']);
+  // Un grupo que empezó después no se mueve, y el alta no puede pasar de su inicio.
+  await enrolments.enrol(
+    StudentId.fromString(id),
+    [{ groupId: 'g2', attendance: null }],
+    false,
+    LocalDate.fromString('2026-09-20'),
+  );
+  await assertRejects(() => change.execute(id, '2026-09-25'), InvalidValue, 'grupo');
+  await change.execute(id, '2026-09-10');
+  assertEquals(enrolments.starts.get(id)?.map(String), ['2026-09-10', '2026-09-20']);
 });
 
 Deno.test('LinkSiblings and UnlinkSiblings should be mutual', async () => {

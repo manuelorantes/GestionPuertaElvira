@@ -69,21 +69,40 @@ export class SpyMembership implements Membership {
 }
 
 export class SpyEnrolments implements Enrolments {
-  enrolled: { student: string; groups: string[]; confirmed: boolean }[] = [];
+  enrolled: { student: string; groups: string[]; confirmed: boolean; from?: string }[] = [];
   ended: { student: string; on: string }[] = [];
+  /** Inicio de cada grupo en curso de cada alumno. */
+  starts = new Map<string, LocalDate[]>();
   failWith: Error | null = null;
 
   enrol(
     student: StudentId,
     requests: EnrolmentRequest[],
     confirmOverCapacity: boolean,
+    from?: LocalDate,
   ): Promise<void> {
     if (this.failWith) return Promise.reject(this.failWith);
     this.enrolled.push({
       student: student.value,
       groups: requests.map((r) => r.groupId),
       confirmed: confirmOverCapacity,
+      ...(from ? { from: from.toString() } : {}),
     });
+    const starts = this.starts.get(student.value) ?? [];
+    this.starts.set(student.value, [
+      ...starts,
+      ...requests.map(() => from ?? LocalDate.fromString('2026-10-02')),
+    ]);
+    return Promise.resolve();
+  }
+
+  currentStarts(student: StudentId): Promise<LocalDate[]> {
+    return Promise.resolve(this.starts.get(student.value) ?? []);
+  }
+
+  moveStarts(student: StudentId, from: LocalDate, to: LocalDate): Promise<void> {
+    const starts = this.starts.get(student.value) ?? [];
+    this.starts.set(student.value, starts.map((d) => (d.equals(from) ? to : d)));
     return Promise.resolve();
   }
 

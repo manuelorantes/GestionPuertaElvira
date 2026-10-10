@@ -124,15 +124,31 @@ export class ContactPolicy {
   }
 }
 
-/** Alumno del club: datos personales, contacto, hermanos, alta y baja. */
+/** Un periodo de alta en el club: desde su alta hasta su baja (exclusiva), o null si sigue de alta. */
+export interface MembershipPeriod {
+  joinedOn: LocalDate;
+  withdrawnOn: LocalDate | null;
+}
+
+/**
+ * Alumno del club: datos personales, contacto, hermanos y sus periodos de alta. Puede darse de baja y volver a darse de
+ * alta varias veces; el último periodo es el actual (su última alta y su última baja).
+ */
 export class Student {
   private constructor(
     readonly id: StudentId,
     private current: StudentDetails,
-    readonly joinedOn: LocalDate,
+    private joined: LocalDate,
     private withdrawn: LocalDate | null,
     private siblingIds: Map<string, StudentId>,
+    /** Periodos anteriores, ya cerrados, del más antiguo al más reciente. */
+    private past: MembershipPeriod[] = [],
   ) {}
+
+  /** Su última alta (la del periodo actual). */
+  get joinedOn(): LocalDate {
+    return this.joined;
+  }
 
   static register(
     id: StudentId,
@@ -150,6 +166,7 @@ export class Student {
     joinedOn: LocalDate,
     withdrawnOn: LocalDate | null,
     siblings: readonly StudentId[],
+    past: readonly MembershipPeriod[] = [],
   ): Student {
     return new Student(
       id,
@@ -157,6 +174,7 @@ export class Student {
       joinedOn,
       withdrawnOn,
       new Map(siblings.map((s) => [s.value, s])),
+      [...past],
     );
   }
 
@@ -175,8 +193,49 @@ export class Student {
     this.withdrawn = on;
   }
 
+  /** Vuelve a darse de alta tras su baja (ya llegada), desde ese día y hasta hoy; el periodo anterior queda guardado. */
+  rejoin(on: LocalDate, today: LocalDate): void {
+    if (this.withdrawn === null || today.isBefore(this.withdrawn)) {
+      throw new InvalidValue('date', 'El alumno sigue de alta en el club.');
+    }
+    if (on.isBefore(this.withdrawn)) {
+      throw new InvalidValue('date', 'La nueva alta no puede ser anterior a su última baja.');
+    }
+    if (today.isBefore(on)) throw new InvalidValue('date', 'La fecha de alta no puede ser futura.');
+    this.past.push({ joinedOn: this.joined, withdrawnOn: this.withdrawn });
+    this.joined = on;
+    this.withdrawn = null;
+  }
+
+  /** Corrige su última alta: nunca futura, antes de su baja anterior ni después de su última baja. */
+  changeJoinedOn(on: LocalDate, today: LocalDate): void {
+    if (today.isBefore(on)) {
+      throw new InvalidValue('joinedOn', 'La fecha de alta no puede ser futura.');
+    }
+    const previous = this.past.at(-1)?.withdrawnOn ?? null;
+    if (previous !== null && on.isBefore(previous)) {
+      throw new InvalidValue(
+        'joinedOn',
+        'La fecha de alta no puede ser anterior a su baja anterior.',
+      );
+    }
+    if (this.withdrawn !== null && !on.isBefore(this.withdrawn)) {
+      throw new InvalidValue('joinedOn', 'La fecha de alta tiene que ser antes de su baja.');
+    }
+    this.joined = on;
+  }
+
+  /** Todos sus periodos de alta, del más antiguo al actual. */
+  membership(): MembershipPeriod[] {
+    return [...this.past, { joinedOn: this.joined, withdrawnOn: this.withdrawn }];
+  }
+
+  /** De alta ese día: en alguno de sus periodos (antes de su primera alta cuenta como el primero). */
   isActiveOn(day: LocalDate): boolean {
-    return this.withdrawn === null || day.isBefore(this.withdrawn);
+    return this.membership().some((p, i) =>
+      (i === 0 || !day.isBefore(p.joinedOn)) &&
+      (p.withdrawnOn === null || day.isBefore(p.withdrawnOn))
+    );
   }
 
   addSibling(sibling: StudentId): void {
