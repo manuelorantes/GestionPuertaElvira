@@ -129,14 +129,14 @@ export function registerClassRoutes(api: ApiApp): void {
   const query = (scope: RequestScope) => new SqlClassQuery(scope.tx);
 
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/groups', access: 'admin' },
+    { method: 'GET', path: '/api/admin/groups', access: 'clubReader' },
     async (c, scope) => {
       return c.json({ items: (await query(scope).groups(today(api))).map(present) });
     },
   );
 
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/groups/:id', access: 'admin' },
+    { method: 'GET', path: '/api/admin/groups/:id', access: 'clubReader' },
     async (c, scope) => {
       const id = param(c, 'id');
       const group = await query(scope).group(id, today(api));

@@ -209,7 +209,7 @@ Deno.test('teacher accounts should be linked to one teacher each and see only te
     204,
   );
   assertEquals(await linkedTo(), lucia);
-  assertError(await teacher.get('/api/admin/students'), 403, 'forbidden');
+  assertError(await teacher.get('/api/admin/teachers'), 403, 'forbidden');
 
   // Pasar a asistente quita el vínculo.
   assertEquals(

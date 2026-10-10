@@ -51,8 +51,10 @@ export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 /**
  * `teacher`: cuenta vinculada a un profesor, de profesorado o de administración que también da clases (las rutas
  * toman el profesor de la sesión).
+ * `clubReader`: consultas del club (grupos, alumnos y sus fichas, cobros incluidos) que administración comparte con el
+ * profesorado; solo lectura (ver specs/decisions/profesorado-lee-datos-del-club.md).
  */
-export type Access = 'public' | 'user' | 'admin' | 'superadmin' | 'teacher';
+export type Access = 'public' | 'user' | 'admin' | 'superadmin' | 'teacher' | 'clubReader';
 
 export interface RouteOptions {
   method: Method;
@@ -133,6 +135,9 @@ export class ApiApp {
   }
 
   defineRoute(options: RouteOptions, handler: RouteHandler): void {
+    if (options.access === 'clubReader' && options.method !== 'GET') {
+      throw new Error(`${options.method} ${options.path}: el profesorado solo lee datos del club.`);
+    }
     this.remember(options.method, options.path);
     this.hono.on(options.method, options.path, async (c) => {
       const scope = c.get('scope');
@@ -212,7 +217,8 @@ function enforceAccess(user: AuthenticatedUser | null, options: RouteOptions): v
   const allowed = options.access === 'user' ||
     (options.access === 'admin' && ADMIN_ROLES.has(user.role)) ||
     (options.access === 'superadmin' && user.role === 'superadministrator') ||
-    (options.access === 'teacher' && canUseTeacherSpace(user));
+    (options.access === 'teacher' && canUseTeacherSpace(user)) ||
+    (options.access === 'clubReader' && (ADMIN_ROLES.has(user.role) || user.role === 'teacher'));
   if (!allowed) throw httpError(403);
   if (options.access === 'teacher' && user.teacherId === null) {
     throw new ApiProblem(

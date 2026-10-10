@@ -103,28 +103,34 @@ export function registerEquipmentRoutes(api: ApiApp): void {
     return c.body(null, 204);
   });
 
-  api.defineRoute(admin('GET', '/orders'), async (c, scope) => {
-    const status = c.req.query('status');
-    const season = c.req.query('season');
-    if (season !== undefined && season !== '' && !/^\d{4}$/.test(season)) {
-      throw new InvalidValue('season', 'Indica la temporada con el año en que empieza.');
-    }
-    const id = (name: string) => {
-      const value = c.req.query(name);
-      if (value === undefined || value === '') return null;
-      if (!/^[0-9a-f-]{36}$/i.test(value)) throw new InvalidValue(name, 'Identificador no válido.');
-      return value;
-    };
-    return c.json({
-      items: await equipment(api, scope).query.orders({
-        open: c.req.query('open') === '1',
-        status: status === undefined || status === '' ? null : orderStateFromName(status),
-        productId: id('productId'),
-        studentId: id('studentId'),
-        season: season === undefined || season === '' ? null : Number(season),
-      }),
-    });
-  });
+  api.defineRoute(
+    // El profesorado ve los pedidos de un alumno en su ficha.
+    { method: 'GET', path: '/api/admin/equipment/orders', access: 'clubReader' },
+    async (c, scope) => {
+      const status = c.req.query('status');
+      const season = c.req.query('season');
+      if (season !== undefined && season !== '' && !/^\d{4}$/.test(season)) {
+        throw new InvalidValue('season', 'Indica la temporada con el año en que empieza.');
+      }
+      const id = (name: string) => {
+        const value = c.req.query(name);
+        if (value === undefined || value === '') return null;
+        if (!/^[0-9a-f-]{36}$/i.test(value)) {
+          throw new InvalidValue(name, 'Identificador no válido.');
+        }
+        return value;
+      };
+      return c.json({
+        items: await equipment(api, scope).query.orders({
+          open: c.req.query('open') === '1',
+          status: status === undefined || status === '' ? null : orderStateFromName(status),
+          productId: id('productId'),
+          studentId: id('studentId'),
+          season: season === undefined || season === '' ? null : Number(season),
+        }),
+      });
+    },
+  );
 
   api.defineRoute(admin('POST', '/orders'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
