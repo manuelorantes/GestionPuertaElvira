@@ -36,6 +36,7 @@ import { useToast } from '@/shared/ui/Toast';
 
 import { EnrolmentDialog } from './EnrolmentDialog';
 import { ScheduleEditor } from './ScheduleEditor';
+import { SimilarStudentsNotice } from './SimilarStudentsNotice';
 
 interface StudentDialogProps {
   detail: StudentDetail | null;
@@ -140,6 +141,7 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                 onChange={(e) => set('fullName', e.target.value)}
                 error={fieldErrors.fullName}
               />
+              {!detail && <SimilarStudentsNotice fullName={values.fullName} onLeave={onClose} />}
               <DateField
                 label="Fecha de nacimiento"
                 value={values.birthDate}

@@ -11,6 +11,16 @@ export function useStudents(filter: api.StudentFilter, search: string) {
   });
 }
 
+/** Solo con nombre y algún apellido: con una palabra no hay con qué comparar. */
+export function useSimilarStudents(fullName: string) {
+  const name = fullName.trim().replace(/\s+/g, ' ');
+  return useQuery({
+    queryKey: ['students', 'similar', name.toLowerCase()],
+    queryFn: () => api.fetchSimilarStudents(name),
+    enabled: name.includes(' '),
+  });
+}
+
 export function usePendingData(enabled = true) {
   return useQuery({
     queryKey: ['students', 'pending-data'],

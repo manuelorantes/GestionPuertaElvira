@@ -15,6 +15,8 @@ export interface StudentSummary {
   /** null si no consta la fecha de nacimiento. */
   age: number | null;
   status: 'active' | 'withdrawn';
+  /** Su última baja (pasada o futura), o null si no tiene. */
+  withdrawnOn: string | null;
   groups: { id: string; name: string; slotLabel: string }[];
   hasSiblings: boolean;
 }
@@ -93,6 +95,14 @@ export async function fetchStudents(
 ): Promise<{ items: StudentSummary[]; total: number }> {
   const query = `filter=${filter}${search.trim() ? `&q=${encodeURIComponent(search.trim())}` : ''}`;
   return apiGet(`/api/admin/students?${query}`);
+}
+
+/** Alumnos con el mismo nombre y primer apellido (primero los de baja), para no duplicar a nadie al dar de alta. */
+export async function fetchSimilarStudents(fullName: string): Promise<StudentSummary[]> {
+  const found = await apiGet<{ items: StudentSummary[] }>(
+    `/api/admin/students/similar?name=${encodeURIComponent(fullName.trim())}`,
+  );
+  return found.items;
 }
 
 export interface PendingStudent {
