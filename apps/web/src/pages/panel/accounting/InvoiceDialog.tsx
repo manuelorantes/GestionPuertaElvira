@@ -3,8 +3,8 @@ import { useId, useState, type DragEvent, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { payInvoice, registerInvoice } from '@/features/accounting/api';
-import { CATEGORIES, documentProblem } from '@/features/accounting/categories';
-import { useAccountingMutation } from '@/features/accounting/hooks';
+import { documentProblem } from '@/features/accounting/categories';
+import { useAccountingMutation, useCategoryOptions } from '@/features/accounting/hooks';
 import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -36,6 +36,8 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const toast = useToast();
   const inputId = useId();
+  // Lo del profesorado sale de sus liquidaciones, no de facturas.
+  const categories = useCategoryOptions('expense', ['teachers']);
   const save = useAccountingMutation(async () => {
     let id = createdId;
     if (!id) {
@@ -149,10 +151,7 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
             label="Categoría"
             value={values.category}
             onChange={set('category')}
-            options={[
-              { value: '', label: 'Elige una categoría' },
-              ...CATEGORIES.expense.filter((c) => c.value !== 'teachers'),
-            ]}
+            options={[{ value: '', label: 'Elige una categoría' }, ...categories]}
           />
           <DateField
             label="Fecha de la factura"
