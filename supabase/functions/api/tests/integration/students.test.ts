@@ -330,7 +330,13 @@ Deno.test('students should answer not found and forbid teachers', async () => {
   await createUser('profe@club.es', 'teacher');
   const teacher = new ApiClient();
   await teacher.logIn('profe@club.es');
-  assertError(await teacher.get('/api/admin/students'), 403, 'forbidden');
+  // El profesorado consulta el alumnado, pero no lo cambia.
+  assertEquals((await teacher.get('/api/admin/students')).status, 200);
+  assertError(
+    await teacher.json('POST', '/api/admin/students', { fullName: 'Nuevo', groupIds: [] }),
+    403,
+    'forbidden',
+  );
 });
 
 Deno.test('registration takes the hours a student attends and turns them into groups', async () => {

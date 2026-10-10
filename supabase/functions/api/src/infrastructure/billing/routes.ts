@@ -129,6 +129,12 @@ export function registerBillingRoutes(api: ApiApp): void {
     path,
     access: 'admin' as const,
   });
+  /** Lo que el profesorado también puede consultar: la cuenta y los pagos de un alumno. */
+  const clubReader = (path: string) => ({
+    method: 'GET' as const,
+    path,
+    access: 'clubReader' as const,
+  });
 
   api.defineRoute(admin('GET', '/api/admin/billing/charges'), async (c, scope) => {
     const kind = c.req.query('kind') ?? 'all';
@@ -201,13 +207,13 @@ export function registerBillingRoutes(api: ApiApp): void {
     return c.json({ id }, 201);
   });
 
-  api.defineRoute(admin('GET', '/api/admin/billing/payments'), async (c, scope) => {
+  api.defineRoute(clubReader('/api/admin/billing/payments'), async (c, scope) => {
     const student = c.req.query('studentId');
     const studentId = student ? StudentRef.fromString(student).value : null;
     return c.json({ items: await billing(api, scope).query.payments(studentId) });
   });
 
-  api.defineRoute(admin('GET', '/api/admin/billing/payments/:id'), async (c, scope) => {
+  api.defineRoute(clubReader('/api/admin/billing/payments/:id'), async (c, scope) => {
     const b = billing(api, scope);
     const detail = await b.query.payment(param(c, 'id'));
     if (detail === null) throw new PaymentNotFound();
@@ -262,7 +268,7 @@ export function registerBillingRoutes(api: ApiApp): void {
     return c.body(null, 204);
   });
 
-  api.defineRoute(admin('GET', '/api/admin/billing/accounts/:id'), async (c, scope) => {
+  api.defineRoute(clubReader('/api/admin/billing/accounts/:id'), async (c, scope) => {
     return c.json(await billing(api, scope).getAccount.execute(param(c, 'id')));
   });
 

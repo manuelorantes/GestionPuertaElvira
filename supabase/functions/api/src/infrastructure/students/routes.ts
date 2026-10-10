@@ -159,7 +159,7 @@ export function registerStudentRoutes(api: ApiApp): void {
   const transactions = (scope: RequestScope) => new SavepointTransactionRunner(scope.tx);
 
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/students', access: 'admin' },
+    { method: 'GET', path: '/api/admin/students', access: 'clubReader' },
     async (c, scope) => {
       const filter = studentFilterFrom(c.req.query('filter') ?? 'all');
       const search = c.req.query('q') ?? null;
@@ -195,7 +195,7 @@ export function registerStudentRoutes(api: ApiApp): void {
   );
 
   api.defineRoute(
-    { method: 'GET', path: '/api/admin/students/:id', access: 'admin' },
+    { method: 'GET', path: '/api/admin/students/:id', access: 'clubReader' },
     async (c, scope) => {
       const detail = await query(scope).detail(param(c, 'id'), today(api));
       if (detail === null) throw new StudentNotFound();
