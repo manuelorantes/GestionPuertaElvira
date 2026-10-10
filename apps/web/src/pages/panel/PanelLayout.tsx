@@ -11,6 +11,7 @@ import { PanelMobileHeader, PanelMobileNav } from './PanelMobileBars';
 import { PanelSidebar } from './PanelSidebar';
 import { PANEL_SECTIONS, sectionsFor } from './panelSections';
 import type { ViewSwitch } from './ViewSwitchButton';
+import { StudentQuickView } from './students/StudentQuickView';
 
 export function PanelLayout() {
   const { data: user } = useSession();
@@ -70,6 +71,7 @@ export function PanelLayout() {
         <PanelMobileHeader title={title} viewSwitch={viewSwitch} onLogout={handleLogout} />
         <div className="min-h-0 min-w-0 flex-1 overflow-auto">
           <Outlet />
+          <StudentQuickView />
         </div>
         <PanelMobileNav role={role} />
       </div>

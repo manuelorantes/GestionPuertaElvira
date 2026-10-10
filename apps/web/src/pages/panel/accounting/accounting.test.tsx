@@ -184,7 +184,7 @@ describe('Contabilidad', () => {
     );
     expect(within(fee).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s1',
+      expect.stringMatching(/[?&]ficha=s1$/),
     );
     expect(
       within(table).getByRole('link', { name: /Ir a Facturas: Propietario del local/ }),

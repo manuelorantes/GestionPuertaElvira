@@ -196,7 +196,7 @@ describe('Mis grupos', () => {
     // Cada nombre lleva a la ficha del alumno (el profesorado la puede consultar).
     expect(within(attendance).getByRole('link', { name: 'Pablo Gil Ruiz' })).toHaveAttribute(
       'href',
-      expect.stringMatching(/^\/panel\/alumnos\/.+/),
+      expect.stringMatching(/[?&]ficha=.+$/),
     );
     expect(within(students).getByRole('link', { name: 'Martina López Herrera' })).toBeVisible();
     expect(within(attendance).getByRole('button', { name: 'Mes siguiente' })).toBeDisabled();

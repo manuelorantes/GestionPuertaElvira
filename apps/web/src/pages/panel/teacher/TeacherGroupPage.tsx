@@ -27,7 +27,6 @@ import { Select } from '@/shared/ui/Select';
 import { CommentList } from '../attendance/ClassComments';
 import { GroupAttendanceGrid } from '../classes/GroupAttendanceTable';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
-import { studentPath } from '@/features/students/links';
 
 const SECTION_TITLE = 'text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase';
 
@@ -246,7 +245,7 @@ function GroupMonthAttendance({ groupId }: { groupId: string }) {
             onNext={month < thisMonth ? () => setMonth(shiftMonth(month, 1)) : undefined}
           />
         </div>
-        <GroupAttendanceGrid attendance={attendance} month={month} studentHref={studentPath} />
+        <GroupAttendanceGrid attendance={attendance} month={month} />
       </section>
     </Card>
   );
