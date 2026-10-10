@@ -198,6 +198,7 @@ function canonicalJson(data: FindingData): string {
 /** Arreglo automático que propone un hallazgo; lo aplica infraestructura con los casos de uso de cada contexto. */
 export type Fix =
   | { kind: 'reprice_charge'; studentId: string; month: string }
+  | { kind: 'note_discount'; studentId: string; month: string; percent: number }
   | { kind: 'link_family'; a: string; b: string }
   | { kind: 'set_enrolment_start'; studentId: string; groupIds: string[]; date: string }
   | { kind: 'own_phone_from_guardian'; studentId: string }

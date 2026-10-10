@@ -59,6 +59,12 @@ cerrado no se vuelve a aceptar ni a descartar.
 - **THEN** la cuota pasa a 49,50 €, lo cobrado se reparte de nuevo, el historial recoge «Aceptar hallazgo» a su nombre
   y el hallazgo sale en «Aceptados»
 
+#### Scenario: Pago adelantado sin apuntar
+- **WHEN** Mario tiene 2 h con descuento familiar (40,50 €) y su cuota importada de noviembre es de 32,40 € sin
+  porcentaje apuntado
+- **THEN** el hallazgo explica que lleva un 20 % de pago adelantado sin apuntar y, al aceptarlo, la cuota queda en
+  32,40 € con el 20 % apuntado y su ficha muestra «−10 % familia · −20 % pago adelantado»
+
 #### Scenario: Los datos cambiaron
 - **WHEN** administración acepta un hallazgo cuyo caso ha cambiado desde el diagnóstico
 - **THEN** no se aplica nada y la pantalla avisa de que hay que volver a diagnosticar
@@ -80,6 +86,10 @@ Dinero:
    familiar y el descuento por pago adelantado apuntado en la cuota (sumados sobre la tarifa base). Incluye las cuotas
    ya cobradas. La explicación muestra horas, tarifa, particulares, descuentos y los dos importes. Arreglo:
    ajustar la cuota al importe calculado (lo cobrado se reparte de nuevo; la diferencia queda pendiente o a favor).
+   Si la cuota no tiene apuntado el pago adelantado y su importe es la cuota de un mes con uno de los porcentajes de
+   la tarifa (sumado al familiar o aplicado encima, como hacía la hoja), el hallazgo propone apuntar ese porcentaje
+   sin cambiar el importe, también en los meses ya pasados. Solo si el alumno tiene al menos los meses que pide ese
+   descuento (3, 6 o 9) con ese mismo importe y sin porcentaje apuntado; si no, es un importe equivocado.
 2. **Gasto en una categoría genérica que tiene la suya**: apunte manual de gasto o factura en «Otros gastos» o
    «Suministros» cuyo concepto habla de limpieza, presidente, luz o electricidad, agua, internet, wifi, fibra o Digi,
    alquiler o comunidad, cuando el club tiene esa categoría. Arreglo: cambiar la categoría.

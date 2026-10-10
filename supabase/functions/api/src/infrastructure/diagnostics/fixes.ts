@@ -9,7 +9,7 @@ import {
   EntryNotFound,
   SupplierInvoiceNotFound,
 } from '../../application/accounting/mod.ts';
-import { decimal, SetChargeDiscount } from '../../application/billing/mod.ts';
+import { decimal, NoteChargeDiscount, SetChargeDiscount } from '../../application/billing/mod.ts';
 import { ChangeEnrolmentStart } from '../../application/classes/mod.ts';
 import type { FixExecutor } from '../../application/diagnostics/mod.ts';
 import { RecordAdvance } from '../../application/payroll/mod.ts';
@@ -49,6 +49,12 @@ export class UseCaseFixExecutor implements FixExecutor {
     switch (fix.kind) {
       case 'reprice_charge':
         return await this.repriceCharge(fix.studentId, fix.month);
+      case 'note_discount':
+        return await new NoteChargeDiscount(new SqlChargeRepository(this.tx)).execute(
+          fix.studentId,
+          fix.month,
+          fix.percent,
+        );
       case 'link_family':
         return await this.linkFamily(fix.a, fix.b);
       case 'set_enrolment_start':

@@ -108,7 +108,8 @@ no cambian. La diferencia queda como pendiente o como saldo a favor.
 
 Los meses pagados por adelantado (3, 6 meses o todo el año) MUST conservar su descuento al recalcularse: la cuota
 nueva es la tarifa nueva con el mismo porcentaje. En cuotas sin porcentaje apuntado (importadas) se deduce de la cuota
-que tenía el alumno antes del cambio. Administración MUST poder fijar a mano el descuento de una cuota. El descuento
+que tenía el alumno antes del cambio, tanto si se sumó al familiar como si se aplicó encima de él (como en la hoja:
+40,50 € − 20 % = 32,40 €). Administración MUST poder fijar a mano el descuento de una cuota. El descuento
 por pago adelantado se suma al familiar sobre la tarifa base, como al cobrar: con 40 €, un 10 % familiar y un 20 % por
 todo el año, la cuota es de 28 € (no 36 € − 20 %). Cada cuota del alumno MUST mostrar sus descuentos (familia y pago
 adelantado).
