@@ -190,7 +190,7 @@ export const Siblings = {
   },
 };
 
-/** Cobros da de alta como socio a quien entra en el club sin clases: se le pedirá la cuota de socio. */
+/** Cobros da de alta como socio a toda persona que entra en el club: se le pedirá la cuota de socio. */
 export interface Membership {
   makeMember(student: StudentId): Promise<void>;
 }
@@ -206,7 +206,7 @@ export class RegisterStudent {
 
   /**
    * Alta del alumno, inscripción en sus grupos y vínculo con sus hermanos, todo o nada.
-   * Sin grupos, el alumno es un socio sin clases y queda marcado como socio.
+   * Toda persona que se da de alta es socia (con grupos o, sin ellos, como socio sin clases).
    * @param joinedOn fecha de alta; por defecto hoy (una importación puede traer altas anteriores)
    */
   async execute(
@@ -226,9 +226,8 @@ export class RegisterStudent {
       await this.students.save(student);
       if (enrolments.length > 0) {
         await this.enrolments.enrol(student.id, enrolments, confirmOverCapacity, joined);
-      } else if (this.membership !== null) {
-        await this.membership.makeMember(student.id);
       }
+      await this.membership?.makeMember(student.id);
       for (const siblingId of siblingIds) {
         await Siblings.link(this.students, student.id.value, siblingId);
       }
@@ -278,7 +277,7 @@ export class UpdateStudent {
 
 /**
  * Vuelve a dar de alta a un alumno de baja, desde un día (hasta hoy): conserva su número de socio, su familia y su
- * historial, y entra en los grupos indicados desde ese día o, sin grupos, como socio.
+ * historial, y entra en los grupos indicados desde ese día o, sin grupos, como socio sin clases. Siempre queda como socio.
  */
 export class RejoinStudent {
   constructor(
@@ -302,9 +301,8 @@ export class RejoinStudent {
       await this.students.save(student);
       if (requests.length > 0) {
         await this.enrolments.enrol(student.id, requests, confirmOverCapacity, on);
-      } else if (this.membership !== null) {
-        await this.membership.makeMember(student.id);
       }
+      await this.membership?.makeMember(student.id);
     });
   }
 }
