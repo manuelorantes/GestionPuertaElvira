@@ -41,9 +41,10 @@ test('should register a minor in two groups, with the guardian added before savi
   await page.getByRole('button', { name: 'Nuevo alumno' }).click();
   const dialog = page.getByRole('dialog', { name: 'Nuevo alumno' });
   await dialog.getByLabel('Nombre y apellidos').fill('Lucía Fernández Ortiz');
-  await dialog.getByLabel('Día').selectOption('7');
-  await dialog.getByLabel('Mes').selectOption({ label: 'marzo' });
-  await dialog.getByLabel('Año').selectOption('2015');
+  const birth = dialog.getByRole('group', { name: 'Fecha de nacimiento' });
+  await birth.getByLabel('Día').selectOption('7');
+  await birth.getByLabel('Mes').selectOption({ label: 'marzo' });
+  await birth.getByLabel('Año').selectOption('2015');
   await expect(dialog.getByText(/pendiente: tutor y email/i)).toBeVisible();
   await dialog.getByLabel('Tutor 1', { exact: true }).fill('Carmen Ortiz');
   await dialog.getByLabel('Teléfono tutor 1').fill('612000111');
