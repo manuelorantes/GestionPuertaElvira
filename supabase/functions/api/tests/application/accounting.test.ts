@@ -9,6 +9,7 @@ import {
   CloseSeason,
   DeleteEntry,
   DeleteInvoice,
+  EditMovement,
   FiscalYearSummary,
   ListCategories,
   MonthLedger,
@@ -41,6 +42,7 @@ function setUp() {
       amountCents: 4500,
       studentId: 'martina',
       period: '2026-10',
+      corrected: false,
     },
     {
       source: 'settlement',
@@ -53,6 +55,7 @@ function setUp() {
       amountCents: 41600,
       studentId: null,
       period: '2026-09',
+      corrected: false,
     },
   ];
   const registerInvoice = (
@@ -190,6 +193,7 @@ Deno.test('CloseSeason should refuse while an older season with movements is ope
     amountCents: 4500,
     studentId: 'martina',
     period: '2024-10',
+    corrected: false,
   }];
   await assertRejects(() => close().execute(2026), PreviousSeasonOpen);
   const fresh = setUp();
@@ -233,4 +237,98 @@ Deno.test('the club adds and renames its own categories, and removes them only w
   const unused = await new AddCategory(fx).execute('income', 'Rifa');
   await new RemoveCategory(fx).execute(unused.code);
   assertEquals((await new ListCategories(fx).execute()).filter((c) => c.custom).length, 1);
+});
+
+Deno.test('EditMovement should edit entries and invoices, and correct payments only in accounting', async () => {
+  const { fx, registerInvoice } = setUp();
+  const edit = new EditMovement(fx, fx, fx, fx, fx, fx, fx);
+  const line = async (source: string, id: string) =>
+    (await new MonthLedger(fx, fx).execute('2026-10')).lines.find(
+      (l) => l.source === source && l.sourceId === id,
+    );
+
+  const entry = await new RecordEntry(fx, fx, fx).execute({
+    date: '2026-10-10',
+    kind: 'expense',
+    concept: 'Luz',
+    category: 'electricity',
+    method: 'card',
+    amount: '80',
+  });
+  await edit.execute({
+    source: 'manual',
+    sourceId: entry,
+    month: '2026-10',
+    concept: 'Luz de septiembre',
+    category: 'electricity',
+    method: 'transfer',
+    amount: '85',
+    period: '2026-09',
+  });
+  assertEquals(await line('manual', entry), {
+    source: 'manual',
+    sourceId: entry,
+    date: '2026-10-10',
+    kind: 'expense',
+    concept: 'Luz de septiembre',
+    category: 'electricity',
+    method: 'transfer',
+    amountCents: 8500,
+    studentId: null,
+    period: '2026-09',
+    corrected: false,
+  });
+
+  const invoice = await registerInvoice('2026-10-01', 'Alquiler', 'rent', '950');
+  await new PayInvoice(fx, fx).execute(invoice, '2026-10-05', 'transfer');
+  // El concepto llega como en el libro, con el proveedor delante.
+  await edit.execute({
+    source: 'invoice',
+    sourceId: invoice,
+    month: '2026-10',
+    concept: 'Proveedor · Alquiler de octubre',
+    category: 'rent',
+    method: 'cash',
+    amount: '900',
+    period: '2026-10',
+  });
+  const edited = await line('invoice', invoice);
+  assertEquals(
+    [edited?.concept, edited?.amountCents, edited?.method],
+    ['Proveedor · Alquiler de octubre', 90000, 'cash'],
+  );
+
+  // Un cobro: se corrige solo en contabilidad (y la forma de pago, también en el cobro).
+  await edit.execute({
+    source: 'payment',
+    sourceId: 'p1',
+    month: '2026-10',
+    concept: 'Octubre 2026 · Martina López',
+    category: 'other_income',
+    method: 'transfer',
+    amount: '40',
+    period: '2026-10',
+  });
+  const payment = await line('payment', 'p1');
+  assertEquals(
+    [payment?.amountCents, payment?.category, payment?.method, payment?.corrected],
+    [4000, 'other_income', 'transfer', true],
+  );
+  assertEquals(fx.paymentMethodChanges, [['p1', 'transfer']]);
+
+  // La categoría tiene que ser del mismo tipo.
+  await assertRejects(
+    () =>
+      edit.execute({
+        source: 'settlement',
+        sourceId: 's1',
+        month: '2026-10',
+        concept: 'Liquidación',
+        category: 'fees',
+        method: 'transfer',
+        amount: '416',
+        period: '2026-09',
+      }),
+    InvalidValue,
+  );
 });

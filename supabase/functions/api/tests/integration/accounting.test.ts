@@ -306,3 +306,42 @@ Deno.test('the club adds its own categories, uses and renames them, and removes 
     ['fees', code],
   );
 });
+
+Deno.test('accounting edits a manual entry, but not one in a closed season', async () => {
+  const client = await admin();
+  const created = await client.json('POST', '/api/admin/accounting/entries', {
+    date: '2025-10-03',
+    kind: 'expense',
+    concept: 'Luz',
+    category: 'electricity',
+    method: 'card',
+    amount: '80',
+  });
+  const id = body<{ id: string }>(created).id;
+  const edit = (overrides: Record<string, string> = {}) =>
+    client.json('PUT', '/api/admin/accounting/movements', {
+      source: 'manual',
+      sourceId: id,
+      month: '2025-10',
+      concept: 'Luz de septiembre',
+      category: 'electricity',
+      method: 'transfer',
+      amount: '85,50',
+      period: '2025-09',
+      ...overrides,
+    });
+  assertEquals((await edit()).status, 204);
+  const ledger = body<{ items: Record<string, unknown>[] }>(
+    await client.get('/api/admin/accounting/ledger?month=2025-10'),
+  );
+  assertEquals(
+    ledger.items.map((i) => [i.concept, i.method, i.amountCents, i.period, i.corrected]),
+    [['Luz de septiembre', 'transfer', 8550, '2025-09', false]],
+  );
+  assertError(await edit({ category: 'fees' }), 422, 'unprocessable');
+  assertError(
+    await edit({ source: 'payment', sourceId: 'no-existe' }),
+    404,
+    'not_found',
+  );
+});
