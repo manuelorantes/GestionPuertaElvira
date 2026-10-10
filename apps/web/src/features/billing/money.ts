@@ -81,3 +81,15 @@ export function seasonMonths(month: string): string[] {
     (m) => `${m >= 9 ? start : start + 1}-${String(m).padStart(2, '0')}`,
   );
 }
+
+/** «40,50» o «40.5» → 4050; null si no es un importe válido (hasta dos decimales, sin signo). */
+export function centsFromText(value: string): number | null {
+  const normalised = value.trim().replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(normalised)) return null;
+  return Math.round(Number(normalised) * 100);
+}
+
+/** 4050 → «40,50»; 4500 → «45» (para rellenar un campo de importe). */
+export function centsToText(cents: number): string {
+  return (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2)).replace('.', ',');
+}

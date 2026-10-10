@@ -3,7 +3,8 @@ import { apiGet, apiSend } from '@/shared/api/client';
 /** `expected`: cuota prevista de un mes futuro (aún no existe; lo que se espera cobrar). */
 export type ChargeStatus =
   'paid' | 'partial' | 'due' | 'overdue' | 'upcoming' | 'expected' | 'cancelled';
-export type ChargeKind = 'monthly' | 'membership';
+/** `material`: el cobro de un pedido de material deportivo. */
+export type ChargeKind = 'monthly' | 'membership' | 'material';
 export type PaymentMethod = 'cash' | 'card' | 'transfer';
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
@@ -34,6 +35,8 @@ export interface Charge {
   /** Si se canceló lo pendiente: su importe sin cancelar y lo cancelado (0 si no). */
   fullAmountCents: number;
   cancelledCents: number;
+  /** Concepto propio (el producto, en las de material). */
+  concept: string | null;
 }
 
 export interface MonthlyCharges {
@@ -58,6 +61,8 @@ export interface PaymentRequest {
   specialDiscount: { percent: number | null; amountCents: number | null; concept: string } | null;
   /** Puntos a canjear (1 punto = 1 % de una cuota mensual; máximo 5; solo cuotas mensuales). */
   redeemPoints: number;
+  /** Solo en los cobros de material: el cobro del pedido que se paga. */
+  chargeId?: string | null;
 }
 
 interface Line {
@@ -129,6 +134,10 @@ export interface Account {
   membershipCharge: { id: string; pendingCents: number } | null;
   /** Lo que sobra de los cobros tras cubrir todas las cuotas. */
   balanceCents: number;
+  /** Cobros de material con algo pendiente. */
+  materialCharges: { id: string; concept: string; pendingCents: number }[];
+  /** Todo lo que mueve en el club, por tipo: lo cobrado y lo pendiente. */
+  totals: { kind: ChargeKind; paidCents: number; pendingCents: number }[];
 }
 
 export interface AccountCharge {

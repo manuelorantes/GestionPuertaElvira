@@ -9,6 +9,7 @@ import { Tabs } from '@/shared/ui/Tabs';
 
 import { CancelChargeDialog } from './CancelChargeDialog';
 import { ChargesTab, type ChargesView } from './ChargesTab';
+import { MaterialTab } from './material/MaterialTab';
 import { PaymentDialog } from './PaymentDialog';
 import { PaymentsTab } from './PaymentsTab';
 import { ReceiptDialog } from './ReceiptDialog';
@@ -16,7 +17,7 @@ import { SettingsTab } from './SettingsTab';
 import { WhatsAppDialog } from './WhatsAppDialog';
 
 export type BillingDialog =
-  | { type: 'payment'; studentId?: string; kind?: ChargeKind }
+  | { type: 'payment'; studentId?: string; kind?: ChargeKind; chargeId?: string }
   | { type: 'receipt'; paymentId: string }
   | { type: 'whatsapp'; charge: Charge }
   | { type: 'cancel'; charge: Charge }
@@ -36,6 +37,7 @@ export function BillingPage() {
     : currentMonth();
   const tabs = [
     { id: 'cuotas', label: 'Cuotas' },
+    { id: 'material', label: 'Material deportivo' },
     { id: 'registro', label: 'Cobros registrados' },
     { id: 'tarifas', label: 'Tarifas y ajustes' },
   ];
@@ -60,6 +62,7 @@ export function BillingPage() {
         <PaymentsTab onOpenReceipt={(paymentId) => setDialog({ type: 'receipt', paymentId })} />
       );
     if (tab === 'tarifas') return <SettingsTab />;
+    if (tab === 'material') return <MaterialTab onAction={setDialog} />;
     return (
       <ChargesTab
         key={view === 'month' ? month : view}
@@ -108,6 +111,7 @@ export function BillingDialogs({
       <PaymentDialog
         initialStudentId={dialog.studentId}
         initialKind={dialog.kind}
+        initialChargeId={dialog.chargeId}
         onClose={() => onChange(null)}
         onSaved={(paymentId) => onChange({ type: 'receipt', paymentId })}
       />

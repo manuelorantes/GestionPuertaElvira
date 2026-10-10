@@ -18,6 +18,7 @@ import { ToggleButton } from '@/shared/ui/ToggleButton';
 interface PaymentDialogProps {
   initialStudentId: string | undefined;
   initialKind: ChargeKind | undefined;
+  initialChargeId?: string | undefined;
   onClose: () => void;
   onSaved: (paymentId: string) => void;
 }
@@ -25,10 +26,11 @@ interface PaymentDialogProps {
 export function PaymentDialog({
   initialStudentId,
   initialKind,
+  initialChargeId,
   onClose,
   onSaved,
 }: PaymentDialogProps) {
-  const form = usePaymentForm(initialStudentId, initialKind);
+  const form = usePaymentForm(initialStudentId, initialKind, initialChargeId);
   const students = useStudents('active', '');
   const toast = useToast();
   const options = (students.data?.items ?? []).map((s) => ({ value: s.id, label: s.fullName }));
@@ -79,26 +81,28 @@ export function PaymentDialog({
           <fieldset className="flex flex-col gap-1.5">
             <legend className="mb-1.5 text-sm font-medium">Concepto</legend>
             <div className="flex flex-wrap gap-2">
-              {CONCEPTS.map((c) => (
-                <ToggleButton
-                  key={c.id}
-                  disabled={form.unavailable(c.id)}
-                  title={
-                    form.unavailable(c.id)
-                      ? c.id === 'year'
-                        ? `Todo el año es para quien tiene 9 o 10 meses por pagar; quedan ${form.remainingMonths}`
-                        : `Solo quedan ${form.remainingMonths} meses por cobrar`
-                      : c.id === 'year' && form.remainingMonths !== null
-                        ? `Cobra los ${form.remainingMonths} meses que quedan, con un 20 %`
-                        : undefined
-                  }
-                  pressed={form.concept === c.id}
-                  onClick={() => form.setConcept(c.id)}
-                  className="h-9 rounded-full font-medium"
-                >
-                  {c.label}
-                </ToggleButton>
-              ))}
+              {CONCEPTS.filter((c) => c.id !== 'material' || form.materialCharges.length > 0).map(
+                (c) => (
+                  <ToggleButton
+                    key={c.id}
+                    disabled={form.unavailable(c.id)}
+                    title={
+                      form.unavailable(c.id)
+                        ? c.id === 'year'
+                          ? `Todo el año es para quien tiene 9 o 10 meses por pagar; quedan ${form.remainingMonths}`
+                          : `Solo quedan ${form.remainingMonths} meses por cobrar`
+                        : c.id === 'year' && form.remainingMonths !== null
+                          ? `Cobra los ${form.remainingMonths} meses que quedan, con un 20 %`
+                          : undefined
+                    }
+                    pressed={form.concept === c.id}
+                    onClick={() => form.setConcept(c.id)}
+                    className="h-9 rounded-full font-medium"
+                  >
+                    {c.label}
+                  </ToggleButton>
+                ),
+              )}
             </div>
             {form.remainingMonths !== null && CONCEPTS.some((c) => form.unavailable(c.id)) && (
               <p className="text-[13px] text-ink-muted">
@@ -107,6 +111,17 @@ export function PaymentDialog({
               </p>
             )}
           </fieldset>
+          {form.concept === 'material' && (
+            <Select
+              label="Pedido de material"
+              value={form.materialChargeId}
+              onChange={form.setMaterialChargeId}
+              options={form.materialCharges.map((c) => ({
+                value: c.id,
+                label: `${c.concept} · faltan ${formatCents(c.pendingCents)}`,
+              }))}
+            />
+          )}
           <div className="flex flex-col gap-4">
             <fieldset className="flex flex-col gap-1.5">
               <legend className="mb-1.5 text-sm font-medium">Forma de pago</legend>
@@ -145,7 +160,7 @@ export function PaymentDialog({
               toYear={year + 1}
             />
           </div>
-          {form.concept !== 'membership' && form.account && (
+          {form.concept !== 'membership' && form.concept !== 'material' && form.account && (
             <div className="flex flex-col gap-1">
               <Switch
                 label="Canjear 5 puntos (−5 % de una cuota mensual)"

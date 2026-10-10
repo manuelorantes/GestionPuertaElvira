@@ -9,7 +9,7 @@ import {
   type ChargeScope,
 } from '@/features/billing/api';
 import { useBillingMutation } from '@/features/billing/hooks';
-import { formatCents, monthLabel } from '@/features/billing/money';
+import { centsFromText, formatCents, monthLabel } from '@/features/billing/money';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Dialog } from '@/shared/ui/Dialog';
@@ -21,12 +21,6 @@ const SCOPES: { id: ChargeScope; label: string }[] = [
   { id: 'one', label: 'Solo este mes' },
   { id: 'rest', label: 'Este y los siguientes' },
 ];
-
-function toCents(value: string): number | null {
-  const normalised = value.trim().replace(',', '.');
-  if (!/^\d+(\.\d{1,2})?$/.test(normalised)) return null;
-  return Math.round(Number(normalised) * 100);
-}
 
 /**
  * Fija a mano el importe de una cuota con un motivo (solo ese mes o también los siguientes de la temporada), o la
@@ -54,7 +48,7 @@ export function ChargeDialog({
   const applyDiscount = useBillingMutation((percent: number) =>
     setChargeDiscount(studentId, charge.period, percent),
   );
-  const cents = toCents(amount);
+  const cents = centsFromText(amount);
   const ready = cents !== null && reason.trim() !== '';
   const month = monthLabel(charge.period).toLowerCase();
   const error = save.error ?? reset.error ?? applyDiscount.error;
