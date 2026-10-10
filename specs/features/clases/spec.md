@@ -75,8 +75,17 @@ Un grupo lleno se distingue visualmente, y uno con más alumnos que plazas se ma
 - **THEN** la ocupación es 9/12 el lunes y 8/12 el miércoles, y el miércoles queda una plaza libre más
 
 ### Requirement: Acceso restringido
-Las operaciones de grupos MUST estar reservadas a cuentas de administración.
+Crear y cambiar grupos e inscribir alumnos MUST estar reservado a cuentas de administración. El profesorado MUST poder
+consultar «Clases» de solo lectura, sin ningún botón de gestión: horario semanal, grupos con su ocupación y plazas
+libres por día, la hoja de cada grupo (sus alumnos, con enlace a la ficha) y la asistencia con sus comentarios, para
+informar a familias y a posibles alumnos nuevos (ver [la decisión](../../decisions/profesorado-lee-datos-del-club.md)).
+No ve la lista de profesores con sus tarifas.
 
-#### Scenario: Profesorado o anónimo
-- **WHEN** una cuenta de profesorado o alguien sin sesión intenta consultar o modificar grupos
+#### Scenario: Profesorado
+- **WHEN** Lucía, de profesorado, abre Clases
+- **THEN** ve los grupos y sus plazas libres, pero no «Nuevo grupo», «Editar» ni «Inscribir alumno», y el sistema
+  rechaza cualquier cambio que intente
+
+#### Scenario: Anónimo
+- **WHEN** alguien sin sesión intenta consultar o modificar grupos
 - **THEN** el sistema lo rechaza
