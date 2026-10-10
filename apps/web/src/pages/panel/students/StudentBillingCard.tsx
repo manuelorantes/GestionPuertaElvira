@@ -62,7 +62,7 @@ export function StudentBillingCard({
         <p className="text-sm text-ink-muted">Sin cobros todavía.</p>
       ) : (
         <ul aria-label="Historial de cobros">
-          {(payments.data ?? []).slice(0, 6).map((p) => (
+          {(payments.data ?? []).map((p) => (
             <li
               key={p.id}
               className="flex items-center gap-2 border-t border-line-soft py-2 text-sm"
@@ -243,6 +243,17 @@ function chargeState(charge: AccountCharge): { text: string; tone: string } {
   return { text: 'Pendiente', tone: 'text-warning-fg' };
 }
 
+/** Estado de la cuota de socio de la temporada: cobrada, a medias o pendiente. */
+function MembershipState({ pendingCents, feeCents }: { pendingCents: number; feeCents: number }) {
+  const state =
+    pendingCents <= 0
+      ? { text: 'Cobrada', tone: 'text-success-fg' }
+      : pendingCents < feeCents
+        ? { text: `Faltan ${formatCents(pendingCents)}`, tone: 'text-warning-fg' }
+        : { text: 'Pendiente', tone: 'text-warning-fg' };
+  return <span className={`text-[13px] font-medium ${state.tone}`}>{state.text}</span>;
+}
+
 /** Descuentos que lleva una cuota mensual: el familiar y el de pago adelantado (o null si ninguno). */
 function discountsLabel(charge: AccountCharge, account: Account): string | null {
   const parts: string[] = [];
@@ -257,7 +268,8 @@ function SeasonCharges({ studentId, account }: { studentId: string; account: Acc
   const [editing, setEditing] = useState<AccountCharge | null>(null);
   const canManage = useCanManageClub();
   const toast = useToast();
-  if (account.charges.length === 0 && account.balanceCents <= 0) return null;
+  const membership = account.membershipCharge;
+  if (account.charges.length === 0 && membership === null && account.balanceCents <= 0) return null;
 
   return (
     <section aria-label="Cuotas de la temporada" className="mt-2 border-t border-line-soft pt-3">
@@ -265,6 +277,18 @@ function SeasonCharges({ studentId, account }: { studentId: string; account: Acc
         Cuotas de la temporada
       </h4>
       <ul>
+        {membership !== null && (
+          <li className="flex items-center gap-2 py-1 text-sm">
+            <span className="w-28 shrink-0">Cuota de socio</span>
+            <span className="flex-1 font-medium">{formatCents(account.membershipFeeCents)}</span>
+            <MembershipState
+              pendingCents={membership.pendingCents}
+              feeCents={account.membershipFeeCents}
+            />
+            {/* Sin botón de editar: hueco para alinear con las cuotas del mes. */}
+            {canManage && <span aria-hidden className="size-8" />}
+          </li>
+        )}
         {account.charges.map((charge) => {
           const state = chargeState(charge);
           const month = monthLabel(charge.period);
