@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowRight, ArrowUpRight, Plus, Trash2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowRight, ArrowUpRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
@@ -22,6 +22,7 @@ import { MonthNav } from '@/shared/ui/MonthNav';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
 
+import { EditMovementDialog } from './EditMovementDialog';
 import { EntryDialog } from './EntryDialog';
 
 import { MovementConcept } from './MovementConcept';
@@ -141,10 +142,12 @@ function LedgerTable({
   items,
   label,
   onRemove,
+  onEdit,
 }: {
   items: LedgerItem[];
   label: string;
   onRemove: (item: LedgerItem) => void;
+  onEdit: (item: LedgerItem) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -191,6 +194,14 @@ function LedgerTable({
                     Corresponde a {monthLabel(item.period).toLowerCase()}
                   </span>
                 )}
+                {item.corrected && (
+                  <span
+                    className="block text-[12px] font-normal text-warning-fg"
+                    title="Corregido en contabilidad: el recibo o la nómina siguen como estaban"
+                  >
+                    Corregido en contabilidad
+                  </span>
+                )}
               </td>
               <td className="px-3 py-3">
                 <span className="rounded-full bg-line-soft px-2 py-0.5 text-xs whitespace-nowrap">
@@ -203,7 +214,16 @@ function LedgerTable({
               >
                 {signed(item)}
               </td>
-              <td className="px-2 py-3">
+              <td className="flex items-center px-2 py-3">
+                <button
+                  type="button"
+                  aria-label={`Editar ${item.concept}`}
+                  title="Editar"
+                  onClick={() => onEdit(item)}
+                  className={ROW_ACTION}
+                >
+                  <Pencil aria-hidden size={16} />
+                </button>
                 {item.source === 'manual' ? (
                   <button
                     type="button"
@@ -240,6 +260,7 @@ export function LedgerTab({
   const ledger = useLedger(month);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<LedgerItem | null>(null);
+  const [editing, setEditing] = useState<LedgerItem | null>(null);
   const remove = useAccountingMutation(deleteEntry);
   const toast = useToast();
   const data = ledger.data;
@@ -263,7 +284,12 @@ export function LedgerTab({
         {shown.items.length === 0 ? (
           <p className="px-5 py-12 text-center text-ink-muted">{emptyFilterMessage(filter)}</p>
         ) : (
-          <LedgerTable items={shown.items} label={label} onRemove={setRemoving} />
+          <LedgerTable
+            items={shown.items}
+            label={label}
+            onRemove={setRemoving}
+            onEdit={setEditing}
+          />
         )}
         {shown.active && shown.items.length > 0 && (
           <p className="border-t border-line px-5 pt-3 text-sm font-medium">
@@ -330,6 +356,9 @@ export function LedgerTab({
         </Card>
       </div>
       {adding && <EntryDialog onClose={() => setAdding(false)} />}
+      {editing && (
+        <EditMovementDialog item={editing} month={month} onClose={() => setEditing(null)} />
+      )}
       {removing && (
         <ConfirmDialog
           title="Quitar movimiento"
