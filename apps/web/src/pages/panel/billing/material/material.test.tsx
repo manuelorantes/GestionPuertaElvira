@@ -24,6 +24,7 @@ const order = (overrides: Record<string, unknown>) => ({
   values: { talla: '10' },
   detail: 'Talla 10',
   variantLabel: 'Talla 10',
+  missing: [],
   note: null,
   status: 'reserved',
   priceCents: null,
@@ -122,6 +123,57 @@ describe('Material deportivo', () => {
     );
   });
 
+  it('asks for the size still to choose before turning a reservation into an order', async () => {
+    const spy = api({
+      'GET /api/admin/equipment/orders?open=1': [
+        200,
+        { items: [order({ values: {}, detail: '', variantLabel: '', missing: ['Talla'] })] },
+      ],
+      'PUT /api/admin/equipment/orders/o1': [204],
+      'POST /api/admin/equipment/orders/o1/place': [204],
+    });
+    renderApp('/panel/cobros?pestana=material');
+
+    const list = await screen.findByRole('list', { name: 'Pedidos de material' });
+    expect(within(list).getByText('Falta talla')).toBeInTheDocument();
+    await userEvent.click(within(list).getByRole('button', { name: 'Pasar a pedido' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Pasar a pedido' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pasar a pedido' }));
+    expect(
+      await within(dialog).findByText('Antes de pasarlo a pedido, elige talla.'),
+    ).toBeInTheDocument();
+    await userEvent.selectOptions(within(dialog).getByLabelText('Talla'), '12');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pasar a pedido' }));
+    await waitFor(() =>
+      expect(bodyOf(spy, 'POST', '/api/admin/equipment/orders/o1/place')).toEqual({
+        priceCents: 4500,
+      }),
+    );
+    expect(bodyOf(spy, 'PUT', '/api/admin/equipment/orders/o1')).toEqual({
+      quantity: 1,
+      values: { talla: '12' },
+      note: null,
+    });
+  });
+
+  it('reserves an order with the size still to choose', async () => {
+    const spy = api({ 'POST /api/admin/equipment/orders': [201, { id: 'o3' }] });
+    renderApp('/panel/cobros?pestana=material');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Apuntar pedido' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Apuntar pedido' });
+    await userEvent.type(within(dialog).getByRole('combobox', { name: 'Alumno' }), 'martina');
+    await userEvent.click(
+      await within(dialog).findByRole('option', { name: 'Martina López Herrera' }),
+    );
+    await userEvent.selectOptions(within(dialog).getByLabelText('Producto'), 'p1');
+    expect(within(dialog).getByLabelText('Talla')).toHaveDisplayValue('Sin elegir aún');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Apuntar reserva' }));
+    await waitFor(() =>
+      expect(bodyOf(spy, 'POST', '/api/admin/equipment/orders')).toMatchObject({ values: {} }),
+    );
+  });
+
   it('notes a new order choosing the student, the product and its fields', async () => {
     const spy = api({ 'POST /api/admin/equipment/orders': [201, { id: 'o3' }] });
     renderApp('/panel/cobros?pestana=material');
@@ -133,8 +185,6 @@ describe('Material deportivo', () => {
       await within(dialog).findByRole('option', { name: 'Martina López Herrera' }),
     );
     await userEvent.selectOptions(within(dialog).getByLabelText('Producto'), 'p1');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Apuntar reserva' }));
-    expect(await within(dialog).findByText('Elige talla.')).toBeInTheDocument();
     await userEvent.selectOptions(within(dialog).getByLabelText('Talla'), '10');
     await userEvent.type(within(dialog).getByLabelText('Nombre a estampar (opcional)'), 'Martina');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Apuntar reserva' }));

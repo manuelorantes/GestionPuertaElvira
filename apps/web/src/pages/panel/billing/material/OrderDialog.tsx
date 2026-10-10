@@ -14,39 +14,50 @@ import { useToast } from '@/shared/ui/Toast';
 import { FormDialog } from './FormDialog';
 
 /** Los campos de un producto: una lista para cada campo de lista y un texto para cada campo de texto. */
-function ProductFields({
+export function ProductFields({
   product,
   values,
   onChange,
+  canWait = false,
+  only,
 }: {
   product: Product;
   values: Record<string, string>;
   onChange: (values: Record<string, string>) => void;
+  /** En una reserva, los campos de lista pueden quedar sin elegir hasta pasarla a pedido. */
+  canWait?: boolean;
+  /** Solo estos campos (por nombre). */
+  only?: string[];
 }) {
   return (
     <>
-      {product.fields.map((field) =>
-        field.kind === 'options' ? (
-          <Select
-            key={field.id}
-            label={field.name}
-            value={values[field.id] ?? ''}
-            onChange={(value) => onChange({ ...values, [field.id]: value })}
-            options={[
-              { value: '', label: `Elige ${field.name.toLowerCase()}` },
-              ...field.options.map((o) => ({ value: o, label: o })),
-            ]}
-          />
-        ) : (
-          <TextField
-            key={field.id}
-            label={`${field.name} (opcional)`}
-            value={values[field.id] ?? ''}
-            maxLength={60}
-            onChange={(e) => onChange({ ...values, [field.id]: e.target.value })}
-          />
-        ),
-      )}
+      {product.fields
+        .filter((field) => !only || only.includes(field.name))
+        .map((field) =>
+          field.kind === 'options' ? (
+            <Select
+              key={field.id}
+              label={field.name}
+              value={values[field.id] ?? ''}
+              onChange={(value) => onChange({ ...values, [field.id]: value })}
+              options={[
+                {
+                  value: '',
+                  label: canWait ? 'Sin elegir aún' : `Elige ${field.name.toLowerCase()}`,
+                },
+                ...field.options.map((o) => ({ value: o, label: o })),
+              ]}
+            />
+          ) : (
+            <TextField
+              key={field.id}
+              label={`${field.name} (opcional)`}
+              value={values[field.id] ?? ''}
+              maxLength={60}
+              onChange={(e) => onChange({ ...values, [field.id]: e.target.value })}
+            />
+          ),
+        )}
     </>
   );
 }
@@ -87,8 +98,10 @@ export function OrderDialog({
     if (!student) return 'Elige el alumno.';
     if (!product) return 'Elige el producto.';
     if (!Number.isInteger(units) || units < 1) return 'La cantidad debe ser 1 o más.';
+    // Una reserva puede quedar con campos de lista sin elegir; con precio, no.
+    const reserving = order ? order.status === 'reserved' : !withPrice;
     const missing = product.fields.find((f) => f.kind === 'options' && !values[f.id]);
-    if (missing) return `Elige ${missing.name.toLowerCase()}.`;
+    if (missing && !reserving) return `Elige ${missing.name.toLowerCase()}.`;
     const input = { quantity: units, values, note: note.trim() || null };
     if (order) {
       return editOrder(order.id, input).then(() => {
@@ -147,7 +160,14 @@ export function OrderDialog({
           />
         </>
       )}
-      {product && <ProductFields product={product} values={values} onChange={setValues} />}
+      {product && (
+        <ProductFields
+          product={product}
+          values={values}
+          onChange={setValues}
+          canWait={order ? order.status === 'reserved' : !withPrice}
+        />
+      )}
       <TextField
         label="Cantidad"
         inputMode="numeric"

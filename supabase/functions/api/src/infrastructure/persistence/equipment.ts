@@ -267,7 +267,11 @@ function stateOf(row: Row): OrderState {
 }
 
 function toOrderView(row: Row): OrderView {
+  const values = row.json('field_values') as Record<string, string>;
   return {
+    missing: (row.json('product_fields') as StoredField[])
+      .filter((f) => f.kind === 'options' && !f.options.includes(values[f.id] ?? ''))
+      .map((f) => f.name),
     id: row.string('id'),
     studentId: row.string('student_id'),
     studentName: row.string('full_name'),
@@ -324,7 +328,7 @@ export class SqlEquipmentQuery implements EquipmentQuery {
     }
     const rows = await this.sql.unsafe(
       `WITH ${ALLOCATED}
-       SELECT ${ORDER_COLUMNS}, p.name AS product_name, s.full_name,
+       SELECT ${ORDER_COLUMNS}, p.name AS product_name, p.fields AS product_fields, s.full_name,
               COALESCE(a.due_cents, 0) AS due_cents, COALESCE(a.covered_cents, 0) AS covered_cents
          FROM equipment_order o
          JOIN equipment_product p ON p.id = o.product_id
@@ -341,7 +345,7 @@ export class SqlEquipmentQuery implements EquipmentQuery {
   async order(id: string): Promise<OrderView | null> {
     const rows = await this.sql.unsafe(
       `WITH ${ALLOCATED}
-       SELECT ${ORDER_COLUMNS}, p.name AS product_name, s.full_name,
+       SELECT ${ORDER_COLUMNS}, p.name AS product_name, p.fields AS product_fields, s.full_name,
               COALESCE(a.due_cents, 0) AS due_cents, COALESCE(a.covered_cents, 0) AS covered_cents
          FROM equipment_order o
          JOIN equipment_product p ON p.id = o.product_id
@@ -391,6 +395,8 @@ export class SqlEquipmentQuery implements EquipmentQuery {
                CASE WHEN delivered_on IS NOT NULL AND NOT returned_to_stock THEN quantity ELSE 0 END,
                CASE WHEN status <> 'cancelled' AND delivered_on IS NULL THEN quantity ELSE 0 END
           FROM equipment_order
+         -- Una reserva con campos de lista sin elegir aún no es de ninguna variante.
+         WHERE variant_key <> ''
       )
       SELECT pr.id, pr.name, pr.active, m.variant_key, MAX(m.variant_label) AS variant_label,
              SUM(m.bought)::integer AS bought, SUM(m.delivered)::integer AS delivered,

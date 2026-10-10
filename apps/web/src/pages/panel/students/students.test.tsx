@@ -471,6 +471,7 @@ describe('Alumnos', () => {
               values: { talla: '10' },
               detail: 'Talla 10',
               variantLabel: 'Talla 10',
+              missing: [],
               note: null,
               status: 'ordered',
               priceCents: 4500,

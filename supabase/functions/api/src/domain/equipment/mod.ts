@@ -65,7 +65,10 @@ export class ProductField {
 export class Selection {
   constructor(
     readonly values: Readonly<Record<string, string>>,
-    /** JSON canónico de los valores de los campos de lista: identifica la variante para el stock. */
+    /**
+     * JSON canónico de los valores de los campos de lista: identifica la variante para el stock. Vacío si falta alguno
+     * (una reserva a medias aún no es de ninguna variante).
+     */
     readonly variantKey: string,
     /** «Talla 10 · Color azul» (vacío si el producto no tiene campos de lista). */
     readonly variantLabel: string,
@@ -161,15 +164,32 @@ export class Product {
 
   /** Lo elegido en un pedido: una opción de cada campo de lista y, si se quiere, los textos. */
   select(values: Readonly<Record<string, string>>): Selection {
-    return this.selection(values, true);
+    return this.selection(values, true, false);
+  }
+
+  /** Lo elegido en una reserva: los campos de lista pueden quedar aún sin elegir. */
+  selectSoFar(values: Readonly<Record<string, string>>): Selection {
+    return this.selection(values, true, true);
   }
 
   /** La variante de una línea de compra: solo los campos de lista. */
   variant(values: Readonly<Record<string, string>>): Selection {
-    return this.selection(values, false);
+    return this.selection(values, false, false);
   }
 
-  private selection(values: Readonly<Record<string, string>>, withText: boolean): Selection {
+  /** Los campos de lista sin una opción válida elegida. */
+  missingIn(values: Readonly<Record<string, string>>): string[] {
+    return this.fieldList
+      .filter((f) => f.kind === 'options' && !f.options.includes((values[f.id] ?? '').trim()))
+      .map((f) => f.name);
+  }
+
+  private selection(
+    values: Readonly<Record<string, string>>,
+    withText: boolean,
+    partial: boolean,
+  ): Selection {
+    let complete = true;
     const chosen: Record<string, string> = {};
     const variant: [string, string][] = [];
     const variantParts: string[] = [];
@@ -178,6 +198,10 @@ export class Product {
       const raw = (values[field.id] ?? '').trim();
       if (field.kind === 'options') {
         if (!field.options.includes(raw)) {
+          if (partial && raw === '') {
+            complete = false;
+            continue;
+          }
           throw new InvalidValue('values', `Elige ${field.name.toLocaleLowerCase('es')}.`);
         }
         chosen[field.id] = raw;
@@ -194,7 +218,7 @@ export class Product {
     variant.sort(([a], [b]) => a.localeCompare(b));
     return new Selection(
       chosen,
-      JSON.stringify(variant),
+      complete ? JSON.stringify(variant) : '',
       variantParts.join(' · '),
       [...variantParts, ...textParts].join(' · '),
     );
@@ -269,7 +293,7 @@ export class Order {
       fields.student,
       fields.product.id,
       quantityOf(fields.quantity),
-      fields.product.select(fields.values),
+      fields.product.selectSoFar(fields.values),
       noteOf(fields.note),
       'reserved',
       null,
@@ -328,14 +352,25 @@ export class Order {
       throw new InvalidValue('id', 'El pedido ya está entregado: deshaz antes la entrega.');
     }
     this.units = quantityOf(quantity);
-    this.chosen = product.select(values);
+    // Mientras está reservado puede quedar algo por elegir; con precio, ya no.
+    this.chosen = this.state === 'reserved' ? product.selectSoFar(values) : product.select(values);
     this.remark = noteOf(note);
   }
 
   /** De reservado a pedido: ya tiene precio y su cobro. */
-  place(price: Money, charge: ChargeRef, today: LocalDate): void {
+  place(product: Product, price: Money, charge: ChargeRef, today: LocalDate): void {
     this.mustBeOpen();
     if (this.state !== 'reserved') throw new InvalidValue('id', 'El pedido ya tiene precio.');
+    const missing = product.missingIn(this.chosen.values);
+    if (missing.length > 0) {
+      throw new InvalidValue(
+        'values',
+        `Antes de pasarlo a pedido, elige ${
+          missing.map((m) => m.toLocaleLowerCase('es')).join(' y ')
+        }.`,
+      );
+    }
+    this.chosen = product.select(this.chosen.values);
     if (price.isNegative()) {
       throw new InvalidValue('priceCents', 'El precio no puede ser negativo.');
     }
