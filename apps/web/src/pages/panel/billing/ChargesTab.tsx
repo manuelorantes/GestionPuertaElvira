@@ -88,6 +88,7 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
       : 0;
 
   function concept(charge: Charge) {
+    if (charge.kind === 'material') return charge.concept ?? 'Material deportivo';
     if (charge.kind === 'membership') {
       const year = Number(charge.period.slice(0, 4));
       return `Cuota de socio ${year}/${String((year + 1) % 100).padStart(2, '0')}`;
@@ -109,7 +110,13 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
           Recibo
         </button>
       );
-    const pay = () => onAction({ type: 'payment', studentId: charge.studentId, kind: charge.kind });
+    const pay = () =>
+      onAction({
+        type: 'payment',
+        studentId: charge.studentId,
+        kind: charge.kind,
+        ...(charge.kind === 'material' ? { chargeId: charge.id } : {}),
+      });
     return (
       <>
         {charge.status === 'overdue' && !charge.remindedOn && (
@@ -129,7 +136,8 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
         >
           {charge.status === 'overdue' ? 'Cobrar' : 'Registrar cobro'}
         </button>
-        {charge.status !== 'expected' && (
+        {/* El cobro del material se cancela desde su pedido, en «Material deportivo». */}
+        {charge.status !== 'expected' && charge.kind !== 'material' && (
           <button
             type="button"
             aria-label={`Cancelar cuota de ${charge.studentName}`}

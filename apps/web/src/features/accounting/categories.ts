@@ -13,6 +13,7 @@ export const CATEGORIES: Record<EntryKind, { value: string; label: string }[]> =
   income: [
     { value: 'fees', label: 'Cuotas' },
     { value: 'membership', label: 'Cuota de socio' },
+    { value: 'material_sales', label: 'Venta de material' },
     { value: 'grants', label: 'Subvenciones' },
     { value: 'tournament_income', label: 'Torneos' },
     { value: 'other_income', label: 'Otros ingresos' },

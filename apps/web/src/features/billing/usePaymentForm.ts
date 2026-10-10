@@ -11,7 +11,7 @@ import { useAccount, useBillingMutation } from './hooks';
 /** Todo el año (20 %) solo se ofrece si quedan 9 o 10 meses por cobrar. */
 const WHOLE_YEAR_MIN_MONTHS = 9;
 
-export type Concept = 'month' | 'three' | 'six' | 'year' | 'membership';
+export type Concept = 'month' | 'three' | 'six' | 'year' | 'membership' | 'material';
 
 export const CONCEPTS: { id: Concept; label: string }[] = [
   { id: 'month', label: 'Mes' },
@@ -19,6 +19,7 @@ export const CONCEPTS: { id: Concept; label: string }[] = [
   { id: 'six', label: '6 meses' },
   { id: 'year', label: 'Todo el año' },
   { id: 'membership', label: 'Cuota de socio' },
+  { id: 'material', label: 'Material' },
 ];
 
 type SpecialMode = 'percent' | 'amount';
@@ -31,11 +32,16 @@ export interface SpecialState {
 }
 
 /** Estado del diálogo de cobro: pide la cotización al cambiar algo (meses, puntos, descuento especial). */
-export function usePaymentForm(initialStudentId?: string, initialKind?: api.ChargeKind) {
+export function usePaymentForm(
+  initialStudentId?: string,
+  initialKind?: api.ChargeKind,
+  initialChargeId?: string,
+) {
   const [studentId, setStudentId] = useState(initialStudentId ?? '');
   const [chosenConcept, setConcept] = useState<Concept | null>(
-    initialKind === 'membership' ? 'membership' : null,
+    initialKind === 'membership' || initialKind === 'material' ? initialKind : null,
   );
+  const [chosenMaterial, setMaterialChargeId] = useState(initialChargeId ?? '');
   const [method, setMethod] = useState<api.PaymentMethod>('cash');
   const [date, setDate] = useState(todayIso());
   const [special, setSpecial] = useState<SpecialState>({
@@ -55,9 +61,16 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
       ? 'membership'
       : 'month';
   const concept = chosenConcept ?? defaultConcept;
+  // El pedido de material que se cobra: el elegido o, si no, el primero pendiente.
+  const materialCharges = account.data?.materialCharges ?? [];
+  const materialChargeId = materialCharges.some((c) => c.id === chosenMaterial)
+    ? chosenMaterial
+    : (materialCharges[0]?.id ?? '');
   const remaining = account.data?.remainingMonths ?? null;
   // «Todo el año» cobra todo lo que queda de temporada (9 o 10 meses; la temporada es de septiembre a junio).
-  const months = { month: 1, three: 3, six: 6, year: remaining ?? 0, membership: 1 }[concept];
+  const months = { month: 1, three: 3, six: 6, year: remaining ?? 0, membership: 1, material: 1 }[
+    concept
+  ];
   const specialValue = Number(special.value.replace(',', '.'));
   const specialDiscount =
     special.enabled && specialValue > 0 && special.concept.trim()
@@ -68,24 +81,30 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
         }
       : null;
   // Los puntos se canjean de 5 en 5: con menos de 5 no hay descuento.
-  const canRedeem = (account.data?.points ?? 0) >= 5 && concept !== 'membership';
+  const canRedeem =
+    (account.data?.points ?? 0) >= 5 && concept !== 'membership' && concept !== 'material';
   const points = canRedeem && redeemPoints ? 5 : 0;
 
   const request: api.PaymentRequest = {
     studentId,
-    kind: concept === 'membership' ? 'membership' : 'monthly',
+    kind: concept === 'membership' || concept === 'material' ? concept : 'monthly',
     months,
     method,
     date,
     specialDiscount,
     redeemPoints: points,
+    ...(concept === 'material' ? { chargeId: materialChargeId } : {}),
   };
   // Se espera a una pausa en la escritura comparando el texto de la petición (un objeto nuevo en cada render no se asentaría nunca).
   // La forma de pago no cambia el importe: no entra en la cotización (cambiarla no recalcula nada).
   const requestKey = JSON.stringify({ ...request, method: 'cash' });
   const debouncedKey = useDebouncedValue(requestKey, 250);
   const debounced = useMemo(() => JSON.parse(debouncedKey) as api.PaymentRequest, [debouncedKey]);
-  const ready = Boolean(debounced.studentId) && Boolean(debounced.date) && debounced.months > 0;
+  const ready =
+    Boolean(debounced.studentId) &&
+    Boolean(debounced.date) &&
+    debounced.months > 0 &&
+    (debounced.kind !== 'material' || Boolean(debounced.chargeId));
   const quote = useQuery({
     queryKey: ['quote', debouncedKey],
     queryFn: () => api.quotePayment(debounced),
@@ -103,15 +122,21 @@ export function usePaymentForm(initialStudentId?: string, initialKind?: api.Char
     setStudentId: (id: string) => {
       setStudentId(id);
       if (chosenConcept !== 'membership') setConcept(null);
+      setMaterialChargeId('');
     },
     concept,
     setConcept,
     remainingMonths: remaining,
     /** Conceptos que no caben en lo que queda por cobrar (se muestran desactivados). */
     unavailable: (id: Concept) =>
-      remaining !== null &&
       id !== 'membership' &&
+      id !== 'material' &&
+      remaining !== null &&
       ({ month: 1, three: 3, six: 6, year: WHOLE_YEAR_MIN_MONTHS } as const)[id] > remaining,
+    /** Pedidos de material con algo pendiente: sin ninguno, el concepto «Material» no se ofrece. */
+    materialCharges,
+    materialChargeId,
+    setMaterialChargeId,
     method,
     setMethod,
     date,

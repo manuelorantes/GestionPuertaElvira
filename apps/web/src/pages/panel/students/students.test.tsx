@@ -380,6 +380,8 @@ describe('Alumnos', () => {
       membershipFeeCents: 5000,
       charges: [],
       balanceCents: 0,
+      materialCharges: [],
+      totals: [],
     };
     const spy = api({
       'GET /api/admin/billing/accounts/s1': [
@@ -424,6 +426,87 @@ describe('Alumnos', () => {
       '/panel/puntos?alumno=s1',
     );
     expect(spy).toHaveBeenCalled();
+  });
+
+  it('sums up everything the student moves in the club and lists their sports equipment', async () => {
+    api({
+      'GET /api/admin/billing/accounts/s1': [
+        200,
+        {
+          preferredPlan: 'monthly',
+          member: true,
+          privateRate: null,
+          points: 0,
+          suggestedMonths: 1,
+          remainingMonths: 9,
+          weeklyHours: 2,
+          monthlyFeeCents: 4500,
+          familyDiscount: false,
+          familyPercent: 0,
+          hasPrivateLessons: false,
+          membershipPaid: true,
+          membershipFeeCents: 5000,
+          charges: [],
+          membershipCharge: null,
+          balanceCents: 0,
+          materialCharges: [{ id: 'c7', concept: 'Chándal · Talla 10', pendingCents: 4500 }],
+          totals: [
+            { kind: 'monthly', paidCents: 9000, pendingCents: 4500 },
+            { kind: 'membership', paidCents: 5000, pendingCents: 0 },
+            { kind: 'material', paidCents: 0, pendingCents: 4500 },
+          ],
+        },
+      ],
+      'GET /api/admin/equipment/orders?studentId=s1': [
+        200,
+        {
+          items: [
+            {
+              id: 'o1',
+              studentId: 's1',
+              studentName: 'Martina López Herrera',
+              productId: 'p1',
+              productName: 'Chándal',
+              quantity: 1,
+              values: { talla: '10' },
+              detail: 'Talla 10',
+              variantLabel: 'Talla 10',
+              note: null,
+              status: 'ordered',
+              priceCents: 4500,
+              dueCents: 4500,
+              coveredCents: 0,
+              chargeId: 'c7',
+              createdOn: '2026-10-08',
+              orderedOn: '2026-10-08',
+              deliveredOn: null,
+              cancelledOn: null,
+              returnedToStock: false,
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    const totals = await screen.findByRole('region', { name: 'Total en el club' });
+    expect(
+      within(totals)
+        .getAllByRole('row')
+        .map((r) => r.textContent),
+    ).toEqual([
+      'ConceptoCobradoPendiente',
+      'Cuotas90 €45 €',
+      'Cuota de socio50 €—',
+      'Material deportivo0 €45 €',
+      'Total140 €90 €',
+    ]);
+    const material = await screen.findByRole('list', { name: 'Pedidos de material del alumno' });
+    expect(material).toHaveTextContent('Chándal · Talla 10');
+    expect(within(material).getByText('Pedido')).toBeInTheDocument();
+    await userEvent.click(within(material).getByRole('button', { name: 'Cobrar' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Registrar cobro' });
+    expect(await within(dialog).findByLabelText('Pedido de material')).toHaveValue('c7');
   });
 
   it('lists the season charges and fixes one by hand for this and the following months', async () => {
@@ -476,6 +559,8 @@ describe('Alumnos', () => {
         },
       ],
       balanceCents: 0,
+      materialCharges: [],
+      totals: [],
     };
     const spy = api({
       'GET /api/admin/billing/accounts/s1': [200, account],
@@ -771,6 +856,8 @@ describe('Alumnos', () => {
           charges: [pendingCharge('c-now', now), pendingCharge('c-next', next)],
           membershipCharge: { id: 'c-socio', pendingCents: 5000 },
           balanceCents: 0,
+          materialCharges: [],
+          totals: [],
         },
       ],
       'POST /api/admin/students/s1/withdrawal': [204],
