@@ -38,6 +38,11 @@ La lista MUST poder ordenarse por número de socio o alfabéticamente (por defec
 - **WHEN** administración elige «Socios sin clases»
 - **THEN** solo aparecen los alumnos activos que no están inscritos en ningún grupo
 
+### Requirement: Enlace a la ficha
+Allí donde el panel muestre el nombre de un alumno (resumen, cuotas, cobros y recibos, movimientos, material, puntos,
+clases, asistencia, comentarios, familia directa y «Mis grupos») MUST poder pulsarse para ir a su ficha. Quedan fuera
+los sitios donde pulsar el nombre ya hace otra cosa (pasar lista, el historial de puntos) y los avisos de confirmación.
+
 ### Requirement: Ficha del alumno
 La ficha MUST mostrar:
 
