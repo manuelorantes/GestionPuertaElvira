@@ -22,6 +22,15 @@ Table identity_user {
 
 Ref: identity_user.teacher_id - teachers_teacher.id [delete: set null]
 
+Table identity_user_email {
+  email varchar(254) [pk, note: 'normalizado a minúsculas; no puede ser el email de otra cuenta']
+  user_id uuid [not null]
+
+  Note: 'Emails adicionales (opcionales) con los que también se entra en la cuenta.'
+}
+
+Ref: identity_user_email.user_id > identity_user.id [delete: cascade]
+
 Table identity_session {
   id uuid [pk, note: 'UUIDv7']
   token_hash varchar(64) [not null, unique, note: 'SHA-256 del token de la cookie; el token nunca se guarda']

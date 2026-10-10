@@ -37,19 +37,29 @@ function toUser(row: Row): User {
       ? null
       : TeacherLink.fromString(row.string('teacher_id')),
     teacherLinkedAt: row.json('teacher_linked_at') === null ? null : row.date('teacher_linked_at'),
+    otherEmails: row.stringList('other_emails').map((e) => EmailAddress.fromString(e)),
   });
 }
+
+/** La cuenta con sus emails adicionales (`other_emails`). */
+const USER_COLUMNS =
+  `u.*, COALESCE((SELECT json_agg(e.email ORDER BY e.email) FROM identity_user_email e
+  WHERE e.user_id = u.id), '[]'::json) AS other_emails`;
 
 export class SqlUserRepository implements UserRepository {
   constructor(private readonly sql: Sql) {}
 
   async find(id: UserId): Promise<User | null> {
-    const rows = await this.sql`SELECT * FROM identity_user WHERE id = ${id.value}`;
+    const rows = await this.sql`SELECT ${this.sql.unsafe(USER_COLUMNS)}
+      FROM identity_user u WHERE u.id = ${id.value}`;
     return rows[0] ? toUser(new Row(rows[0])) : null;
   }
 
+  /** Por su email principal o por uno de sus emails adicionales. */
   async findByEmail(email: EmailAddress): Promise<User | null> {
-    const rows = await this.sql`SELECT * FROM identity_user WHERE email = ${email.value}`;
+    const rows = await this.sql`SELECT ${this.sql.unsafe(USER_COLUMNS)} FROM identity_user u
+      WHERE u.email = ${email.value}
+         OR u.id = (SELECT e.user_id FROM identity_user_email e WHERE e.email = ${email.value})`;
     return rows[0] ? toUser(new Row(rows[0])) : null;
   }
 
@@ -84,6 +94,14 @@ export class SqlUserRepository implements UserRepository {
         'teacher_linked_at',
       )
     }`;
+    const others = user.otherEmails().map((e) => e.value);
+    await this.sql`DELETE FROM identity_user_email
+      WHERE user_id = ${record.id} AND NOT (email = ANY(${others}))`;
+    for (const email of others) {
+      await this
+        .sql`INSERT INTO identity_user_email (email, user_id) VALUES (${email}, ${record.id})
+        ON CONFLICT DO NOTHING`;
+    }
   }
 }
 
@@ -206,6 +224,8 @@ export class SqlUserDirectory implements UserDirectory {
     const rows = await this.sql`
       SELECT u.id, u.email, u.full_name, u.role, u.status, u.must_change_password, u.created_at, u.teacher_id,
              t.full_name AS teacher_name,
+             COALESCE((SELECT json_agg(e.email ORDER BY e.email) FROM identity_user_email e
+                        WHERE e.user_id = u.id), '[]'::json) AS other_emails,
              GREATEST(
                (SELECT max(s.last_activity_at) FROM identity_session s WHERE s.user_id = u.id),
                (SELECT max(a.occurred_at) FROM audit_action a
@@ -221,6 +241,7 @@ export class SqlUserDirectory implements UserDirectory {
       status: r.string('status') === 'disabled' ? 'disabled' : 'active',
       mustChangePassword: r.bool('must_change_password'),
       createdAt: r.date('created_at').toISOString(),
+      otherEmails: r.stringList('other_emails'),
       teacher: r.nullableString('teacher_id') === null
         ? null
         : { id: r.string('teacher_id'), name: r.string('teacher_name') },
