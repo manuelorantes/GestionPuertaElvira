@@ -142,6 +142,7 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
         </div>
       )}
       <SeasonCharges studentId={studentId} account={account} />
+      <ClubTotals account={account} />
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-line-soft pt-3 text-sm">
         <span>
           Puntos de este mes: <strong>{account.points}</strong>
@@ -157,6 +158,62 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
         </Link>
       </div>
     </div>
+  );
+}
+
+const KIND_LABEL: Record<Account['totals'][number]['kind'], string> = {
+  monthly: 'Cuotas',
+  membership: 'Cuota de socio',
+  material: 'Material deportivo',
+};
+
+/** Todo lo que mueve en el club: lo cobrado y lo pendiente de cuotas, cuota de socio y material. */
+function ClubTotals({ account }: { account: Account }) {
+  const rows = account.totals.filter((t) => t.paidCents > 0 || t.pendingCents > 0);
+  if (rows.length === 0) return null;
+  const paid = rows.reduce((sum, t) => sum + t.paidCents, 0);
+  const pending = rows.reduce((sum, t) => sum + t.pendingCents, 0);
+  return (
+    <section aria-label="Total en el club" className="mt-2 border-t border-line-soft pt-3">
+      <h4 className="mb-1 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+        Total en el club
+      </h4>
+      <table className="w-full text-sm">
+        <thead className="text-[12px] text-ink-muted">
+          <tr>
+            <th scope="col" className="py-1 text-left font-normal">
+              <span className="sr-only">Concepto</span>
+            </th>
+            <th scope="col" className="py-1 text-right font-normal">
+              Cobrado
+            </th>
+            <th scope="col" className="py-1 text-right font-normal">
+              Pendiente
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((t) => (
+            <tr key={t.kind}>
+              <td className="py-1">{KIND_LABEL[t.kind]}</td>
+              <td className="py-1 text-right">{formatCents(t.paidCents)}</td>
+              <td className="py-1 text-right">
+                {t.pendingCents > 0 ? formatCents(t.pendingCents) : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+        {rows.length > 1 && (
+          <tfoot className="border-t border-line-soft font-semibold">
+            <tr>
+              <td className="py-1">Total</td>
+              <td className="py-1 text-right">{formatCents(paid)}</td>
+              <td className="py-1 text-right">{pending > 0 ? formatCents(pending) : '—'}</td>
+            </tr>
+          </tfoot>
+        )}
+      </table>
+    </section>
   );
 }
 

@@ -33,6 +33,7 @@ import { useToast } from '@/shared/ui/Toast';
 import { StudentAttendanceCard } from './StudentAttendanceCard';
 import { StudentCommentsCard } from './StudentCommentsCard';
 import { StudentBillingCard } from './StudentBillingCard';
+import { StudentMaterialCard } from './StudentMaterialCard';
 import { EnrolmentDialog } from './EnrolmentDialog';
 import { PickerDialog } from './PickerDialog';
 import { StudentDialog } from './StudentDialog';
@@ -355,6 +356,7 @@ export function StudentPanel() {
           </Button>
         </Card>
         <StudentBillingCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
+        <StudentMaterialCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentAttendanceCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentCommentsCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
       </div>
