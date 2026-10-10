@@ -13,9 +13,12 @@ const CLUE_TEXT: Record<Clue, string> = {
 const linked = (a: FactStudent, b: FactStudent): boolean =>
   a.siblingIds.includes(b.id) || b.siblingIds.includes(a.id);
 
-/** Los dos apellidos (las dos últimas palabras) de un nombre con al menos tres palabras. */
+/**
+ * Los dos apellidos (las dos últimas palabras) de un nombre con al menos tres palabras, sin las notas entre paréntesis
+ * («Candela Rodríguez Sánchez (Huétor)»).
+ */
 function surnamesOf(student: FactStudent): string | null {
-  const words = normalise(student.fullName).split(' ');
+  const words = normalise(student.fullName.replace(/\(.*?\)/g, ' ')).split(' ');
   return words.length >= 3 ? words.slice(-2).join(' ') : null;
 }
 
