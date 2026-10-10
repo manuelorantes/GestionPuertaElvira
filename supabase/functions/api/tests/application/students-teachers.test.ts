@@ -149,6 +149,8 @@ Deno.test('RejoinStudent should join a withdrawn student again from a date, in g
     confirmed: false,
     from: '2026-11-15',
   });
+  // Toda persona que vuelve de alta es socia, también con grupos.
+  assertEquals(membership.members.at(-1), id);
   await assertRejects(
     () => rejoin.execute(id, '2026-11-16', [], false),
     InvalidValue,

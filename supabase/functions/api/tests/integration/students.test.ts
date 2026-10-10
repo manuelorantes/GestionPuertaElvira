@@ -125,6 +125,13 @@ Deno.test('students need only a name; what is missing shows up in pending data a
 
   const complete = await fx.client.json('POST', '/api/admin/students', student(fx));
   assertEquals(complete.status, 201);
+  const withClasses = (complete.body as { id: string }).id;
+  assertEquals(
+    body<{ member: boolean }>(await fx.client.get(`/api/admin/billing/accounts/${withClasses}`))
+      .member,
+    true,
+    'con clases, también es socio',
+  );
   const noClasses = body<{ items: { id: string }[] }>(
     await fx.client.get('/api/admin/students?filter=no_classes'),
   ).items;

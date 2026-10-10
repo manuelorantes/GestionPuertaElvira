@@ -41,8 +41,9 @@ Deno.test({
   ignore: outsideSeason,
   async fn() {
     const fx = await fixture();
+    // Las del mes; la cuota de socio pendiente, que todo alumno tiene, se mira aparte.
     const charges = body<{ month: string; items: Record<string, unknown>[]; totals: unknown }>(
-      await fx.client.get('/api/admin/billing/charges'),
+      await fx.client.get('/api/admin/billing/charges?kind=monthly'),
     );
     assertEquals(charges.month, today.slice(0, 7));
     const charge = charges.items[0] as Record<string, unknown>;
@@ -518,7 +519,7 @@ Deno.test({
     const month = today.slice(0, 7);
     type Item = { id: string; status: string; amountCents: number; cancelledCents: number };
     const listed = async () =>
-      body<{ items: Item[] }>(await fx.client.get('/api/admin/billing/charges')).items;
+      body<{ items: Item[] }>(await fx.client.get('/api/admin/billing/charges?kind=monthly')).items;
     const cancelled = async () =>
       body<{ items: Record<string, unknown>[] }>(
         await fx.client.get('/api/admin/billing/charges/cancelled'),
