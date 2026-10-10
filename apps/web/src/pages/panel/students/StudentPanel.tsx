@@ -42,6 +42,7 @@ import { StudentDialog } from './StudentDialog';
 import { DateDialog } from './DateDialog';
 import { RejoinDialog } from './RejoinDialog';
 import { WithdrawDialog } from './WithdrawDialog';
+import { StudentLink } from './StudentLink';
 
 type Action =
   | { kind: 'edit' }
@@ -336,7 +337,9 @@ export function StudentPanel() {
           )}
           {s.siblings.map((sibling) => (
             <div key={sibling.id} className="flex items-center gap-2 py-1.5 text-sm">
-              <span className="flex-1 font-medium">{sibling.fullName}</span>
+              <StudentLink id={sibling.id} className="flex-1 font-medium">
+                {sibling.fullName}
+              </StudentLink>
               <button
                 type="button"
                 onClick={() => void navigate(`/panel/alumnos/${sibling.id}`)}

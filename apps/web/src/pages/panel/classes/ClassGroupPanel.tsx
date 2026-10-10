@@ -23,6 +23,7 @@ import { OccupancyByDay } from './OccupancyByDay';
 import { MonthNav } from '@/shared/ui/MonthNav';
 import { SidePanel } from '@/shared/ui/SidePanel';
 import { useToast } from '@/shared/ui/Toast';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 interface ClassGroupPanelProps {
   groupId: string;
@@ -130,7 +131,9 @@ export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelPro
             {g.students.map((s) => (
               <li key={s.id} className="flex items-center justify-between gap-2 py-2">
                 <span>
-                  <span className="font-medium">{s.fullName}</span>{' '}
+                  <StudentLink id={s.id} className="font-medium">
+                    {s.fullName}
+                  </StudentLink>{' '}
                   <span className="text-[13px] text-ink-muted">
                     · {s.age === null ? 'edad sin indicar' : `${s.age} años`}
                   </span>

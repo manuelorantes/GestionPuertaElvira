@@ -193,7 +193,12 @@ describe('Mis grupos', () => {
 
     const attendance = screen.getByRole('region', { name: 'Asistencia' });
     expect(await within(attendance).findByLabelText(/Pablo Gil Ruiz faltó/)).toBeVisible();
-    expect(within(attendance).queryByRole('link')).not.toBeInTheDocument();
+    // Cada nombre lleva a la ficha del alumno (el profesorado la puede consultar).
+    expect(within(attendance).getByRole('link', { name: 'Pablo Gil Ruiz' })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/^\/panel\/alumnos\/.+/),
+    );
+    expect(within(students).getByRole('link', { name: 'Martina López Herrera' })).toBeVisible();
     expect(within(attendance).getByRole('button', { name: 'Mes siguiente' })).toBeDisabled();
     // Hacia atrás, hasta septiembre.
     const previous = within(attendance).getByRole('button', { name: 'Mes anterior' });

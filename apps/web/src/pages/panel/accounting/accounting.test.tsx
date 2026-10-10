@@ -33,6 +33,7 @@ const LEDGER = {
       category: 'fees',
       method: 'cash',
       amountCents: 4500,
+      studentId: 's1',
       categoryLabel: 'Cuotas',
       methodLabel: 'Efectivo',
     },
@@ -180,6 +181,10 @@ describe('Contabilidad', () => {
     expect(within(fee).getByRole('link', { name: /Ir a Cobros/ })).toHaveAttribute(
       'href',
       '/panel/cobros?pestana=registro',
+    );
+    expect(within(fee).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s1',
     );
     expect(
       within(table).getByRole('link', { name: /Ir a Facturas: Propietario del local/ }),
