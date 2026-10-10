@@ -3,6 +3,7 @@ import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
   Attachment,
+  CategoryCatalog,
   categoryKind,
   categoryLabel,
   FiscalYear,
@@ -13,6 +14,8 @@ import {
   SupplierInvoice,
   SupplierInvoiceId,
 } from '../../src/domain/accounting/mod.ts';
+
+const cat = (code: string) => CategoryCatalog.of([]).require(code);
 
 Deno.test('FiscalYear should run from september to august', () => {
   const year = FiscalYear.of(LocalDate.fromString('2027-08-31'));
@@ -38,7 +41,7 @@ Deno.test('ManualEntry should keep income and expense categories apart and requi
         date,
         'income',
         'Alquiler',
-        'rent',
+        cat('rent'),
         'transfer',
         Money.euros(950),
       ),
@@ -51,7 +54,7 @@ Deno.test('ManualEntry should keep income and expense categories apart and requi
         date,
         'expense',
         'Comisión',
-        'other_expenses',
+        cat('other_expenses'),
         'card',
         Money.zero(),
       ),
@@ -64,7 +67,7 @@ Deno.test('ManualEntry should keep income and expense categories apart and requi
         date,
         'expense',
         '  ',
-        'other_expenses',
+        cat('other_expenses'),
         'card',
         Money.euros(1),
       ),
@@ -76,7 +79,7 @@ Deno.test('ManualEntry should keep income and expense categories apart and requi
       date,
       'expense',
       ' Comisión ',
-      'other_expenses',
+      cat('other_expenses'),
       'card',
       Money.euros(1),
     ).concept,
@@ -91,7 +94,7 @@ Deno.test('SupplierInvoice should be paid once and replace its attachment', () =
     'E-0912',
     'Escaque Material Didáctico',
     'Tablero mural',
-    'material',
+    cat('material'),
     Money.cents(8600),
   );
   assertFalse(invoice.isPaid());
@@ -111,7 +114,7 @@ Deno.test('SupplierInvoice should be paid once and replace its attachment', () =
         'X',
         'P',
         'C',
-        'grants',
+        cat('grants'),
         Money.euros(1),
       ),
     InvalidValue,
@@ -124,7 +127,7 @@ Deno.test('SupplierInvoice should be paid once and replace its attachment', () =
         'X',
         '',
         'C',
-        'rent',
+        cat('rent'),
         Money.euros(1),
       ),
     InvalidValue,
@@ -178,7 +181,7 @@ Deno.test('entries and invoices belong to the month of their date unless another
       date,
       'expense',
       'Luz de septiembre',
-      'electricity',
+      cat('electricity'),
       'transfer',
       Money.euros(80),
       period ?? null,
@@ -191,9 +194,30 @@ Deno.test('entries and invoices belong to the month of their date unless another
     'A-1',
     'Propietario del local',
     'Alquiler de septiembre',
-    'rent',
+    cat('rent'),
     Money.euros(950),
     YearMonth.fromString('2026-09'),
   );
   assertEquals(invoice.period.toString(), '2026-09');
+});
+
+Deno.test('CategoryCatalog should add and rename the club own categories, never the built-in ones', () => {
+  const catalog = CategoryCatalog.of([]);
+  assertEquals(catalog.add('c_seguro', 'expense', ' Seguro '), {
+    code: 'c_seguro',
+    kind: 'expense',
+    label: 'Seguro',
+    custom: true,
+  });
+  assertEquals(catalog.require('c_seguro', 'expense').label, 'Seguro');
+  // Va después de las de serie de su tipo.
+  assertEquals(catalog.all().filter((c) => c.kind === 'expense').at(-1)?.code, 'c_seguro');
+  assertThrows(() => catalog.require('c_seguro', 'income'), InvalidValue);
+  assertThrows(() => catalog.require('nope'), InvalidValue);
+  // Sin nombres repetidos en el mismo tipo, tampoco con las de serie.
+  assertThrows(() => catalog.add('c_otro', 'expense', 'alquiler'), InvalidValue);
+  assertThrows(() => catalog.add('c_vacia', 'income', '  '), InvalidValue);
+  assertEquals(catalog.rename('c_seguro', 'Seguro del local').label, 'Seguro del local');
+  assertEquals(catalog.label('c_seguro'), 'Seguro del local');
+  assertThrows(() => catalog.rename('rent', 'Local'), InvalidValue);
 });

@@ -1,5 +1,7 @@
 import { type LocalDate, YearMonth } from '../../src/domain/common/mod.ts';
 import {
+  type Category,
+  CategoryCatalog,
   FiscalYear,
   type ManualEntry,
   type ManualEntryId,
@@ -8,6 +10,7 @@ import {
   type SupplierInvoiceId,
 } from '../../src/domain/accounting/mod.ts';
 import type {
+  AccountingCategoryRepository,
   DocumentStorage,
   LedgerLine,
   LedgerQuery,
@@ -26,7 +29,9 @@ export class AccountingFixture
     SeasonClosingRepository,
     DocumentStorage,
     LedgerQuery,
-    ClosedPeriods {
+    ClosedPeriods,
+    AccountingCategoryRepository {
+  customCategories: Category[] = [];
   entries = new Map<string, ManualEntry>();
   invoices = new Map<string, SupplierInvoice>();
   seasonClosings = new Map<number, SeasonClosing>();
@@ -37,6 +42,29 @@ export class AccountingFixture
 
   constructor(now = '2027-09-05T10:00:00+02:00') {
     this.clock = new FrozenClock(now);
+  }
+
+  catalog(): Promise<CategoryCatalog> {
+    return Promise.resolve(CategoryCatalog.of(this.customCategories));
+  }
+
+  saveCategory(category: Category): Promise<void> {
+    this.customCategories = [
+      ...this.customCategories.filter((c) => c.code !== category.code),
+      category,
+    ];
+    return Promise.resolve();
+  }
+
+  categoryInUse(code: string): Promise<boolean> {
+    return Promise.resolve(
+      [...this.entries.values(), ...this.invoices.values()].some((m) => m.category === code),
+    );
+  }
+
+  removeCategory(code: string): Promise<void> {
+    this.customCategories = this.customCategories.filter((c) => c.code !== code);
+    return Promise.resolve();
   }
 
   entry(id: ManualEntryId): Promise<ManualEntry | null> {

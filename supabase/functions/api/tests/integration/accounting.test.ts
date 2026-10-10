@@ -248,3 +248,61 @@ Deno.test('the categories that count as of the month have defaults and can be ch
     'unprocessable',
   );
 });
+
+Deno.test('the club adds its own categories, uses and renames them, and removes them while unused', async () => {
+  const client = await admin();
+  const added = await client.json('POST', '/api/admin/accounting/categories', {
+    kind: 'expense',
+    label: 'Seguro',
+  });
+  assertEquals(added.status, 201, JSON.stringify(added.body));
+  const code = body<{ code: string }>(added).code;
+  assertError(
+    await client.json('POST', '/api/admin/accounting/categories', {
+      kind: 'expense',
+      label: 'alquiler',
+    }),
+    422,
+    'unprocessable',
+  );
+  const entry = await client.json('POST', '/api/admin/accounting/entries', {
+    date: '2025-10-03',
+    kind: 'expense',
+    concept: 'Póliza',
+    category: code,
+    method: 'transfer',
+    amount: '300',
+  });
+  assertEquals(entry.status, 201, JSON.stringify(entry.body));
+  assertEquals(
+    (await client.json('PUT', `/api/admin/accounting/categories/${code}`, {
+      label: 'Seguro del local',
+    })).status,
+    204,
+  );
+  const ledger = body<{ items: { categoryLabel: string }[] }>(
+    await client.get('/api/admin/accounting/ledger?month=2025-10'),
+  );
+  assertEquals(ledger.items.map((i) => i.categoryLabel), ['Seguro del local']);
+  const categories = body<{ items: { code: string; custom: boolean; label: string }[] }>(
+    await client.get('/api/admin/accounting/categories'),
+  ).items;
+  assertEquals(categories.filter((c) => c.custom).map((c) => c.label), ['Seguro del local']);
+  assertError(
+    await client.json('DELETE', `/api/admin/accounting/categories/${code}`),
+    409,
+    'category_in_use',
+  );
+  // Se puede marcar como «del mes».
+  assertEquals(
+    (await client.json('PUT', '/api/admin/accounting/monthly-categories', {
+      categories: ['fees', code],
+    })).status,
+    204,
+  );
+  assertEquals(
+    body<{ categories: string[] }>(await client.get('/api/admin/accounting/monthly-categories'))
+      .categories,
+    ['fees', code],
+  );
+});

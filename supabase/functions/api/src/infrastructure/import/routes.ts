@@ -110,7 +110,7 @@ export function registerImportRoutes(api: ApiApp): void {
           closed,
         ),
         new SqlStudentAccountRepository(tx),
-        new RecordEntry(new SqlAccountingRepository(tx), closed),
+        new RecordEntry(new SqlAccountingRepository(tx), closed, new SqlAccountingRepository(tx)),
         transactions,
         clock,
         new SqlAuditContext(tx),

@@ -8,8 +8,8 @@ import {
 } from '../../domain/common/mod.ts';
 import {
   Attachment,
-  categoryFromName,
-  categoryLabel,
+  type Category,
+  CategoryCatalog,
   FiscalYear,
   ManualEntry,
   ManualEntryId,
@@ -103,6 +103,70 @@ export interface SupplierInvoiceRepository {
   deleteInvoice(id: SupplierInvoiceId): Promise<void>;
 }
 
+export interface AccountingCategoryRepository {
+  /** Las de serie y las creadas por el club. */
+  catalog(): Promise<CategoryCatalog>;
+  saveCategory(category: Category): Promise<void>;
+  /** Si algún apunte, factura o corrección la usa. */
+  categoryInUse(code: string): Promise<boolean>;
+  removeCategory(code: string): Promise<void>;
+}
+
+export class CategoryInUse extends Error {
+  constructor() {
+    super('La categoría tiene movimientos: no se puede quitar.');
+    this.name = 'CategoryInUse';
+  }
+}
+
+/** Las categorías del libro, de serie y del club. */
+export class ListCategories {
+  constructor(private readonly categories: AccountingCategoryRepository) {}
+
+  async execute(): Promise<Category[]> {
+    return (await this.categories.catalog()).all();
+  }
+}
+
+/** Crea una categoría del club, de ingreso o de gasto. */
+export class AddCategory {
+  constructor(private readonly categories: AccountingCategoryRepository) {}
+
+  async execute(kind: string, label: string): Promise<Category> {
+    if (kind !== 'income' && kind !== 'expense') {
+      throw new InvalidValue('kind', 'Indica si es de ingresos o de gastos.');
+    }
+    const code = `c_${crypto.randomUUID().replaceAll('-', '').slice(0, 12)}`;
+    const category = (await this.categories.catalog()).add(code, kind, label);
+    await this.categories.saveCategory(category);
+    return category;
+  }
+}
+
+/** Cambia el nombre de una categoría del club (las de serie no se tocan). */
+export class RenameCategory {
+  constructor(private readonly categories: AccountingCategoryRepository) {}
+
+  async execute(code: string, label: string): Promise<void> {
+    const category = (await this.categories.catalog()).rename(code, label);
+    await this.categories.saveCategory(category);
+  }
+}
+
+/** Quita una categoría del club que no use ningún movimiento. */
+export class RemoveCategory {
+  constructor(private readonly categories: AccountingCategoryRepository) {}
+
+  async execute(code: string): Promise<void> {
+    const category = (await this.categories.catalog()).require(code);
+    if (!category.custom) {
+      throw new InvalidValue('category', 'Las categorías de serie no se pueden quitar.');
+    }
+    if (await this.categories.categoryInUse(code)) throw new CategoryInUse();
+    await this.categories.removeCategory(code);
+  }
+}
+
 export interface AccountingSettingsRepository {
   monthlyCategories(): Promise<MonthlyCategories>;
   saveMonthlyCategories(categories: MonthlyCategories): Promise<void>;
@@ -110,18 +174,25 @@ export interface AccountingSettingsRepository {
 
 /** Las categorías que cuentan como del mes. */
 export class GetMonthlyCategories {
-  constructor(private readonly settings: AccountingSettingsRepository) {}
+  constructor(
+    private readonly settings: AccountingSettingsRepository,
+    private readonly categories: AccountingCategoryRepository,
+  ) {}
 
   async execute(): Promise<string[]> {
-    return (await this.settings.monthlyCategories()).list();
+    return (await this.settings.monthlyCategories()).list(await this.categories.catalog());
   }
 }
 
 export class SetMonthlyCategories {
-  constructor(private readonly settings: AccountingSettingsRepository) {}
+  constructor(
+    private readonly settings: AccountingSettingsRepository,
+    private readonly categories: AccountingCategoryRepository,
+  ) {}
 
-  async execute(categories: string[]): Promise<void> {
-    await this.settings.saveMonthlyCategories(MonthlyCategories.of(categories));
+  async execute(codes: string[]): Promise<void> {
+    const catalog = await this.categories.catalog();
+    await this.settings.saveMonthlyCategories(MonthlyCategories.of(codes, catalog));
   }
 }
 
@@ -230,6 +301,7 @@ export class RecordEntry {
   constructor(
     private readonly entries: ManualEntryRepository,
     private readonly closed: ClosedPeriods,
+    private readonly categories: AccountingCategoryRepository,
   ) {}
 
   async execute(input: EntryInput): Promise<string> {
@@ -243,7 +315,7 @@ export class RecordEntry {
       date,
       input.kind,
       input.concept,
-      categoryFromName(input.category),
+      (await this.categories.catalog()).require(input.category),
       methodFromName(input.method),
       Money.fromDecimal(input.amount),
       periodOf(input.period),
@@ -283,6 +355,7 @@ export class RegisterInvoice {
     private readonly invoices: SupplierInvoiceRepository,
     private readonly storage: DocumentStorage,
     private readonly closed: ClosedPeriods,
+    private readonly categories: AccountingCategoryRepository,
   ) {}
 
   async execute(input: InvoiceInput, document: UploadedDocument | null): Promise<string> {
@@ -294,7 +367,7 @@ export class RegisterInvoice {
       input.number,
       input.supplier,
       input.concept,
-      categoryFromName(input.category),
+      (await this.categories.catalog()).require(input.category),
       Money.fromDecimal(input.amount),
       periodOf(input.period),
     );
@@ -368,24 +441,29 @@ export interface MonthLedgerView {
 
 /** Movimientos del mes, del más reciente al más antiguo, con totales y gastos por categoría. */
 export class MonthLedger {
-  constructor(private readonly ledger: LedgerQuery) {}
+  constructor(
+    private readonly ledger: LedgerQuery,
+    private readonly categories: AccountingCategoryRepository,
+  ) {}
 
   async execute(month: string): Promise<MonthLedgerView> {
-    return this.view(month, await this.ledger.lines(YearMonth.fromString(month)));
+    const catalog = await this.categories.catalog();
+    return this.view(month, await this.ledger.lines(YearMonth.fromString(month)), catalog);
   }
 
   /** Los libros de varios meses seguidos, leídos de una vez (el gráfico del resumen). */
   async between(from: YearMonth, to: YearMonth): Promise<MonthLedgerView[]> {
     const lines = await this.ledger.linesBetween(from, to);
+    const catalog = await this.categories.catalog();
     const views: MonthLedgerView[] = [];
     for (let m = from; !to.isBefore(m); m = m.next()) {
       const key = m.toString();
-      views.push(this.view(key, lines.filter((l) => l.date.startsWith(key))));
+      views.push(this.view(key, lines.filter((l) => l.date.startsWith(key)), catalog));
     }
     return views;
   }
 
-  private view(month: string, monthLines: LedgerLine[]): MonthLedgerView {
+  private view(month: string, monthLines: LedgerLine[], catalog: CategoryCatalog): MonthLedgerView {
     const lines = [...monthLines]
       .sort((a, b) => b.date.localeCompare(a.date) || b.sourceId.localeCompare(a.sourceId));
     let income = 0;
@@ -403,7 +481,7 @@ export class MonthLedger {
       .sort((a, b) => b[1] - a[1])
       .map(([category, amountCents]) => ({
         category,
-        label: categoryLabel(categoryFromName(category)),
+        label: catalog.label(category),
         amountCents,
       }));
     return { month, lines, incomeCents: income, expenseCents: expenses, expensesByCategory };
