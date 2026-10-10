@@ -74,8 +74,12 @@ export interface TeacherGroupRoster {
 }
 
 export interface TeacherRosterQuery {
-  /** Grupos de los que es titular, con los alumnos inscritos ese día. */
-  groupsOf(teacherId: string, on: LocalDate): Promise<TeacherGroupRoster[]>;
+  /** Grupos de los que es titular. */
+  taughtGroupIds(teacherId: string): Promise<string[]>;
+  /** Grupos en los que tiene alguna sustitución entre esas fechas (ambas incluidas). */
+  substitutedGroupIds(teacherId: string, from: LocalDate, to: LocalDate): Promise<string[]>;
+  /** Esos grupos con los alumnos inscritos ese día, por hora y nombre. */
+  rostersOf(groupIds: readonly string[], on: LocalDate): Promise<TeacherGroupRoster[]>;
 }
 
 export interface RollCallRepository {
@@ -161,18 +165,6 @@ export class TeacherClasses {
       });
     }
     return views;
-  }
-}
-
-/** Los alumnos de las clases de un profesor (sin datos de contacto), a día de hoy. */
-export class TeacherStudents {
-  constructor(
-    private readonly query: TeacherRosterQuery,
-    private readonly clock: Clock,
-  ) {}
-
-  execute(teacherId: string): Promise<TeacherGroupRoster[]> {
-    return this.query.groupsOf(teacherId, LocalDate.fromInstant(this.clock.now()));
   }
 }
 
@@ -542,6 +534,12 @@ export class ConfirmActivity {
 
 // ---- Asistencia de un grupo ------------------------------------------------------------------
 
+/** Primer día de la temporada en curso (en julio y agosto, la que acaba de terminar). */
+function seasonStart(today: LocalDate): LocalDate {
+  const first = Season.containing(YearMonth.of(today)).firstMonth().firstDay();
+  return today.isBefore(first) ? Season.startingIn(first.year - 1).firstMonth().firstDay() : first;
+}
+
 /** Lo que guarda el club de un grupo en un periodo: horario, festivos, listas, inscripciones y faltas. */
 export interface GroupAttendanceData {
   name: string;
@@ -611,11 +609,25 @@ export class GroupAttendance {
     private readonly clock: Clock,
   ) {}
 
-  async execute(groupId: string, month: string): Promise<GroupAttendanceView> {
+  execute(groupId: string, month: string): Promise<GroupAttendanceView> {
     const ym = YearMonth.fromString(month);
     const today = LocalDate.fromInstant(this.clock.now());
-    const from = ym.firstDay();
     const to = ym.lastDay().isBefore(today) ? ym.lastDay() : today;
+    return this.between(groupId, ym.firstDay(), to, ym.toString());
+  }
+
+  /** Desde el principio de la temporada hasta hoy (`month` es el mes en curso). */
+  season(groupId: string): Promise<GroupAttendanceView> {
+    const today = LocalDate.fromInstant(this.clock.now());
+    return this.between(groupId, seasonStart(today), today, YearMonth.of(today).toString());
+  }
+
+  private async between(
+    groupId: string,
+    from: LocalDate,
+    to: LocalDate,
+    month: string,
+  ): Promise<GroupAttendanceView> {
     const data = await this.query.between(groupId, from, to);
     if (data === null) throw new AttendanceGroupNotFound();
     const rollCalls = new Map(data.rollCalls.map((r) => [r.date, r.kind]));
@@ -663,7 +675,7 @@ export class GroupAttendance {
     return {
       groupId,
       name: data.name,
-      month: ym.toString(),
+      month,
       days: days.map(({ date, status }) => ({ date, status })),
       students: [...byStudent.values()]
         .filter((s) => s.marks.some((m) => m !== null))
@@ -861,5 +873,140 @@ export class StudentClassComments {
 
   execute(studentId: string): Promise<ClassCommentView[]> {
     return this.comments.ofStudent(studentId);
+  }
+}
+
+// ---- Mis grupos ----------------------------------------------------------------------------------
+
+/** El grupo no es de ese profesor (ni lo sustituye esa semana): no se dice si existe. */
+export class GroupNotYours extends Error {
+  constructor() {
+    super('Ese grupo no es tuyo.');
+    this.name = 'GroupNotYours';
+  }
+}
+
+/** Días antes y después de una sustitución en que quien sustituye ve el grupo. */
+const SUBSTITUTION_REACH_DAYS = 7;
+
+/**
+ * Qué grupos ve un profesor en «Mis grupos»: los suyos y aquellos en los que tiene una sustitución a 7 días o menos
+ * (marcados como sustitución).
+ */
+export class TeacherGroupAccess {
+  constructor(
+    private readonly query: TeacherRosterQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  /** Grupo → si lo ve por una sustitución (false si es titular), en orden: los suyos y luego los sustituidos. */
+  async visible(teacherId: string): Promise<Map<string, boolean>> {
+    const today = LocalDate.fromInstant(this.clock.now());
+    const visible = new Map<string, boolean>();
+    for (const id of await this.query.taughtGroupIds(teacherId)) visible.set(id, false);
+    const substituted = await this.query.substitutedGroupIds(
+      teacherId,
+      today.plusDays(-SUBSTITUTION_REACH_DAYS),
+      today.plusDays(SUBSTITUTION_REACH_DAYS),
+    );
+    for (const id of substituted) if (!visible.has(id)) visible.set(id, true);
+    return visible;
+  }
+
+  async assert(teacherId: string, groupId: string): Promise<void> {
+    if (!(await this.visible(teacherId)).has(groupId)) throw new GroupNotYours();
+  }
+}
+
+/** Un grupo en «Mis grupos»: horario, aula, alumnos de hoy y su asistencia de la temporada en ese grupo. */
+export interface TeacherGroupSummary extends Omit<TeacherGroupRoster, 'students'> {
+  substitution: boolean;
+  students: { id: string; name: string; days: string[]; attended: number; classes: number }[];
+}
+
+export class TeacherGroups {
+  constructor(
+    private readonly access: TeacherGroupAccess,
+    private readonly query: TeacherRosterQuery,
+    private readonly attendance: GroupAttendance,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string): Promise<TeacherGroupSummary[]> {
+    const visible = await this.access.visible(teacherId);
+    const today = LocalDate.fromInstant(this.clock.now());
+    const rosters = await this.query.rostersOf([...visible.keys()], today);
+    const ordered = [...rosters].sort((a, b) =>
+      Number(visible.get(a.groupId)) - Number(visible.get(b.groupId))
+    );
+    const summaries: TeacherGroupSummary[] = [];
+    for (const roster of ordered) {
+      const season = new Map(
+        (await this.attendance.season(roster.groupId)).students.map((s) => [s.id, s]),
+      );
+      summaries.push({
+        ...roster,
+        substitution: visible.get(roster.groupId) ?? false,
+        students: roster.students.map((s) => ({
+          ...s,
+          attended: season.get(s.id)?.attended ?? 0,
+          classes: season.get(s.id)?.classes ?? 0,
+        })),
+      });
+    }
+    return summaries;
+  }
+}
+
+/** La asistencia de un mes de uno de los grupos que ve el profesor (solo lectura). */
+export class TeacherGroupAttendance {
+  constructor(
+    private readonly access: TeacherGroupAccess,
+    private readonly attendance: GroupAttendance,
+  ) {}
+
+  async execute(teacherId: string, groupId: string, month: string): Promise<GroupAttendanceView> {
+    await this.access.assert(teacherId, groupId);
+    return await this.attendance.execute(groupId, month);
+  }
+}
+
+/** Días de comentarios que se ven cada vez (las últimas 4 semanas y, con «Ver más», las 4 anteriores). */
+const COMMENT_WINDOW_DAYS = 28;
+
+export interface TeacherGroupCommentsView {
+  /** Del más reciente al más antiguo. */
+  items: ClassCommentView[];
+  /** Día desde el que pedir los anteriores, o null si ya se llegó al principio de la temporada. */
+  nextBefore: string | null;
+}
+
+/** Los comentarios de las clases de uno de sus grupos, de 4 en 4 semanas hacia atrás hasta el inicio de la temporada. */
+export class TeacherGroupComments {
+  constructor(
+    private readonly access: TeacherGroupAccess,
+    private readonly comments: ClassCommentQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(
+    teacherId: string,
+    groupId: string,
+    before: string | null,
+  ): Promise<TeacherGroupCommentsView> {
+    await this.access.assert(teacherId, groupId);
+    const today = LocalDate.fromInstant(this.clock.now());
+    const asked = before === null ? today : LocalDate.fromString(before);
+    const to = today.isBefore(asked) ? today : asked;
+    const first = seasonStart(today);
+    const windowStart = to.plusDays(1 - COMMENT_WINDOW_DAYS);
+    const from = windowStart.isBefore(first) ? first : windowStart;
+    const items = to.isBefore(from) ? [] : await this.comments.ofGroup(groupId, from, to);
+    return {
+      items: [...items].sort((a, b) =>
+        b.date.localeCompare(a.date) || b.writtenAt.localeCompare(a.writtenAt)
+      ),
+      nextBefore: first.isBefore(from) ? from.plusDays(-1).toString() : null,
+    };
   }
 }

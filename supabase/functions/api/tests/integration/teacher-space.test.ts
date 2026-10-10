@@ -64,11 +64,10 @@ async function fixture() {
 }
 
 Deno.test({
-  name:
-    'a linked teacher should see their classes of the week and their students, and nothing else',
+  name: 'a linked teacher should see their classes of the week and their pay, and nothing else',
   ignore: outsideSeason,
   async fn() {
-    const { admin, teacher, lucia, groupA } = await fixture();
+    const { admin, teacher, lucia } = await fixture();
 
     assertEquals(body(await teacher.get('/api/teacher/me')), {
       teacher: { id: lucia, name: 'Lucía Moreno Gil' },
@@ -86,15 +85,6 @@ Deno.test({
       ],
     );
 
-    const students = body<{ items: { groupId: string; students: Record<string, unknown>[] }[] }>(
-      await teacher.get('/api/teacher/students'),
-    ).items;
-    assertEquals(students.map((g) => g.groupId), [groupA]);
-    assertEquals(students[0]?.students, [
-      { id: students[0]?.students[0]?.id, name: 'Martina López Herrera', days: ['mon', 'wed'] },
-      { id: students[0]?.students[1]?.id, name: 'Pablo Gil Ruiz', days: ['mon'] },
-    ]);
-
     // Sus horas y pagos de la temporada, sin ingresos ni márgenes del club.
     const pay = body<{ months: Record<string, unknown>[]; totals: Record<string, number> }>(
       await teacher.get('/api/teacher/pay'),
@@ -107,6 +97,117 @@ Deno.test({
     assertError(await teacher.get('/api/admin/payroll/settlements'), 403, 'forbidden');
     assertError(await admin.get('/api/teacher/classes'), 403, 'forbidden');
   },
+});
+
+interface GroupItem {
+  groupId: string;
+  name: string;
+  substitution: boolean;
+  students: { name: string; days: string[]; attended: number; classes: number }[];
+}
+
+Deno.test('a teacher should see in their groups what was commented on Thursday when Tuesday comes', async () => {
+  // Jueves 1 de octubre de 2026: Lucía da martes y jueves; el martes 13 sustituye a Carlos.
+  const { teacher, mine, carlos } = await atTime('2026-10-01T16:00:00+02:00', async () => {
+    await resetDatabase();
+    await createUser('junta@club.es');
+    const admin = new ApiClient();
+    await admin.logIn('junta@club.es');
+    const lucia = await newTeacher(admin, 'Lucía Moreno Gil');
+    const mine = await newGroup(admin, lucia, {
+      name: 'Martes y jueves 17:00',
+      days: ['tue', 'thu'],
+      start: '17:00',
+      end: '18:00',
+      classroom: 'alfil',
+    });
+    const carlos = await newGroup(admin, await newTeacher(admin, 'Carlos Ruiz Márquez'), {
+      name: 'Adultos I',
+      days: ['tue'],
+      start: '19:00',
+      end: '20:30',
+      classroom: 'caballo',
+    });
+    for (const fullName of ['Martina López Herrera', 'Pablo Gil Ruiz']) {
+      const created = await admin.json('POST', '/api/admin/students', {
+        fullName,
+        groupIds: [mine],
+      });
+      assertEquals(created.status, 201, JSON.stringify(created.body));
+    }
+    const planned = await admin.json('POST', '/api/admin/payroll/substitutions', {
+      groupId: carlos,
+      date: '2026-10-13',
+      teacherId: lucia,
+    });
+    assertEquals(planned.status, 201, JSON.stringify(planned.body));
+    await createUser('profe@club.es', 'teacher');
+    await db()`UPDATE identity_user SET teacher_id = ${lucia} WHERE email = 'profe@club.es'`;
+    const teacher = new ApiClient();
+    await teacher.logIn('profe@club.es');
+    return { teacher, mine, carlos };
+  });
+  const roll = `/api/teacher/roll-calls/${mine}/2026-10-01`;
+
+  await atTime('2026-10-01T18:00:00+02:00', async () => {
+    await teacher.logIn('profe@club.es');
+    const opened = await teacher.get(roll);
+    assertEquals(opened.status, 200, JSON.stringify(opened.body));
+    const list = body<{ list: { id: string; name: string }[] }>(opened).list;
+    const pablo = list.find((s) => s.name === 'Pablo Gil Ruiz')?.id;
+    assertEquals((await teacher.json('PUT', roll, { absent: [pablo], guests: [] })).status, 204);
+    for (
+      const [studentId, text] of [[null, 'Hemos dado mates de torres'], [pablo, 'No ha venido']]
+    ) {
+      assertEquals(
+        (await teacher.json('POST', `${roll}/comments`, { studentId, text })).status,
+        201,
+      );
+    }
+  });
+
+  await atTime('2026-10-06T16:00:00+02:00', async () => {
+    await teacher.logIn('profe@club.es');
+    const groups = body<{ items: GroupItem[] }>(await teacher.get('/api/teacher/groups')).items;
+    assertEquals(groups.map((g) => [g.groupId, g.substitution]), [[mine, false], [carlos, true]]);
+    assertEquals(groups[0]?.students.map((s) => [s.name, s.attended, s.classes]), [
+      ['Martina López Herrera', 1, 1],
+      ['Pablo Gil Ruiz', 0, 1],
+    ]);
+
+    const comments = body<
+      { items: { date: string; studentName: string | null; text: string }[]; nextBefore: string }
+    >(
+      await teacher.get(`/api/teacher/groups/${mine}/comments`),
+    );
+    assertEquals(comments.items.map((c) => [c.date, c.studentName, c.text]), [
+      // Escritos en el mismo momento: en el orden en que se escribieron.
+      ['2026-10-01', null, 'Hemos dado mates de torres'],
+      ['2026-10-01', 'Pablo Gil Ruiz', 'No ha venido'],
+    ]);
+    assertEquals(comments.nextBefore, '2026-09-08');
+
+    const october = body<{ days: { date: string; status: string }[] }>(
+      await teacher.get(`/api/teacher/groups/${mine}/attendance?month=2026-10`),
+    );
+    assertEquals(october.days.map((d) => [d.date, d.status]), [
+      ['2026-10-01', 'taken'],
+      ['2026-10-06', 'pending'],
+    ]);
+  });
+
+  // Una semana después de sustituir a Carlos ya no ve su grupo.
+  await atTime('2026-10-21T10:00:00+02:00', async () => {
+    await teacher.logIn('profe@club.es');
+    const groups = body<{ items: GroupItem[] }>(await teacher.get('/api/teacher/groups')).items;
+    assertEquals(groups.map((g) => g.groupId), [mine]);
+    assertError(await teacher.get(`/api/teacher/groups/${carlos}/comments`), 404, 'not_found');
+    assertError(
+      await teacher.get(`/api/teacher/groups/${carlos}/attendance?month=2026-10`),
+      404,
+      'not_found',
+    );
+  });
 });
 
 Deno.test('an unlinked teacher account is told to ask administration', async () => {
