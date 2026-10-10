@@ -12,6 +12,7 @@ import {
   MemberRenumbering,
   type MissingDatum,
   NationalId,
+  shareNameAndFirstSurname,
   Student,
   StudentDetails,
   StudentId,
@@ -77,6 +78,8 @@ export interface StudentSummary {
   /** null si no consta la fecha de nacimiento. */
   age: number | null;
   status: string;
+  /** Su última baja (pasada o futura), o null si no tiene. */
+  withdrawnOn: string | null;
   groups: { id: string; name: string; slotLabel: string }[];
   hasSiblings: boolean;
 }
@@ -401,5 +404,29 @@ export class ListPendingData {
       }
     }
     return pending;
+  }
+}
+
+/**
+ * Alumnos que pueden ser el mismo que se va a dar de alta (mismo nombre y primer apellido): primero los de baja, para
+ * darles de alta de nuevo en vez de duplicarlos, y luego los de alta.
+ */
+export class SimilarStudents {
+  constructor(
+    private readonly query: StudentQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(fullName: string): Promise<StudentSummary[]> {
+    const firstWord = fullName.trim().split(/\s+/)[0] ?? '';
+    if (firstWord === '' || !fullName.trim().includes(' ')) return [];
+    const candidates = await this.query.list(
+      'all',
+      firstWord,
+      LocalDate.fromInstant(this.clock.now()),
+    );
+    return candidates
+      .filter((s) => shareNameAndFirstSurname(s.fullName, fullName))
+      .sort((a, b) => Number(a.status !== 'withdrawn') - Number(b.status !== 'withdrawn'));
   }
 }

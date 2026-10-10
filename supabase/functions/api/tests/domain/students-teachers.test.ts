@@ -12,6 +12,7 @@ import {
   Guardian,
   MemberRenumbering,
   NationalId,
+  shareNameAndFirstSurname,
   Student,
   StudentId,
 } from '../../src/domain/students/mod.ts';
@@ -205,4 +206,17 @@ Deno.test('MemberRenumbering should only swap numbers the students already have'
   assertThrows(() => MemberRenumbering.of(current, new Map([['a', 2], ['b', 2]])), InvalidValue);
   assertThrows(() => MemberRenumbering.of(current, new Map([['x', 1]])), InvalidValue);
   assertThrows(() => MemberRenumbering.of(current, new Map([['a', 0]])), InvalidValue);
+});
+
+Deno.test('shareNameAndFirstSurname should match the same name and first surname, ignoring accents and case', () => {
+  assert(shareNameAndFirstSurname('Pablo Gil Ruiz', 'pablo gil martín'));
+  assert(shareNameAndFirstSurname('Pablo Gil Ruiz', 'Pablo Gil'));
+  assert(shareNameAndFirstSurname('María José García López', 'Maria Jose Garcia Pérez'));
+  assert(shareNameAndFirstSurname('  Lucía   Moreno Gil ', 'LUCIA MORENO GIL'));
+  // Un hermano (otro nombre) o un segundo apellido igual no bastan.
+  assertFalse(shareNameAndFirstSurname('Pablo Gil Ruiz', 'Lola Gil Ruiz'));
+  assertFalse(shareNameAndFirstSurname('Pablo Gil Ruiz', 'Pablo Ruiz Gil'));
+  // Con una sola palabra no hay apellido con el que comparar.
+  assertFalse(shareNameAndFirstSurname('Pablo', 'Pablo Gil'));
+  assertFalse(shareNameAndFirstSurname('Pablo', 'Pablo'));
 });

@@ -19,6 +19,7 @@ import {
   RegisterStudent,
   RejoinStudent,
   RenumberMembers,
+  SimilarStudents,
   studentFilterFrom,
   type StudentInput,
   StudentNotFound,
@@ -166,6 +167,16 @@ export function registerStudentRoutes(api: ApiApp): void {
       return c.json({
         items: await query(scope).list(filter, search, today(api)),
         total: await query(scope).total(),
+      });
+    },
+  );
+
+  // Antes de /:id para que «similar» no se tome por un identificador.
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/students/similar', access: 'admin' },
+    async (c, scope) => {
+      return c.json({
+        items: await new SimilarStudents(query(scope), clock).execute(c.req.query('name') ?? ''),
       });
     },
   );
