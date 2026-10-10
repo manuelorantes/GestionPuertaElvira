@@ -16,6 +16,8 @@ y los totales de ingresos, gastos y resultado. Los movimientos MUST salir de:
 - las facturas de proveedores pagadas (gasto de su categoría, en la fecha de pago);
 - los apuntes manuales.
 
+En los movimientos de un cobro, el nombre del alumno MUST llevar a su ficha.
+
 Los movimientos MUST poder filtrarse por tipo: «Todo» (por defecto), «Ingresos» o «Pagos». Con «Ingresos»
 MUST poder elegirse además la forma de pago: «Todos» (por defecto), «Tarjeta», «Transferencia» o
 «Efectivo». Con un filtro activo se indica cuántos movimientos se ven y su suma. El filtro se conserva en la
