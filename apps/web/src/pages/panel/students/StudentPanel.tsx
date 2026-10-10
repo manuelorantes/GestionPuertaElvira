@@ -6,6 +6,7 @@ import {
   Pencil,
   Plus,
   UserMinus,
+  UserPlus,
   X,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -35,11 +36,13 @@ import { EnrolmentDialog } from './EnrolmentDialog';
 import { PickerDialog } from './PickerDialog';
 import { StudentDialog } from './StudentDialog';
 import { DateDialog } from './DateDialog';
+import { RejoinDialog } from './RejoinDialog';
 import { WithdrawDialog } from './WithdrawDialog';
 
 type Action =
   | { kind: 'edit' }
   | { kind: 'withdraw' }
+  | { kind: 'rejoin' }
   | { kind: 'addGroup' }
   | { kind: 'attendance'; groupId: string }
   | { kind: 'since'; groupId: string; groupName: string; since: string }
@@ -91,6 +94,8 @@ export function StudentPanel() {
 
   const s = student.data;
   const isWithdrawn = s.status === 'withdrawn';
+  /** Se ha dado de alta más de una vez: sus fechas son las últimas y se ve el historial. */
+  const rejoined = s.membership.length > 1;
   const done = (message: string) => {
     setAction(null);
     setError(null);
@@ -172,6 +177,12 @@ export function StudentPanel() {
             <Button variant="secondary" onClick={() => setAction({ kind: 'withdraw' })}>
               <UserMinus aria-hidden size={16} />
               Dar de baja
+            </Button>
+          )}
+          {isWithdrawn && (
+            <Button variant="secondary" onClick={() => setAction({ kind: 'rejoin' })}>
+              <UserPlus aria-hidden size={16} />
+              Dar de alta de nuevo
             </Button>
           )}
         </div>
@@ -267,8 +278,26 @@ export function StudentPanel() {
           <Row label="Email">{s.contactEmail ?? '—'}</Row>
           <Row label="Federado">{s.federationLicence ? `Sí · ${s.federationLicence}` : 'No'}</Row>
           <Row label="Autorización de imagen">{s.imageConsent ? 'Sí' : 'No'}</Row>
-          <Row label="Alta en el club">{formatDate(s.joinedOn)}</Row>
-          <Row label="Baja">{formatDate(s.withdrawnOn)}</Row>
+          <Row label={rejoined ? 'Última alta en el club' : 'Alta en el club'}>
+            {formatDate(s.joinedOn)}
+          </Row>
+          <Row label={rejoined ? 'Última baja en el club' : 'Baja'}>
+            {formatDate(s.withdrawnOn)}
+          </Row>
+          {rejoined && (
+            <div className="mt-2 border-t border-line-soft pt-2">
+              <p className="text-sm font-medium">Altas y bajas</p>
+              <ul aria-label="Altas y bajas" className="mt-1 text-[13px] text-ink-muted">
+                {[...s.membership].reverse().map((p) => (
+                  <li key={p.joinedOn}>
+                    {p.withdrawnOn
+                      ? `Del ${formatDate(p.joinedOn)} al ${formatDate(p.withdrawnOn)}`
+                      : `Desde el ${formatDate(p.joinedOn)}`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Card>
         <Card className="p-4">
           <CardTitle>Contacto</CardTitle>
@@ -340,6 +369,19 @@ export function StudentPanel() {
             mutate
               .mutateAsync(() => api.withdrawStudent(s.id, date))
               .then(() => done('Baja registrada'))
+          }
+        />
+      )}
+      {action?.kind === 'rejoin' && (
+        <RejoinDialog
+          name={s.fullName.split(' ')[0] ?? s.fullName}
+          groups={groups.data ?? []}
+          onClose={() => setAction(null)}
+          onRejoin={(date, groupIds) =>
+            enrolWithConfirm(
+              (confirm) => api.rejoinStudent(s.id, date, groupIds, confirm),
+              'Alta registrada',
+            )
           }
         />
       )}
