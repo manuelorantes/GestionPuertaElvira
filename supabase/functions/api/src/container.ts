@@ -14,6 +14,7 @@ import { registerBillingRoutes } from './infrastructure/billing/routes.ts';
 import { registerEquipmentRoutes } from './infrastructure/equipment/routes.ts';
 import { registerClassRoutes } from './infrastructure/classes/routes.ts';
 import { registerDashboardRoutes } from './infrastructure/dashboard/routes.ts';
+import { registerDiagnosticsRoutes } from './infrastructure/diagnostics/routes.ts';
 import { registerImportRoutes } from './infrastructure/import/routes.ts';
 import { registerPayrollRoutes } from './infrastructure/payroll/routes.ts';
 import { registerPointsRoutes } from './infrastructure/points/routes.ts';
@@ -114,6 +115,7 @@ export function buildApp(
   registerDashboardRoutes(api);
   registerAttendanceRoutes(api);
   registerSystemRoutes(api);
+  registerDiagnosticsRoutes(api);
   registerPointsRoutes(api, storage);
   return api;
 }

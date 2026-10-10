@@ -1,0 +1,172 @@
+// Reglas de cuotas y tarifas (specs/features/diagnostico/spec.md, reglas 1 a 5).
+import type { Candidate, FactCharge, Facts, FactStudent, Rule } from '../facts.ts';
+import { discountedFee, euros, hoursLabel, isActive, monthLabel, studentRef } from './support.ts';
+
+const monthlyOf = (facts: Facts, student: FactStudent): FactCharge[] =>
+  facts.charges.filter((c) => c.studentId === student.id && c.kind === 'monthly');
+
+const live = (charge: FactCharge): boolean => charge.status !== 'cancelled';
+
+const PROPOSAL_FIX_FROM_RECORD =
+  'Inscribirlo en su grupo o darlo de baja desde su ficha; el diagnóstico dejará de mostrarlo solo.';
+
+/**
+ * Regla 1: una cuota del mes en curso o futura que no es la que sale hoy de sus horas y descuentos. Los alumnos sin
+ * grupos son de la regla 2.
+ */
+export const feeMismatch: Rule = (facts) => {
+  const found: Candidate[] = [];
+  for (const student of facts.students.filter((s) => isActive(s) && s.groups.length > 0)) {
+    for (const charge of monthlyOf(facts, student)) {
+      if (charge.manual || !live(charge) || charge.period < facts.currentMonth) continue;
+      if (!facts.seasonMonths.includes(charge.period)) continue;
+      const expected = discountedFee(student, charge.discountPercent);
+      if (expected === charge.amountCents) continue;
+      found.push({
+        rule: 'fee_mismatch',
+        entity: studentRef(student),
+        data: { month: charge.period, amountCents: charge.amountCents, expectedCents: expected },
+        explanation: feeExplanation(student, charge, expected),
+        proposal: `Ajustar la cuota de ${monthLabel(charge.period)} a ${
+          euros(expected)
+        }: lo cobrado se reparte de nuevo y la diferencia queda pendiente o como saldo a favor. Si lo que falla es su horario, descarta el hallazgo y corrígelo desde su ficha.`,
+        fix: { kind: 'reprice_charge', studentId: student.id, month: charge.period },
+      });
+    }
+  }
+  return found;
+};
+
+function feeExplanation(student: FactStudent, charge: FactCharge, expected: number): string {
+  const discounts: string[] = [];
+  if (student.familyDiscount) discounts.push(`descuento familiar del ${student.familyPercent} %`);
+  if (charge.discountPercent > 0) {
+    discounts.push(`pago adelantado del ${charge.discountPercent} %`);
+  }
+  const withDiscounts = discounts.length > 0 ? ` con ${discounts.join(' y ')}` : '';
+  const privateLessons = student.privateLessonsCents > 0
+    ? ` y clases particulares por ${euros(student.privateLessonsCents)} al mes`
+    : '';
+  const state = charge.status === 'paid'
+    ? 'cobrada'
+    : charge.coveredCents > 0
+    ? 'pagada en parte'
+    : 'sin cobrar';
+  return `La cuota de ${monthLabel(charge.period)} es de ${
+    euros(charge.amountCents)
+  } (${state}). Hoy hace ${hoursLabel(student.weeklyHours)} semanales (tarifa de ${
+    euros(student.tierCents)
+  })${privateLessons}${withDiscounts}: le corresponden ${euros(expected)}.`;
+}
+
+/** Regla 2: alumno activo sin grupos con cuotas del mes en curso o futuras. */
+export const chargeWithoutGroup: Rule = (facts) =>
+  facts.students.filter((s) => isActive(s) && s.groups.length === 0).flatMap((student) => {
+    const current = monthlyOf(facts, student).filter((c) =>
+      live(c) && c.period >= facts.currentMonth
+    );
+    if (current.length === 0) return [];
+    const months = current.map((c) => c.period).sort();
+    return [{
+      rule: 'charge_without_group',
+      entity: studentRef(student),
+      data: {
+        months: months.join(', '),
+        amountCents: current.reduce((sum, c) => sum + c.amountCents, 0),
+      },
+      explanation: `No está en ningún grupo, pero tiene cuota mensual de ${
+        months.map(monthLabel).join(', ')
+      } (${
+        current.filter((c) => c.coveredCents > 0).length
+      } de ${current.length} con algo cobrado).`,
+      proposal: PROPOSAL_FIX_FROM_RECORD,
+      fix: null,
+    }];
+  });
+
+/** Regla 3: alumno activo sin grupos que pagó algún mes anterior y no tiene cuota del mes en curso. */
+export const paidButNoGroup: Rule = (facts) =>
+  facts.students.filter((s) => isActive(s) && s.groups.length === 0).flatMap((student) => {
+    const charges = monthlyOf(facts, student).filter(live);
+    if (charges.some((c) => c.period >= facts.currentMonth)) return [];
+    const paid = charges.filter((c) => c.coveredCents > 0).sort((a, b) =>
+      a.period.localeCompare(b.period)
+    );
+    const last = paid.at(-1);
+    if (!last) return [];
+    return [{
+      rule: 'paid_but_no_group',
+      entity: studentRef(student),
+      data: { lastPaidMonth: last.period, amountCents: last.coveredCents },
+      explanation: `Pagó ${euros(last.coveredCents)} de la cuota de ${
+        monthLabel(last.period)
+      } y hoy no está en ningún grupo ni tiene cuota de ${monthLabel(facts.currentMonth)}.`,
+      proposal: PROPOSAL_FIX_FROM_RECORD,
+      fix: null,
+    }];
+  });
+
+/** Regla 4: socio sin clases que no ha pagado nunca nada y tiene la cuota de socio pendiente. */
+export const memberNeverPaid: Rule = (facts) =>
+  facts.students.filter((s) => isActive(s) && s.groups.length === 0).flatMap((student) => {
+    if (facts.payments.some((p) => p.studentId === student.id)) return [];
+    const membership = facts.charges.find((c) =>
+      c.studentId === student.id && c.kind === 'membership' && live(c) && c.coveredCents === 0
+    );
+    if (!membership) return [];
+    return [{
+      rule: 'member_never_paid',
+      entity: studentRef(student),
+      data: { joinedOn: student.joinedOn, membershipCents: membership.amountCents },
+      explanation: `Socio sin clases desde el ${
+        student.joinedOn.split('-').reverse().join('/')
+      }, sin ningún cobro y con la cuota de socio (${euros(membership.amountCents)}) pendiente.`,
+      proposal: 'Cobrarle la cuota de socio o darlo de baja desde su ficha.',
+      fix: null,
+    }];
+  });
+
+/** Regla 5: todos sus grupos empiezan después de un mes que ya tiene pagado. */
+export const enrolmentAfterPayment: Rule = (facts) =>
+  facts.students.filter((s) => isActive(s) && s.groups.length > 0).flatMap((student) => {
+    const since = student.groups.map((g) => g.since).sort()[0] ?? '';
+    const paid = monthlyOf(facts, student).filter((c) =>
+      live(c) && c.coveredCents > 0 && c.period < since.slice(0, 7)
+    ).sort((a, b) => a.period.localeCompare(b.period));
+    const first = paid[0];
+    if (!first) return [];
+    const canMove = student.joinedOn < since;
+    return [{
+      rule: 'enrolment_after_payment',
+      entity: studentRef(student),
+      data: { since, paidMonth: first.period, joinedOn: student.joinedOn },
+      explanation: `Está en sus grupos desde el ${
+        since.split('-').reverse().join('/')
+      }, pero tiene pagada la cuota de ${monthLabel(first.period)} (${
+        euros(first.coveredCents)
+      }). Su alta en el club es del ${student.joinedOn.split('-').reverse().join('/')}.`,
+      proposal: canMove
+        ? `Poner «En el grupo desde» el ${
+          student.joinedOn.split('-').reverse().join('/')
+        } en los grupos que empiezan después (${
+          student.groups.filter((g) => g.since > student.joinedOn).map((g) => g.name).join(', ')
+        }).`
+        : 'Revisar desde su ficha la fecha de alta y la de sus grupos.',
+      fix: canMove
+        ? {
+          kind: 'set_enrolment_start',
+          studentId: student.id,
+          groupIds: student.groups.filter((g) => g.since > student.joinedOn).map((g) => g.id),
+          date: student.joinedOn,
+        }
+        : null,
+    }];
+  });
+
+export const feeRules: readonly Rule[] = [
+  feeMismatch,
+  chargeWithoutGroup,
+  paidButNoGroup,
+  memberNeverPaid,
+  enrolmentAfterPayment,
+];

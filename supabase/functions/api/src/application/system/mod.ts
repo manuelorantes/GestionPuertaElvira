@@ -30,6 +30,14 @@ export const SCHEDULED_TASKS: readonly ScheduledTask[] = [
     since: '2026-10-08T21:00:00Z',
   },
   {
+    id: 'diagnostico',
+    name: 'Diagnóstico de datos',
+    description:
+      'Ejecuta las reglas del diagnóstico (pestaña Diagnóstico de Contabilidad) y deja los hallazgos nuevos esperando.',
+    cron: '0 22 * * *',
+    since: '2026-10-10T20:00:00Z',
+  },
+  {
     id: 'copia-seguridad',
     name: 'Copia de seguridad',
     description:
