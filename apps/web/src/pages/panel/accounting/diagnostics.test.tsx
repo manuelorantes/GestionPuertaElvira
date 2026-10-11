@@ -216,4 +216,35 @@ describe('Diagnóstico', () => {
       ),
     ).toBe(true);
   });
+
+  it('lists the closed findings in the order received, newest first, without grouping', async () => {
+    const closed = (id: string, base: (typeof FINDINGS)[number] | undefined, closedAt: string) => ({
+      ...base,
+      id,
+      status: 'accepted',
+      closedAt,
+      closedBy: 'Junta',
+    });
+    api({
+      'GET /api/admin/diagnostics?status=accepted': [
+        200,
+        {
+          run: RUN,
+          items: [
+            closed('a2', FINDINGS[2], '2026-10-11T10:00:00Z'),
+            closed('a1', FINDINGS[0], '2026-10-10T10:00:00Z'),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad?pestana=diagnostico');
+    await userEvent.click(await screen.findByRole('button', { name: 'Aceptados' }));
+    const list = await screen.findByRole('list', { name: 'Hallazgos aceptados' });
+    const items = within(list).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      expect.stringMatching(/Gasto en una categoría genérica.*Limpieza del local.*Aceptado 11\/10/),
+      expect.stringMatching(/Cuota distinta de la tarifa.*Paula Gómez Ruiz.*Aceptado 10\/10/),
+    ]);
+    expect(screen.queryByRole('region', { name: /Dinero/ })).toBeNull();
+  });
 });

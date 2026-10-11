@@ -153,7 +153,7 @@ export interface DiagnosisView {
 
 const RULE_ORDER = new Map(RULE_CATALOGUE.map((r, index) => [r.code, index]));
 
-/** Los hallazgos de un estado, por gravedad, regla y nombre, con el último diagnóstico. */
+/** Los hallazgos de un estado (abiertos por gravedad, regla y nombre; cerrados, los más recientes antes), con el último diagnóstico. */
 export class ListFindings {
   constructor(
     private readonly findings: FindingRepository,
@@ -162,9 +162,12 @@ export class ListFindings {
 
   async execute(status: FindingStatus): Promise<DiagnosisView> {
     const run = await this.runs.lastRun();
+    // Los abiertos, por regla y nombre; los cerrados, del más reciente al más antiguo.
     const items = (await this.findings.list(status)).sort((a, b) =>
-      (RULE_ORDER.get(a.rule) ?? 0) - (RULE_ORDER.get(b.rule) ?? 0) ||
-      a.entity.label.localeCompare(b.entity.label, 'es')
+      status === 'open'
+        ? (RULE_ORDER.get(a.rule) ?? 0) - (RULE_ORDER.get(b.rule) ?? 0) ||
+          a.entity.label.localeCompare(b.entity.label, 'es')
+        : (b.closedAt()?.getTime() ?? 0) - (a.closedAt()?.getTime() ?? 0)
     );
     return {
       run: run === null ? null : {
