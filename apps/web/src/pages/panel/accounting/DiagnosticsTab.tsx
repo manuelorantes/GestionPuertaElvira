@@ -4,14 +4,18 @@ import { Link } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import {
-  acceptFinding,
   deleteFinding,
   dismissFinding,
   type Finding,
   type FindingStatus,
   type Severity,
 } from '@/features/diagnostics/api';
-import { useDiagnostics, useFindingDecision, useRunDiagnosis } from '@/features/diagnostics/hooks';
+import {
+  useAcceptFinding,
+  useDiagnostics,
+  useFindingDecision,
+  useRunDiagnosis,
+} from '@/features/diagnostics/hooks';
 import { TeacherLink } from '@/pages/panel/payroll/TeacherLink';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 import { ApiError } from '@/shared/api/client';
@@ -69,8 +73,8 @@ export function DiagnosticsTab() {
               <p className="text-sm text-ink-soft">
                 {madridDateTime(data.run.finishedAt)} · {data.run.launchedBy} ·{' '}
                 <strong className="text-ink">
-                  {data.run.openCount}{' '}
-                  {data.run.openCount === 1 ? 'hallazgo abierto' : 'hallazgos abiertos'}
+                  {data.openCount}{' '}
+                  {data.openCount === 1 ? 'hallazgo abierto' : 'hallazgos abiertos'}
                 </strong>
                 {data.run.newCount > 0 && ` · ${data.run.newCount} nuevos`}
                 {data.run.resolvedCount > 0 && ` · ${data.run.resolvedCount} resueltos solos`}
@@ -193,7 +197,7 @@ function EntityLabel({ finding }: { finding: Finding }) {
 
 function FindingCard({ finding, showRule = false }: { finding: Finding; showRule?: boolean }) {
   const [confirming, setConfirming] = useState<'accept' | 'dismiss' | null>(null);
-  const accept = useFindingDecision(acceptFinding);
+  const accept = useAcceptFinding();
   const dismiss = useFindingDecision(dismissFinding);
   const remove = useFindingDecision(deleteFinding);
   const toast = useToast();

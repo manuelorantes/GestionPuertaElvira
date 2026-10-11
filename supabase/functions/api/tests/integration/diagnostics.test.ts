@@ -24,6 +24,7 @@ interface Finding {
 }
 
 interface Diagnosis {
+  openCount: number;
   run: { launchedBy: string; openCount: number; newCount: number; resolvedCount: number } | null;
   items: Finding[];
 }
@@ -443,5 +444,34 @@ Deno.test({
     const second = await diagnose(fx.client);
     assertEquals(second.run?.newCount, 1);
     assertEquals(byRule(second, 'fee_mismatch').length, 1);
+  },
+});
+
+Deno.test({
+  name:
+    'diagnostics should find again a case that was resolved and comes back, and count the open ones live',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const first = await diagnose(fx.client);
+    assertEquals(first.openCount, first.items.length);
+    const charge = (cents: number) =>
+      db()`UPDATE billing_charge SET amount_cents = ${cents}
+        WHERE student_id = ${fx.ana} AND kind = 'monthly' AND period = ${month.toString()}`;
+    // Se arregla a mano: se resuelve solo. Vuelve a estar mal: es el mismo caso y sale de nuevo.
+    await charge(4500);
+    assertEquals((await diagnose(fx.client)).run?.resolvedCount, 1);
+    await charge(3600);
+    const again = await diagnose(fx.client);
+    assertEquals(again.run?.newCount, 1);
+    assertEquals(byRule(again, 'fee_mismatch').length, 1);
+
+    // La cifra de abiertos baja al descartar, sin esperar a otro diagnóstico.
+    const name = byRule(again, 'name_format')[0];
+    assert(name);
+    await fx.client.json('POST', `/api/admin/diagnostics/findings/${name.id}/dismiss`);
+    const after = body<Diagnosis>(await fx.client.get('/api/admin/diagnostics'));
+    assertEquals(after.openCount, again.items.length - 1);
+    assertEquals(after.run?.openCount, again.items.length);
   },
 });
