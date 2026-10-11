@@ -1,10 +1,11 @@
-import { Stethoscope } from 'lucide-react';
+import { Stethoscope, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import {
   acceptFinding,
+  deleteFinding,
   dismissFinding,
   type Finding,
   type FindingStatus,
@@ -178,6 +179,7 @@ function FindingCard({ finding }: { finding: Finding }) {
   const [confirming, setConfirming] = useState<'accept' | 'dismiss' | null>(null);
   const accept = useFindingDecision(acceptFinding);
   const dismiss = useFindingDecision(dismissFinding);
+  const remove = useFindingDecision(deleteFinding);
   const toast = useToast();
   const outdated =
     accept.error instanceof ApiError && accept.error.code === 'finding_outdated'
@@ -213,6 +215,7 @@ function FindingCard({ finding }: { finding: Finding }) {
       {outdated && <Alert tone="warning">{outdated}</Alert>}
       {!outdated && accept.isError && <Alert>{apiErrorMessage(accept.error)}</Alert>}
       {dismiss.isError && <Alert>{apiErrorMessage(dismiss.error)}</Alert>}
+      {remove.isError && <Alert>{apiErrorMessage(remove.error)}</Alert>}
       {!closed && (
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="secondary" size="md" onClick={() => setConfirming('dismiss')}>
@@ -223,6 +226,22 @@ function FindingCard({ finding }: { finding: Finding }) {
               Aceptar
             </Button>
           )}
+          {/* Sin confirmación: no deja resultado y, si el caso sigue, vuelve a salir al diagnosticar. */}
+          <button
+            type="button"
+            aria-label={`Borrar el hallazgo de ${finding.entity.label}`}
+            title="Borrar sin aceptar ni descartar: si sigue sin cuadrar, volverá a salir"
+            disabled={remove.isPending}
+            onClick={() =>
+              void remove.mutateAsync(finding.id).then(
+                () => toast('Hallazgo borrado'),
+                () => undefined,
+              )
+            }
+            className="inline-flex size-10 items-center justify-center rounded-md text-danger-fg hover:bg-danger-bg disabled:opacity-50"
+          >
+            <Trash2 aria-hidden size={18} />
+          </button>
         </div>
       )}
       {confirming === 'accept' && (

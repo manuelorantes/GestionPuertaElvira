@@ -192,4 +192,28 @@ describe('Diagnóstico', () => {
     expect(await screen.findByText(/Descartado 09\/10\/2026 12:00 · Junta/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aceptar' })).toBeNull();
   });
+
+  it('deletes a finding without a result from the red bin, right of accepting', async () => {
+    const fetchMock = api({ 'DELETE /api/admin/diagnostics/findings/f1': [204] });
+    renderApp('/panel/contabilidad?pestana=diagnostico');
+    const money = await screen.findByRole('region', { name: /Dinero/ });
+    const remove = within(money).getByRole('button', {
+      name: 'Borrar el hallazgo de Paula Gómez Ruiz',
+    });
+    const actions = within(remove.parentElement as HTMLElement).getAllByRole('button');
+    expect(actions.map((b) => b.textContent || b.getAttribute('aria-label'))).toEqual([
+      'Descartar',
+      'Aceptar',
+      'Borrar el hallazgo de Paula Gómez Ruiz',
+    ]);
+
+    await userEvent.click(remove);
+    expect(await screen.findByText('Hallazgo borrado')).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          String(url) === '/api/admin/diagnostics/findings/f1' && init?.method === 'DELETE',
+      ),
+    ).toBe(true);
+  });
 });

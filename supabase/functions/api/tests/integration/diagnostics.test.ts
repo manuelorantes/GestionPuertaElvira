@@ -420,3 +420,28 @@ Deno.test({
     assertEquals(byRule(await diagnose(client), 'chained_discounts'), []);
   },
 });
+
+Deno.test({
+  name: 'diagnostics should delete an open finding without a result, and find it again as new',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const first = await diagnose(fx.client);
+    const fee = byRule(first, 'fee_mismatch')[0];
+    assert(fee);
+    const path = `/api/admin/diagnostics/findings/${fee.id}`;
+    assertEquals((await fx.client.json('DELETE', path)).status, 204);
+    const after = body<Diagnosis>(await fx.client.get('/api/admin/diagnostics'));
+    assertEquals(after.items.find((f) => f.id === fee.id), undefined);
+    for (const status of ['accepted', 'dismissed', 'resolved']) {
+      const closed = body<Diagnosis>(
+        await fx.client.get(`/api/admin/diagnostics?status=${status}`),
+      );
+      assertEquals(closed.items, []);
+    }
+    assertError(await fx.client.json('DELETE', path), 404, 'not_found');
+    const second = await diagnose(fx.client);
+    assertEquals(second.run?.newCount, 1);
+    assertEquals(byRule(second, 'fee_mismatch').length, 1);
+  },
+});

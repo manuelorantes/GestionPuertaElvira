@@ -2,6 +2,7 @@ import { InvalidValue } from '../../domain/common/mod.ts';
 import type { FindingStatus } from '../../domain/diagnostics/mod.ts';
 import {
   AcceptFinding,
+  DeleteFinding,
   DismissFinding,
   ListFindings,
   RunDiagnosis,
@@ -34,7 +35,7 @@ export function registerDiagnosticsRoutes(api: ApiApp): void {
     FindingNotOpen: [409, 'finding_closed'],
     FindingHasNoFix: [409, 'finding_has_no_fix'],
   });
-  const admin = (method: 'GET' | 'POST', path: string) => ({
+  const admin = (method: 'GET' | 'POST' | 'DELETE', path: string) => ({
     method,
     path,
     access: 'admin' as const,
@@ -75,6 +76,11 @@ export function registerDiagnosticsRoutes(api: ApiApp): void {
     const { findings, facts } = repos(scope);
     await new AcceptFinding(findings, facts, new UseCaseFixExecutor(api, scope), api.deps.clock)
       .execute(param(c, 'id'), actor(scope));
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('DELETE', '/api/admin/diagnostics/findings/:id'), async (c, scope) => {
+    await new DeleteFinding(repos(scope).findings).execute(param(c, 'id'));
     return c.body(null, 204);
   });
 

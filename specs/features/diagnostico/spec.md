@@ -52,7 +52,13 @@ propuesta, el cambio queda en el historial a nombre de quien aceptó y el hallaz
 el arreglo el sistema MUST volver a comprobar la regla: si el caso ya no se reproduce con los datos de ese momento, se
 rechaza con un aviso y hay que volver a diagnosticar. Un hallazgo sin arreglo automático solo MUST ofrecer
 «Descartar» y el enlace a la ficha. Cualquier hallazgo abierto MUST poder descartarse, tras confirmar. Un hallazgo
-cerrado no se vuelve a aceptar ni a descartar.
+cerrado no se vuelve a aceptar ni a descartar. Cualquier hallazgo abierto MUST poder borrarse con la papelera roja, a
+la derecha de «Aceptar», sin confirmar: desaparece sin quedar aceptado, descartado ni resuelto, y si el caso sigue
+ahí el próximo diagnóstico lo vuelve a encontrar como nuevo. Los hallazgos cerrados no se borran.
+
+#### Scenario: Borrar un hallazgo
+- **WHEN** administración borra con la papelera el hallazgo abierto de Paula y vuelve a diagnosticar sin cambiar nada
+- **THEN** el hallazgo no aparece en ningún estado tras borrarlo y el nuevo diagnóstico lo encuentra como nuevo
 
 #### Scenario: Aceptar un arreglo
 - **WHEN** administración acepta «Cuota distinta de la tarifa» de Paula (36 € frente a 49,50 €)
