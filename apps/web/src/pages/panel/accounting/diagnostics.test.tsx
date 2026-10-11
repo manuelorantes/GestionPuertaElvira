@@ -63,10 +63,11 @@ const FINDINGS = [
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /api/auth/me': [200, { user: ADMIN }],
-    'GET /api/admin/diagnostics?status=open': [200, { run: RUN, items: FINDINGS }],
+    'GET /api/admin/diagnostics?status=open': [200, { openCount: 2, run: RUN, items: FINDINGS }],
     'GET /api/admin/diagnostics?status=dismissed': [
       200,
       {
+        openCount: 2,
         run: RUN,
         items: [
           {
@@ -88,7 +89,8 @@ describe('Diagnóstico', () => {
     api();
     renderApp('/panel/contabilidad?pestana=diagnostico');
 
-    expect(await screen.findByText(/3 hallazgos abiertos/)).toBeInTheDocument();
+    // La cifra es la de ahora (2), no la del último diagnóstico (3).
+    expect(await screen.findByText(/2 hallazgos abiertos/)).toBeInTheDocument();
     expect(screen.getByText(/Tarea nocturna/)).toBeInTheDocument();
     const money = screen.getByRole('region', { name: /Dinero/ });
     expect(
@@ -116,7 +118,7 @@ describe('Diagnóstico', () => {
       ],
     });
     renderApp('/panel/contabilidad?pestana=diagnostico');
-    await screen.findByText(/3 hallazgos abiertos/);
+    await screen.findByText(/2 hallazgos abiertos/);
 
     await userEvent.click(screen.getByRole('button', { name: 'Diagnosticar' }));
 
@@ -131,7 +133,10 @@ describe('Diagnóstico', () => {
   });
 
   it('accepts a finding after confirming and applies its fix', async () => {
-    const fetchMock = api({ 'POST /api/admin/diagnostics/findings/f1/accept': [204] });
+    const fetchMock = api({
+      'POST /api/admin/diagnostics/findings/f1/accept': [204],
+      'POST /api/admin/diagnostics/run': [200, RUN],
+    });
     renderApp('/panel/contabilidad?pestana=diagnostico');
     const money = await screen.findByRole('region', { name: /Dinero/ });
     const card = within(money).getByText('Paula Gómez Ruiz').closest('li') as HTMLElement;
@@ -148,6 +153,14 @@ describe('Diagnóstico', () => {
           String(url) === '/api/admin/diagnostics/findings/f1/accept' && init?.method === 'POST',
       ),
     ).toBe(true);
+    // El arreglo cambia datos del club: se vuelve a diagnosticar solo.
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(
+          ([url, init]) => String(url) === '/api/admin/diagnostics/run' && init?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
   });
 
   it('explains when the data changed since the diagnosis', async () => {

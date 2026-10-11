@@ -48,7 +48,9 @@ diagnósticos seguidos sin cambios MUST producir los mismos hallazgos, no duplic
 
 ### Requirement: Aceptar y descartar
 Un hallazgo abierto con arreglo automático MUST poder aceptarse, tras confirmar: se aplica exactamente la solución
-propuesta, el cambio queda en el historial a nombre de quien aceptó y el hallazgo pasa a «aceptado». Antes de aplicar
+propuesta, el cambio queda en el historial a nombre de quien aceptó y el hallazgo pasa a «aceptado». Como el arreglo
+cambia datos del club, la pantalla MUST volver a diagnosticar sola después de aceptarlo. Un caso aceptado o resuelto
+solo que vuelve a darse con los mismos datos sale de nuevo como hallazgo nuevo. Antes de aplicar
 el arreglo el sistema MUST volver a comprobar la regla: si el caso ya no se reproduce con los datos de ese momento, se
 rechaza con un aviso y hay que volver a diagnosticar. Un hallazgo sin arreglo automático solo MUST ofrecer
 «Descartar» y el enlace a la ficha. Cualquier hallazgo abierto MUST poder descartarse, tras confirmar. Un hallazgo
@@ -85,7 +87,8 @@ ahí el próximo diagnóstico lo vuelve a encontrar como nuevo. Los hallazgos ce
 
 ### Requirement: Pantalla
 La pestaña «Diagnóstico» MUST mostrar: el botón «Diagnosticar»; la fecha y hora del último diagnóstico, quién o qué
-lo lanzó y el número de hallazgos abiertos (y los nuevos y resueltos solos de ese diagnóstico, si los hubo); un
+lo lanzó y el número de hallazgos abiertos ahora (baja al aceptar, descartar o borrar, sin esperar a otro
+diagnóstico), y los nuevos y resueltos solos de ese diagnóstico, si los hubo; un
 selector de estado (Abiertos, Aceptados, Descartados, Resueltos solos); y la lista agrupada por gravedad (Dinero,
 Datos del club y Forma, en ese orden) y dentro por regla, cada hallazgo con su entidad, explicación, propuesta y los
 botones «Aceptar» (solo con arreglo) y «Descartar». Los hallazgos cerrados (aceptados, descartados o resueltos solos)
