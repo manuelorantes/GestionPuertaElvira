@@ -104,6 +104,8 @@ export function DiagnosticsTab() {
         <Card className="p-6 text-sm text-ink-muted">
           {status === 'open' ? 'No hay nada que no cuadre.' : 'No hay hallazgos en este estado.'}
         </Card>
+      ) : status !== 'open' ? (
+        <ClosedList status={status} findings={data.items} />
       ) : (
         SEVERITIES.map((severity) => (
           <SeverityGroup
@@ -114,6 +116,20 @@ export function DiagnosticsTab() {
         ))
       )}
     </div>
+  );
+}
+
+/** Los cerrados, en una sola lista del más reciente al más antiguo (el orden lo da la API), con su regla. */
+function ClosedList({ status, findings }: { status: FindingStatus; findings: Finding[] }) {
+  const label = STATUSES.find((s) => s.id === status)?.label.toLowerCase() ?? '';
+  return (
+    <ul aria-label={`Hallazgos ${label}`} className="flex flex-col gap-2">
+      {findings.map((finding) => (
+        <li key={finding.id}>
+          <FindingCard finding={finding} showRule />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -175,7 +191,7 @@ function EntityLabel({ finding }: { finding: Finding }) {
   return <span className={className}>{label}</span>;
 }
 
-function FindingCard({ finding }: { finding: Finding }) {
+function FindingCard({ finding, showRule = false }: { finding: Finding; showRule?: boolean }) {
   const [confirming, setConfirming] = useState<'accept' | 'dismiss' | null>(null);
   const accept = useFindingDecision(acceptFinding);
   const dismiss = useFindingDecision(dismissFinding);
@@ -200,6 +216,7 @@ function FindingCard({ finding }: { finding: Finding }) {
   const closed = finding.status !== 'open';
   return (
     <Card className="flex flex-col gap-3 p-5">
+      {showRule && <h4 className={SECTION_TITLE}>{finding.ruleTitle}</h4>}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <EntityLabel finding={finding} />
         <span className="text-xs text-ink-muted">

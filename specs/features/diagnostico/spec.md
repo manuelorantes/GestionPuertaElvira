@@ -88,7 +88,9 @@ La pestaña «Diagnóstico» MUST mostrar: el botón «Diagnosticar»; la fecha 
 lo lanzó y el número de hallazgos abiertos (y los nuevos y resueltos solos de ese diagnóstico, si los hubo); un
 selector de estado (Abiertos, Aceptados, Descartados, Resueltos solos); y la lista agrupada por gravedad (Dinero,
 Datos del club y Forma, en ese orden) y dentro por regla, cada hallazgo con su entidad, explicación, propuesta y los
-botones «Aceptar» (solo con arreglo) y «Descartar». Los hallazgos cerrados muestran cuándo y quién los cerró.
+botones «Aceptar» (solo con arreglo) y «Descartar». Los hallazgos cerrados (aceptados, descartados o resueltos solos)
+MUST salir en una sola lista, sin agrupar, del cerrado más reciente al más antiguo, cada uno con su regla y con cuándo
+y quién lo cerró.
 
 ### Requirement: Reglas
 Cada regla es una comprobación con nombre. «Arreglo» indica la solución automática si la hay; sin arreglo, el

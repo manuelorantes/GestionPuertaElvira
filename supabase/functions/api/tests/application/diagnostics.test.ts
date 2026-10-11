@@ -214,3 +214,19 @@ Deno.test('DeleteFinding should remove an open finding without a trace, so the s
   await assertRejects(() => remove.execute(name?.id ?? ''), FindingNotOpen);
   await assertRejects(() => remove.execute('no-existe'), FindingNotFound);
 });
+
+Deno.test('ListFindings should list the closed ones from the newest to the oldest', async () => {
+  const { fx, run, dismiss, list, advance } = setUp();
+  await run.execute('Junta');
+  const fee = fx.all().find((f) => f.rule === 'fee_mismatch');
+  const name = fx.all().find((f) => f.rule === 'name_format');
+  // El de la cuota (primero en pantalla abierto) se descarta antes; el del nombre, después.
+  advance('2026-10-11T09:00:00Z');
+  await dismiss.execute(fee?.id ?? '', 'Junta');
+  advance('2026-10-12T09:00:00Z');
+  await dismiss.execute(name?.id ?? '', 'Junta');
+  assertEquals((await list.execute('dismissed')).items.map((i) => i.rule), [
+    'name_format',
+    'fee_mismatch',
+  ]);
+});
