@@ -147,6 +147,8 @@ export interface RunView {
 }
 
 export interface DiagnosisView {
+  /** Los abiertos ahora (los del último diagnóstico menos los aceptados, descartados o borrados desde entonces). */
+  openCount: number;
   run: RunView | null;
   items: FindingView[];
 }
@@ -170,6 +172,7 @@ export class ListFindings {
         : (b.closedAt()?.getTime() ?? 0) - (a.closedAt()?.getTime() ?? 0)
     );
     return {
+      openCount: status === 'open' ? items.length : (await this.findings.open()).length,
       run: run === null ? null : {
         startedAt: run.startedAt.toISOString(),
         finishedAt: run.finishedAt.toISOString(),

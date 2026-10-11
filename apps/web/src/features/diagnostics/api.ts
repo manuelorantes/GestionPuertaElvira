@@ -30,6 +30,8 @@ export interface DiagnosisRun {
 }
 
 export interface Diagnosis {
+  /** Los abiertos ahora, aunque se hayan cerrado algunos desde el último diagnóstico. */
+  openCount: number;
   run: DiagnosisRun | null;
   items: Finding[];
 }
