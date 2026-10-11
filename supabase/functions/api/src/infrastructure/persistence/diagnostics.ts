@@ -72,6 +72,10 @@ export class SqlFindingRepository implements FindingRepository {
     for (const finding of findings) await this.save(finding);
   }
 
+  async delete(id: string): Promise<void> {
+    await this.sql`DELETE FROM diagnostics_finding WHERE id = ${id}`;
+  }
+
   /** Los de un estado, por fecha de detección (el orden de pantalla lo pone el caso de uso). */
   async list(status: FindingStatus): Promise<Finding[]> {
     const rows = await this.sql.unsafe(

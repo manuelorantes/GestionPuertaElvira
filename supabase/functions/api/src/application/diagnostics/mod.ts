@@ -27,6 +27,7 @@ export interface FindingRepository {
   byId(id: string): Promise<Finding | null>;
   save(finding: Finding): Promise<void>;
   saveAll(findings: Finding[]): Promise<void>;
+  delete(id: string): Promise<void>;
   /** Los de un estado, de la temporada en curso. */
   list(status: FindingStatus): Promise<Finding[]>;
 }
@@ -244,5 +245,19 @@ export class DismissFinding {
     const finding = await lookUp(this.findings, id);
     finding.dismiss(by, this.clock.now());
     await this.findings.save(finding);
+  }
+}
+
+/**
+ * Borra un hallazgo abierto sin dejar resultado (ni aceptado ni descartado): si el caso sigue ahí, el próximo
+ * diagnóstico lo vuelve a encontrar como nuevo.
+ */
+export class DeleteFinding {
+  constructor(private readonly findings: FindingRepository) {}
+
+  async execute(id: string): Promise<void> {
+    const finding = await lookUp(this.findings, id);
+    finding.assertDeletable();
+    await this.findings.delete(id);
   }
 }
