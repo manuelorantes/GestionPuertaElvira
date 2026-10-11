@@ -46,6 +46,11 @@ export function acceptFinding(id: string): Promise<void> {
   return apiSend('POST', `/api/admin/diagnostics/findings/${id}/accept`);
 }
 
+/** Lo borra sin resultado: si el caso sigue, el próximo diagnóstico lo vuelve a encontrar. */
+export function deleteFinding(id: string): Promise<void> {
+  return apiSend('DELETE', `/api/admin/diagnostics/findings/${id}`);
+}
+
 export function dismissFinding(id: string): Promise<void> {
   return apiSend('POST', `/api/admin/diagnostics/findings/${id}/dismiss`);
 }

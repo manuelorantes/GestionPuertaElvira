@@ -1,8 +1,9 @@
 import { assertEquals, assertRejects } from '@std/assert';
 
-import type { Fix } from '../../src/domain/diagnostics/mod.ts';
+import { FindingNotOpen, type Fix } from '../../src/domain/diagnostics/mod.ts';
 import {
   AcceptFinding,
+  DeleteFinding,
   DismissFinding,
   type Facts,
   FindingNotFound,
@@ -196,4 +197,20 @@ Deno.test('ListFindings should order open findings by severity, rule and label',
   ]);
   assertEquals(view.items[0]?.status, 'open');
   assertEquals(typeof view.items[0]?.detectedAt, 'string');
+});
+
+Deno.test('DeleteFinding should remove an open finding without a trace, so the same case comes back', async () => {
+  const { fx, run, dismiss } = setUp();
+  await run.execute('Junta');
+  const fee = fx.all().find((f) => f.rule === 'fee_mismatch');
+  const remove = new DeleteFinding(fx);
+  await remove.execute(fee?.id ?? '');
+  assertEquals(fx.all().map((f) => f.rule), ['name_format']);
+  const again = await run.execute('Junta');
+  assertEquals([again.openCount, again.newCount], [2, 1]);
+  // Solo los abiertos: uno cerrado se queda como está.
+  const name = fx.all().find((f) => f.rule === 'name_format');
+  await dismiss.execute(name?.id ?? '', 'Junta');
+  await assertRejects(() => remove.execute(name?.id ?? ''), FindingNotOpen);
+  await assertRejects(() => remove.execute('no-existe'), FindingNotFound);
 });

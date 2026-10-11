@@ -343,6 +343,11 @@ export class Finding {
     this.close('accepted', at, by);
   }
 
+  /** Solo se borra un hallazgo abierto: los cerrados son el historial del diagnóstico. */
+  assertDeletable(): void {
+    this.ensureOpen();
+  }
+
   dismiss(by: string, at: Date): void {
     this.ensureOpen();
     this.close('dismissed', at, by);

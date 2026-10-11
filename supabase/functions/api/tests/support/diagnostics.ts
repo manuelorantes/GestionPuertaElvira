@@ -193,6 +193,11 @@ export class DiagnosticsFixture implements FindingRepository, RunLog {
     for (const finding of findings) await this.save(finding);
   }
 
+  delete(id: string): Promise<void> {
+    this.findings.delete(id);
+    return Promise.resolve();
+  }
+
   list(status: FindingStatus): Promise<Finding[]> {
     return Promise.resolve([...this.findings.values()].filter((f) => f.status() === status));
   }
