@@ -307,6 +307,38 @@ Deno.test('the club adds its own categories, uses and renames them, and removes 
   );
 });
 
+Deno.test('accounting shows a manual entry by id, to open the ledger where it is', async () => {
+  const client = await admin();
+  const created = await client.json('POST', '/api/admin/accounting/entries', {
+    date: '2025-10-03',
+    kind: 'expense',
+    concept: 'Luz',
+    category: 'electricity',
+    method: 'card',
+    amount: '80',
+    period: '2025-09',
+  });
+  const id = body<{ id: string }>(created).id;
+
+  const shown = await client.get(`/api/admin/accounting/entries/${id}`);
+  assertEquals(shown.status, 200);
+  assertEquals(shown.body, {
+    id,
+    date: '2025-10-03',
+    kind: 'expense',
+    concept: 'Luz',
+    category: 'electricity',
+    method: 'card',
+    amountCents: 8000,
+    period: '2025-09',
+  });
+  assertError(
+    await client.get('/api/admin/accounting/entries/00000000-0000-7000-8000-000000000000'),
+    404,
+    'not_found',
+  );
+});
+
 Deno.test('accounting edits a manual entry, but not one in a closed season', async () => {
   const client = await admin();
   const created = await client.json('POST', '/api/admin/accounting/entries', {
