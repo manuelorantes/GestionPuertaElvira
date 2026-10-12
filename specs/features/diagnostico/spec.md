@@ -144,7 +144,8 @@ Datos del club:
 13. **Posible familia sin vincular**: dos alumnos activos que comparten email de contacto o teléfono de un tutor, o
     tienen los mismos dos apellidos, y no son familia directa. Cada par sale una vez. Arreglo: vincularlos (sus cuotas
     se recalculan).
-14. **Familia directa no mutua**: A tiene a B y B no tiene a A. Arreglo: completar la relación.
+14. **Familia directa no mutua**: A tiene a B y B no tiene a A, o A tiene a B, B tiene a C y A no tiene a C.
+    Arreglo: completar la relación (vincularlos une las dos familias).
 15. **Número de socio repetido**: sin arreglo.
 16. **Ingresos atribuidos sin horas**: profesor con ingresos atribuidos en un mes pasado y sin horas ni liquidación.
 17. **Puntos del mes que no cuadran** con la suma de sus movimientos: sin arreglo.
