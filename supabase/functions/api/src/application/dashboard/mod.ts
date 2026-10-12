@@ -1,5 +1,10 @@
 import { type Clock, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
-import type { AccountingSettingsRepository, LedgerLine, MonthLedger } from '../accounting/mod.ts';
+import type {
+  AccountingSettingsRepository,
+  FiscalYearSummary,
+  LedgerLine,
+  MonthLedger,
+} from '../accounting/mod.ts';
 import type { BillingQuery, ChargeView, ListMonthlyCharges } from '../billing/mod.ts';
 import type { ClassQuery, GroupSummary } from '../classes/mod.ts';
 import type { StudentQuery } from '../students/mod.ts';
@@ -23,12 +28,14 @@ export interface MonthFeeBars extends MonthBars {
 export interface ClubSummaryView {
   month: string;
   today: string;
-  collectedCents: number;
-  expectedCents: number;
+  /** Saldo del club: el acumulado del ejercicio hasta el mes en curso, desde el saldo arrastrado. */
+  balanceCents: number;
+  /** Ingresos menos gastos del ejercicio hasta el mes en curso. */
+  seasonResultCents: number;
+  /** Lo que falta por cobrar de las cuotas del mes (y el material). */
   pendingCents: number;
   /** Cuotas de socio de la temporada sin cobrar: aparte de las cifras del mes. */
   membershipPendingCents: number;
-  expensesCents: number;
   activeStudents: number;
   registeredStudents: number;
   /** Lo que entra y sale cada mes, por fecha (cuadra con Contabilidad). */
@@ -81,6 +88,7 @@ export class ClubSummary {
     private readonly fees: FeeIncome,
     private readonly settings: AccountingSettingsRepository,
     private readonly expectedPayroll: ExpectedPayroll,
+    private readonly fiscalYear: FiscalYearSummary,
   ) {}
 
   /** Meses de margen alrededor de la temporada: un gasto puede pagarse antes o después del mes al que corresponde. */
@@ -126,6 +134,10 @@ export class ClubSummary {
       if (m.equals(month)) current = view;
       else if (m.next().equals(month)) previousLines = view.lines;
     }
+    // El saldo: lo que Contabilidad acumula hasta este mes en «Mes a mes».
+    const year = await this.fiscalYear.execute(Season.containing(month).startYear);
+    const balance = year.months.find((m) => m.month === month.toString())?.accumulatedCents ??
+      year.openingCents;
     const groups = await this.classes.groups(today);
     const capacity = groups.reduce((sum, g) => sum + g.capacity, 0);
     const occupied = groups.reduce((sum, g) => sum + Math.min(g.occupied, g.capacity), 0);
@@ -135,11 +147,10 @@ export class ClubSummary {
     return {
       month: month.toString(),
       today: today.toString(),
-      collectedCents: charges.collectedCents,
-      expectedCents: charges.expectedCents,
+      balanceCents: balance,
+      seasonResultCents: balance - year.openingCents,
       pendingCents: charges.expectedCents - charges.collectedCents,
       membershipPendingCents: memberships.expectedCents - memberships.collectedCents,
-      expensesCents: current?.expenseCents ?? 0,
       activeStudents: (await this.students.list('active', null, today)).length,
       registeredStudents: await this.students.total(),
       cashChart,

@@ -52,18 +52,33 @@ function Title({ children }: { children: string }) {
   );
 }
 
+/** Con signo: «+1240 €» o «−500 €». */
+function formatSigned(cents: number): string {
+  return `${cents > 0 ? '+' : ''}${formatCents(cents)}`;
+}
+
+/** Cuotas (cobradas y previstas) menos gastos fijos (anotados y profesorado previsto) del mes en curso. */
+function monthMargin(data: Dashboard): { fees: number; fixed: number } {
+  const bar = data.monthChart.find((m) => m.month === data.month);
+  return {
+    fees: (bar?.incomeCents ?? 0) + (bar?.expectedCents ?? 0),
+    fixed: (bar?.expenseCents ?? 0) + (bar?.expectedExpenseCents ?? 0),
+  };
+}
+
 function Summary({ data }: { data: Dashboard }) {
   const [dialog, setDialog] = useState<BillingDialog>(null);
   const month = monthName(data.month);
+  const margin = monthMargin(data);
 
   return (
     <>
       <div className="grid [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] gap-4">
         <Kpi
           accent
-          label={`Cobrado en ${month}`}
-          value={formatCents(data.collectedCents)}
-          hint={`de ${formatCents(data.expectedCents)} previstos`}
+          label="Saldo del club"
+          value={formatCents(data.balanceCents)}
+          hint={`${formatSigned(data.seasonResultCents)} esta temporada`}
         />
         <Kpi
           label="Pendiente de cobro"
@@ -75,9 +90,9 @@ function Summary({ data }: { data: Dashboard }) {
           }`}
         />
         <Kpi
-          label={`Gastos de ${month}`}
-          value={formatCents(data.expensesCents)}
-          hint="Profesores, facturas y otros gastos"
+          label={`Margen previsto de ${month}`}
+          value={formatSigned(margin.fees - margin.fixed)}
+          hint={`${formatCents(margin.fees)} de cuotas · ${formatCents(margin.fixed)} de gastos fijos`}
         />
         <Kpi
           label="Alumnos activos"

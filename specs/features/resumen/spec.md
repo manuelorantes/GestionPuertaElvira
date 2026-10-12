@@ -5,12 +5,21 @@ Portada del panel para administración con las cifras reales del club. Se compon
 ### Requirement: Cifras clave del mes
 El resumen MUST mostrar:
 
-- lo cobrado en el mes frente a lo previsto: solo las cuotas del mes (y el material), las mismas cifras que «Cuotas» de
-  ese mes en Cobros;
-- lo pendiente de cobro de esas cuotas, con el plazo del día 5 y, aparte en la misma línea, lo que falta por cobrar de
-  cuotas de socio de la temporada (p. ej. «Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio»);
-- los gastos del mes (liquidaciones, facturas y otros gastos);
+- el saldo del club: el acumulado del ejercicio hasta el mes en curso que enseña «Mes a mes» de
+  [Contabilidad](../contabilidad/spec.md) (desde el saldo arrastrado), con el resultado de la temporada debajo
+  (p. ej. «+1240 € esta temporada»);
+- lo pendiente de cobro de las cuotas del mes (y el material), las mismas cifras que «Cuotas» de ese mes en Cobros, con
+  el plazo del día 5 y, aparte en la misma línea, lo que falta por cobrar de cuotas de socio de la temporada (p. ej.
+  «Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio»);
+- el margen previsto del mes: las cuotas del mes en curso (cobradas y previstas) menos sus gastos fijos (anotados y
+  profesorado previsto), las mismas cifras que el mes en curso de «Cuotas vs gastos fijos», con el detalle debajo
+  (p. ej. «3920 € de cuotas · 2100 € de gastos fijos»);
 - los alumnos activos frente a los registrados.
+
+#### Scenario: Saldo y margen
+- **WHEN** el ejercicio arrastra 14.100 € y en lo que va de temporada han entrado 5.000 € y salido 3.760 €
+- **THEN** el saldo del club es «15.340 €» y debajo pone «+1240 € esta temporada»; si en octubre hay 3.920 € de cuotas
+  cobradas o previstas y 2.100 € de gastos fijos, el margen previsto de octubre es «+1820 €»
 
 ### Requirement: Mes a mes
 El resumen MUST mostrar dos gráficos de barras de ingresos y gastos de la temporada en curso, de septiembre a agosto,
