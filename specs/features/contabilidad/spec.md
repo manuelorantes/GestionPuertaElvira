@@ -76,7 +76,7 @@ los cobros. Los movimientos de otro mes MUST indicarlo («Corresponde a septiemb
 #### Scenario: Luz pagada al mes siguiente
 - **WHEN** administración anota el 3 de octubre la luz y elige «Septiembre 2026» como mes al que corresponde
 - **THEN** el movimiento sale en octubre con «Corresponde a septiembre 2026», y en el resumen cuenta como gasto de
-  septiembre en «Lo que corresponde a cada mes»
+  septiembre en «Cuotas vs gastos fijos»
 
 ### Requirement: Categorías del club
 En «Ajustes», administración MUST poder añadir categorías propias de ingresos o de gastos, renombrarlas y quitarlas
@@ -90,7 +90,7 @@ se pueden marcar como «del mes».
 
 ### Requirement: Categorías del mes
 En la pestaña «Ajustes», administración MUST poder marcar qué categorías de ingresos y gastos cuentan como «del mes»
-(las que salen en la gráfica «Lo que corresponde a cada mes» del resumen). Por defecto: en ingresos, Cuotas; en gastos,
+(las que salen en la gráfica «Cuotas vs gastos fijos» del resumen). Por defecto: en ingresos, Cuotas; en gastos,
 Profesores, Presidente, Alquiler, Limpieza, Agua, Electricidad y Wifi.
 
 ### Requirement: Gastos por categoría

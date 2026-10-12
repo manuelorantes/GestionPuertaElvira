@@ -94,8 +94,8 @@ function Summary({ data }: { data: Dashboard }) {
             current={data.month}
           />
           <ChartCard
-            title={`Lo que corresponde a cada mes · ${seasonLabel(data.month)}`}
-            label="Lo que corresponde a cada mes, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan, y los gastos del mes en el suyo"
+            title={`Cuotas vs gastos fijos · ${seasonLabel(data.month)}`}
+            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan, y los gastos del mes en el suyo"
             id="mes"
             months={data.monthChart}
             current={data.month}
