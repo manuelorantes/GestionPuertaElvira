@@ -37,11 +37,10 @@ const STUDENT = {
 const SUMMARY = {
   month: '2026-10',
   today: '2026-10-03',
-  collectedCents: 412000,
-  expectedCents: 658000,
+  balanceCents: 1534000,
+  seasonResultCents: 124000,
   pendingCents: 246000,
   membershipPendingCents: 275000,
-  expensesCents: 118000,
   activeStudents: 157,
   registeredStudents: 170,
   cashChart: chart,
@@ -105,10 +104,15 @@ describe('Resumen', () => {
     });
     renderApp('/panel');
 
-    expect(await screen.findByText('Cobrado en octubre')).toBeInTheDocument();
-    expect(screen.getByText('4120 €')).toBeInTheDocument();
-    expect(screen.getByText('de 6580 € previstos')).toBeInTheDocument();
+    // El saldo del club y el resultado de la temporada, de Contabilidad.
+    expect(await screen.findByText('Saldo del club')).toBeInTheDocument();
+    expect(screen.getByText('15.340 €')).toBeInTheDocument();
+    expect(screen.getByText('+1240 € esta temporada')).toBeInTheDocument();
     expect(screen.getByText('2460 €')).toBeInTheDocument();
+    // El margen previsto del mes: cuotas (3920 €) menos gastos fijos anotados (900 €) y profesorado previsto (1200 €).
+    expect(screen.getByText('Margen previsto de octubre')).toBeInTheDocument();
+    expect(screen.getByText('+1820 €')).toBeInTheDocument();
+    expect(screen.getByText('3920 € de cuotas · 2100 € de gastos fijos')).toBeInTheDocument();
     // Las cuotas de socio pendientes, aparte de las del mes.
     expect(
       screen.getByText('Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio'),
@@ -178,12 +182,12 @@ describe('Resumen', () => {
     const overdue = await screen.findByRole('region', { name: 'Recibos vencidos' });
     await user.click(within(overdue).getByRole('link', { name: 'Irene Moreno Salas' }));
     expect(await screen.findByRole('dialog', { name: 'Irene Moreno Salas' })).toBeVisible();
-    expect(screen.getByText('Cobrado en octubre')).toBeInTheDocument();
+    expect(screen.getByText('Saldo del club')).toBeInTheDocument();
 
     // Pulsar en la zona gris, fuera del botón, cierra la ficha y se sigue en el resumen.
     await user.click(screen.getByTestId('fondo-ficha'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByText('Cobrado en octubre')).toBeInTheDocument();
+    expect(screen.getByText('Saldo del club')).toBeInTheDocument();
 
     await user.click(within(overdue).getByRole('link', { name: 'Irene Moreno Salas' }));
     await screen.findByRole('dialog', { name: 'Irene Moreno Salas' });

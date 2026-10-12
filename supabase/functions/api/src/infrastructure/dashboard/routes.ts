@@ -1,4 +1,4 @@
-import { MonthLedger } from '../../application/accounting/mod.ts';
+import { FiscalYearSummary, MonthLedger } from '../../application/accounting/mod.ts';
 import { ClubSummary } from '../../application/dashboard/mod.ts';
 import { ExpectedPayroll } from '../../application/payroll/mod.ts';
 import { billing } from '../billing/routes.ts';
@@ -34,6 +34,11 @@ export function registerDashboardRoutes(api: ApiApp): void {
           new SqlDutyRepository(scope.tx),
           new SqlHolidayCalendar(scope.tx),
           new SqlTeacherRates(scope.tx),
+        ),
+        new FiscalYearSummary(
+          new SqlLedgerQuery(scope.tx),
+          new SqlAccountingRepository(scope.tx),
+          api.deps.clock,
         ),
       );
       return c.json(await summary.execute());

@@ -10,7 +10,8 @@ test('should summarise the club with real figures', async ({ page }) => {
   await page.getByLabel('Contraseña').fill('desarrollo-admin');
   await page.getByRole('button', { name: 'Entrar' }).click();
 
-  await expect(page.getByText(/^Cobrado en /)).toBeVisible();
+  await expect(page.getByText('Saldo del club')).toBeVisible();
+  await expect(page.getByText(/^Margen previsto de /)).toBeVisible();
   await expect(page.getByRole('img', { name: /Lo que entra y sale cada mes/ })).toBeVisible();
   await expect(page.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toBeVisible();
   await expect(page.getByText('Ocupación de clases')).toBeVisible();
