@@ -10,10 +10,12 @@ import {
   Attachment,
   type Category,
   CategoryCatalog,
+  type EntryKind,
   FiscalYear,
   LedgerCorrection,
   ManualEntry,
   ManualEntryId,
+  type Method,
   methodFromName,
   MonthlyCategories,
   SeasonClosing,
@@ -421,6 +423,37 @@ export class RecordEntry {
     );
     await this.entries.saveEntry(entry);
     return entry.id.value;
+  }
+}
+
+/** Un apunte manual tal como lo guarda el libro, para abrir Contabilidad donde está. */
+export interface ManualEntryView {
+  id: string;
+  date: string;
+  kind: EntryKind;
+  concept: string;
+  category: string;
+  method: Method;
+  amountCents: number;
+  period: string;
+}
+
+export class ShowEntry {
+  constructor(private readonly entries: ManualEntryRepository) {}
+
+  async execute(id: string): Promise<ManualEntryView> {
+    const entry = await this.entries.entry(ManualEntryId.fromString(id));
+    if (entry === null) throw new EntryNotFound();
+    return {
+      id: entry.id.value,
+      date: entry.date.toString(),
+      kind: entry.kind,
+      concept: entry.concept,
+      category: entry.category,
+      method: entry.method,
+      amountCents: entry.amount.cents,
+      period: entry.period.toString(),
+    };
   }
 }
 
