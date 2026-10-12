@@ -16,6 +16,7 @@ import {
   ChangeSettlementPaymentDate,
   DeleteAdvance,
   DeleteSession,
+  ExpectedPayroll,
   ListSessions,
   ListSettlements,
   PayAllSettlements,
@@ -492,6 +493,27 @@ Deno.test('Substitutions should cover club duty shifts too, alone or with all th
   assertEquals(
     [...fx.substitutions.values()].map((s) => s.date.toString()).sort(),
     ['2026-10-09', '2026-10-13', '2026-10-16'],
+  );
+});
+
+Deno.test('ExpectedPayroll should cost the expected hours of each month at the current rates', async () => {
+  const { fx, duties } = setUp();
+  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
+  // Octubre: Lucía 7 h a 16 € y Carlos 4 × 1,5 h a 18 €; noviembre: 9 h de Lucía y 4 martes de Carlos.
+  const costs = await new ExpectedPayroll(fx, duties, fx, fx).between(
+    YearMonth.fromString('2026-10'),
+    YearMonth.fromString('2026-11'),
+  );
+  assertEquals([...costs], [['2026-10', 11200 + 10800], ['2026-11', 14400 + 10800]]);
+  // En verano no hay clases.
+  assertEquals(
+    [
+      ...await new ExpectedPayroll(fx, duties, fx, fx).between(
+        YearMonth.fromString('2027-07'),
+        YearMonth.fromString('2027-08'),
+      ),
+    ],
+    [['2027-07', 0], ['2027-08', 0]],
   );
 });
 

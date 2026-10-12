@@ -739,6 +739,37 @@ export class Profitability {
   }
 }
 
+/**
+ * Lo que costará el profesorado cada mes según el horario: las horas esperadas de cada profesor (sus clases y turnos
+ * salvo festivos, sin sustituciones ni solapes) a su tarifa de hoy. Lo que usa el resumen para los meses que vienen.
+ */
+export class ExpectedPayroll {
+  constructor(
+    private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
+    private readonly holidays: HolidayCalendar,
+    private readonly teachers: TeacherRates,
+  ) {}
+
+  /** Céntimos por mes («AAAA-MM»), de `first` a `last`; 0 en julio y agosto. */
+  async between(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
+    const groups = await this.schedule.groups();
+    const duties = await this.duties.all();
+    const rates = new Map((await this.teachers.all()).map((t) => [t.id, t.rate]));
+    const holidays = await this.holidays.holidaysBetween(first.firstDay(), last.lastDay());
+    const hours = new ExpectedHours();
+    const result = new Map<string, number>();
+    for (let month = first; !last.isBefore(month); month = month.next()) {
+      let cents = 0;
+      for (const [teacher, minutes] of hours.ofMonth(month, groups, duties, holidays)) {
+        cents += rates.get(teacher)?.times(minutes / 60).cents ?? 0;
+      }
+      result.set(month.toString(), cents);
+    }
+    return result;
+  }
+}
+
 // ---- Sustituciones ---------------------------------------------------------------------------
 
 export class SubstitutionNeedsReason extends Error {
