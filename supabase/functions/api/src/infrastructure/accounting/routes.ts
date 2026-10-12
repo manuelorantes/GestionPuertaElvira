@@ -19,6 +19,7 @@ import {
   RemoveCategory,
   RenameCategory,
   SetMonthlyCategories,
+  ShowEntry,
   SupplierInvoiceNotFound,
   type UploadedDocument,
 } from '../../application/accounting/mod.ts';
@@ -155,6 +156,10 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
       period: b.requiredString('period'),
     });
     return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('GET', '/api/admin/accounting/entries/:id'), async (c, scope) => {
+    return c.json(await new ShowEntry(repos(scope).accounting).execute(param(c, 'id')));
   });
 
   api.defineRoute(admin('DELETE', '/api/admin/accounting/entries/:id'), async (c, scope) => {
