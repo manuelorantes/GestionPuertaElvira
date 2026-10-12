@@ -77,11 +77,6 @@ export interface TeacherDirectory {
   isActive(teacher: TeacherReference): Promise<boolean>;
 }
 
-/** Si un alumno sigue activo en el club (lo responde el contexto de Alumnado). */
-export interface StudentStatus {
-  isActive(student: StudentReference): Promise<boolean>;
-}
-
 export interface GroupSummary {
   id: string;
   name: string;
@@ -140,13 +135,6 @@ export class ClassroomConflict extends Error implements HasErrorDetails {
       groupName: this.conflicting.details().name.value,
       slotLabel: this.conflicting.details().slot.label(),
     };
-  }
-}
-
-export class LastEnrolment extends Error {
-  constructor() {
-    super('Es su único grupo: para dejarlo, da de baja al alumno o muévelo a otro grupo.');
-    this.name = 'LastEnrolment';
   }
 }
 
@@ -411,10 +399,10 @@ export class ChangeEnrolmentStart {
   }
 }
 
+/** Saca a un alumno de un grupo hoy; si era el único, se queda como socio sin clases. */
 export class UnenrolStudent {
   constructor(
     private readonly enrolments: EnrolmentRepository,
-    private readonly students: StudentStatus,
     private readonly clock: Clock,
   ) {}
 
@@ -427,8 +415,6 @@ export class UnenrolStudent {
       today,
     );
     if (enrolment === null) throw new NotEnrolled();
-    const isLastGroup = (await this.enrolments.activeForStudent(student, today)).length === 1;
-    if (isLastGroup && (await this.students.isActive(student))) throw new LastEnrolment();
     enrolment.endOn(today);
     await this.enrolments.save(enrolment);
   }

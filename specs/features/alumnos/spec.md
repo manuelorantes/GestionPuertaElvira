@@ -192,7 +192,7 @@ ha dado de alta más de una vez, la ficha MUST mostrar «Última alta en el club
 ### Requirement: Inscripciones en grupos
 Un alumno MAY estar en varios grupos, pero MUST NOT estar en dos cuyos horarios reales coincidan en algún día y hora,
 ni dos veces en el mismo grupo.
-Un alumno con grupos MUST conservar al menos uno (quitarle el último se impide; un socio sin clases no tiene ninguno).
+Un alumno MUST poder dejar cualquiera de sus grupos, también el último: sigue de alta, como socio sin clases.
 Cada inscripción tiene la fecha desde la que el alumno está en el grupo, que es la que cuenta para sus listas y sus
 cuotas. Al añadir un grupo MUST poder elegirse «Desde» (por defecto hoy), y la ficha MUST mostrar «En el grupo desde» en
 cada grupo y permitir corregirla (por ejemplo, si venía antes de que se le inscribiera). Esa fecha nunca puede ser futura,
@@ -237,8 +237,9 @@ El horario especial MUST poder cambiarse o quitarse después, con las mismas com
 - **THEN** sale del primero y entra en el segundo en una sola operación, y la ocupación de ambos se actualiza
 
 #### Scenario: Quitar el único grupo
-- **WHEN** se intenta quitar el único grupo de un alumno activo
-- **THEN** el sistema lo impide y sugiere darle de baja o moverlo a otro grupo
+- **WHEN** administración quita el único grupo de un alumno activo
+- **THEN** sale del grupo, sigue de alta como socio sin clases (aparece en «Socios sin clases») y no se le dan de baja
+  ni se le cancelan las cuotas ya emitidas
 
 ### Requirement: Grupo completo
 Inscribir o mover a un alumno a un grupo completo MUST requerir una confirmación explícita que muestre la ocupación.
