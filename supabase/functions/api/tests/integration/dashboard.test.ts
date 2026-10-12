@@ -102,7 +102,7 @@ Deno.test({
     const currentPayroll = await payrollOf(today.slice(0, 7));
     assert(currentPayroll > 0, 'la profesora tiene clases este mes');
     // Cuotas vs gastos fijos: solo las categorías del mes (las cuotas y la luz, no el material). La cuota del mes ya
-    // está emitida: no hay nada previsto; la liquidación de la profesora, aún sin pagar, sí.
+    // está cobrada: nada previsto; la liquidación de la profesora, aún sin pagar, sí.
     assertEquals(at(ofMonth, today.slice(0, 7)), {
       month: today.slice(0, 7),
       incomeCents: 4500,
@@ -149,6 +149,44 @@ Deno.test({
     });
     assertEquals((summary.latest as unknown[]).length, 3);
     assertEquals(summary.overdue, []);
+  },
+});
+
+Deno.test({
+  name:
+    'dashboard chart should count the unpaid fees of the month as expected until they are cancelled',
+  ignore: outsideSeason,
+  async fn() {
+    await resetDatabase();
+    await createUser('junta@club.es');
+    const client = new ApiClient();
+    await client.logIn('junta@club.es');
+    const group = await newGroup(client, await newTeacher(client));
+    await client.json('POST', '/api/admin/students', {
+      fullName: 'Lucía López Herrera',
+      groupIds: [group],
+    });
+    const month = today.slice(0, 7);
+    const expectedOf = async () => {
+      const bar = ((await client.get('/api/admin/dashboard')).body as {
+        monthChart: { month: string; incomeCents: number; expectedCents: number }[];
+      }).monthChart.find((m) => m.month === month);
+      return {
+        month: bar?.month,
+        incomeCents: bar?.incomeCents,
+        expectedCents: bar?.expectedCents,
+      };
+    };
+    // Su cuota del mes está emitida y sin cobrar: prevista, sin ingreso.
+    assertEquals(await expectedOf(), { month, incomeCents: 0, expectedCents: 4500 });
+    // Cancelada, deja de preverse.
+    const charge = ((await client.get(`/api/admin/billing/charges?month=${month}&kind=monthly`))
+      .body as { items: { id: string }[] }).items[0]?.id ?? '';
+    assertEquals(
+      (await client.json('POST', `/api/admin/billing/charges/${charge}/cancel`)).status,
+      204,
+    );
+    assertEquals(await expectedOf(), { month, incomeCents: 0, expectedCents: 0 });
   },
 });
 

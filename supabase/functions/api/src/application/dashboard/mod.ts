@@ -1,4 +1,4 @@
-import { type Clock, LocalDate, type Money, Season, YearMonth } from '../../domain/common/mod.ts';
+import { type Clock, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import type { AccountingSettingsRepository, LedgerLine, MonthLedger } from '../accounting/mod.ts';
 import type { BillingQuery, ChargeView, ListMonthlyCharges } from '../billing/mod.ts';
 import type { ClassQuery, GroupSummary } from '../classes/mod.ts';
@@ -11,8 +11,9 @@ export interface MonthBars {
 }
 
 /**
- * Un mes de «Cuotas vs gastos fijos»: además, las cuotas que aún se emitirán a los alumnos matriculados y lo que
- * costará el profesorado según el horario y aún no está en el libro.
+ * Un mes de «Cuotas vs gastos fijos»: además, las cuotas del mes que faltan por cobrar (emitidas y pendientes, o que
+ * aún se emitirán a los alumnos matriculados) y lo que costará el profesorado según el horario y aún no está en el
+ * libro.
  */
 export interface MonthFeeBars extends MonthBars {
   expectedCents: number;
@@ -57,14 +58,6 @@ export interface FeeIncome {
   earnedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
 }
 
-/**
- * Cuotas previstas de un mes futuro: las que se emitirán a los alumnos matriculados hoy que aún no tengan la de ese
- * mes (lo que calcula Cobros para sus meses futuros).
- */
-export interface ExpectedFees {
-  expected(month: string): Promise<{ amount: Money }[]>;
-}
-
 /** Lo que costará el profesorado cada mes según el horario, a la tarifa de hoy (céntimos por «AAAA-MM»). */
 export interface ExpectedPayroll {
   between(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
@@ -87,7 +80,6 @@ export class ClubSummary {
     private readonly clock: Clock,
     private readonly fees: FeeIncome,
     private readonly settings: AccountingSettingsRepository,
-    private readonly expectedFees: ExpectedFees,
     private readonly expectedPayroll: ExpectedPayroll,
   ) {}
 
@@ -172,8 +164,9 @@ export class ClubSummary {
   }
   /**
    * Las categorías «del mes», cada movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas entre los
-   * meses que paga cada cobro; y, en los meses que vienen, las previstas de los alumnos matriculados hoy. Del mes en
-   * curso en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes.
+   * meses que paga cada cobro; y lo que falta por cobrar de las cuotas de cada mes: las emitidas y pendientes (lo
+   * cancelado no se debe) y, en los meses que vienen, las previstas de los alumnos matriculados hoy. Del mes en curso
+   * en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes.
    */
   private async monthChart(
     months: string[],
@@ -201,8 +194,9 @@ export class ClubSummary {
     );
     if (withFees) {
       for (const [month, bar] of bars) {
-        bar.expected = (await this.expectedFees.expected(month))
-          .reduce((total, fee) => total + fee.amount.cents, 0);
+        bar.expected = (await this.charges.execute(month, 'monthly')).items
+          .filter((charge) => charge.kind === 'monthly')
+          .reduce((total, c) => total + Math.max(0, c.amountCents - c.coveredCents), 0);
       }
     }
     for (const line of lines) {

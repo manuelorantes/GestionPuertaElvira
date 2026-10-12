@@ -9,8 +9,8 @@ interface MonthBars {
 }
 
 /**
- * Un mes de «Cuotas vs gastos fijos»: además, las cuotas que aún se emitirán a los alumnos matriculados y lo que
- * costará el profesorado según el horario.
+ * Un mes de «Cuotas vs gastos fijos»: además, las cuotas del mes que faltan por cobrar (pendientes o aún por emitir) y
+ * lo que costará el profesorado según el horario.
  */
 interface MonthFeeBars extends MonthBars {
   expectedCents: number;
