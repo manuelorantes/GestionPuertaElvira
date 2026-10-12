@@ -936,25 +936,28 @@ describe('Alumnos', () => {
     );
   });
 
-  it('should explain why the only group cannot be removed', async () => {
+  it('should remove the only group leaving the student as a member without classes', async () => {
     const user = userEvent.setup();
-    api({
-      'DELETE /api/admin/students/s1/enrolments/g1': [
-        409,
-        {
-          error: {
-            code: 'last_enrolment',
-            message:
-              'Es su único grupo: para dejarlo, da de baja al alumno o muévelo a otro grupo.',
-          },
-        },
+    const spy = api({
+      'GET /api/admin/students/s1': [
+        [200, DETAIL],
+        [200, { ...DETAIL, groups: [] }],
       ],
+      'DELETE /api/admin/students/s1/enrolments/g1': [204],
     });
     renderApp('/panel/alumnos/s1');
 
     await user.click(await screen.findByRole('button', { name: 'Quitar de Iniciación A' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Es su único grupo');
+    expect(await screen.findByText('Quitado de Iniciación A')).toBeVisible();
+    const card = screen.getByRole('dialog', { name: 'Martina López Herrera' });
+    expect(await within(card).findByText('Sin grupos activos.')).toBeVisible();
+    expect(within(card).getByText('Activo')).toBeVisible();
+    expect(
+      spy.mock.calls.some(
+        ([u, init]) => u === '/api/admin/students/s1/enrolments/g1' && init?.method === 'DELETE',
+      ),
+    ).toBe(true);
   });
 
   it('should move a student to another group', async () => {
