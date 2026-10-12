@@ -63,12 +63,12 @@ Deno.test({
     const response = await client.get('/api/admin/dashboard');
     assertEquals(response.status, 200);
     const summary = response.body as Record<string, unknown>;
-    assertEquals(summary.collectedCents, 4500);
+    // El saldo: sin ejercicios cerrados, lo cobrado (45 €) menos lo gastado (20 € + 30 €).
+    assertEquals(summary.balanceCents, -500);
+    assertEquals(summary.seasonResultCents, -500);
     // Las cifras del mes son solo sus cuotas; la cuota de socio pendiente va aparte.
-    assertEquals(summary.expectedCents, 4500);
     assertEquals(summary.pendingCents, 0);
     assertEquals(summary.membershipPendingCents, 5000);
-    assertEquals(summary.expensesCents, 5000);
     assertEquals(summary.activeStudents, 1);
     assertEquals(summary.registeredStudents, 1);
     // Dos gráficas de la temporada, de septiembre a agosto.

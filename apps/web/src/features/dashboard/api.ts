@@ -20,12 +20,14 @@ interface MonthFeeBars extends MonthBars {
 export interface Dashboard {
   month: string;
   today: string;
-  collectedCents: number;
-  expectedCents: number;
+  /** Saldo del club: el acumulado del ejercicio hasta el mes en curso, desde el saldo arrastrado. */
+  balanceCents: number;
+  /** Ingresos menos gastos del ejercicio hasta el mes en curso. */
+  seasonResultCents: number;
+  /** Lo que falta por cobrar de las cuotas del mes. */
   pendingCents: number;
   /** Cuotas de socio de la temporada sin cobrar, aparte de las del mes. */
   membershipPendingCents: number;
-  expensesCents: number;
   activeStudents: number;
   registeredStudents: number;
   /** Lo que entra y sale cada mes, por fecha. */
