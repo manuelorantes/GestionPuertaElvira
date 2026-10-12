@@ -1,4 +1,4 @@
-import { assertEquals } from '@std/assert';
+import { assert, assertEquals } from '@std/assert';
 
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
@@ -77,6 +77,7 @@ Deno.test({
       incomeCents: number;
       expenseCents: number;
       expectedCents?: number;
+      expectedExpenseCents?: number;
     }[];
     const cash = summary.cashChart as Chart;
     const ofMonth = summary.monthChart as Chart;
@@ -93,29 +94,48 @@ Deno.test({
       incomeCents: 4500,
       expenseCents: 5000,
     });
+    // Profesorado previsto: lo que Rentabilidad calcula para el mes (horario × tarifa), de este mes en adelante.
+    const payrollOf = async (m: string) =>
+      ((await client.get(`/api/admin/payroll/profitability?month=${m}`)).body as {
+        items: { costCents: number }[];
+      }).items.reduce((total, row) => total + row.costCents, 0);
+    const currentPayroll = await payrollOf(today.slice(0, 7));
+    assert(currentPayroll > 0, 'la profesora tiene clases este mes');
     // Cuotas vs gastos fijos: solo las categorías del mes (las cuotas y la luz, no el material). La cuota del mes ya
-    // está emitida: no hay nada previsto.
+    // está emitida: no hay nada previsto; la liquidación de la profesora, aún sin pagar, sí.
     assertEquals(at(ofMonth, today.slice(0, 7)), {
       month: today.slice(0, 7),
       incomeCents: 4500,
       expenseCents: 0,
       expectedCents: 0,
+      expectedExpenseCents: currentPayroll,
     });
     if (season.includes(YearMonth.fromString(previousMonth))) {
       assertEquals(at(ofMonth, previousMonth)?.expenseCents, 3000);
+      assertEquals(
+        at(ofMonth, previousMonth)?.expectedExpenseCents,
+        0,
+        'los meses pasados no prevén',
+      );
     }
-    // En los meses que vienen, la cuota prevista de la alumna matriculada; en julio y agosto no hay cuotas.
+    // En los meses que vienen, la cuota prevista de la alumna matriculada y el coste de la profesora según el
+    // horario; en julio y agosto no hay clases.
     const nextMonth = YearMonth.fromString(today.slice(0, 7)).next();
     if (Season.teachingSeason(nextMonth) !== null) {
+      const nextPayroll = await payrollOf(nextMonth.toString());
+      assert(nextPayroll > 0);
       assertEquals(at(ofMonth, nextMonth.toString()), {
         month: nextMonth.toString(),
         incomeCents: 0,
         expenseCents: 0,
         expectedCents: 4500,
+        expectedExpenseCents: nextPayroll,
       });
     }
-    assertEquals(at(ofMonth, `${season.startYear + 1}-07`)?.expectedCents, 0);
-    assertEquals(at(ofMonth, `${season.startYear + 1}-08`)?.expectedCents, 0);
+    for (const summer of [`${season.startYear + 1}-07`, `${season.startYear + 1}-08`]) {
+      assertEquals(at(ofMonth, summer)?.expectedCents, 0);
+      assertEquals(at(ofMonth, summer)?.expectedExpenseCents, 0);
+    }
     assertEquals(summary.occupancy, {
       percent: 25,
       fullGroups: 0,

@@ -96,7 +96,7 @@ function Summary({ data }: { data: Dashboard }) {
           />
           <ChartCard
             title={`Cuotas vs gastos fijos · ${seasonLabel(data.month)}`}
-            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan; las previstas de los alumnos matriculados, en los meses que vienen; y los gastos del mes en el suyo"
+            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan; las previstas de los alumnos matriculados y el profesorado previsto según el horario, en los meses que vienen; y los gastos del mes en el suyo"
             id="mes"
             months={data.monthChart}
             current={data.month}
@@ -235,7 +235,7 @@ function Summary({ data }: { data: Dashboard }) {
   );
 }
 
-/** Una gráfica de la temporada con su leyenda; con `expected`, las cuotas previstas apiladas sobre los ingresos. */
+/** Una gráfica de la temporada con su leyenda; con `expected`, lo previsto apilado sobre lo real. */
 function ChartCard({
   title,
   label,
@@ -251,7 +251,9 @@ function ChartCard({
   current: string;
   expected?: boolean;
 }) {
-  const kinds: BarKind[] = expected ? ['income', 'expected', 'expense'] : ['income', 'expense'];
+  const kinds: BarKind[] = expected
+    ? ['income', 'expected', 'expense', 'expectedExpense']
+    : ['income', 'expense'];
   return (
     <Card className="p-6">
       <div className="mb-5 flex flex-wrap items-baseline justify-between gap-4">
