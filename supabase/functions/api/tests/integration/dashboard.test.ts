@@ -72,7 +72,12 @@ Deno.test({
     assertEquals(summary.activeStudents, 1);
     assertEquals(summary.registeredStudents, 1);
     // Dos gráficas de la temporada, de septiembre a agosto.
-    type Chart = { month: string; incomeCents: number; expenseCents: number }[];
+    type Chart = {
+      month: string;
+      incomeCents: number;
+      expenseCents: number;
+      expectedCents?: number;
+    }[];
     const cash = summary.cashChart as Chart;
     const ofMonth = summary.monthChart as Chart;
     const season = Season.containing(YearMonth.fromString(today.slice(0, 7)));
@@ -88,15 +93,29 @@ Deno.test({
       incomeCents: 4500,
       expenseCents: 5000,
     });
-    // Lo que corresponde a cada mes: solo las categorías del mes (las cuotas y la luz, no el material).
+    // Cuotas vs gastos fijos: solo las categorías del mes (las cuotas y la luz, no el material). La cuota del mes ya
+    // está emitida: no hay nada previsto.
     assertEquals(at(ofMonth, today.slice(0, 7)), {
       month: today.slice(0, 7),
       incomeCents: 4500,
       expenseCents: 0,
+      expectedCents: 0,
     });
     if (season.includes(YearMonth.fromString(previousMonth))) {
       assertEquals(at(ofMonth, previousMonth)?.expenseCents, 3000);
     }
+    // En los meses que vienen, la cuota prevista de la alumna matriculada; en julio y agosto no hay cuotas.
+    const nextMonth = YearMonth.fromString(today.slice(0, 7)).next();
+    if (Season.teachingSeason(nextMonth) !== null) {
+      assertEquals(at(ofMonth, nextMonth.toString()), {
+        month: nextMonth.toString(),
+        incomeCents: 0,
+        expenseCents: 0,
+        expectedCents: 4500,
+      });
+    }
+    assertEquals(at(ofMonth, `${season.startYear + 1}-07`)?.expectedCents, 0);
+    assertEquals(at(ofMonth, `${season.startYear + 1}-08`)?.expectedCents, 0);
     assertEquals(summary.occupancy, {
       percent: 25,
       fullGroups: 0,
@@ -145,13 +164,20 @@ Deno.test({
     assertEquals(paid.status, 201, JSON.stringify(paid.body));
     // 3 × 45 € con un 10 % = 121,50 €: 40,50 € en cada uno de los tres meses.
     const chart = ((await client.get('/api/admin/dashboard')).body as {
-      monthChart: { month: string; incomeCents: number }[];
+      monthChart: { month: string; incomeCents: number; expectedCents: number }[];
     }).monthChart;
     let month = YearMonth.fromString(today.slice(0, 7));
     const shares: number[] = [];
+    const expected: number[] = [];
     for (let i = 0; i < 3; i++, month = month.next()) {
       shares.push(chart.find((m) => m.month === month.toString())?.incomeCents ?? -1);
+      expected.push(chart.find((m) => m.month === month.toString())?.expectedCents ?? -1);
     }
     assertEquals(shares, [4050, 4050, 4050]);
+    // Los meses pagados por adelantado no se prevén; el siguiente, si es lectivo, sí (45 € con la tarifa de hoy).
+    assertEquals(expected, [0, 0, 0]);
+    if (Season.teachingSeason(month) !== null) {
+      assertEquals(chart.find((m) => m.month === month.toString())?.expectedCents, 4500);
+    }
   },
 });

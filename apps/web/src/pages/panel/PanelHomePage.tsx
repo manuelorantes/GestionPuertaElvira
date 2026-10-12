@@ -7,7 +7,7 @@ import { usePanelRole } from '@/features/auth/panelView';
 import { useSession } from '@/features/auth/useSession';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { formatCents, monthLabel, monthName } from '@/features/billing/money';
-import { fetchDashboard, type Dashboard, type MonthBars } from '@/features/dashboard/api';
+import { fetchDashboard, type Dashboard } from '@/features/dashboard/api';
 import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Avatar } from '@/shared/ui/Avatar';
@@ -16,6 +16,7 @@ import { StudentLink } from '@/pages/panel/students/StudentLink';
 import { Card } from '@/shared/ui/Card';
 
 import { MonthlyChart } from './MonthlyChart';
+import { BAR_STYLE, type BarKind, type ChartMonth } from './chartBars';
 import { MissedRollCalls } from './attendance/MissedRollCalls';
 import { TeacherHomePage } from './teacher/TeacherHomePage';
 
@@ -95,10 +96,11 @@ function Summary({ data }: { data: Dashboard }) {
           />
           <ChartCard
             title={`Cuotas vs gastos fijos · ${seasonLabel(data.month)}`}
-            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan, y los gastos del mes en el suyo"
+            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan; las previstas de los alumnos matriculados, en los meses que vienen; y los gastos del mes en el suyo"
             id="mes"
             months={data.monthChart}
             current={data.month}
+            expected
           />
         </div>
         <Card className="flex flex-col gap-4 p-6">
@@ -233,33 +235,34 @@ function Summary({ data }: { data: Dashboard }) {
   );
 }
 
-/** Una gráfica de la temporada con su leyenda. */
+/** Una gráfica de la temporada con su leyenda; con `expected`, las cuotas previstas apiladas sobre los ingresos. */
 function ChartCard({
   title,
   label,
   id,
   months,
   current,
+  expected = false,
 }: {
   title: string;
   label: string;
   id: string;
-  months: MonthBars[];
+  months: ChartMonth[];
   current: string;
+  expected?: boolean;
 }) {
+  const kinds: BarKind[] = expected ? ['income', 'expected', 'expense'] : ['income', 'expense'];
   return (
     <Card className="p-6">
       <div className="mb-5 flex flex-wrap items-baseline justify-between gap-4">
         <Title>{title}</Title>
-        <div className="flex gap-4 text-[13px] text-ink-soft">
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden className="size-3 rounded-[3px] bg-brand" />
-            Ingresos
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span aria-hidden className="size-3 rounded-[3px] bg-ink-strong" />
-            Gastos
-          </span>
+        <div className="flex flex-wrap gap-4 text-[13px] text-ink-soft">
+          {kinds.map((kind) => (
+            <span key={kind} className="flex items-center gap-1.5">
+              <span aria-hidden className={`size-3 rounded-[3px] ${BAR_STYLE[kind].color}`} />
+              {BAR_STYLE[kind].label}
+            </span>
+          ))}
           <span className="text-ink-muted">{monthLabel(current)} en curso</span>
         </div>
       </div>

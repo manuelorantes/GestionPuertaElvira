@@ -2,10 +2,15 @@ import type { LedgerItem } from '@/features/accounting/api';
 import type { Charge } from '@/features/billing/api';
 import { apiGet } from '@/shared/api/client';
 
-export interface MonthBars {
+interface MonthBars {
   month: string;
   incomeCents: number;
   expenseCents: number;
+}
+
+/** Un mes de «Cuotas vs gastos fijos»: además, las cuotas que aún se emitirán a los alumnos matriculados. */
+interface MonthFeeBars extends MonthBars {
+  expectedCents: number;
 }
 
 export interface Dashboard {
@@ -22,7 +27,7 @@ export interface Dashboard {
   /** Lo que entra y sale cada mes, por fecha. */
   cashChart: MonthBars[];
   /** Cuotas vs gastos fijos: lo que corresponde a cada mes, con las categorías «del mes» de Contabilidad. */
-  monthChart: MonthBars[];
+  monthChart: MonthFeeBars[];
   occupancy: {
     percent: number;
     fullGroups: number;
