@@ -79,6 +79,22 @@ export function fetchLedger(month: string): Promise<Ledger> {
   return apiGet(`${BASE}/ledger?month=${month}`);
 }
 
+/** Un apunte manual: lo justo para abrir el libro donde está. */
+export interface ManualEntry {
+  id: string;
+  date: string;
+  kind: EntryKind;
+  concept: string;
+  category: string;
+  method: string;
+  amountCents: number;
+  period: string;
+}
+
+export function fetchEntry(id: string): Promise<ManualEntry> {
+  return apiGet(`${BASE}/entries/${id}`);
+}
+
 export async function fetchInvoices(): Promise<Invoice[]> {
   return (await apiGet<{ items: Invoice[] }>(`${BASE}/invoices`)).items;
 }

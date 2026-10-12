@@ -12,6 +12,15 @@ export function useLedger(month: string) {
   });
 }
 
+/** El apunte al que apunta un enlace, o nada si no hay enlace. */
+export function useEntry(id: string | null) {
+  return useQuery({
+    queryKey: ['accounting-entry', id],
+    queryFn: () => api.fetchEntry(id ?? ''),
+    enabled: id !== null,
+  });
+}
+
 export function useInvoices() {
   return useQuery({ queryKey: ['invoices'], queryFn: api.fetchInvoices });
 }
