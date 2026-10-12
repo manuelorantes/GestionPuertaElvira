@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, mockApi, renderApp, TEACHER } from '@/test/render';
 
 const RUN = {
   startedAt: '2026-10-10T20:00:00Z',
@@ -209,6 +209,51 @@ describe('Diagnóstico', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Descartados' }));
     expect(await screen.findByText(/Descartado 09\/10\/2026 12:00 · Junta/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Aceptar' })).toBeNull();
+  });
+
+  it('leaves the staff section when a refused action reveals the session changed in another tab', async () => {
+    api({
+      // La primera lectura es la de administración; tras el 403 la sesión ya es la de una profesora.
+      'GET /api/auth/me': [
+        [200, { user: ADMIN }],
+        [200, { user: TEACHER }],
+      ],
+      'POST /api/admin/diagnostics/findings/f2/dismiss': [
+        403,
+        { error: { code: 'forbidden', message: 'No tienes permiso para esta acción.' } },
+      ],
+    });
+    renderApp('/panel/contabilidad?pestana=diagnostico');
+    const club = await screen.findByRole('region', { name: /Datos del club/ });
+
+    await userEvent.click(within(club).getByRole('button', { name: 'Descartar' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Descartar' }),
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByRole('tab', { name: 'Diagnóstico' })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText('No tienes permiso para esta acción.')).not.toBeInTheDocument();
+  });
+
+  it('keeps the permission message when the session is still the same account', async () => {
+    api({
+      'POST /api/admin/diagnostics/findings/f2/dismiss': [
+        403,
+        { error: { code: 'forbidden', message: 'No tienes permiso para esta acción.' } },
+      ],
+    });
+    renderApp('/panel/contabilidad?pestana=diagnostico');
+    const club = await screen.findByRole('region', { name: /Datos del club/ });
+
+    await userEvent.click(within(club).getByRole('button', { name: 'Descartar' }));
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Descartar' }),
+    );
+
+    expect(await screen.findByText('No tienes permiso para esta acción.')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Diagnóstico' })).toBeInTheDocument();
   });
 
   it('deletes a finding without a result from the red bin, right of accepting', async () => {

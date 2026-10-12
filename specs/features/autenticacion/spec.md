@@ -47,6 +47,20 @@ El panel y sus datos MUST ser inaccesibles sin una sesión válida, aunque se co
 - **WHEN** cualquiera abre la portada
 - **THEN** la ve completa sin necesidad de sesión
 
+### Requirement: Una sola cuenta por navegador
+La sesión es del navegador, no de la pestaña: entrar como otra cuenta o iniciar otra sesión en una pestaña
+cambia la cuenta de todas.
+Si una pestaña abierta en una sección sigue mostrando la cuenta anterior
+y una acción es rechazada por falta de permiso,
+el sistema MUST comprobar de quién es la sesión
+y, si ha cambiado, pasar a esa cuenta y recolocar la pestaña en la pantalla que le corresponde,
+sin mostrar el aviso de permiso.
+Si la cuenta es la misma, el aviso de permiso se muestra como siempre.
+
+#### Scenario: Suplantación abierta en otra pestaña
+- **WHEN** administración descarta un hallazgo del diagnóstico en una pestaña mientras en otra ha entrado como una profesora
+- **THEN** esa pestaña pasa a la cuenta de la profesora y sale de Contabilidad, sin aviso de permiso
+
 ### Requirement: Caducidad de la sesión
 Una sesión MUST caducar tras 2 horas sin actividad y, en cualquier caso, a las 12 horas de iniciarse.
 No existe la opción «mantener la sesión iniciada».
