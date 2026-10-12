@@ -22,6 +22,7 @@ export function registerDashboardRoutes(api: ApiApp): void {
         api.deps.clock,
         new SqlFeeIncome(scope.tx),
         new SqlAccountingRepository(scope.tx),
+        b.generate,
       );
       return c.json(await summary.execute());
     },

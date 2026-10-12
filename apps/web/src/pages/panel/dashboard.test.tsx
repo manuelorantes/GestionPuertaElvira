@@ -45,8 +45,13 @@ const SUMMARY = {
   activeStudents: 157,
   registeredStudents: 170,
   cashChart: chart,
-  // Cuotas vs gastos fijos: solo las categorías del mes.
-  monthChart: chart.map((m) => ({ ...m, incomeCents: m.incomeCents - 20000, expenseCents: 90000 })),
+  // Cuotas vs gastos fijos: solo las categorías del mes, y las cuotas previstas de los meses que vienen.
+  monthChart: chart.map((m, i) => ({
+    ...m,
+    incomeCents: m.incomeCents - 20000,
+    expenseCents: 90000,
+    expectedCents: i === 10 ? 134000 : 0,
+  })),
   occupancy: {
     percent: 86,
     fullGroups: 3,
@@ -115,6 +120,16 @@ describe('Resumen', () => {
     expect(screen.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining('octubre 2026: ingresos 3920 €, gastos 900 €'),
     );
+    // Las cuotas previstas, solo en la segunda gráfica y solo en los meses que las tienen.
+    expect(screen.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
+      expect.stringContaining(
+        'septiembre 2026: ingresos 4800 €, gastos 900 €, cuotas previstas 1340 €',
+      ),
+    );
+    expect(screen.getByText('Cuotas previstas')).toBeInTheDocument();
+    expect(screen.queryByTestId('caja-2026-09-expected')).not.toBeInTheDocument();
+    await userEvent.hover(screen.getByTestId('mes-2026-09-expected'));
+    expect(screen.getByText('Cuotas previstas de septiembre 2026: 1340 €')).toBeVisible();
     await userEvent.hover(screen.getByTestId('caja-2026-10-income'));
     expect(screen.getByText('Ingresos de octubre 2026: 4120 €')).toBeVisible();
     await userEvent.hover(screen.getByTestId('caja-2026-10-expense'));
