@@ -28,7 +28,7 @@ import {
   UpdateStudent,
   WithdrawStudent,
 } from '../../application/students/mod.ts';
-import { StudentsJoinDates, StudentsStudentStatus, today } from '../classes/routes.ts';
+import { StudentsJoinDates, today } from '../classes/routes.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { generatingCharges, recalculatingFees } from '../billing/recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
@@ -427,11 +427,7 @@ export function registerStudentRoutes(api: ApiApp): void {
   api.defineRoute(
     { method: 'DELETE', path: '/api/admin/students/:id/enrolments/:groupId', access: 'admin' },
     async (c, scope) => {
-      const unenrol = new UnenrolStudent(
-        new SqlEnrolmentRepository(scope.tx),
-        new StudentsStudentStatus(scope.tx, today(api)),
-        clock,
-      );
+      const unenrol = new UnenrolStudent(new SqlEnrolmentRepository(scope.tx), clock);
       await recalculatingFees(
         api,
         scope,

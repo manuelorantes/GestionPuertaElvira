@@ -9,7 +9,6 @@ import {
   type GroupSummary,
   ResolveSchedule,
   type StudentJoinDates,
-  type StudentStatus,
   type TeacherDirectory,
   UpdateClassGroup,
 } from '../../application/classes/mod.ts';
@@ -31,21 +30,6 @@ export class TeachersTeacherDirectory implements TeacherDirectory {
       TeacherId.fromString(teacher.value),
     );
     return found?.isActive() ?? false;
-  }
-}
-
-/** Clases pregunta a Alumnado si un alumno sigue activo hoy. */
-export class StudentsStudentStatus implements StudentStatus {
-  constructor(
-    private readonly sql: Sql,
-    private readonly today: LocalDate,
-  ) {}
-
-  async isActive(student: StudentReference): Promise<boolean> {
-    const found = await new SqlStudentRepository(this.sql).find(
-      StudentId.fromString(student.value),
-    );
-    return found?.isActiveOn(this.today) ?? false;
   }
 }
 
@@ -124,7 +108,6 @@ export function registerClassRoutes(api: ApiApp): void {
     StudentScheduleOverlap: [409, 'schedule_overlap'],
     AlreadyEnrolled: [409, 'already_enrolled'],
     NotEnrolled: [404, 'not_enrolled'],
-    LastEnrolment: [409, 'last_enrolment'],
   });
   const query = (scope: RequestScope) => new SqlClassQuery(scope.tx);
 

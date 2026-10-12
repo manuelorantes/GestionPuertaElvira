@@ -20,7 +20,6 @@ import {
   EndStudentEnrolments,
   EnrolStudent,
   type GroupInput,
-  LastEnrolment,
   MoveStudent,
   NotEnrolled,
   TeacherNotAvailable,
@@ -123,8 +122,7 @@ function enrolling() {
   const joinDates = { joinedOn: () => Promise.resolve(LocalDate.fromString('2026-09-01')) };
   const enrol = new EnrolStudent(groups, enrolments, clock, joinDates);
   const changeStart = new ChangeEnrolmentStart(enrolments, joinDates, clock);
-  const unenrol = (active = true) =>
-    new UnenrolStudent(enrolments, { isActive: () => Promise.resolve(active) }, clock);
+  const unenrol = new UnenrolStudent(enrolments, clock);
   return {
     groups,
     enrolments,
@@ -210,19 +208,20 @@ Deno.test('EnrolStudent should ask for confirmation when full and accept it when
   assertEquals(await enrolments.activeCount(tiny.id, today), 2);
 });
 
-Deno.test('UnenrolStudent should leave one group when another remains, keep the last one and fail when not enrolled', async () => {
+Deno.test('UnenrolStudent should leave any group, the only one included, and fail when not enrolled', async () => {
   const { enrolments, student, today, group, enrol, unenrol } = enrolling();
   const a = await group('Iniciación A', [1], '17:00', '18:00');
   const b = await group('Particular', [5], '17:30', '19:00');
-  await assertRejects(() => unenrol().execute(student, a.id.value), NotEnrolled);
+  await assertRejects(() => unenrol.execute(student, a.id.value), NotEnrolled);
   await enrol.execute(student, a.id.value, false);
   await enrol.execute(student, b.id.value, false);
-  await unenrol().execute(student, a.id.value);
+  await unenrol.execute(student, a.id.value);
   assertEquals(await enrolments.activeCount(a.id, today), 0);
   assertEquals(await enrolments.activeCount(b.id, today), 1);
-  await assertRejects(() => unenrol().execute(student, b.id.value), LastEnrolment);
-  await unenrol(false).execute(student, b.id.value);
+  // El único grupo también se puede dejar: el alumno sigue de alta, como socio sin clases.
+  await unenrol.execute(student, b.id.value);
   assertEquals(await enrolments.activeCount(b.id, today), 0);
+  assertEquals(await enrolments.activeForStudent(StudentReference.fromString(student), today), []);
 });
 
 Deno.test('MoveStudent should move atomically ignoring the group being left for overlaps', async () => {

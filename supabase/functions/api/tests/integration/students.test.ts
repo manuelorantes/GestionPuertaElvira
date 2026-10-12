@@ -166,7 +166,7 @@ Deno.test('students should need confirmation when the group is full, leaving no 
   await register(fx, { groupIds: [fx.tiny], confirmOverCapacity: true });
 });
 
-Deno.test('students should add, move and remove groups keeping at least one', async () => {
+Deno.test('students should add, move and remove groups, staying members without classes after the last one', async () => {
   const fx = await fixture();
   const id = await register(fx);
   assertEquals(
@@ -185,24 +185,34 @@ Deno.test('students should add, move and remove groups keeping at least one', as
     204,
   );
   assertError(
-    await fx.client.json('DELETE', `/api/admin/students/${id}/enrolments/${fx.groupA}`),
-    409,
-    'last_enrolment',
-  );
-  assertError(
     await fx.client.json('DELETE', `/api/admin/students/${id}/enrolments/${fx.tiny}`),
     404,
     'not_enrolled',
   );
 
-  const group = (await fx.client.get(`/api/admin/groups/${fx.groupA}`)).body as {
-    students: unknown[];
-    occupied: number;
-  };
-  assertEquals(group.students, [
+  const groupA = async () =>
+    (await fx.client.get(`/api/admin/groups/${fx.groupA}`)).body as {
+      students: unknown[];
+      occupied: number;
+    };
+  assertEquals((await groupA()).students, [
     { id, fullName: 'Martina López Herrera', age: 12, attendanceLabel: null },
   ]);
-  assertEquals(group.occupied, 1);
+  assertEquals((await groupA()).occupied, 1);
+
+  // Dejar el único grupo no le da de baja: queda como socio sin clases.
+  assertEquals(
+    (await fx.client.json('DELETE', `/api/admin/students/${id}/enrolments/${fx.groupA}`)).status,
+    204,
+  );
+  assertEquals((await groupA()).students, []);
+  assertEquals((await groupA()).occupied, 0);
+  const detail = (await fx.client.get(`/api/admin/students/${id}`)).body as {
+    status: string;
+    groups: unknown[];
+  };
+  assertEquals(detail.status, 'active');
+  assertEquals(detail.groups, []);
 });
 
 Deno.test('students can attend only some days or part of the time of a group, taking a seat only then', async () => {
