@@ -45,7 +45,7 @@ const SUMMARY = {
   activeStudents: 157,
   registeredStudents: 170,
   cashChart: chart,
-  // Lo que corresponde a cada mes: solo las categorías del mes.
+  // Cuotas vs gastos fijos: solo las categorías del mes.
   monthChart: chart.map((m) => ({ ...m, incomeCents: m.incomeCents - 20000, expenseCents: 90000 })),
   occupancy: {
     percent: 86,
@@ -108,11 +108,11 @@ describe('Resumen', () => {
       screen.getByText('Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio'),
     ).toBeInTheDocument();
     expect(screen.getByText('157')).toBeInTheDocument();
-    // Dos gráficas: lo que entra y sale cada mes, y lo que corresponde a cada mes.
+    // Dos gráficas: lo que entra y sale cada mes, y cuotas vs gastos fijos (lo que corresponde a cada mes).
     expect(
       screen.getByRole('img', { name: /Lo que entra y sale cada mes, por fecha/ }),
     ).toHaveAccessibleName(expect.stringContaining('octubre 2026: ingresos 4120 €, gastos 1180 €'));
-    expect(screen.getByRole('img', { name: /Lo que corresponde a cada mes/ })).toHaveAccessibleName(
+    expect(screen.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining('octubre 2026: ingresos 3920 €, gastos 900 €'),
     );
     await userEvent.hover(screen.getByTestId('caja-2026-10-income'));

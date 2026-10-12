@@ -18,15 +18,16 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
 
 - **Ingresos y gastos de cada mes**: todo lo que entra y sale en cada mes, por fecha (cuadra con los totales de
   Contabilidad de ese mes).
-- **Lo que corresponde a cada mes**: solo las [categorías del mes](../contabilidad/spec.md) de Contabilidad, cada
-  movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas a partes iguales entre los meses que paga
-  cada cobro; lo del profesorado, en el mes de la liquidación; apuntes y facturas, en su mes al que corresponde.
+- **Cuotas vs gastos fijos**: lo que corresponde a cada mes, solo las [categorías del mes](../contabilidad/spec.md)
+  de Contabilidad, cada movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas a partes iguales
+  entre los meses que paga cada cobro; lo del profesorado, en el mes de la liquidación; apuntes y facturas, en su mes
+  al que corresponde.
 Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cuánto dinero equivale, p. ej. «Ingresos de
 octubre 2026: 4120 €».
 
 #### Scenario: Un pago trimestral
 - **WHEN** un alumno paga en octubre tres meses por 121,50 €
-- **THEN** «Ingresos y gastos de cada mes» suma 121,50 € a octubre y «Lo que corresponde a cada mes» suma 40,50 € a
+- **THEN** «Ingresos y gastos de cada mes» suma 121,50 € a octubre y «Cuotas vs gastos fijos» suma 40,50 € a
   octubre, a noviembre y a diciembre
 
 ### Requirement: Ocupación

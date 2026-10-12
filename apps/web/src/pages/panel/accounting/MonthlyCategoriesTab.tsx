@@ -195,7 +195,7 @@ function ClubCategories({ categories }: { categories: Category[] }) {
   );
 }
 
-/** Qué categorías salen en la gráfica «Lo que corresponde a cada mes» del resumen. */
+/** Qué categorías salen en la gráfica «Cuotas vs gastos fijos» del resumen. */
 function MonthlyCategoriesForm({
   categories,
   initial,
@@ -223,9 +223,9 @@ function MonthlyCategoriesForm({
     <Card className="flex flex-col gap-5 p-6">
       <h3 className={SECTION_TITLE}>Cuentan como del mes</h3>
       <p className="text-sm text-ink-soft">
-        Las categorías marcadas salen en la gráfica «Lo que corresponde a cada mes» del resumen,
-        cada movimiento en el mes al que corresponde (las cuotas, repartidas entre los meses que
-        pagan; lo del profesorado, en el mes de la liquidación).
+        Las categorías marcadas salen en la gráfica «Cuotas vs gastos fijos» del resumen, cada
+        movimiento en el mes al que corresponde (las cuotas, repartidas entre los meses que pagan;
+        lo del profesorado, en el mes de la liquidación).
       </p>
       {save.isError && <Alert>{apiErrorMessage(save.error)}</Alert>}
       <div className="grid gap-6 sm:grid-cols-2">

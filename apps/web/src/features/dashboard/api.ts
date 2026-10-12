@@ -21,7 +21,7 @@ export interface Dashboard {
   registeredStudents: number;
   /** Lo que entra y sale cada mes, por fecha. */
   cashChart: MonthBars[];
-  /** Lo que corresponde a cada mes, con las categorías «del mes» de Contabilidad. */
+  /** Cuotas vs gastos fijos: lo que corresponde a cada mes, con las categorías «del mes» de Contabilidad. */
   monthChart: MonthBars[];
   occupancy: {
     percent: number;
