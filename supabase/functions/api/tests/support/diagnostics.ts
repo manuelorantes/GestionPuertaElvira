@@ -115,6 +115,7 @@ export function payment(overrides: Partial<FactPayment> & { studentId: string })
     sequence,
     paidOn: '2026-10-03',
     kind: 'monthly',
+    concept: 'Octubre 2026',
     totalCents: 4500,
     ...overrides,
   };

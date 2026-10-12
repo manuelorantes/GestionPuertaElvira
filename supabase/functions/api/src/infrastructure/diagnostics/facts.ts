@@ -228,6 +228,7 @@ export class SqlDiagnosticsFacts implements FactsSource {
       paidOn: p.paidOn,
       studentId: p.studentId,
       kind: p.kind,
+      concept: p.concept,
       totalCents: p.totalCents,
     }));
   }
