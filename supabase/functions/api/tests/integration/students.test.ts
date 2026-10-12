@@ -300,10 +300,27 @@ Deno.test('students should be updated, withdrawn and linked as siblings', async 
     [{ id: martina, fullName: 'Martina López' }],
   );
   assertEquals(items((await fx.client.get('/api/admin/students?filter=siblings')).body).length, 2);
+  // Vincular a Lola con Pablo la vincula también con Martina: la familia es un grupo.
+  const lola = await register(fx, { fullName: 'Lola López Herrera', groupIds: [] });
+  assertEquals(
+    (await fx.client.json('POST', `/api/admin/students/${lola}/siblings`, { siblingId: pablo }))
+      .status,
+    204,
+  );
+  const siblingsOf = async (id: string) =>
+    ((await fx.client.get(`/api/admin/students/${id}`)).body as { siblings: { id: string }[] })
+      .siblings.map((s) => s.id);
+  assertEquals(await siblingsOf(martina), [lola, pablo]);
+  assertEquals(await siblingsOf(lola), [martina, pablo]);
+  assertEquals(items((await fx.client.get('/api/admin/students?filter=siblings')).body).length, 3);
+  // Quitar a Martina desde la ficha de Pablo la saca de la familia entera.
   assertEquals(
     (await fx.client.json('DELETE', `/api/admin/students/${pablo}/siblings/${martina}`)).status,
     204,
   );
+  assertEquals(await siblingsOf(martina), []);
+  assertEquals(await siblingsOf(pablo), [lola]);
+  assertEquals(await siblingsOf(lola), [pablo]);
 
   const today = LocalDate.fromInstant(new Date()).toString();
   assertEquals(

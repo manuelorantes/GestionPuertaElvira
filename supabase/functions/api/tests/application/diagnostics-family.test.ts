@@ -106,3 +106,20 @@ Deno.test('family_not_mutual should flag a one-way link and propose completing i
   // No se duplica con la regla de posibles familias: ya están (a medias) vinculados.
   assertEquals(ofRule(facts, 'family_unlinked').length, 0);
 });
+
+Deno.test('family_not_mutual should flag a family that is not linked all the way round', () => {
+  const facts = factsWith({
+    students: [
+      student({ id: 'a', fullName: 'Ana Gil Ríos', siblingIds: ['b'] }),
+      student({ id: 'b', fullName: 'Bea Gil Ríos', siblingIds: ['a', 'c'] }),
+      student({ id: 'c', fullName: 'Cloe Gil Ríos', siblingIds: ['b'] }),
+    ],
+  });
+  const found = ofRule(facts, 'family_not_mutual');
+  assertEquals(found.map((f) => f.data), [{ a: 'a', b: 'c' }, { a: 'c', b: 'a' }]);
+  assertStringIncludes(
+    found[0]?.explanation ?? '',
+    'Ana Gil Ríos tiene a Bea Gil Ríos como familia directa, y Bea Gil Ríos a Cloe Gil Ríos, pero Ana Gil Ríos no tiene a Cloe Gil Ríos.',
+  );
+  assertEquals(found[0]?.fix, { kind: 'link_family', a: 'a', b: 'c' });
+});

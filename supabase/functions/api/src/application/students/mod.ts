@@ -170,23 +170,49 @@ async function lookUp(students: StudentRepository, id: string): Promise<Student>
   return student;
 }
 
-/** La relación de hermanos es mutua: se actualizan siempre los dos alumnos. */
+/** Un alumno y toda su familia directa, cargados. */
+async function familyOf(students: StudentRepository, member: Student): Promise<Student[]> {
+  const family = [member];
+  for (const id of member.siblings()) {
+    const relative = await students.find(id);
+    if (relative) family.push(relative);
+  }
+  return family;
+}
+
+/**
+ * La familia directa es un grupo: la relación es mutua y transitiva. Vincular a dos alumnos une sus familias (cada
+ * uno queda vinculado con todos los del otro) y quitar a uno lo saca de la familia entera.
+ */
 export const Siblings = {
   async link(students: StudentRepository, a: string, b: string): Promise<void> {
     const first = await lookUp(students, a);
     const second = await lookUp(students, b);
-    first.addSibling(second.id);
-    second.addSibling(first.id);
-    await students.save(first);
-    await students.save(second);
+    if (first.id.equals(second.id)) first.addSibling(second.id); // Rechaza vincularse consigo mismo.
+    const family = new Map<string, Student>();
+    for (
+      const member of [...(await familyOf(students, first)), ...(await familyOf(students, second))]
+    ) {
+      family.set(member.id.value, member);
+    }
+    for (const member of family.values()) {
+      for (const other of family.values()) {
+        if (!other.id.equals(member.id)) member.addSibling(other.id);
+      }
+      await students.save(member);
+    }
   },
+  /** Saca a `b` de la familia de `a`: deja de ser familia directa de `a` y de todos los familiares de `a`. */
   async unlink(students: StudentRepository, a: string, b: string): Promise<void> {
     const first = await lookUp(students, a);
-    const second = await lookUp(students, b);
-    first.removeSibling(second.id);
-    second.removeSibling(first.id);
-    await students.save(first);
-    await students.save(second);
+    const leaving = await lookUp(students, b);
+    for (const member of await familyOf(students, first)) {
+      if (member.id.equals(leaving.id)) continue;
+      member.removeSibling(leaving.id);
+      leaving.removeSibling(member.id);
+      await students.save(member);
+    }
+    await students.save(leaving);
   },
 };
 
@@ -357,7 +383,7 @@ export class WithdrawStudent {
       await this.students.save(student);
       await this.enrolments.endAll(student.id, on);
       for (const sibling of student.siblings()) {
-        await Siblings.unlink(this.students, id, sibling.value);
+        await Siblings.unlink(this.students, sibling.value, id);
       }
     });
   }
@@ -396,6 +422,7 @@ export class LinkSiblings {
   }
 }
 
+/** Quita a un familiar de la familia directa de un alumno (deja de serlo de toda la familia). */
 export class UnlinkSiblings {
   constructor(
     private readonly students: StudentRepository,

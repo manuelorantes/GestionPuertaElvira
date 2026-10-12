@@ -250,11 +250,21 @@ Inscribir o mover a un alumno a un grupo completo MUST requerir una confirmació
 
 ### Requirement: Familia directa
 La familia directa son hermanos, padres y madres que están en el club; da derecho al descuento familiar.
-La relación MUST ser mutua.
+La familia es un grupo: la relación MUST ser mutua y transitiva. Vincular a dos alumnos MUST unir sus familias (cada
+uno queda vinculado con todos los familiares del otro), y quitar a un familiar desde la ficha de un alumno MUST sacarlo
+de toda la familia de ese alumno.
 
 #### Scenario: Vincular familia directa
 - **WHEN** administración indica que A es familia directa de B (por ejemplo, su madre o su hermano)
 - **THEN** la ficha de A muestra a B y la de B muestra a A, y ambos aparecen con el filtro «Familia directa»
+
+#### Scenario: Tres en la familia
+- **WHEN** A y B son familia directa y administración vincula a C con B
+- **THEN** C queda vinculado también con A, y las fichas de los tres muestran a los otros dos
+
+#### Scenario: Quitar a uno de la familia
+- **WHEN** A, B y C son familia directa y administración quita a C desde la ficha de A
+- **THEN** C deja de ser familia directa de A y de B, que siguen siéndolo entre ellos
 
 ### Requirement: Acceso restringido
 Dar de alta, cambiar, inscribir, dar de baja, cobrar o apuntar pedidos MUST estar reservado a cuentas de
