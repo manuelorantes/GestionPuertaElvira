@@ -25,6 +25,7 @@ const BY_CODE: Record<RuleCode, Rule> = {
   paid_but_no_group: feeRules[3] as Rule,
   member_never_paid: feeRules[4] as Rule,
   enrolment_after_payment: feeRules[5] as Rule,
+  student_overpaid: feeRules[6] as Rule,
   family_unlinked: familyRules[0] as Rule,
   family_not_mutual: familyRules[1] as Rule,
   adult_guardian_is_self: studentRules[0] as Rule,
@@ -36,11 +37,10 @@ const BY_CODE: Record<RuleCode, Rule> = {
   income_without_hours: payrollRules[0] as Rule,
   settlement_sessions_mismatch: payrollRules[1] as Rule,
   ledger_payments_mismatch: integrityRules[0] as Rule,
-  covered_payments_mismatch: integrityRules[1] as Rule,
-  receipt_gaps: integrityRules[2] as Rule,
-  receipt_order: integrityRules[3] as Rule,
-  charge_cover_inconsistent: integrityRules[4] as Rule,
-  points_mismatch: integrityRules[5] as Rule,
+  receipt_gaps: integrityRules[1] as Rule,
+  receipt_order: integrityRules[2] as Rule,
+  charge_cover_inconsistent: integrityRules[3] as Rule,
+  points_mismatch: integrityRules[4] as Rule,
 };
 
 /** Las reglas, en el orden de pantalla del catálogo. */

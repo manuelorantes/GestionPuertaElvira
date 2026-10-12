@@ -125,9 +125,13 @@ Dinero:
 4. **Gasto de «Profesores» que nombra a un profesor**: apunte manual de gasto en «Profesores» cuyo concepto nombra a un
    profesor (nombre completo, nombre y un apellido, o un nombre que solo tiene un profesor). Arreglo: convertirlo en un
    anticipo a ese profesor con la misma fecha e importe, a descontar de su primer mes de la temporada sin liquidar.
-5. **Los cobros del mes no cuadran con el libro**, 6. **Lo cubierto no cuadra con lo cobrado**, 7. **Cuota con lo
-   cubierto incoherente con su estado** y 8. **Horas y liquidación no cuadran** (liquidación pagada cuyas horas o
-   importe difieren de las sesiones del mes): cuadres del propio sistema; sin arreglo.
+5. **Los cobros del mes no cuadran con el libro**, 7. **Cuota con lo cubierto incoherente con su estado** y
+   8. **Horas y liquidación no cuadran** (liquidación pagada cuyas horas o importe difieren de las sesiones del mes):
+   cuadres del propio sistema; sin arreglo.
+6. **Ha pagado más que sus cuotas**: alumno cuyos recibos suman más de lo que tienen cubierto sus cuotas, sin contar
+   los extras por error en el cálculo de varios descuentos, que son saldo a favor a propósito. Un hallazgo por
+   alumno, con cuánto pagó de más. Sin arreglo: se corrige el importe del recibo si fue un error al teclear, o se
+   descarta si pagó de más y queda como saldo a favor.
 
 Datos del club:
 9. **Paga cuota sin estar en ningún grupo**: alumno activo sin grupos con cuotas mensuales del mes en curso o futuras.

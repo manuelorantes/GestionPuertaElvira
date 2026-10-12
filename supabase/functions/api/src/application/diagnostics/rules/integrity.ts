@@ -1,4 +1,4 @@
-// Reglas de integridad: cuadres que hoy se cumplen y deben seguir cumpliéndose (reglas 15 a 19 y 21). Señalan un
+// Reglas de integridad: cuadres que hoy se cumplen y deben seguir cumpliéndose (reglas 15, 17 a 19 y 21). Señalan un
 // fallo del sistema, así que no tienen arreglo automático.
 import type { Candidate, FactCharge, FactPayment, Rule } from '../facts.ts';
 import { euros, monthLabel, studentRef } from './support.ts';
@@ -32,23 +32,6 @@ export const ledgerPaymentsMismatch: Rule = (facts) => {
       fix: null,
     }];
   });
-};
-
-/** Regla 16: la suma de lo cubierto en las cuotas frente a la suma de los recibos. */
-export const coveredPaymentsMismatch: Rule = (facts) => {
-  const coveredCents = sum(facts.charges.map((c) => c.coveredCents));
-  const paymentsCents = sum(facts.payments.map((p) => p.totalCents));
-  if (coveredCents === paymentsCents) return [];
-  return [{
-    rule: 'covered_payments_mismatch',
-    entity: { kind: 'club', id: 'covered', label: 'Cuotas y cobros' },
-    data: { coveredCents, paymentsCents },
-    explanation: `Las cuotas tienen cubiertos ${euros(coveredCents)} y los recibos suman ${
-      euros(paymentsCents)
-    }.`,
-    proposal: 'Es un fallo del sistema: revisar el reparto de los cobros entre las cuotas.',
-    fix: null,
-  }];
 };
 
 /** Regla 17: huecos o repetidos en la numeración de los recibos de cada temporada. */
@@ -172,7 +155,6 @@ export const pointsMismatch: Rule = (facts) =>
 
 export const integrityRules: readonly Rule[] = [
   ledgerPaymentsMismatch,
-  coveredPaymentsMismatch,
   receiptGaps,
   receiptOrder,
   chargeCoverInconsistent,

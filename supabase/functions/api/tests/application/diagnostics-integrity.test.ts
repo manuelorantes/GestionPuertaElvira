@@ -104,24 +104,6 @@ Deno.test("ledger_payments_mismatch should compare each month's receipts with th
   });
 });
 
-Deno.test('covered_payments_mismatch should compare what the charges cover with the receipts total', () => {
-  const good = factsWith({
-    charges: [
-      charge({ studentId: 's', amountCents: 4500, coveredCents: 4500, status: 'paid' }),
-      charge({ studentId: 's', period: '2026-11', amountCents: 4500, status: 'expected' }),
-    ],
-    payments: [payment({ studentId: 's', totalCents: 4500 })],
-  });
-  assertEquals(ofRule(good, 'covered_payments_mismatch'), []);
-  const bad = factsWith({
-    charges: [charge({ studentId: 's', amountCents: 4500, coveredCents: 4000, status: 'partial' })],
-    payments: [payment({ studentId: 's', totalCents: 4500 })],
-  });
-  const found = ofRule(bad, 'covered_payments_mismatch');
-  assertEquals(found[0]?.data, { coveredCents: 4000, paymentsCents: 4500 });
-  assertEquals(found[0]?.entity.kind, 'club');
-});
-
 Deno.test('receipt_gaps should flag missing and repeated receipt numbers of a season', () => {
   const facts = factsWith({
     payments: [
