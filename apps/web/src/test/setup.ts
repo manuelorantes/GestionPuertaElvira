@@ -10,3 +10,6 @@ afterEach(() => {
   // El espacio elegido (administración o profesor) dura lo que la pestaña: cada test empieza de cero.
   sessionStorage.clear();
 });
+
+// jsdom no desplaza la vista: las filas resaltadas por un enlace lo piden al pintarse.
+Element.prototype.scrollIntoView = () => undefined;

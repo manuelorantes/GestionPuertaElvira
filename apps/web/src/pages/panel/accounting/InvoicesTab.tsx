@@ -16,6 +16,7 @@ import { DateField } from '@/shared/ui/DateField';
 import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
+import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
 
 function PayInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const [date, setDate] = useState(todayIso());
@@ -75,6 +76,7 @@ export function InvoicesTab() {
   const [removing, setRemoving] = useState<Invoice | null>(null);
   const remove = useAccountingMutation(deleteInvoice);
   const toast = useToast();
+  const spotlight = useSpotlight('factura');
   const items = invoices.data ?? [];
 
   if (invoices.isPending) return <p className="text-ink-muted">Cargando facturas…</p>;
@@ -104,7 +106,11 @@ export function InvoicesTab() {
         </thead>
         <tbody>
           {items.map((invoice) => (
-            <tr key={invoice.id} className="border-b border-line-soft last:border-b-0">
+            <tr
+              key={invoice.id}
+              ref={invoice.id === spotlight.id ? spotlight.attach : undefined}
+              className={`border-b border-line-soft last:border-b-0 ${invoice.id === spotlight.id ? SPOTLIGHT_CLASS : ''}`}
+            >
               <td className="px-4 py-3 text-ink-muted">{formatDate(invoice.date)}</td>
               <td className="px-4 py-3 font-mono text-[13px]">{invoice.number || '—'}</td>
               <td className="px-4 py-3 font-medium">{invoice.supplier}</td>

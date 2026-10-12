@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
@@ -205,12 +205,77 @@ describe('Contabilidad', () => {
     );
     expect(
       within(table).getByRole('link', { name: /Ir a Facturas: Propietario del local/ }),
-    ).toHaveAttribute('href', '/panel/contabilidad?pestana=facturas');
+    ).toHaveAttribute('href', '/panel/contabilidad?pestana=facturas&factura=i1');
     await userEvent.click(within(fee).getByRole('link', { name: /Ir a Cobros/ }));
 
     expect(
       await screen.findByRole('tab', { name: 'Cobros registrados', selected: true }),
     ).toBeInTheDocument();
+  });
+
+  it('opens the month and type of a movement reached by link and spotlights its row', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api({
+      'GET /api/admin/accounting/entries/e1': [
+        200,
+        {
+          id: 'e1',
+          date: '2026-10-10',
+          kind: 'income',
+          concept: 'Subvención municipal',
+          category: 'grants',
+          method: 'transfer',
+          amountCents: 60000,
+          period: '2026-10',
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad?pestana=movimientos&movimiento=e1');
+
+    const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
+    const kind = screen.getByRole('group', { name: 'Tipo de movimiento' });
+    expect(within(kind).getByRole('button', { name: 'Ingresos' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    const row = within(table).getByRole('row', { name: /Subvención municipal/ });
+    expect(row).toHaveClass('bg-surface-muted');
+    expect(within(table).getByRole('row', { name: /Martina López/ })).not.toHaveClass(
+      'bg-surface-muted',
+    );
+
+    act(() => vi.advanceTimersByTime(3000));
+    await waitFor(() => expect(row).not.toHaveClass('bg-surface-muted'));
+    vi.useRealTimers();
+  });
+
+  it('explains when the movement of a link no longer exists', async () => {
+    api({ [`GET /api/admin/accounting/ledger?month=${currentMonth()}`]: [200, LEDGER] });
+    renderApp('/panel/contabilidad?pestana=movimientos&movimiento=gone');
+
+    expect(await screen.findByText('Ese movimiento ya no existe.')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('table', {
+        name: `Movimientos de ${monthLabel(currentMonth()).toLowerCase()}`,
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('spotlights the invoice reached by link', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api();
+    renderApp('/panel/contabilidad?pestana=facturas&factura=i2');
+
+    const table = await screen.findByRole('table', { name: 'Facturas de proveedores' });
+    const row = within(table).getByRole('row', { name: /TP-044/ });
+    expect(row).toHaveClass('bg-surface-muted');
+    expect(within(table).getByRole('row', { name: /R-2026-10/ })).not.toHaveClass(
+      'bg-surface-muted',
+    );
+
+    act(() => vi.advanceTimersByTime(3000));
+    await waitFor(() => expect(row).not.toHaveClass('bg-surface-muted'));
+    vi.useRealTimers();
   });
 
   it('edits a movement after confirming what changes; a payment only in accounting', async () => {
