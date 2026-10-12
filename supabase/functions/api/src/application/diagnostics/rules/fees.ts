@@ -1,4 +1,4 @@
-// Reglas de cuotas y tarifas (specs/features/diagnostico/spec.md, reglas 1 a 5).
+// Reglas de cuotas y tarifas (specs/features/diagnostico/spec.md, reglas 1 a 6 y 9 a 12).
 import { Money } from '../../../domain/common/mod.ts';
 import { prepaymentIn } from '../../../domain/billing/mod.ts';
 import type { Candidate, FactCharge, Facts, FactStudent, Rule } from '../facts.ts';
@@ -268,6 +268,37 @@ export const enrolmentAfterPayment: Rule = (facts) =>
     }];
   });
 
+const sum = (values: number[]): number => values.reduce((total, v) => total + v, 0);
+
+/**
+ * Regla «Ha pagado más que sus cuotas»: alumno cuyos recibos suman más de lo que tienen cubierto sus cuotas. Los
+ * extras del arreglo de descuentos en cadena son saldo a favor a propósito y no cuentan. Un hallazgo por alumno.
+ */
+export const studentOverpaid: Rule = (facts) =>
+  facts.students.flatMap((student): Candidate[] => {
+    const receipts = facts.payments.filter(
+      (p) => p.studentId === student.id && p.concept !== CHAINED_EXTRA_CONCEPT,
+    );
+    const paidCents = sum(receipts.map((p) => p.totalCents));
+    const coveredCents = sum(
+      facts.charges.filter((c) => c.studentId === student.id).map((c) => c.coveredCents),
+    );
+    if (paidCents <= coveredCents) return [];
+    return [{
+      rule: 'student_overpaid',
+      entity: studentRef(student),
+      data: { paidCents, coveredCents },
+      explanation: `Sus ${receipts.length} recibos suman ${
+        euros(paidCents)
+      } y sus cuotas tienen cubiertos ${euros(coveredCents)}: ${
+        euros(paidCents - coveredCents)
+      } de más.`,
+      proposal:
+        'Si fue un error al teclear un recibo, corregir su importe; si pagó de más, queda como saldo a favor: descarta el hallazgo.',
+      fix: null,
+    }];
+  });
+
 export const feeRules: readonly Rule[] = [
   feeMismatch,
   chainedDiscounts,
@@ -275,4 +306,5 @@ export const feeRules: readonly Rule[] = [
   paidButNoGroup,
   memberNeverPaid,
   enrolmentAfterPayment,
+  studentOverpaid,
 ];

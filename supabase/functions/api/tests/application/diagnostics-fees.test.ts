@@ -1,6 +1,6 @@
 import { assertEquals, assertStringIncludes } from '@std/assert';
 
-import { feeRules } from '../../src/application/diagnostics/rules/fees.ts';
+import { CHAINED_EXTRA_CONCEPT, feeRules } from '../../src/application/diagnostics/rules/fees.ts';
 import { charge, factsWith, payment, SEASON_MONTHS, student } from '../support/diagnostics.ts';
 
 const run = (facts: ReturnType<typeof factsWith>) => feeRules.flatMap((rule) => rule(facts));
@@ -350,4 +350,51 @@ Deno.test('chained_discounts should flag charges where family and prepayment dis
   });
   // Ni «cuota distinta de la tarifa» ni «pago adelantado sin apuntar» vuelven a señalar esas cuotas.
   assertEquals(ofRule(facts, 'fee_mismatch'), []);
+});
+
+Deno.test('student_overpaid should flag a student whose receipts exceed what the charges cover, ignoring the discount extras', () => {
+  const pedro = student({ id: 'pedro', fullName: 'Pedro Santos Parra' });
+  const irene = student({ id: 'irene', fullName: 'Irene Fernandez Aguilera' });
+  const facts = factsWith({
+    students: [pedro, irene],
+    charges: [
+      charge({
+        studentId: 'pedro',
+        period: '2026-09',
+        amountCents: 3150,
+        coveredCents: 3150,
+        status: 'paid',
+      }),
+      charge({
+        studentId: 'pedro',
+        period: '2026-10',
+        amountCents: 3150,
+        coveredCents: 3150,
+        status: 'paid',
+      }),
+      charge({
+        studentId: 'irene',
+        period: '2026-09',
+        amountCents: 3150,
+        coveredCents: 3150,
+        status: 'paid',
+      }),
+      charge({ studentId: 'irene', period: '2026-11', amountCents: 3150, status: 'expected' }),
+    ],
+    payments: [
+      payment({ studentId: 'pedro', totalCents: 3150, concept: 'Septiembre 2026' }),
+      payment({ studentId: 'pedro', totalCents: 3200, concept: 'Octubre 2026' }),
+      payment({ studentId: 'irene', totalCents: 3150, concept: 'Septiembre 2026' }),
+      payment({ studentId: 'irene', totalCents: 900, concept: CHAINED_EXTRA_CONCEPT }),
+    ],
+  });
+  const found = ofRule(facts, 'student_overpaid');
+  assertEquals(found.length, 1);
+  assertEquals(found[0]?.entity, { kind: 'student', id: 'pedro', label: 'Pedro Santos Parra' });
+  assertEquals(found[0]?.data, { paidCents: 6350, coveredCents: 6300 });
+  assertStringIncludes(found[0]?.explanation ?? '', 'Sus 2 recibos suman 63,50 €');
+  assertStringIncludes(found[0]?.explanation ?? '', 'cubiertos 63 €');
+  assertStringIncludes(found[0]?.explanation ?? '', '0,50 € de más');
+  assertStringIncludes(found[0]?.proposal ?? '', 'saldo a favor');
+  assertEquals(found[0]?.fix, null);
 });

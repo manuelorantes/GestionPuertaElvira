@@ -56,6 +56,7 @@ export interface FactPayment {
   paidOn: string;
   studentId: string;
   kind: string;
+  concept: string;
   totalCents: number;
 }
 

@@ -11,7 +11,7 @@ export type RuleCode =
   | 'invoice_duplicates_entry'
   | 'teacher_expense_as_entry'
   | 'ledger_payments_mismatch'
-  | 'covered_payments_mismatch'
+  | 'student_overpaid'
   | 'charge_cover_inconsistent'
   | 'settlement_sessions_mismatch'
   | 'charge_without_group'
@@ -70,8 +70,8 @@ export const RULE_CATALOGUE: readonly RuleDefinition[] = [
     hasFix: false,
   },
   {
-    code: 'covered_payments_mismatch',
-    title: 'Lo cubierto no cuadra con lo cobrado',
+    code: 'student_overpaid',
+    title: 'Ha pagado más que sus cuotas',
     severity: 'money',
     hasFix: false,
   },
