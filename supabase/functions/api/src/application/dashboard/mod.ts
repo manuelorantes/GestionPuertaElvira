@@ -10,9 +10,13 @@ export interface MonthBars {
   expenseCents: number;
 }
 
-/** Un mes de «Cuotas vs gastos fijos»: además, las cuotas que aún se emitirán a los alumnos matriculados. */
+/**
+ * Un mes de «Cuotas vs gastos fijos»: además, las cuotas que aún se emitirán a los alumnos matriculados y lo que
+ * costará el profesorado según el horario y aún no está en el libro.
+ */
 export interface MonthFeeBars extends MonthBars {
   expectedCents: number;
+  expectedExpenseCents: number;
 }
 
 export interface ClubSummaryView {
@@ -61,6 +65,11 @@ export interface ExpectedFees {
   expected(month: string): Promise<{ amount: Money }[]>;
 }
 
+/** Lo que costará el profesorado cada mes según el horario, a la tarifa de hoy (céntimos por «AAAA-MM»). */
+export interface ExpectedPayroll {
+  between(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
+}
+
 /**
  * Resumen del club con cifras reales: lo compone a partir de Cobros, Contabilidad, Alumnado y Clases.
  */
@@ -79,6 +88,7 @@ export class ClubSummary {
     private readonly fees: FeeIncome,
     private readonly settings: AccountingSettingsRepository,
     private readonly expectedFees: ExpectedFees,
+    private readonly expectedPayroll: ExpectedPayroll,
   ) {}
 
   /** Meses de margen alrededor de la temporada: un gasto puede pagarse antes o después del mes al que corresponde. */
@@ -115,6 +125,7 @@ export class ClubSummary {
       views.flatMap((v) => v.lines),
       first,
       last,
+      month,
     );
     let current: { expenseCents: number; lines: LedgerLine[] } | null = null;
     let previousLines: LedgerLine[] = [];
@@ -161,21 +172,32 @@ export class ClubSummary {
   }
   /**
    * Las categorías «del mes», cada movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas entre los
-   * meses que paga cada cobro; y, en los meses que vienen, las previstas de los alumnos matriculados hoy.
+   * meses que paga cada cobro; y, en los meses que vienen, las previstas de los alumnos matriculados hoy. Del mes en
+   * curso en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes.
    */
   private async monthChart(
     months: string[],
     lines: LedgerLine[],
     first: YearMonth,
     last: YearMonth,
+    current: YearMonth,
   ): Promise<MonthFeeBars[]> {
     const categories = await this.settings.monthlyCategories();
     const withFees = categories.includes('fees');
     const earned = withFees
       ? await this.fees.earnedByMonth(first, last)
       : new Map<string, number>();
+    const payroll = categories.includes('teachers') && !last.isBefore(current)
+      ? await this.expectedPayroll.between(current.isBefore(first) ? first : current, last)
+      : new Map<string, number>();
     const bars = new Map(
-      months.map((m) => [m, { income: earned.get(m) ?? 0, expected: 0, expense: 0 }]),
+      months.map((m) => [m, {
+        income: earned.get(m) ?? 0,
+        expected: 0,
+        expense: 0,
+        teachers: 0,
+        expectedExpense: payroll.get(m) ?? 0,
+      }]),
     );
     if (withFees) {
       for (const [month, bar] of bars) {
@@ -188,13 +210,20 @@ export class ClubSummary {
       const bar = bars.get(line.period);
       if (!bar) continue;
       if (line.kind === 'income') bar.income += line.amountCents;
-      else bar.expense += line.amountCents;
+      else {
+        bar.expense += line.amountCents;
+        if (line.category === 'teachers') bar.teachers += line.amountCents;
+      }
     }
-    return months.map((m) => ({
-      month: m,
-      incomeCents: bars.get(m)?.income ?? 0,
-      expenseCents: bars.get(m)?.expense ?? 0,
-      expectedCents: bars.get(m)?.expected ?? 0,
-    }));
+    return months.map((m) => {
+      const bar = bars.get(m);
+      return {
+        month: m,
+        incomeCents: bar?.income ?? 0,
+        expenseCents: bar?.expense ?? 0,
+        expectedCents: bar?.expected ?? 0,
+        expectedExpenseCents: Math.max(0, (bar?.expectedExpense ?? 0) - (bar?.teachers ?? 0)),
+      };
+    });
   }
 }

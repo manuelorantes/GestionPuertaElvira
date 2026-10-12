@@ -24,9 +24,13 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
   al que corresponde. Sobre los ingresos de cada mes que viene, apiladas en el verde claro de los grupos de
   iniciación, las **cuotas previstas**: las que se emitirán a los alumnos matriculados hoy que aún no tengan la de ese
   mes (las [previstas](../cobros/spec.md) de Cobros, con la tarifa de hoy). El mes en curso y los pasados no tienen
-  previstas; julio y agosto, tampoco.
+  previstas; julio y agosto, tampoco. Sobre los gastos, en gris, el **profesorado previsto**: lo que costará el
+  profesorado ese mes según el horario (las [horas esperadas](../profesorado/spec.md) de Rentabilidad: clases y
+  actividades de los días del mes salvo festivos, a la tarifa de hoy), menos lo del profesorado que ya esté en el
+  libro ese mes. Del mes en curso en adelante; los meses pasados, julio y agosto no tienen.
 Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cuánto dinero equivale, p. ej. «Ingresos de
-octubre 2026: 4120 €» o «Cuotas previstas de noviembre 2026: 1340 €».
+octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «Profesorado previsto de noviembre 2026:
+1200 €».
 
 #### Scenario: Un pago trimestral
 - **WHEN** un alumno paga en octubre tres meses por 121,50 €
@@ -37,6 +41,12 @@ octubre 2026: 4120 €» o «Cuotas previstas de noviembre 2026: 1340 €».
 - **WHEN** en octubre un alumno matriculado en un grupo de dos horas semanales solo ha pagado octubre
 - **THEN** «Cuotas vs gastos fijos» muestra de noviembre a junio una cuota prevista de 45 € sobre los ingresos, y
   nada previsto en octubre ni en julio y agosto
+
+#### Scenario: Profesorado previsto
+- **WHEN** en octubre una profesora a 15 €/h da una clase de una hora los lunes y miércoles y aún no se ha pagado
+  su liquidación
+- **THEN** «Cuotas vs gastos fijos» muestra en octubre y en cada mes hasta junio, sobre los gastos, el profesorado
+  previsto de ese mes (sus lunes y miércoles no festivos × 15 €), y nada en julio ni en agosto
 
 ### Requirement: Ocupación
 El resumen MUST mostrar la ocupación media de los grupos (plazas ocupadas sobre plazas totales), cuántos están completos

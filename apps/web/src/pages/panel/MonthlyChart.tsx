@@ -29,17 +29,33 @@ function tooltipSide(index: number, count: number): string {
 }
 
 function describe(m: ChartMonth): string {
-  const expected =
-    (m.expectedCents ?? 0) > 0 ? `, cuotas previstas ${formatCents(m.expectedCents ?? 0)}` : '';
-  return `${monthLabel(m.month).toLowerCase()}: ingresos ${formatCents(m.incomeCents)}, gastos ${formatCents(m.expenseCents)}${expected}`;
+  const extras = [
+    (m.expectedCents ?? 0) > 0 ? `cuotas previstas ${formatCents(m.expectedCents ?? 0)}` : null,
+    (m.expectedExpenseCents ?? 0) > 0
+      ? `profesorado previsto ${formatCents(m.expectedExpenseCents ?? 0)}`
+      : null,
+  ].filter((part) => part !== null);
+  return [
+    `${monthLabel(m.month).toLowerCase()}: ingresos ${formatCents(m.incomeCents)}`,
+    `gastos ${formatCents(m.expenseCents)}`,
+    ...extras,
+  ].join(', ');
 }
 
-/** Barras de ingresos y gastos por mes (sin dependencias de gráficos); las cuotas previstas, sobre los ingresos. */
+/**
+ * Barras de ingresos y gastos por mes (sin dependencias de gráficos); lo previsto, apilado sobre lo real: las cuotas
+ * sobre los ingresos y el profesorado sobre los gastos.
+ */
 export function MonthlyChart({ months, current, label, id: chartId }: MonthlyChartProps) {
   // La barra señalada (al pasar el ratón o al tocarla) muestra su importe.
   const [pointed, setPointed] = useState<string | null>(null);
   const max = axisMax(
-    Math.max(...months.flatMap((m) => [m.incomeCents + (m.expectedCents ?? 0), m.expenseCents])),
+    Math.max(
+      ...months.flatMap((m) => [
+        m.incomeCents + (m.expectedCents ?? 0),
+        m.expenseCents + (m.expectedExpenseCents ?? 0),
+      ]),
+    ),
   );
   const ticks = [4, 3, 2, 1, 0].map((i) => (max * i) / 4);
   const description = months.map(describe).join('; ');
@@ -83,6 +99,7 @@ export function MonthlyChart({ months, current, label, id: chartId }: MonthlyCha
       <div aria-hidden className="flex flex-1 items-stretch gap-1 border-l border-line sm:gap-2">
         {months.map((m, index) => {
           const expected = m.expectedCents ?? 0;
+          const expectedExpense = m.expectedExpenseCents ?? 0;
           return (
             <div
               key={m.month}
@@ -101,9 +118,11 @@ export function MonthlyChart({ months, current, label, id: chartId }: MonthlyCha
                 </div>
                 <div
                   className="flex w-[42%] max-w-4 flex-col"
-                  style={{ height: `${(m.expenseCents / max) * 100}%` }}
+                  style={{ height: `${((m.expenseCents + expectedExpense) / max) * 100}%` }}
                 >
-                  {segment(m, index, 'expense', m.expenseCents, true)}
+                  {expectedExpense > 0 &&
+                    segment(m, index, 'expectedExpense', expectedExpense, true)}
+                  {segment(m, index, 'expense', m.expenseCents, expectedExpense === 0)}
                 </div>
               </div>
               <span
