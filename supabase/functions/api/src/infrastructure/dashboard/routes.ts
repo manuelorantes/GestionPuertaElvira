@@ -29,7 +29,6 @@ export function registerDashboardRoutes(api: ApiApp): void {
         api.deps.clock,
         new SqlFeeIncome(scope.tx),
         new SqlAccountingRepository(scope.tx),
-        b.generate,
         new ExpectedPayroll(
           new SqlScheduleDirectory(scope.tx),
           new SqlDutyRepository(scope.tx),
