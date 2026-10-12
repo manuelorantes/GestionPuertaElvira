@@ -135,10 +135,10 @@ Deno.test('WithdrawStudent should withdraw and end enrolments on the same date',
 Deno.test('WithdrawStudent should unlink the direct family, and tell who would be left without any', async () => {
   const { repo, enrolments, transactions, clock, register } = students();
   const pablo = await register(['g1']);
-  // Lola solo tiene a Pablo; Hugo tiene a Pablo y a Ana, que sigue de alta.
+  // Lola solo tiene a Pablo; Hugo y Ana son otra familia.
   const lola = await register(['g1'], [pablo]);
   const ana = await register(['g1']);
-  const hugo = await register(['g1'], [pablo, ana]);
+  const hugo = await register(['g1'], [ana]);
 
   assertEquals((await new FamilyLeftAlone(repo).execute(pablo)).map((s) => s.id), [lola]);
 
@@ -148,6 +148,7 @@ Deno.test('WithdrawStudent should unlink the direct family, and tell who would b
   assertEquals(await siblingsOf(pablo), []);
   assertEquals(await siblingsOf(lola), []);
   assertEquals(await siblingsOf(hugo), [ana]);
+  assertEquals(await siblingsOf(ana), [hugo]);
 });
 
 Deno.test('RejoinStudent should join a withdrawn student again from a date, in groups or as a member', async () => {
@@ -211,6 +212,27 @@ Deno.test('LinkSiblings and UnlinkSiblings should be mutual', async () => {
   await new UnlinkSiblings(repo, transactions).execute(b, a);
   assertEquals((await repo.find(StudentId.fromString(a)))?.siblings(), []);
   assertEquals((await repo.find(StudentId.fromString(b)))?.siblings(), []);
+});
+
+Deno.test('LinkSiblings should join both families and UnlinkSiblings should take one out of the whole family', async () => {
+  const { repo, transactions, register } = students();
+  const siblingsOf = async (id: string) =>
+    ((await repo.find(StudentId.fromString(id)))?.siblings().map((s) => s.value) ?? []).sort();
+  const a = await register(['g1']);
+  const b = await register(['g2']);
+  const c = await register([]);
+  const d = await register([]);
+  await new LinkSiblings(repo, transactions).execute(a, b);
+  await new LinkSiblings(repo, transactions).execute(c, d);
+  // Al vincular a B con C, las dos familias se unen: los cuatro quedan vinculados entre sí.
+  await new LinkSiblings(repo, transactions).execute(b, c);
+  assertEquals(await siblingsOf(a), [b, c, d].sort());
+  assertEquals(await siblingsOf(d), [a, b, c].sort());
+  // Quitar a D desde la ficha de A lo saca de la familia entera.
+  await new UnlinkSiblings(repo, transactions).execute(a, d);
+  assertEquals(await siblingsOf(a), [b, c].sort());
+  assertEquals(await siblingsOf(c), [a, b].sort());
+  assertEquals(await siblingsOf(d), []);
 });
 
 Deno.test('Teacher use cases should register, rename, change the rate, deactivate without groups and activate again', async () => {

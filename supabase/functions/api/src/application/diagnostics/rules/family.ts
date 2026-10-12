@@ -60,23 +60,46 @@ export const familyUnlinked: Rule = (facts: Facts) => {
   return found;
 };
 
-/** Regla 7: A tiene a B como familia y B no tiene a A. */
+/**
+ * Regla 7: la familia directa no es un grupo cerrado: A tiene a B y B no tiene a A, o A tiene a B, B tiene a C y
+ * A no tiene a C. Vincular a los dos que faltan une las familias.
+ */
 export const familyNotMutual: Rule = (facts: Facts) => {
   const byId = new Map(facts.students.map((s) => [s.id, s]));
   const found: Candidate[] = [];
+  const seen = new Set<string>();
+  const missing = (a: FactStudent, c: FactStudent, explanation: string) => {
+    if (seen.has(`${a.id}|${c.id}`)) return;
+    seen.add(`${a.id}|${c.id}`);
+    found.push({
+      rule: 'family_not_mutual',
+      entity: studentRef(a),
+      data: { a: a.id, b: c.id },
+      explanation,
+      proposal: 'Completar la relación para que toda la familia esté vinculada entre sí.',
+      fix: { kind: 'link_family', a: a.id, b: c.id },
+    });
+  };
   for (const a of facts.students) {
     for (const id of a.siblingIds) {
       const b = byId.get(id);
-      if (!b || b.siblingIds.includes(a.id)) continue;
-      found.push({
-        rule: 'family_not_mutual',
-        entity: studentRef(a),
-        data: { a: a.id, b: b.id },
-        explanation:
+      if (!b) continue;
+      if (!b.siblingIds.includes(a.id)) {
+        missing(
+          a,
+          b,
           `${a.fullName} tiene a ${b.fullName} como familia directa, pero ${b.fullName} no tiene a ${a.fullName}.`,
-        proposal: 'Completar la relación para que sea mutua.',
-        fix: { kind: 'link_family', a: a.id, b: b.id },
-      });
+        );
+      }
+      for (const other of b.siblingIds) {
+        const c = byId.get(other);
+        if (!c || c.id === a.id || a.siblingIds.includes(c.id)) continue;
+        missing(
+          a,
+          c,
+          `${a.fullName} tiene a ${b.fullName} como familia directa, y ${b.fullName} a ${c.fullName}, pero ${a.fullName} no tiene a ${c.fullName}.`,
+        );
+      }
     }
   }
   return found;
