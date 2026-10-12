@@ -96,7 +96,7 @@ function Summary({ data }: { data: Dashboard }) {
           />
           <ChartCard
             title={`Cuotas vs gastos fijos · ${seasonLabel(data.month)}`}
-            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan; las previstas de los alumnos matriculados y el profesorado previsto según el horario, en los meses que vienen; y los gastos del mes en el suyo"
+            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan; las que faltan por cobrar de cada mes, previstas; el profesorado previsto según el horario, de este mes en adelante; y los gastos del mes en el suyo"
             id="mes"
             months={data.monthChart}
             current={data.month}

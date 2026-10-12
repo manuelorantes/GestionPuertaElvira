@@ -21,10 +21,12 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
 - **Cuotas vs gastos fijos**: lo que corresponde a cada mes, solo las [categorías del mes](../contabilidad/spec.md)
   de Contabilidad, cada movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas a partes iguales
   entre los meses que paga cada cobro; lo del profesorado, en el mes de la liquidación; apuntes y facturas, en su mes
-  al que corresponde. Sobre los ingresos de cada mes que viene, apiladas en el verde claro de los grupos de
-  iniciación, las **cuotas previstas**: las que se emitirán a los alumnos matriculados hoy que aún no tengan la de ese
-  mes (las [previstas](../cobros/spec.md) de Cobros, con la tarifa de hoy). El mes en curso y los pasados no tienen
-  previstas; julio y agosto, tampoco. Sobre los gastos, en gris, el **profesorado previsto**: lo que costará el
+  al que corresponde. Sobre los ingresos de cada mes, apiladas en el verde claro de los grupos de iniciación, las
+  **cuotas previstas**: lo que falta por cobrar de las cuotas mensuales de ese mes. En el mes en curso y los pasados,
+  lo pendiente de las cuotas emitidas (una cuota cancelada ya no se debe y desaparece de ahí); en los meses que
+  vienen, además, las que se emitirán a los alumnos matriculados hoy que aún no tengan la de ese mes (las
+  [previstas](../cobros/spec.md) de Cobros, con la tarifa de hoy). Julio y agosto no tienen cuotas. Sobre los gastos,
+  en gris, el **profesorado previsto**: lo que costará el
   profesorado ese mes según el horario (las [horas esperadas](../profesorado/spec.md) de Rentabilidad: clases y
   actividades de los días del mes salvo festivos, a la tarifa de hoy), menos lo del profesorado que ya esté en el
   libro ese mes. Del mes en curso en adelante; los meses pasados, julio y agosto no tienen.
@@ -41,6 +43,11 @@ octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «P
 - **WHEN** en octubre un alumno matriculado en un grupo de dos horas semanales solo ha pagado octubre
 - **THEN** «Cuotas vs gastos fijos» muestra de noviembre a junio una cuota prevista de 45 € sobre los ingresos, y
   nada previsto en octubre ni en julio y agosto
+
+#### Scenario: Cuota del mes sin cobrar y cancelada
+- **WHEN** en octubre un alumno recién matriculado tiene su cuota de octubre de 45 € emitida y sin cobrar
+- **THEN** «Cuotas vs gastos fijos» muestra en octubre 45 € de cuotas previstas y ningún ingreso; si administración
+  cancela esa cuota, octubre se queda sin previstas
 
 #### Scenario: Profesorado previsto
 - **WHEN** en octubre una profesora a 15 €/h da una clase de una hora los lunes y miércoles y aún no se ha pagado
