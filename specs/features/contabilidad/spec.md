@@ -31,6 +31,22 @@ dirección de la página.
 - **WHEN** administración registra un cobro de cuota o paga una liquidación
 - **THEN** aparece como movimiento del mes sin anotarlo en Contabilidad
 
+### Requirement: Ir a un movimiento o a una factura
+Un enlace a un movimiento concreto MUST abrir Contabilidad en el mes de ese movimiento,
+con el filtro de su tipo («Ingresos» o «Pagos»),
+desplazar la vista hasta su fila y resaltarla con un fondo algo más oscuro durante tres segundos.
+Un enlace a una factura MUST hacer lo mismo en «Facturas».
+Si el movimiento ya no existe, el sistema MUST avisarlo y mostrar el mes actual.
+El enlace «Ir a Facturas» de un movimiento que viene de una factura MUST llevar a esa factura.
+
+#### Scenario: Desde un hallazgo del diagnóstico
+- **WHEN** administración pulsa el nombre de un apunte en un hallazgo
+- **THEN** ve el mes de ese apunte, filtrado por su tipo, con su fila resaltada tres segundos
+
+#### Scenario: El apunte se quitó
+- **WHEN** administración sigue un enlace a un apunte que ya no existe
+- **THEN** ve el aviso «Ese movimiento ya no existe.» sobre los movimientos del mes actual
+
 ### Requirement: Apuntes manuales
 Administración MUST poder anotar ingresos o gastos con fecha, concepto, categoría de su tipo, forma de pago (efectivo, transferencia o tarjeta)
 e importe mayor que cero, y quitarlos.

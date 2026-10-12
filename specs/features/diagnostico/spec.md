@@ -21,8 +21,9 @@ club: solo crea, actualiza o cierra hallazgos. Su ejecución nocturna MUST queda
 - **THEN** se ejecuta el mismo diagnóstico a nombre de «Tarea nocturna» y los hallazgos nuevos quedan abiertos
 
 ### Requirement: Hallazgos
-Cada hallazgo MUST indicar la regla, la entidad afectada (alumno, apunte, factura o profesor, con enlace a su ficha;
-o recibos o el club entero, sin enlace), una explicación con los datos concretos y la solución propuesta. Cada
+Cada hallazgo MUST indicar la regla, la entidad afectada (alumno o profesor, con enlace a su ficha; apunte o
+factura, con enlace a su fila en Contabilidad, que se resalta un momento al llegar; o recibos o el club entero,
+sin enlace), una explicación con los datos concretos y la solución propuesta. Cada
 hallazgo MUST estar en uno de estos estados: abierto, aceptado, descartado o resuelto solo. Aceptado y descartado
 guardan la fecha y el nombre de quien lo decidió.
 

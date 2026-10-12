@@ -100,6 +100,11 @@ describe('Diagnóstico', () => {
       'href',
       expect.stringContaining('s1'),
     );
+    // El apunte lleva a su fila en Movimientos (la página busca el mes y el tipo).
+    expect(within(money).getByRole('link', { name: 'Limpieza del local · 150 €' })).toHaveAttribute(
+      'href',
+      '/panel/contabilidad?pestana=movimientos&movimiento=e1',
+    );
     expect(within(money).getByText(/Le corresponden 49,50 €/)).toBeInTheDocument();
     expect(within(money).getByText(/Ajustar la cuota/)).toBeInTheDocument();
     const club = screen.getByRole('region', { name: /Datos del club/ });

@@ -21,6 +21,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { MonthNav } from '@/shared/ui/MonthNav';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
+import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
 
 import { EditMovementDialog } from './EditMovementDialog';
 import { EntryDialog } from './EntryDialog';
@@ -53,7 +54,7 @@ function origin(item: LedgerItem): { to: string; label: string; hint: string } |
       };
     case 'invoice':
       return {
-        to: '/panel/contabilidad?pestana=facturas',
+        to: `/panel/contabilidad?pestana=facturas&factura=${item.sourceId}`,
         label: 'Ir a Facturas',
         hint: 'Viene de una factura pagada: se gestiona en Facturas',
       };
@@ -149,6 +150,7 @@ function LedgerTable({
   onRemove: (item: LedgerItem) => void;
   onEdit: (item: LedgerItem) => void;
 }) {
+  const spotlight = useSpotlight('movimiento');
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-left text-sm">
@@ -175,7 +177,8 @@ function LedgerTable({
           {items.map((item) => (
             <tr
               key={`${item.source}-${item.sourceId}`}
-              className="border-b border-line-soft last:border-b-0"
+              ref={item.sourceId === spotlight.id ? spotlight.attach : undefined}
+              className={`border-b border-line-soft last:border-b-0 ${item.sourceId === spotlight.id ? SPOTLIGHT_CLASS : ''}`}
             >
               <td
                 className={`pl-4 ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}

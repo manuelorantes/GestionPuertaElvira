@@ -183,10 +183,15 @@ function EntityLabel({ finding }: { finding: Finding }) {
       </StudentLink>
     );
   if (kind === 'teacher') return <TeacherLink id={id} name={label} />;
+  // A su fila en Contabilidad, que se resalta un momento al llegar.
   if (kind === 'entry' || kind === 'invoice')
     return (
       <Link
-        to={`/panel/contabilidad?pestana=${kind === 'entry' ? 'movimientos' : 'facturas'}`}
+        to={
+          kind === 'entry'
+            ? `/panel/contabilidad?pestana=movimientos&movimiento=${id}`
+            : `/panel/contabilidad?pestana=facturas&factura=${id}`
+        }
         className={`${className} decoration-1 underline-offset-2 hover:underline`}
       >
         {label}
