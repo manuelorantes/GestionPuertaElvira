@@ -120,7 +120,7 @@ describe('Resumen', () => {
     // Los socios activos y, de ellos, los que están en alguna clase.
     expect(screen.getByText('Socios activos')).toBeInTheDocument();
     expect(screen.getByText('157')).toBeInTheDocument();
-    expect(screen.getByText('142 en alguna clase')).toBeInTheDocument();
+    expect(screen.getByText('142 dando clases')).toBeInTheDocument();
     // Dos gráficas: lo que entra y sale cada mes, y cuotas vs gastos fijos (lo que corresponde a cada mes).
     expect(
       screen.getByRole('img', { name: /Lo que entra y sale cada mes, por fecha/ }),
