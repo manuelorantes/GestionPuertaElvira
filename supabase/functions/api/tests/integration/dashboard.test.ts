@@ -81,8 +81,11 @@ Deno.test({
     // Las cifras del mes son solo sus cuotas; las cuotas de socio pendientes (una por socio) van aparte.
     assertEquals(summary.pendingCents, 0);
     assertEquals(summary.membershipPendingCents, 10000);
+    // Los dos socios son de este mes; solo uno tiene clase, y empezó este mes.
     assertEquals(summary.activeStudents, 2);
+    assertEquals(summary.newStudents, 2);
     assertEquals(summary.studentsInClasses, 1);
+    assertEquals(summary.newInClasses, 1);
     // Dos gráficas de la temporada, de septiembre a agosto.
     type Chart = {
       month: string;
