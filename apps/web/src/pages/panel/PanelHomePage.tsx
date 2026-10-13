@@ -97,7 +97,7 @@ function Summary({ data }: { data: Dashboard }) {
         <Kpi
           label="Socios activos"
           value={String(data.activeStudents)}
-          hint={`${data.studentsInClasses} en alguna clase`}
+          hint={`${data.studentsInClasses} dando clases`}
         />
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
