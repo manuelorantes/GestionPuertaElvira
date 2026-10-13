@@ -13,6 +13,8 @@ import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
+
 import { TeacherLink } from './TeacherLink';
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -32,6 +34,16 @@ const KINDS = [
 ];
 const KIND_LABEL: Record<Duty['kind'], string> = { shift: 'Turno', fridays: 'Viernes (puntos)' };
 
+type Column = 'weekday' | 'slot' | 'label' | 'kind' | 'teacher';
+
+const COLUMNS: Record<Column, SortColumn<Duty>> = {
+  weekday: { label: 'Día', name: 'día', value: (d) => d.weekday },
+  slot: { label: 'Franja', name: 'franja', value: (d) => d.start },
+  label: { label: 'Actividad', name: 'actividad', value: (d) => d.label },
+  kind: { label: 'Tipo', name: 'tipo', value: (d) => KIND_LABEL[d.kind] },
+  teacher: { label: 'Encargado', name: 'encargado', value: (d) => d.teacherName },
+};
+
 /**
  * Actividades del club con un encargado fijo semanal: cuentan como horas cada semana. Si mientras tanto da una clase,
  * esas horas no se suman dos veces. Su encargado las confirma («Turno hecho» o, la de los viernes, pasando la lista).
@@ -42,6 +54,7 @@ export function DutiesTab({ teachers }: { teachers: Teacher[] }) {
   const [removing, setRemoving] = useState<Duty | null>(null);
   const remove = usePayrollMutation(deleteDuty);
   const toast = useToast();
+  const { header, apply } = useTableSort(COLUMNS, { key: 'weekday' });
 
   return (
     <div className="flex flex-col gap-4">
@@ -66,9 +79,9 @@ export function DutiesTab({ teachers }: { teachers: Teacher[] }) {
             <caption className="sr-only">Actividades del club</caption>
             <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
               <tr>
-                {['Día', 'Franja', 'Actividad', 'Tipo', 'Encargado'].map((h) => (
-                  <th key={h} scope="col" className="px-5 py-3 font-semibold">
-                    {h}
+                {(Object.keys(COLUMNS) as Column[]).map((key) => (
+                  <th key={key} scope="col" className="px-5 py-3 font-semibold">
+                    {header(key)}
                   </th>
                 ))}
                 <th scope="col">
@@ -77,7 +90,7 @@ export function DutiesTab({ teachers }: { teachers: Teacher[] }) {
               </tr>
             </thead>
             <tbody>
-              {(duties.data ?? []).map((d) => (
+              {apply(duties.data ?? []).map((d) => (
                 <tr key={d.id} className="border-b border-line-soft last:border-b-0">
                   <td className="px-5 py-3 font-medium">{DAYS[d.weekday - 1]}</td>
                   <td className="px-5 py-3">

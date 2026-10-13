@@ -70,7 +70,7 @@ test('should sell a product to a student: product, purchase, order, payment and 
   // Pagado y entregado: deja de estar abierto.
   await expect(row).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Margen' }).click();
+  await page.getByRole('button', { name: 'Margen', exact: true }).click();
   await expect(
     page
       .getByRole('table', { name: 'Margen por producto' })

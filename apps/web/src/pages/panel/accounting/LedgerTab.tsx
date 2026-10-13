@@ -22,6 +22,7 @@ import { MonthNav } from '@/shared/ui/MonthNav';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
 import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import { EditMovementDialog } from './EditMovementDialog';
 import { EntryDialog } from './EntryDialog';
@@ -81,6 +82,21 @@ function OriginLink({ item }: { item: LedgerItem }) {
 function signed(item: LedgerItem): string {
   return `${item.kind === 'income' ? '+' : '−'}${formatCents(item.amountCents)}`;
 }
+
+type Column = 'date' | 'concept' | 'category' | 'method' | 'amount';
+
+const COLUMNS: Record<Column, SortColumn<LedgerItem>> = {
+  date: { label: 'Fecha', name: 'fecha', value: (item) => item.date },
+  concept: { label: 'Concepto', name: 'concepto', value: (item) => item.concept },
+  category: { label: 'Categoría', name: 'categoría', value: (item) => item.categoryLabel },
+  method: { label: 'Forma de pago', name: 'forma de pago', value: (item) => item.methodLabel },
+  // Con su signo, como se ve: los gastos quedan por debajo de los ingresos.
+  amount: {
+    label: 'Importe',
+    name: 'importe',
+    value: (item) => (item.kind === 'income' ? item.amountCents : -item.amountCents),
+  },
+};
 
 function LedgerFilters({
   filter,
@@ -151,6 +167,7 @@ function LedgerTable({
   onEdit: (item: LedgerItem) => void;
 }) {
   const spotlight = useSpotlight('movimiento');
+  const { header, apply } = useTableSort(COLUMNS, { key: 'date', descending: true });
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[640px] text-left text-sm">
@@ -160,13 +177,13 @@ function LedgerTable({
             <th scope="col" className="w-10">
               <span className="sr-only">Tipo</span>
             </th>
-            {['Fecha', 'Concepto', 'Categoría', 'Forma de pago'].map((h) => (
-              <th key={h} scope="col" className="px-3 py-3 font-semibold">
-                {h}
+            {(['date', 'concept', 'category', 'method'] as const).map((key) => (
+              <th key={key} scope="col" className="px-3 py-3 font-semibold">
+                {header(key)}
               </th>
             ))}
             <th scope="col" className="px-3 py-3 text-right font-semibold">
-              Importe
+              {header('amount')}
             </th>
             <th scope="col">
               <span className="sr-only">Acciones</span>
@@ -174,7 +191,7 @@ function LedgerTable({
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
+          {apply(items).map((item) => (
             <tr
               key={`${item.source}-${item.sourceId}`}
               ref={item.sourceId === spotlight.id ? spotlight.attach : undefined}

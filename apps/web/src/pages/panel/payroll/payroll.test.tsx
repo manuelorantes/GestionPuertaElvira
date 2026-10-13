@@ -139,6 +139,18 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
   });
 }
 
+/** Primera celda de cada fila de datos, para comprobar el orden. */
+const firstCells = (table: HTMLElement) =>
+  within(table)
+    .getAllByRole('row')
+    .slice(1)
+    .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+/** Nombres enlazados (profesores) de arriba abajo, para comprobar el orden. */
+const links = (table: HTMLElement) =>
+  within(table)
+    .getAllByRole('link')
+    .map((link) => link.textContent);
+
 describe('Profesorado', () => {
   it('shows the profitability of each teacher with the month totals', async () => {
     api();
@@ -283,11 +295,9 @@ describe('Profesorado', () => {
     renderApp('/panel/profesores?mes=2026-09&pestana=horas');
 
     const table = await screen.findByRole('table', { name: 'Sesiones de septiembre 2026' });
-    const paid = within(table).getAllByRole('row')[2];
+    const paid = within(table).getByRole('row', { name: /Carlos/ });
     expect(paid).toHaveTextContent('Pagada');
-    expect(
-      within(paid as HTMLElement).queryByRole('button', { name: /Quitar/ }),
-    ).not.toBeInTheDocument();
+    expect(within(paid).queryByRole('button', { name: /Quitar/ })).not.toBeInTheDocument();
 
     await userEvent.click(
       within(table).getByRole('button', { name: 'Quitar sesión del 07/09/2026' }),
@@ -700,5 +710,284 @@ describe('Profesorado', () => {
       '/api/admin/payroll/settlements/t1/2026-09/payment',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('sorts the sessions from the headers, most recent first unless another column is chosen', async () => {
+    api({
+      'GET /api/admin/payroll/sessions?month=2026-09': [
+        200,
+        {
+          month: '2026-09',
+          items: [
+            session({
+              id: 's2',
+              date: '2026-09-09',
+              teacherId: 't2',
+              teacherName: 'Carlos Ruiz Márquez',
+              label: 'Adultos I',
+              minutes: 90,
+              countedMinutes: 90,
+              costCents: 2700,
+            }),
+            session({}),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=horas');
+    const table = await screen.findByRole('table', { name: 'Sesiones de septiembre 2026' });
+    const sortBy = (name: string) =>
+      userEvent.click(within(table).getByRole('button', { name: `Ordenar por ${name}` }));
+
+    expect(firstCells(table)).toEqual(['09/09/2026', '07/09/2026']);
+    await sortBy('clase');
+    expect(firstCells(table)).toEqual(['09/09/2026', '07/09/2026']);
+    await sortBy('clase');
+    expect(firstCells(table)).toEqual(['07/09/2026', '09/09/2026']);
+    await sortBy('profesor');
+    expect(firstCells(table)).toEqual(['09/09/2026', '07/09/2026']);
+    await sortBy('horas');
+    expect(firstCells(table)).toEqual(['07/09/2026', '09/09/2026']);
+    await sortBy('coste');
+    await sortBy('coste');
+    expect(firstCells(table)).toEqual(['09/09/2026', '07/09/2026']);
+    await sortBy('fecha');
+    expect(firstCells(table)).toEqual(['07/09/2026', '09/09/2026']);
+  });
+
+  it('sorts the settlements from the headers, by teacher unless another column is chosen', async () => {
+    api();
+    renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
+    const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
+    const sortBy = (name: string) =>
+      userEvent.click(within(table).getByRole('button', { name: `Ordenar por ${name}` }));
+
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('horas');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('horas');
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+    await sortBy('tarifa');
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+    await sortBy('importe');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('estado');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('estado');
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+    await sortBy('profesor');
+    await sortBy('profesor');
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+  });
+
+  it('sorts the club activities from the headers, by day unless another column is chosen', async () => {
+    api({
+      'GET /api/admin/payroll/duties': [
+        200,
+        {
+          items: [
+            {
+              id: 'd2',
+              teacherId: 't1',
+              teacherName: 'Lucía Moreno Gil',
+              weekday: 2,
+              start: '18:00',
+              end: '19:00',
+              label: 'Encargado del club',
+              kind: 'shift',
+            },
+            {
+              id: 'd1',
+              teacherId: 't2',
+              teacherName: 'Carlos Ruiz Márquez',
+              weekday: 5,
+              start: '17:00',
+              end: '20:00',
+              label: 'Viernes',
+              kind: 'fridays',
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/profesores?pestana=encargado');
+    const table = await screen.findByRole('table', { name: 'Actividades del club' });
+    const sortBy = (name: string) =>
+      userEvent.click(within(table).getByRole('button', { name: `Ordenar por ${name}` }));
+
+    expect(firstCells(table)).toEqual(['Martes', 'Viernes']);
+    await sortBy('día');
+    expect(firstCells(table)).toEqual(['Viernes', 'Martes']);
+    await sortBy('franja');
+    expect(firstCells(table)).toEqual(['Viernes', 'Martes']);
+    await sortBy('actividad');
+    expect(firstCells(table)).toEqual(['Martes', 'Viernes']);
+    await sortBy('tipo');
+    expect(firstCells(table)).toEqual(['Martes', 'Viernes']);
+    await sortBy('encargado');
+    expect(firstCells(table)).toEqual(['Viernes', 'Martes']);
+    await sortBy('encargado');
+    expect(firstCells(table)).toEqual(['Martes', 'Viernes']);
+  });
+
+  it('sorts the profitability from the headers, by margin (highest first) unless another column is chosen', async () => {
+    api();
+    renderApp('/panel/profesores?mes=2026-09');
+    const table = await screen.findByRole('table', { name: 'Rentabilidad de septiembre 2026' });
+    const sortBy = (name: string) =>
+      userEvent.click(within(table).getByRole('button', { name: `Ordenar por ${name}` }));
+
+    // Ya no hay botones aparte: se ordena desde las cabeceras.
+    expect(screen.queryByRole('group', { name: 'Ordenar por' })).not.toBeInTheDocument();
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+    await sortBy('margen');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('profesor');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('profesor');
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+    await sortBy('horas');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('tarifa');
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+    await sortBy('€ por hora');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('ocupación');
+    expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
+    await sortBy('ocupación');
+    expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
+  });
+
+  it('sorts each table of the teacher page from its own headers', async () => {
+    api({
+      'GET /api/admin/payroll/teachers/t1/report': [
+        200,
+        {
+          teacher: { id: 't1', name: 'Lucía Moreno Gil', rateCents: 1600, active: true },
+          season: 2026,
+          months: [],
+          balanceCents: 0,
+          payments: [
+            {
+              id: 'a1',
+              date: '2026-10-05',
+              kind: 'advance',
+              month: '2026-10',
+              amountCents: 9000,
+              note: null,
+            },
+            {
+              id: null,
+              date: '2026-09-30',
+              kind: 'settlement',
+              month: '2026-09',
+              amountCents: 48000,
+              note: null,
+            },
+          ],
+          groups: [
+            {
+              id: 'g2',
+              name: 'Adultos I',
+              days: ['tue'],
+              start: '16:00',
+              end: '17:30',
+              classroom: 'caballo',
+              capacity: 12,
+              occupancyByDay: { tue: 3 },
+              students: 3,
+            },
+            {
+              id: 'g1',
+              name: 'Iniciación A',
+              days: ['mon', 'wed'],
+              start: '17:00',
+              end: '18:00',
+              classroom: 'alfil',
+              capacity: 10,
+              occupancyByDay: { mon: 6, wed: 4 },
+              students: 7,
+            },
+          ],
+          occupancy: { occupied: 13, capacity: 32 },
+          students: [
+            { id: 's1', name: 'Ana Pérez', groups: ['Iniciación A'], weeklyMinutes: 120 },
+            { id: 's2', name: 'Beatriz Soto', groups: ['Adultos I'], weeklyMinutes: 90 },
+          ],
+          substitutions: [],
+          duties: [],
+        },
+      ],
+      [`GET /api/admin/payroll/sessions?month=${currentMonth()}&teacherId=t1`]: [
+        200,
+        {
+          items: [
+            session({
+              id: 's2',
+              date: '2026-09-09',
+              label: 'Adultos I',
+              minutes: 90,
+              costCents: 2700,
+            }),
+            session({}),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/profesores/t1');
+    const sortBy = (table: HTMLElement, name: string) =>
+      userEvent.click(within(table).getByRole('button', { name: `Ordenar por ${name}` }));
+
+    const sessions = await screen.findByRole('table', { name: /^Clases dadas en / });
+    expect(firstCells(sessions)).toEqual(['09/09/2026', '07/09/2026']);
+    await sortBy(sessions, 'horas');
+    expect(firstCells(sessions)).toEqual(['07/09/2026', '09/09/2026']);
+    await sortBy(sessions, 'clase o actividad');
+    expect(firstCells(sessions)).toEqual(['09/09/2026', '07/09/2026']);
+    await sortBy(sessions, 'coste');
+    await sortBy(sessions, 'coste');
+    expect(firstCells(sessions)).toEqual(['09/09/2026', '07/09/2026']);
+    await sortBy(sessions, 'fecha');
+    expect(firstCells(sessions)).toEqual(['07/09/2026', '09/09/2026']);
+
+    const groups = screen.getByRole('table', { name: 'Clases asignadas' });
+    expect(firstCells(groups)).toEqual(['Adultos I', 'Iniciación A']);
+    await sortBy(groups, 'clase');
+    await sortBy(groups, 'clase');
+    expect(firstCells(groups)).toEqual(['Iniciación A', 'Adultos I']);
+    await sortBy(groups, 'días');
+    expect(firstCells(groups)).toEqual(['Iniciación A', 'Adultos I']);
+    await sortBy(groups, 'horario');
+    expect(firstCells(groups)).toEqual(['Adultos I', 'Iniciación A']);
+    await sortBy(groups, 'aula');
+    expect(firstCells(groups)).toEqual(['Iniciación A', 'Adultos I']);
+    await sortBy(groups, 'alumnos');
+    expect(firstCells(groups)).toEqual(['Adultos I', 'Iniciación A']);
+    await sortBy(groups, 'ocupación');
+    await sortBy(groups, 'ocupación');
+    expect(firstCells(groups)).toEqual(['Iniciación A', 'Adultos I']);
+
+    const students = screen.getByRole('table', { name: 'Alumnos' });
+    expect(firstCells(students)).toEqual(['Ana Pérez', 'Beatriz Soto']);
+    await sortBy(students, 'horas semanales con él o ella');
+    expect(firstCells(students)).toEqual(['Beatriz Soto', 'Ana Pérez']);
+    await sortBy(students, 'clases');
+    expect(firstCells(students)).toEqual(['Beatriz Soto', 'Ana Pérez']);
+    await sortBy(students, 'clases');
+    expect(firstCells(students)).toEqual(['Ana Pérez', 'Beatriz Soto']);
+    await sortBy(students, 'alumno');
+    await sortBy(students, 'alumno');
+    expect(firstCells(students)).toEqual(['Beatriz Soto', 'Ana Pérez']);
+
+    const payments = screen.getByRole('table', { name: 'Pagos recibidos' });
+    expect(firstCells(payments)).toEqual(['05/10/2026', '30/09/2026']);
+    await sortBy(payments, 'importe');
+    expect(firstCells(payments)).toEqual(['05/10/2026', '30/09/2026']);
+    await sortBy(payments, 'importe');
+    expect(firstCells(payments)).toEqual(['30/09/2026', '05/10/2026']);
+    await sortBy(payments, 'concepto');
+    expect(firstCells(payments)).toEqual(['05/10/2026', '30/09/2026']);
+    await sortBy(payments, 'fecha');
+    expect(firstCells(payments)).toEqual(['30/09/2026', '05/10/2026']);
   });
 });

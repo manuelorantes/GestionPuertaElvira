@@ -13,9 +13,24 @@ import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { useToast } from '@/shared/ui/Toast';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import { SettlementSheetDialog } from './SettlementSheetDialog';
 import { TeacherLink } from './TeacherLink';
+
+type Column = 'teacher' | 'hours' | 'rate' | 'amount' | 'status';
+
+function statusLabel(s: Settlement): string {
+  return s.status === 'paid' ? `Pagada el ${formatDate(s.paidOn)}` : 'Pendiente';
+}
+
+const COLUMNS: Record<Column, SortColumn<Settlement>> = {
+  teacher: { label: 'Profesor', name: 'profesor', value: (s) => s.teacherName },
+  hours: { label: 'Horas', name: 'horas', value: (s) => s.minutes },
+  rate: { label: 'Tarifa', name: 'tarifa', value: (s) => s.rateCents },
+  amount: { label: 'Importe', name: 'importe', value: (s) => s.amountCents },
+  status: { label: 'Estado', name: 'estado', value: statusLabel },
+};
 
 export function SettlementsTab({ month }: { month: string }) {
   const settlements = useSettlements(month);
@@ -25,6 +40,7 @@ export function SettlementsTab({ month }: { month: string }) {
   const pay = usePayrollMutation((s: Settlement) => paySettlement(s.teacherId, month));
   const payAll = usePayrollMutation(() => payAllSettlements(month));
   const toast = useToast();
+  const { header, apply } = useTableSort(COLUMNS, { key: 'teacher' });
   const items = settlements.data ?? [];
   const pending = items.filter((s) => s.status === 'pending');
 
@@ -68,9 +84,9 @@ export function SettlementsTab({ month }: { month: string }) {
               <th scope="col" className="w-12">
                 <span className="sr-only">Detalle</span>
               </th>
-              {['Profesor', 'Horas', 'Tarifa', 'Importe', 'Estado'].map((h) => (
-                <th key={h} scope="col" className="px-4 py-3 font-semibold">
-                  {h}
+              {(Object.keys(COLUMNS) as Column[]).map((key) => (
+                <th key={key} scope="col" className="px-4 py-3 font-semibold">
+                  {header(key)}
                 </th>
               ))}
               <th scope="col">
@@ -79,7 +95,7 @@ export function SettlementsTab({ month }: { month: string }) {
             </tr>
           </thead>
           <tbody>
-            {items.map((s) => (
+            {apply(items).map((s) => (
               <Fragment key={s.teacherId}>
                 <tr className="border-b border-line-soft">
                   <td className="px-2 py-3">
@@ -112,11 +128,9 @@ export function SettlementsTab({ month }: { month: string }) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    {s.status === 'paid' ? (
-                      <Badge tone="success">Pagada el {formatDate(s.paidOn)}</Badge>
-                    ) : (
-                      <Badge tone="warning">Pendiente</Badge>
-                    )}
+                    <Badge tone={s.status === 'paid' ? 'success' : 'warning'}>
+                      {statusLabel(s)}
+                    </Badge>
                   </td>
                   <td className="px-4 py-3">
                     <span className="flex justify-end gap-2">

@@ -11,6 +11,7 @@ import {
   changeSettlementPaymentDate,
   deleteAdvance,
   recordAdvance,
+  type Session,
   type TeacherGroup,
   type TeacherPayment,
   type TeacherReport,
@@ -30,6 +31,7 @@ import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const DUTY_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -38,17 +40,86 @@ const TD = 'px-4 py-2.5';
 const ROW_ACTION =
   'flex size-8 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted';
 
+type TeacherStudent = TeacherReport['students'][number];
+
 function percent(occupied: number, capacity: number): string {
   return capacity > 0 ? `${Math.round((occupied / capacity) * 100)} %` : '—';
 }
 
-function groupOccupancy(group: TeacherGroup): string {
+/** Plazas ocupadas entre las totales contando cada día (null sin plazas). */
+function groupOccupancyRatio(group: TeacherGroup): number | null {
   const occupied = Object.values(group.occupancyByDay).reduce((sum, n) => sum + n, 0);
-  return percent(occupied, group.capacity * group.days.length);
+  const capacity = group.capacity * group.days.length;
+  return capacity > 0 ? occupied / capacity : null;
+}
+
+function groupOccupancy(group: TeacherGroup): string {
+  const ratio = groupOccupancyRatio(group);
+  return ratio === null ? '—' : `${Math.round(ratio * 100)} %`;
 }
 
 function daysLabel(days: string[]): string {
   return days.map((d) => WEEKDAYS.find((w) => w.id === d)?.short ?? d).join(', ');
+}
+
+function sessionLabel(s: Session): string {
+  return s.substitution ? `(Sustitución) ${s.label}` : s.label;
+}
+
+function paymentLabel(p: TeacherPayment): string {
+  return p.kind === 'settlement'
+    ? `Liquidación de ${monthLabel(p.month).toLowerCase()}`
+    : `Anticipo a cuenta de ${monthLabel(p.month).toLowerCase()}`;
+}
+
+type SessionColumn = 'date' | 'label' | 'hours' | 'cost';
+const SESSION_COLUMNS: Record<SessionColumn, SortColumn<Session>> = {
+  date: { label: 'Fecha', name: 'fecha', value: (s) => s.date },
+  label: { label: 'Clase o actividad', name: 'clase o actividad', value: sessionLabel },
+  hours: { label: 'Horas', name: 'horas', value: (s) => s.minutes },
+  cost: { label: 'Coste', name: 'coste', value: (s) => s.costCents },
+};
+
+type GroupColumn = 'name' | 'days' | 'slot' | 'classroom' | 'students' | 'occupancy';
+const GROUP_COLUMNS: Record<GroupColumn, SortColumn<TeacherGroup>> = {
+  name: { label: 'Clase', name: 'clase', value: (g) => g.name },
+  // Por su primer día de la semana.
+  days: {
+    label: 'Días',
+    name: 'días',
+    value: (g) => WEEKDAYS.findIndex((d) => d.id === g.days[0]),
+  },
+  slot: { label: 'Horario', name: 'horario', value: (g) => g.start },
+  classroom: { label: 'Aula', name: 'aula', value: (g) => classroomLabel(g.classroom) },
+  students: { label: 'Alumnos', name: 'alumnos', value: (g) => g.students },
+  occupancy: { label: 'Ocupación', name: 'ocupación', value: groupOccupancyRatio },
+};
+
+type StudentColumn = 'name' | 'groups' | 'hours';
+const STUDENT_COLUMNS: Record<StudentColumn, SortColumn<TeacherStudent>> = {
+  name: { label: 'Alumno', name: 'alumno', value: (s) => s.name },
+  groups: { label: 'Clases', name: 'clases', value: (s) => s.groups.join(' · ') },
+  hours: {
+    label: 'Horas semanales con él o ella',
+    name: 'horas semanales con él o ella',
+    value: (s) => s.weeklyMinutes,
+  },
+};
+
+type PaymentColumn = 'date' | 'concept' | 'amount';
+const PAYMENT_COLUMNS: Record<PaymentColumn, SortColumn<TeacherPayment>> = {
+  date: { label: 'Fecha', name: 'fecha', value: (p) => p.date },
+  concept: { label: 'Concepto', name: 'concepto', value: paymentLabel },
+  amount: { label: 'Importe', name: 'importe', value: (p) => p.amountCents },
+};
+
+/** Cabeceras de una tabla, cada una ordenando por su columna. */
+function sortHeaders<K extends string>(keys: K[], header: (key: K) => ReactNode) {
+  return keys.map((key) => (
+    <th key={key} scope="col" className={TH}>
+      {header(key)}
+    </th>
+  ));
 }
 
 /**
@@ -238,6 +309,8 @@ function MonthsTable({ data }: { data: TeacherReport }) {
 function SessionsSection({ teacherId }: { teacherId: string }) {
   const [month, setMonth] = useState(currentMonth());
   const sessions = useSessions(month, teacherId);
+  // De lo más reciente a lo más antiguo, salvo que se elija otra columna.
+  const { header, apply } = useTableSort(SESSION_COLUMNS, { key: 'date', descending: true });
   const items = sessions.data ?? [];
   const total = items.reduce((sum, s) => sum + s.minutes, 0);
   return (
@@ -259,19 +332,13 @@ function SessionsSection({ teacherId }: { teacherId: string }) {
         <table className="mt-2 w-full min-w-[560px] text-left text-sm">
           <caption className="sr-only">Clases dadas en {monthLabel(month).toLowerCase()}</caption>
           <thead className="border-b border-line text-xs tracking-[0.06em] text-ink-muted uppercase">
-            <tr>
-              {['Fecha', 'Clase o actividad', 'Horas', 'Coste'].map((h) => (
-                <th key={h} scope="col" className={TH}>
-                  {h}
-                </th>
-              ))}
-            </tr>
+            <tr>{sortHeaders(Object.keys(SESSION_COLUMNS) as SessionColumn[], header)}</tr>
           </thead>
           <tbody>
-            {items.map((s) => (
+            {apply(items).map((s) => (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <td className={TD}>{formatDate(s.date)}</td>
-                <td className={TD}>{s.substitution ? `(Sustitución) ${s.label}` : s.label}</td>
+                <td className={TD}>{sessionLabel(s)}</td>
                 <td className={TD}>{hoursLabel(s.minutes)}</td>
                 <td className={TD}>{formatCents(s.costCents)}</td>
               </tr>
@@ -284,6 +351,8 @@ function SessionsSection({ teacherId }: { teacherId: string }) {
 }
 
 function GroupsSection({ groups }: { groups: TeacherGroup[] }) {
+  // Por su hora, como salen en el horario, salvo que se elija otra columna.
+  const { header, apply } = useTableSort(GROUP_COLUMNS, { key: 'slot' });
   return (
     <Section title="Sus clases">
       {groups.length === 0 ? (
@@ -292,16 +361,10 @@ function GroupsSection({ groups }: { groups: TeacherGroup[] }) {
         <table className="w-full min-w-[640px] text-left text-sm">
           <caption className="sr-only">Clases asignadas</caption>
           <thead className="border-b border-line text-xs tracking-[0.06em] text-ink-muted uppercase">
-            <tr>
-              {['Clase', 'Días', 'Horario', 'Aula', 'Alumnos', 'Ocupación'].map((h) => (
-                <th key={h} scope="col" className={TH}>
-                  {h}
-                </th>
-              ))}
-            </tr>
+            <tr>{sortHeaders(Object.keys(GROUP_COLUMNS) as GroupColumn[], header)}</tr>
           </thead>
           <tbody>
-            {groups.map((g) => (
+            {apply(groups).map((g) => (
               <tr key={g.id} className="border-b border-line-soft last:border-b-0">
                 <td className={`${TD} font-medium`}>{g.name}</td>
                 <td className={TD}>{daysLabel(g.days)}</td>
@@ -347,7 +410,8 @@ function StudentsByDay({ group }: { group: TeacherGroup }) {
   );
 }
 
-function StudentsSection({ students }: { students: TeacherReport['students'] }) {
+function StudentsSection({ students }: { students: TeacherStudent[] }) {
+  const { header, apply } = useTableSort(STUDENT_COLUMNS, { key: 'name' });
   return (
     <Section title={`Alumnos (${students.length})`}>
       {students.length === 0 ? (
@@ -356,16 +420,10 @@ function StudentsSection({ students }: { students: TeacherReport['students'] }) 
         <table className="w-full min-w-[560px] text-left text-sm">
           <caption className="sr-only">Alumnos</caption>
           <thead className="border-b border-line text-xs tracking-[0.06em] text-ink-muted uppercase">
-            <tr>
-              {['Alumno', 'Clases', 'Horas semanales con él o ella'].map((h) => (
-                <th key={h} scope="col" className={TH}>
-                  {h}
-                </th>
-              ))}
-            </tr>
+            <tr>{sortHeaders(Object.keys(STUDENT_COLUMNS) as StudentColumn[], header)}</tr>
           </thead>
           <tbody>
-            {students.map((s) => (
+            {apply(students).map((s) => (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <td className={TD}>
                   <StudentLink id={s.id} className="font-medium hover:text-brand">
@@ -394,6 +452,8 @@ function PaymentsSection({
   const [removing, setRemoving] = useState<TeacherPayment | null>(null);
   const remove = usePayrollMutation(deleteAdvance);
   const toast = useToast();
+  // Del más reciente al más antiguo, salvo que se elija otra columna.
+  const { header, apply } = useTableSort(PAYMENT_COLUMNS, { key: 'date', descending: true });
   return (
     <Section title="Pagos recibidos">
       {payments.length === 0 ? (
@@ -403,27 +463,21 @@ function PaymentsSection({
           <caption className="sr-only">Pagos recibidos</caption>
           <thead className="border-b border-line text-xs tracking-[0.06em] text-ink-muted uppercase">
             <tr>
-              {['Fecha', 'Concepto', 'Importe'].map((h) => (
-                <th key={h} scope="col" className={TH}>
-                  {h}
-                </th>
-              ))}
+              {sortHeaders(Object.keys(PAYMENT_COLUMNS) as PaymentColumn[], header)}
               <th scope="col">
                 <span className="sr-only">Acciones</span>
               </th>
             </tr>
           </thead>
           <tbody>
-            {payments.map((p) => (
+            {apply(payments).map((p) => (
               <tr
                 key={`${p.kind}-${p.id ?? p.month}`}
                 className="border-b border-line-soft last:border-b-0"
               >
                 <td className={TD}>{formatDate(p.date)}</td>
                 <td className={TD}>
-                  {p.kind === 'settlement'
-                    ? `Liquidación de ${monthLabel(p.month).toLowerCase()}`
-                    : `Anticipo a cuenta de ${monthLabel(p.month).toLowerCase()}`}
+                  {paymentLabel(p)}
                   {p.note && <span className="block text-[12px] text-ink-muted">{p.note}</span>}
                 </td>
                 <td className={`${TD} font-medium`}>{formatCents(p.amountCents)}</td>

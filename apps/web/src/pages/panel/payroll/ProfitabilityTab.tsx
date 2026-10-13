@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { currentMonth, formatCents, monthLabel } from '@/features/billing/money';
 import type { ProfitabilityReport, ProfitabilityRow } from '@/features/payroll/api';
@@ -6,20 +6,37 @@ import { useProfitability } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
 import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Card } from '@/shared/ui/Card';
-import { ToggleButton } from '@/shared/ui/ToggleButton';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import { TeacherLink } from './TeacherLink';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 
-const ORDERS: { id: string; label: string; value: (r: ProfitabilityRow) => number }[] = [
-  { id: 'margin', label: 'Margen', value: (r) => r.marginCents },
-  { id: 'perHour', label: '€ por hora', value: (r) => r.incomePerHourCents ?? -Infinity },
-  { id: 'occupancy', label: 'Ocupación', value: (r) => occupancy(r) },
-];
-
 function occupancy(row: ProfitabilityRow): number {
   return row.capacity > 0 ? Math.round((row.occupied / row.capacity) * 100) : 0;
 }
+
+type Column =
+  | 'teacher'
+  | 'hours'
+  | 'rate'
+  | 'cost'
+  | 'students'
+  | 'income'
+  | 'margin'
+  | 'perHour'
+  | 'occupancy';
+
+const COLUMNS: Record<Column, SortColumn<ProfitabilityRow>> = {
+  teacher: { label: 'Profesor', name: 'profesor', value: (r) => r.teacherName },
+  hours: { label: 'Horas', name: 'horas', value: (r) => r.minutes },
+  rate: { label: 'Tarifa', name: 'tarifa', value: (r) => r.rateCents },
+  cost: { label: 'Coste', name: 'coste', value: (r) => r.costCents },
+  students: { label: 'Alumnos', name: 'alumnos', value: (r) => r.students },
+  income: { label: 'Ingresos', name: 'ingresos', value: (r) => r.incomeCents },
+  margin: { label: 'Margen', name: 'margen', value: (r) => r.marginCents },
+  perHour: { label: '€ por hora', name: '€ por hora', value: (r) => r.incomePerHourCents },
+  occupancy: { label: 'Ocupación', name: 'ocupación', value: occupancy },
+};
 
 function initials(name: string): string {
   return name
@@ -31,7 +48,8 @@ function initials(name: string): string {
 
 export function ProfitabilityTab({ month }: { month: string }) {
   const profitability = useProfitability(month);
-  const [order, setOrder] = useState('margin');
+  // De mayor a menor margen, salvo que se elija otra columna.
+  const { header, apply } = useTableSort(COLUMNS, { key: 'margin', descending: true });
   const rows = profitability.data?.items ?? [];
   // En un mes ya pasado cuentan las horas realmente imputadas; en el actual y los futuros, las esperadas.
   const past = month < currentMonth();
@@ -40,8 +58,6 @@ export function ProfitabilityTab({ month }: { month: string }) {
   if (rows.length === 0)
     return <p className="text-ink-muted">No hay datos de rentabilidad este mes.</p>;
 
-  const sort = ORDERS.find((o) => o.id === order) ?? ORDERS[0];
-  const sorted = [...rows].sort((a, b) => (sort ? sort.value(b) - sort.value(a) : 0));
   const top = [...rows]
     .filter((r) => r.minutes > 0 && r.marginCents > 0)
     .sort((a, b) => b.marginCents - a.marginCents)[0];
@@ -72,51 +88,22 @@ export function ProfitabilityTab({ month }: { month: string }) {
         ))}
       </div>
       <Card className="overflow-x-auto">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-5 py-4">
-          <h2 className="font-display text-xl font-semibold tracking-[0.04em] uppercase">
-            Rentabilidad · {monthLabel(month).toLowerCase()}
-          </h2>
-          <div
-            role="group"
-            aria-label="Ordenar por"
-            className="flex items-center gap-2 text-[13px] text-ink-muted"
-          >
-            Ordenar por
-            {ORDERS.map((o) => (
-              <ToggleButton
-                key={o.id}
-                pressed={order === o.id}
-                onClick={() => setOrder(o.id)}
-                className="h-9 font-medium"
-              >
-                {o.label}
-              </ToggleButton>
-            ))}
-          </div>
-        </div>
+        <h2 className="border-b border-line px-5 py-4 font-display text-xl font-semibold tracking-[0.04em] uppercase">
+          Rentabilidad · {monthLabel(month).toLowerCase()}
+        </h2>
         <table className="w-full min-w-[980px] text-left text-sm">
           <caption className="sr-only">Rentabilidad de {monthLabel(month).toLowerCase()}</caption>
           <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
             <tr>
-              {[
-                'Profesor',
-                'Horas',
-                'Tarifa',
-                'Coste',
-                'Alumnos',
-                'Ingresos',
-                'Margen',
-                '€ por hora',
-                'Ocupación',
-              ].map((h) => (
-                <th key={h} scope="col" className="px-5 py-3 font-semibold">
-                  {h}
+              {(Object.keys(COLUMNS) as Column[]).map((key) => (
+                <th key={key} scope="col" className="px-5 py-3 font-semibold">
+                  {header(key)}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row) => (
+            {apply(rows).map((row) => (
               <tr
                 key={row.teacherId}
                 className={`border-b border-line-soft last:border-b-0 ${row === top ? 'bg-brand-soft/40' : ''}`}

@@ -29,6 +29,9 @@ temporada para elegir y estas pestañas:
   hasta 5 MB; el navegador la reduce antes de subirla); cada foto es 1 punto en el mes de la foto, que no puede ser
   de un día que aún no ha llegado. Una foto se puede quitar, y con ella su punto si no se ha gastado.
 - **Movimientos**: todo lo del mes, filtrable por tipo (viernes, torneo, ajuste o canje).
+  La lista MUST poder ordenarse desde las cabeceras por fecha
+  (por defecto, del más reciente al más antiguo), alumno, tipo, concepto,
+  puntos o quién lo hizo, en ambos sentidos.
 - **Canjes**: lo que se puede conseguir con puntos (por ahora, 5 puntos = 5 % de una cuota mensual al cobrar) y los
   canjes del mes.
 

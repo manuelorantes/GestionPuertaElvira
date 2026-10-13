@@ -87,6 +87,8 @@ horas que se solapan el mismo día (una clase durante la actividad) MUST contar 
   marca es la misma que la de la pestaña Viernes de Puntos.
 Una actividad que su encargado no confirma en el plazo de las listas sale en «Listas sin pasar» (ver la spec de
 asistencia).
+La lista MUST poder ordenarse desde las cabeceras por día (por defecto), franja, actividad, tipo o encargado, en ambos
+sentidos.
 
 #### Scenario: Encargado con clase
 - **WHEN** un profesor es encargado de 17:00 a 20:00 y tiene clase de 18:00 a 19:30
@@ -98,6 +100,8 @@ descripción), cambiar su profesor y sus horas (de 0,5 a 12, en medias horas) y 
 El registro MUST ir de lo más reciente a lo más antiguo y mostrar en cada sesión las horas que cuentan de verdad y su
 coste (ver los solapes en la liquidación): si otra sesión del mismo día se queda con parte de sus horas, un asterisco
 explica cuántas eran y con qué se pisa. El total de arriba suma lo que cuenta.
+El registro MUST poder ordenarse desde las cabeceras por fecha (por defecto, de lo más reciente a lo más antiguo),
+profesor, clase, horas o coste, en ambos sentidos.
 Al elegir una actividad del club se proponen su encargado y sus horas, y la sesión queda ligada a la actividad como si la
 hubiera apuntado la tarea de cada noche (cuenta los solapes con su hora de inicio y no se duplica): cada actividad se
 apunta como mucho una vez por día.
@@ -126,6 +130,8 @@ son iguales en eso, a la que va antes).
 - **WHEN** Ángel tiene clase de 16:30 a 18:00 y la actividad «Viernes» de 17:00 a 20:00
 - **THEN** se le pagan 3,5 horas: 1,5 de la clase y 2 de la actividad
 Se paga a mes vencido: por defecto se muestra el mes anterior. Se puede imprimir y marcar como pagada, una a una o todas.
+La lista MUST poder ordenarse desde las cabeceras por profesor (por defecto), horas, tarifa, importe o estado, en ambos
+sentidos.
 
 #### Scenario: Pagar una liquidación
 - **WHEN** administración marca como pagada una liquidación
@@ -133,7 +139,8 @@ Se paga a mes vencido: por defecto se muestra el mes anterior. Se puede imprimir
 
 ### Requirement: Rentabilidad
 Para cada mes, el sistema MUST mostrar por profesor: alumnos, horas, tarifa, coste, ingresos atribuidos, margen, € por hora y ocupación de sus grupos,
-con los totales del mes y ordenable por margen, € por hora u ocupación.
+con los totales del mes. La tabla MUST poder ordenarse desde las cabeceras por cualquiera de esas columnas, en ambos
+sentidos; por defecto, de mayor a menor margen.
 - Horas y coste: en el mes en curso y los futuros, las horas esperadas según el horario (todas sus clases y turnos salvo
   festivos, aunque aún no se hayan dado; sin tener en cuenta sustituciones ni contar dos veces lo que se solapa) por su
   tarifa. En un mes ya pasado, las horas realmente imputadas y el coste de su liquidación.
@@ -172,6 +179,9 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
   frente a las plazas;
 - sus alumnos, con sus clases y las horas semanales con él o ella;
 - pagos recibidos (liquidaciones y anticipos), sustituciones (dadas y recibidas) y turnos fijos.
+Las clases dadas, las clases asignadas, los alumnos y los pagos recibidos MUST poder ordenarse desde las cabeceras por
+cualquiera de sus columnas, en ambos sentidos; por defecto, las clases dadas y los pagos de lo más reciente a lo más
+antiguo, las clases asignadas por horario y los alumnos por nombre.
 
 ### Requirement: Anticipos y fecha de pago
 Administración MUST poder apuntar un anticipo a un profesor (importe, mes del que se descuenta, día en que se pagó y

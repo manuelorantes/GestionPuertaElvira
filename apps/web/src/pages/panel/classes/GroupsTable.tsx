@@ -3,10 +3,28 @@ import { Pencil } from 'lucide-react';
 import type { ClassGroup } from '@/features/classes/api';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { LEVELS, WEEKLY_PLAN_LABEL } from '@/features/classes/levels';
+import { WEEKDAYS } from '@/features/classes/schedule';
 import { Card } from '@/shared/ui/Card';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import { OccupancyByDay } from './OccupancyByDay';
+
+type Column = 'name' | 'level' | 'teacher' | 'slot' | 'classroom' | 'occupancy';
+
+const COLUMNS: Record<Column, SortColumn<ClassGroup>> = {
+  name: { label: 'Grupo', name: 'grupo', value: (g) => g.name },
+  level: { label: 'Nivel', name: 'nivel', value: (g) => LEVELS[g.level].label },
+  teacher: { label: 'Profesor', name: 'profesor', value: (g) => g.teacher.fullName },
+  // Por su primer día de la semana y su hora, como salen en el horario.
+  slot: {
+    label: 'Horario',
+    name: 'horario',
+    value: (g) => `${WEEKDAYS.findIndex((d) => d.id === g.days[0])} ${g.start}`,
+  },
+  classroom: { label: 'Aula', name: 'aula', value: (g) => classroomLabel(g.classroom) },
+  occupancy: { label: 'Ocupación', name: 'ocupación', value: (g) => g.occupied / g.capacity },
+};
 
 export function GroupsTable({
   groups,
@@ -18,15 +36,16 @@ export function GroupsTable({
   onEdit?: ((group: ClassGroup) => void) | undefined;
   onOpen: (group: ClassGroup) => void;
 }) {
+  const { header, apply } = useTableSort(COLUMNS, { key: 'name' });
   return (
     <Card className="overflow-x-auto">
       <table className="w-full min-w-[900px] text-left text-sm">
         <caption className="sr-only">Grupos</caption>
         <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
           <tr>
-            {['Grupo', 'Nivel', 'Profesor', 'Horario', 'Aula', 'Ocupación'].map((heading) => (
-              <th key={heading} scope="col" className="px-4 py-3 font-semibold">
-                {heading}
+            {(Object.keys(COLUMNS) as Column[]).map((key) => (
+              <th key={key} scope="col" className="px-4 py-3 font-semibold">
+                {header(key)}
               </th>
             ))}
             <th scope="col">
@@ -35,7 +54,7 @@ export function GroupsTable({
           </tr>
         </thead>
         <tbody>
-          {groups.map((group) => (
+          {apply(groups).map((group) => (
             <tr key={group.id} className="border-b border-line last:border-b-0">
               <td className="px-4 py-3 font-medium">
                 <span className="flex items-center gap-2.5">

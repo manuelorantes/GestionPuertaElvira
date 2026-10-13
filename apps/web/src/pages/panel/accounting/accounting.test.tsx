@@ -186,6 +186,44 @@ describe('Contabilidad', () => {
     expect(await screen.findByText('No hay ingresos con tarjeta este mes.')).toBeInTheDocument();
   });
 
+  it('sorts the movements from the headers, most recent first unless another column is chosen', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
+    const dates = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[1]?.textContent);
+
+    expect(dates()).toEqual(['10/10/2026', '02/10/2026', '01/10/2026']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por fecha' }));
+    expect(dates()).toEqual(['01/10/2026', '02/10/2026', '10/10/2026']);
+    // Con su signo: el gasto queda por debajo de los ingresos.
+    await user.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    expect(dates()).toEqual(['01/10/2026', '02/10/2026', '10/10/2026']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    expect(dates()).toEqual(['10/10/2026', '02/10/2026', '01/10/2026']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por categoría' }));
+    expect(dates()).toEqual(['01/10/2026', '02/10/2026', '10/10/2026']);
+    // Efectivo antes que las dos transferencias, que desempatan por fecha.
+    await user.click(screen.getByRole('button', { name: 'Ordenar por forma de pago' }));
+    expect(dates()).toEqual(['02/10/2026', '01/10/2026', '10/10/2026']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por concepto' }));
+    expect(dates()).toEqual(['02/10/2026', '01/10/2026', '10/10/2026']);
+
+    // El orden elegido se mantiene al filtrar.
+    await user.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    await user.click(
+      within(screen.getByRole('group', { name: 'Tipo de movimiento' })).getByRole('button', {
+        name: 'Ingresos',
+      }),
+    );
+    expect(dates()).toEqual(['02/10/2026', '10/10/2026']);
+  });
+
   it('sends automatic movements to the section where they are managed', async () => {
     api();
     renderApp('/panel/contabilidad?mes=2026-10');
@@ -567,6 +605,35 @@ describe('Contabilidad', () => {
       '/api/admin/accounting/invoices/i2/payment',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('sorts the invoices from the headers, most recent first unless another column is chosen', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/contabilidad?pestana=facturas');
+
+    const table = await screen.findByRole('table', { name: 'Facturas de proveedores' });
+    const numbers = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[1]?.textContent);
+
+    expect(numbers()).toEqual(['R-2026-10', 'TP-044']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por fecha' }));
+    expect(numbers()).toEqual(['TP-044', 'R-2026-10']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por proveedor' }));
+    expect(numbers()).toEqual(['TP-044', 'R-2026-10']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por proveedor' }));
+    expect(numbers()).toEqual(['R-2026-10', 'TP-044']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    expect(numbers()).toEqual(['TP-044', 'R-2026-10']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por estado' }));
+    expect(numbers()).toEqual(['R-2026-10', 'TP-044']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por número' }));
+    expect(numbers()).toEqual(['R-2026-10', 'TP-044']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por número' }));
+    expect(numbers()).toEqual(['TP-044', 'R-2026-10']);
   });
 
   it('shows the season month by month and closes it after confirming', async () => {

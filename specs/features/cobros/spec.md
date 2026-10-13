@@ -85,8 +85,12 @@ antigua a la más reciente. Lo que cubre un cobro es su importe en cuotas antes 
 favor y cubre las cuotas siguientes.
 
 La pestaña «Cuotas» MUST ofrecer un botón por cada mes de la temporada (septiembre a junio) y, antes, «Cuotas de socio»,
-que reúne las cuotas de socio de la temporada (las de los meses solo muestran cuotas mensuales). La cabecera «Estado» MUST
-permitir ordenar (por alumno, lo pendiente primero o lo cobrado primero) y filtrar por los estados presentes.
+que reúne las cuotas de socio de la temporada (las de los meses solo muestran cuotas mensuales).
+La tabla MUST poder ordenarse desde las cabeceras por alumno (por defecto), concepto o importe, en ambos sentidos.
+La cabecera «Estado» MUST permitir ordenar (por alumno, lo pendiente primero o lo cobrado primero)
+y filtrar por los estados presentes.
+Solo hay un orden a la vez: manda la última elección, sea en una cabecera o en el menú «Estado»,
+y el menú refleja el orden vigente (sin opción marcada cuando se ordena por concepto o importe).
 
 En los meses futuros, además de las cuotas ya cobradas por adelantado, MUST mostrarse como «Prevista» la cuota
 esperada de cada alumno activo ese mes que aún no la tenga (con la tarifa de hoy). Las previstas no se guardan: pasan a
@@ -158,7 +162,9 @@ motivo, lo cubierto y lo pendiente) y su saldo a favor, con la acción de editar
 ### Requirement: Registrar un cobro
 Un cobro MUST indicar el alumno, el concepto (1 mes, 3 meses, 6 meses, todo el año o cuota de socio),
 la forma de pago (efectivo, datáfono o transferencia) y la fecha, y MUST mostrar el desglose antes de guardarlo.
-La lista de cobros MUST mostrar los totales por forma de pago.
+La lista de cobros MUST mostrar los totales por forma de pago
+y MUST poder ordenarse desde las cabeceras por fecha (por defecto, los más recientes primero), recibo, alumno,
+concepto, forma de pago o importe, en ambos sentidos.
 Un cobro de N meses MUST pagar primero las cuotas pendientes más antiguas y después los meses siguientes, sin pasar de junio.
 De una cuota pagada en parte se cobra solo lo que falta.
 

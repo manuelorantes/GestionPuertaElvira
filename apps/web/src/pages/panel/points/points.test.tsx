@@ -185,6 +185,102 @@ describe('Puntos', () => {
     });
   });
 
+  it('sorts the movements from the headers, most recent first unless another column is chosen', async () => {
+    const user = userEvent.setup();
+    const movement = (overrides: Record<string, unknown>) => ({
+      id: 'm1',
+      studentId: 's1',
+      studentName: 'Natan Rodriguez Raposo',
+      date: `${month}-10`,
+      delta: 1,
+      kind: 'friday',
+      concept: 'Viernes 10/10',
+      by: 'Lucía Moreno Gil',
+      ...overrides,
+    });
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      [`GET /api/admin/points/movements?month=${month}`]: [
+        200,
+        {
+          items: [
+            movement({}),
+            movement({
+              id: 'm2',
+              studentId: 's3',
+              studentName: 'Pablo Gil Ruiz',
+              date: `${month}-05`,
+              delta: 2,
+              kind: 'manual',
+              concept: 'Premio del torneo interno',
+            }),
+            movement({
+              id: 'm3',
+              studentId: 's2',
+              studentName: 'Alberto Rodriguez Garcia',
+              date: `${month}-03`,
+              delta: -5,
+              kind: 'redemption',
+              concept: 'Canje en el recibo R-2026-0027',
+              by: null,
+            }),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/puntos?pestana=movimientos');
+
+    const table = await screen.findByRole('table', { name: /^Movimientos de/ });
+    const names = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => (r as HTMLTableRowElement).cells[1]?.textContent);
+
+    expect(names()).toEqual([
+      'Natan Rodriguez Raposo',
+      'Pablo Gil Ruiz',
+      'Alberto Rodriguez Garcia',
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por fecha' }));
+    expect(names()).toEqual([
+      'Alberto Rodriguez Garcia',
+      'Pablo Gil Ruiz',
+      'Natan Rodriguez Raposo',
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por alumno' }));
+    expect(names()).toEqual([
+      'Alberto Rodriguez Garcia',
+      'Natan Rodriguez Raposo',
+      'Pablo Gil Ruiz',
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por alumno' }));
+    expect(names()).toEqual([
+      'Pablo Gil Ruiz',
+      'Natan Rodriguez Raposo',
+      'Alberto Rodriguez Garcia',
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por tipo' }));
+    expect(names()).toEqual([
+      'Pablo Gil Ruiz',
+      'Alberto Rodriguez Garcia',
+      'Natan Rodriguez Raposo',
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por puntos' }));
+    expect(names()).toEqual([
+      'Alberto Rodriguez Garcia',
+      'Natan Rodriguez Raposo',
+      'Pablo Gil Ruiz',
+    ]);
+    // Sin nadie detrás (un canje) va primero; a igualdad, por fecha.
+    await user.click(screen.getByRole('button', { name: 'Ordenar por quién' }));
+    expect(names()).toEqual([
+      'Alberto Rodriguez Garcia',
+      'Pablo Gil Ruiz',
+      'Natan Rodriguez Raposo',
+    ]);
+  });
+
   it('is not for teachers', async () => {
     mockApi({ 'GET /api/auth/me': [200, { user: TEACHER }] });
     renderApp('/panel/puntos');
