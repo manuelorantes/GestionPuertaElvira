@@ -128,13 +128,14 @@ function TeacherSubstitutionForm({
   const toast = useToast();
   const year = new Date().getFullYear();
   const active = teachers.filter((t) => t.active);
-  const own = (groups.data ?? []).filter((g) => g.teacher.id === absentId);
-  const ownDuties = (duties.data ?? []).filter((d) => d.teacherId === absentId);
   const holidayDates = new Set((holidays.data ?? []).map((h) => h.date));
   const until = period ? to : from;
-  const classes = daysBetween(from, until)
-    .filter((d) => !holidayDates.has(d))
-    .reduce((count, d) => {
+  const days = daysBetween(from, until).filter((d) => !holidayDates.has(d));
+  /** Clases y turnos de un profesor en esos días, sin festivos. */
+  const classesOf = (teacherId: string) => {
+    const own = (groups.data ?? []).filter((g) => g.teacher.id === teacherId);
+    const ownDuties = (duties.data ?? []).filter((d) => d.teacherId === teacherId);
+    return days.reduce((count, d) => {
       const weekday = weekdayOf(d);
       return (
         count +
@@ -142,15 +143,20 @@ function TeacherSubstitutionForm({
         ownDuties.filter((duty) => duty.weekday === isoWeekdayOf(d)).length
       );
     }, 0);
+  };
+  // Solo puede faltar quien tiene algo que dar esos días; si cambia el día y ya no lo tiene, se deselecciona.
+  const teaching = active.filter((t) => classesOf(t.id) > 0);
+  const absent = teaching.some((t) => t.id === absentId) ? absentId : '';
+  const classes = absent === '' ? 0 : classesOf(absent);
   const needsReason = isReasonRequired(substitute.error);
-  const ready = absentId !== '' && substituteId !== '' && until >= from && classes > 0;
+  const ready = absent !== '' && substituteId !== '' && until >= from && classes > 0;
 
   function submit(event: FormEvent) {
     event.preventDefault();
     if (!ready) return;
     void substitute
       .mutateAsync({
-        teacherId: absentId,
+        teacherId: absent,
         substituteId,
         from,
         to: until,
@@ -171,10 +177,18 @@ function TeacherSubstitutionForm({
       <Select
         label="Falta"
         options={[
-          { value: '', label: 'Elige a quién se sustituye' },
-          ...active.map((t) => ({ value: t.id, label: t.fullName })),
+          {
+            value: '',
+            label:
+              teaching.length === 0
+                ? period
+                  ? 'Nadie tiene clases ni turnos esos días'
+                  : 'Nadie tiene clases ni turnos ese día'
+                : 'Elige a quién se sustituye',
+          },
+          ...teaching.map((t) => ({ value: t.id, label: t.fullName })),
         ]}
-        value={absentId}
+        value={absent}
         onChange={(value) => {
           setAbsentId(value);
           if (value === substituteId) setSubstituteId('');
@@ -213,25 +227,19 @@ function TeacherSubstitutionForm({
         label="Le sustituye"
         options={[
           { value: '', label: 'Elige quién sustituye' },
-          ...active
-            .filter((t) => t.id !== absentId)
-            .map((t) => ({ value: t.id, label: t.fullName })),
+          ...active.filter((t) => t.id !== absent).map((t) => ({ value: t.id, label: t.fullName })),
         ]}
         value={substituteId}
         onChange={setSubstituteId}
-        disabled={absentId === ''}
+        disabled={absent === ''}
       />
       <ReasonField needsReason={needsReason} value={reason} onChange={setReason} />
       <p className="text-[13px] text-ink-muted">
-        {absentId === ''
-          ? 'Sus clases y turnos se apuntarán solos a quien sustituye. Los festivos no cuentan.'
-          : classes === 0
-            ? period
-              ? 'No tiene clases ni turnos esos días.'
-              : 'No tiene clases ni turnos ese día.'
-            : classes === 1
-              ? 'Se sustituye 1 clase o turno (los festivos no cuentan).'
-              : `Se sustituyen ${classes} clases y turnos (los festivos no cuentan).`}
+        {absent === ''
+          ? 'Solo se puede sustituir a quien tiene clase o turno ese día. Sus clases y turnos se apuntarán solos a quien sustituye; los festivos no cuentan.'
+          : classes === 1
+            ? 'Se sustituye 1 clase o turno (los festivos no cuentan).'
+            : `Se sustituyen ${classes} clases y turnos (los festivos no cuentan).`}
       </p>
       <Actions
         onClose={onClose}

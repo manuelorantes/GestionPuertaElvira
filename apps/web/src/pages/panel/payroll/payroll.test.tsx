@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { currentMonth } from '@/features/billing/money';
+import { todayIso } from '@/features/students/format';
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
 const TEACHERS = [
@@ -432,6 +433,86 @@ describe('Profesorado', () => {
         reason: null,
       });
     });
+  });
+
+  it('highlights today in the calendar of substitutions', async () => {
+    const month = currentMonth();
+    const season = Number(month.slice(0, 4)) - (month.slice(5) < '09' ? 1 : 0);
+    api({
+      [`GET /api/admin/payroll/substitutions?month=${month}`]: [200, { month, items: [] }],
+      [`GET /api/admin/payroll/holidays?season=${season}`]: [200, { items: [] }],
+    });
+    renderApp(`/panel/profesores?mes=${month}&pestana=sustituciones`);
+
+    const calendar = await screen.findByRole('table', { name: /^Sustituciones de / });
+    const today = todayIso();
+    const weekday = new Date(`${today}T12:00:00`).getDay();
+    if (weekday === 0 || weekday === 6) {
+      expect(within(calendar).queryByRole('cell', { current: 'date' })).not.toBeInTheDocument();
+      return;
+    }
+    expect(within(calendar).getByRole('cell', { current: 'date' })).toHaveTextContent(
+      `Hoy, ${Number(today.slice(8))}`,
+    );
+  });
+
+  it('offers as absent only the teachers with a class or a duty on that day', async () => {
+    api({
+      'GET /api/admin/payroll/substitutions?month=2026-10': [200, { month: '2026-10', items: [] }],
+      'GET /api/admin/payroll/holidays?season=2026': [200, { items: [] }],
+      'GET /api/admin/payroll/duties': [
+        200,
+        {
+          items: [
+            {
+              id: 'd1',
+              teacherId: 't2',
+              teacherName: 'Carlos Ruiz Márquez',
+              weekday: 4,
+              start: '17:00',
+              end: '20:00',
+              label: 'Jueves',
+              kind: 'shift',
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/profesores?mes=2026-10&pestana=sustituciones');
+    const calendar = await screen.findByRole('table', { name: 'Sustituciones de octubre 2026' });
+    const absentOptions = (dialog: HTMLElement) =>
+      within(within(dialog).getByLabelText('Falta'))
+        .getAllByRole('option')
+        .map((o) => o.textContent);
+
+    // Miércoles: solo Lucía tiene clase.
+    await userEvent.click(
+      within(calendar).getByRole('button', { name: 'Nueva sustitución el 07/10/2026' }),
+    );
+    let dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
+    await waitFor(() =>
+      expect(absentOptions(dialog)).toEqual(['Elige a quién se sustituye', 'Lucía Moreno Gil']),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    // Jueves: solo Carlos tiene turno.
+    await userEvent.click(
+      within(calendar).getByRole('button', { name: 'Nueva sustitución el 08/10/2026' }),
+    );
+    dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
+    await waitFor(() =>
+      expect(absentOptions(dialog)).toEqual(['Elige a quién se sustituye', 'Carlos Ruiz Márquez']),
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    // Viernes: nadie.
+    await userEvent.click(
+      within(calendar).getByRole('button', { name: 'Nueva sustitución el 09/10/2026' }),
+    );
+    dialog = await screen.findByRole('dialog', { name: 'Nueva sustitución' });
+    await waitFor(() =>
+      expect(absentOptions(dialog)).toEqual(['Nadie tiene clases ni turnos ese día']),
+    );
   });
 
   it('substitutes a teacher in all their classes of a day by default', async () => {
