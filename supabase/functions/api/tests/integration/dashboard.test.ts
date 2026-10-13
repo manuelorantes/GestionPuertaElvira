@@ -60,17 +60,29 @@ Deno.test({
       201,
     );
 
+    // Un socio sin clases: cuenta como activo, no entre los que están en alguna clase.
+    assertEquals(
+      (await client.json('POST', '/api/admin/students', {
+        fullName: 'Tomás Ruiz Caro',
+        birthDate: '1980-05-02',
+        guardians: [],
+        imageConsent: false,
+        groupIds: [],
+      })).status,
+      201,
+    );
+
     const response = await client.get('/api/admin/dashboard');
     assertEquals(response.status, 200);
     const summary = response.body as Record<string, unknown>;
     // El saldo: sin ejercicios cerrados, lo cobrado (45 €) menos lo gastado (20 € + 30 €).
     assertEquals(summary.balanceCents, -500);
     assertEquals(summary.seasonResultCents, -500);
-    // Las cifras del mes son solo sus cuotas; la cuota de socio pendiente va aparte.
+    // Las cifras del mes son solo sus cuotas; las cuotas de socio pendientes (una por socio) van aparte.
     assertEquals(summary.pendingCents, 0);
-    assertEquals(summary.membershipPendingCents, 5000);
-    assertEquals(summary.activeStudents, 1);
-    assertEquals(summary.registeredStudents, 1);
+    assertEquals(summary.membershipPendingCents, 10000);
+    assertEquals(summary.activeStudents, 2);
+    assertEquals(summary.studentsInClasses, 1);
     // Dos gráficas de la temporada, de septiembre a agosto.
     type Chart = {
       month: string;
