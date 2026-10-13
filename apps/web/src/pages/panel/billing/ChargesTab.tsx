@@ -1,5 +1,6 @@
 import { ArrowDownUp, Ban, Check, ChevronDown, MessageCircle, Printer } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 import type { Charge, ChargeStatus } from '@/features/billing/api';
 import { useMonthlyCharges } from '@/features/billing/hooks';
@@ -38,6 +39,9 @@ const ACTION =
   'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm px-3 text-[13px] font-semibold';
 
 /** Orden de urgencia del estado: lo que hay que reclamar primero, lo cobrado al final. */
+/** Ancho del panel del menú «Estado» (`w-64`), para que no se salga por la derecha en pantallas estrechas. */
+const MENU_WIDTH = 256;
+
 const URGENCY: ChargeStatus[] = [
   'overdue',
   'partial',
@@ -406,6 +410,30 @@ function StatusMenu({
   onSort: (sort: StatusSort) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement>(null);
+  // El panel se pinta fuera de la tabla, fijo bajo el botón: la tabla se desplaza en horizontal y recortaría el panel
+  // cuando hay pocas filas. Si la página se mueve o cambia de tamaño, se cierra en vez de quedarse descolocado.
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+    };
+  }, [open]);
+  const toggleOpen = () => {
+    const rect = button.current?.getBoundingClientRect();
+    if (rect) {
+      setPosition({
+        top: rect.bottom + 8,
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8)),
+      });
+    }
+    setOpen(!open);
+  };
   const counts = new Map<ChargeStatus, number>();
   for (const c of charges) counts.set(c.status, (counts.get(c.status) ?? 0) + 1);
   const present = URGENCY.filter((s) => counts.has(s));
@@ -417,10 +445,11 @@ function StatusMenu({
   return (
     <span className="relative inline-block">
       <button
+        ref={button}
         type="button"
         aria-haspopup="true"
         aria-expanded={open}
-        onClick={() => setOpen(!open)}
+        onClick={toggleOpen}
         className={`inline-flex cursor-pointer items-center gap-1 text-xs font-semibold tracking-[0.06em] uppercase hover:text-ink ${active ? 'text-ink' : 'text-ink-muted'}`}
       >
         Estado
@@ -428,71 +457,74 @@ function StatusMenu({
         {byStatus && <ArrowDownUp aria-hidden size={12} />}
         <ChevronDown aria-hidden size={13} />
       </button>
-      {open && (
-        <>
-          <button
-            type="button"
-            aria-label="Cerrar el menú de estado"
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className="fixed inset-0 z-10 cursor-default"
-          />
-          <div
-            role="dialog"
-            aria-label="Ordenar y filtrar por estado"
-            onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-            className="absolute right-0 z-20 mt-2 flex w-64 flex-col gap-3 rounded-sm border border-line-strong bg-surface-raised p-3 text-sm font-normal tracking-normal normal-case shadow-overlay md:right-auto md:left-0"
-          >
-            <div role="group" aria-label="Ordenar" className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-                Ordenar
-              </span>
-              {(
-                [
-                  ['none', 'Por alumno'],
-                  ['urgent', 'Lo pendiente primero'],
-                  ['paid', 'Lo cobrado primero'],
-                ] as const
-              ).map(([id, label]) => (
-                <label key={id} className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="radio"
-                    name="status-sort"
-                    checked={sort === id}
-                    onChange={() => onSort(id)}
-                  />
-                  {label}
-                </label>
-              ))}
+      {open &&
+        createPortal(
+          <>
+            <button
+              type="button"
+              aria-label="Cerrar el menú de estado"
+              tabIndex={-1}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-10 cursor-default"
+            />
+            <div
+              role="dialog"
+              aria-label="Ordenar y filtrar por estado"
+              onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+              style={position}
+              className="fixed z-20 flex w-64 flex-col gap-3 rounded-sm border border-line-strong bg-surface-raised p-3 text-sm font-normal tracking-normal normal-case shadow-overlay"
+            >
+              <div role="group" aria-label="Ordenar" className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+                  Ordenar
+                </span>
+                {(
+                  [
+                    ['none', 'Por alumno'],
+                    ['urgent', 'Lo pendiente primero'],
+                    ['paid', 'Lo cobrado primero'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <label key={id} className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="radio"
+                      name="status-sort"
+                      checked={sort === id}
+                      onChange={() => onSort(id)}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+              <div role="group" aria-label="Filtrar" className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+                  Mostrar
+                </span>
+                {present.map((status) => (
+                  <label key={status} className="flex cursor-pointer items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={filter.includes(status)}
+                      onChange={() => toggle(status)}
+                    />
+                    {STATUS[status].label}
+                    <span className="text-ink-muted">({counts.get(status)})</span>
+                  </label>
+                ))}
+                {filter.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onFilter([])}
+                    className="cursor-pointer self-start text-[13px] font-semibold text-brand"
+                  >
+                    Ver todos
+                  </button>
+                )}
+              </div>
             </div>
-            <div role="group" aria-label="Filtrar" className="flex flex-col gap-1.5">
-              <span className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-                Mostrar
-              </span>
-              {present.map((status) => (
-                <label key={status} className="flex cursor-pointer items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={filter.includes(status)}
-                    onChange={() => toggle(status)}
-                  />
-                  {STATUS[status].label}
-                  <span className="text-ink-muted">({counts.get(status)})</span>
-                </label>
-              ))}
-              {filter.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onFilter([])}
-                  className="cursor-pointer self-start text-[13px] font-semibold text-brand"
-                >
-                  Ver todos
-                </button>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+          </>,
+          document.body,
+        )}
     </span>
   );
 }
