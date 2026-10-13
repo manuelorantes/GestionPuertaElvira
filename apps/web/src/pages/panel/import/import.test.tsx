@@ -165,7 +165,7 @@ describe('Importar hoja', () => {
           pendingCents: 0,
           expensesCents: 0,
           activeStudents: 0,
-          registeredStudents: 0,
+          studentsInClasses: 0,
           chart: [],
           occupancy: { percent: 0, fullGroups: 0, emptiest: [] },
           overdue: [],
