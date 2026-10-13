@@ -24,7 +24,11 @@ test('should record an action with its author and undo it', async ({ page }) => 
   const row = page.getByRole('row', { name: /Añadir movimiento/ }).first();
   await expect(row).toContainText('Administración Pruebas');
   await row.getByRole('button', { name: 'Ver detalle de Añadir movimiento' }).click();
-  await expect(page.getByText('Gasto para probar el historial')).toBeVisible();
+  // El cambio se presenta por su concepto y fecha, y el concepto sale también como campo.
+  await expect(
+    page.getByText(/Alta · Movimiento manual · Gasto para probar el historial · /),
+  ).toBeVisible();
+  await expect(page.getByText('Gasto para probar el historial', { exact: true })).toBeVisible();
   await row.getByRole('button', { name: 'Deshacer Añadir movimiento' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Deshacer' }).click();
   await expect(
