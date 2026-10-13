@@ -66,9 +66,13 @@ La ocupación del grupo es la del día más lleno; cuando difiere entre días se
 y el horario semanal muestra en cada columna la ocupación de ese día.
 Un grupo lleno se distingue visualmente, y uno con más alumnos que plazas se marca «Sobre el cupo».
 
+La lista de grupos MUST poder ordenarse desde las cabeceras por grupo (por defecto), nivel, profesor, horario, aula u
+ocupación, en ambos sentidos.
+
 #### Scenario: Lista de grupos
 - **WHEN** administración consulta la lista de grupos
-- **THEN** ve por cada grupo su nivel, profesor, horario, modalidad, aula y ocupación
+- **THEN** ve por cada grupo su nivel, profesor, horario, modalidad, aula y ocupación, y puede ordenarlos por cualquiera
+  de esas columnas
 
 #### Scenario: Ocupación distinta según el día
 - **WHEN** en un grupo de lunes y miércoles con 12 plazas hay 9 alumnos, uno de ellos solo los lunes

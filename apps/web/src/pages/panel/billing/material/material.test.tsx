@@ -258,6 +258,61 @@ describe('Material deportivo', () => {
     );
   });
 
+  it('sorts the stock from the headers, in the order of the product options by default', async () => {
+    const variant = (label: string, counts: number[]) => {
+      const [bought, delivered, inStock, awaiting, toBuy] = counts;
+      return {
+        variantKey: label,
+        variantLabel: label,
+        bought,
+        delivered,
+        inStock,
+        awaiting,
+        toBuy,
+      };
+    };
+    api({
+      'GET /api/admin/equipment/stock': [
+        200,
+        {
+          items: [
+            {
+              productId: 'p1',
+              productName: 'Chándal',
+              active: true,
+              variants: [
+                variant('Talla 8', [5, 5, 0, 2, 2]),
+                variant('Talla 10', [10, 6, 4, 7, 3]),
+                variant('Talla 12', [3, 1, 2, 0, 0]),
+              ],
+            },
+          ],
+        },
+      ],
+      'GET /api/admin/equipment/purchases': [200, { items: [] }],
+    });
+    renderApp('/panel/cobros?pestana=material&vista=stock');
+
+    const table = await screen.findByRole('table', { name: 'Stock de Chándal' });
+    const sizes = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+
+    expect(sizes()).toEqual(['Talla 8', 'Talla 10', 'Talla 12']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por en stock' }));
+    expect(sizes()).toEqual(['Talla 8', 'Talla 12', 'Talla 10']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por en stock' }));
+    expect(sizes()).toEqual(['Talla 10', 'Talla 12', 'Talla 8']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por faltan por comprar' }));
+    expect(sizes()).toEqual(['Talla 12', 'Talla 8', 'Talla 10']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por variante' }));
+    expect(sizes()).toEqual(['Talla 8', 'Talla 10', 'Talla 12']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por variante' }));
+    expect(sizes()).toEqual(['Talla 12', 'Talla 10', 'Talla 8']);
+  });
+
   it('shows what was bought against what was sold, with the margin', async () => {
     api({
       'GET /api/admin/equipment/margins': [
@@ -295,6 +350,70 @@ describe('Material deportivo', () => {
       'Chándal20600 €30 €10450 €400 €15 €150 €',
     );
     expect(screen.getByText('Margen de lo vendido').parentElement).toHaveTextContent('150 €');
+  });
+
+  it('sorts the margins from the headers, with what cannot be calculated first', async () => {
+    api({
+      'GET /api/admin/equipment/margins': [
+        200,
+        {
+          products: [
+            {
+              productId: 'p1',
+              productName: 'Chándal',
+              unitsBought: 20,
+              spentCents: 60000,
+              averageCostCents: 3000,
+              unitsSold: 10,
+              revenueCents: 45000,
+              collectedCents: 40000,
+              marginCents: 15000,
+              marginPerUnitCents: 1500,
+            },
+            {
+              productId: 'p2',
+              productName: 'Polo',
+              unitsBought: 0,
+              spentCents: 0,
+              averageCostCents: null,
+              unitsSold: 2,
+              revenueCents: 3000,
+              collectedCents: 3000,
+              marginCents: null,
+              marginPerUnitCents: null,
+            },
+          ],
+          totals: {
+            unitsBought: 20,
+            spentCents: 60000,
+            unitsSold: 12,
+            revenueCents: 48000,
+            collectedCents: 43000,
+            marginCents: 15000,
+          },
+        },
+      ],
+    });
+    renderApp('/panel/cobros?pestana=material&vista=margen');
+
+    const table = await screen.findByRole('table', { name: 'Margen por producto' });
+    const products = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1, -1) // Sin la cabecera ni la fila de totales.
+        .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+
+    expect(products()).toEqual(['Chándal', 'Polo']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por margen' }));
+    expect(products()).toEqual(['Polo', 'Chándal']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por margen' }));
+    expect(products()).toEqual(['Chándal', 'Polo']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por vendidas' }));
+    expect(products()).toEqual(['Polo', 'Chándal']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por producto' }));
+    expect(products()).toEqual(['Chándal', 'Polo']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por producto' }));
+    expect(products()).toEqual(['Polo', 'Chándal']);
   });
 
   it('creates a product with a list field and a text field', async () => {

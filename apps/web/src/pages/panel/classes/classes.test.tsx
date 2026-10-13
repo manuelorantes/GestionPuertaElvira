@@ -130,6 +130,40 @@ describe('Clases', () => {
     expect(within(row).getByText('Sobre el cupo')).toBeVisible();
   });
 
+  it('sorts the groups from the headers, by name unless another column is chosen', async () => {
+    const user = userEvent.setup();
+    const avanzado = {
+      ...GROUP,
+      id: 'g2',
+      name: 'Avanzado',
+      level: 'advanced',
+      days: ['tue'],
+      start: '16:00',
+      slotLabel: 'Mar · 16:00–17:00',
+      classroom: 'caballo',
+      occupied: 3,
+    };
+    api({ 'GET /api/admin/groups': [200, { items: [GROUP, avanzado] }] });
+    renderApp('/panel/clases');
+    await user.click(await screen.findByRole('tab', { name: 'Grupos' }));
+    const table = await screen.findByRole('table', { name: 'Grupos' });
+    const names = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[0]?.textContent);
+
+    expect(names()).toEqual(['Avanzado', 'Iniciación A']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por nivel' }));
+    expect(names()).toEqual(['Avanzado', 'Iniciación A']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por nivel' }));
+    expect(names()).toEqual(['Iniciación A', 'Avanzado']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por horario' }));
+    expect(names()).toEqual(['Iniciación A', 'Avanzado']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por ocupación' }));
+    expect(names()).toEqual(['Avanzado', 'Iniciación A']);
+  });
+
   it('should preview the default name and create a group without one', async () => {
     const user = userEvent.setup();
     const fetchSpy = api({

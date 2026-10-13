@@ -15,6 +15,12 @@ pero el historial MUST mostrar solo las acciones que cambiaron datos guardados: 
 (sirven para la seguridad y para la última conexión de la sección Usuarios).
 Las consultas (ver pantallas) no se registran.
 
+La lista MUST poder ordenarse desde las cabeceras por fecha y hora
+(por defecto, de la más reciente a la más antigua), persona, acción
+o lo que afectó, en ambos sentidos.
+Se ordena lo que ya está cargado:
+las acciones más antiguas que trae «Ver más» se colocan en el orden elegido.
+
 #### Scenario: Ver quién hizo qué
 - **WHEN** superadministración abre el historial
 - **THEN** ve las acciones de la más reciente a la más antigua con fecha y hora (de Madrid), persona, acción y lo que afectó, puede filtrar por persona y ver el detalle campo a campo (sin contraseñas)

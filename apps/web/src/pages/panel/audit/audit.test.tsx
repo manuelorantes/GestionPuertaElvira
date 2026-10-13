@@ -99,6 +99,55 @@ describe('Historial', () => {
     );
   });
 
+  it('sorts the actions from the headers, most recent first unless another column is chosen', async () => {
+    const user = userEvent.setup();
+    api({
+      'GET /api/admin/audit/actions': [
+        200,
+        {
+          ...ACTIONS,
+          items: [
+            ACTIONS.items[0],
+            action({
+              id: 'a0',
+              seq: 9,
+              userId: null,
+              userName: 'Sistema',
+              label: 'Inicio de sesión',
+              occurredAt: '2026-10-04T09:15:00+02:00',
+              changeCount: 0,
+              affected: [],
+              undoable: false,
+            }),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/historial');
+
+    const table = await screen.findByRole('table', { name: 'Historial de acciones' });
+    const labels = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[3]?.textContent);
+
+    expect(labels()).toEqual(['Registrar cobro', 'Inicio de sesión']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por fecha y hora' }));
+    expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por persona' }));
+    expect(labels()).toEqual(['Registrar cobro', 'Inicio de sesión']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por persona' }));
+    expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por acción' }));
+    expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
+    // Lo que no afectó a nada va primero.
+    await user.click(screen.getByRole('button', { name: 'Ordenar por afecta a' }));
+    expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por afecta a' }));
+    expect(labels()).toEqual(['Registrar cobro', 'Inicio de sesión']);
+  });
+
   it('undoes an action after confirming', async () => {
     const fetch = api({ 'POST /api/admin/audit/actions/a1/undo': [204] });
     renderApp('/panel/historial');

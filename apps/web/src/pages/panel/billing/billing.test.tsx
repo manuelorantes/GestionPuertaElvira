@@ -290,6 +290,79 @@ describe('Cobros y cuotas', () => {
     expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Cobrada');
   });
 
+  it('sorts the charges from the headers, the last choice winning over the status menu', async () => {
+    api({
+      'GET /api/admin/billing/charges?month=2026-10&kind=monthly': [
+        200,
+        {
+          ...OCTOBER,
+          items: [
+            ...OCTOBER.items,
+            charge({
+              id: 'c3',
+              studentId: 's3',
+              studentName: 'Carla Ruiz Mota',
+              kind: 'material',
+              concept: 'Chándal',
+              amountCents: 4500,
+              status: 'due',
+            }),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    const table = await screen.findByRole('table', { name: 'Cuotas de octubre 2026' });
+    const students = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getByRole('link').textContent);
+
+    expect(students()).toEqual([
+      'Carla Ruiz Mota',
+      'Hugo Martín Castillo',
+      'Martina López Herrera',
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    expect(students()).toEqual([
+      'Martina López Herrera',
+      'Carla Ruiz Mota',
+      'Hugo Martín Castillo',
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    expect(students()).toEqual([
+      'Hugo Martín Castillo',
+      'Carla Ruiz Mota',
+      'Martina López Herrera',
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por concepto' }));
+    expect(students()).toEqual([
+      'Carla Ruiz Mota',
+      'Hugo Martín Castillo',
+      'Martina López Herrera',
+    ]);
+
+    await userEvent.click(within(table).getByRole('button', { name: /Estado/ }));
+    const menu = screen.getByRole('dialog', { name: 'Ordenar y filtrar por estado' });
+    expect(within(menu).getByRole('radio', { name: 'Por alumno' })).not.toBeChecked();
+    await userEvent.click(within(menu).getByRole('radio', { name: 'Lo cobrado primero' }));
+    expect(students()).toEqual([
+      'Hugo Martín Castillo',
+      'Carla Ruiz Mota',
+      'Martina López Herrera',
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por alumno' }));
+    expect(students()).toEqual([
+      'Carla Ruiz Mota',
+      'Hugo Martín Castillo',
+      'Martina López Herrera',
+    ]);
+    expect(within(menu).getByRole('radio', { name: 'Por alumno' })).toBeChecked();
+    expect(within(menu).getByRole('radio', { name: 'Lo cobrado primero' })).not.toBeChecked();
+  });
+
   it('registers a payment with a live quote and shows the receipt', async () => {
     const fetch = api({
       'POST /api/admin/billing/payments': [201, { id: 'p9' }],
@@ -488,6 +561,42 @@ describe('Cobros y cuotas', () => {
       '/api/admin/billing/payments/p9/invoice',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('sorts the registered payments from the headers, the most recent first by default', async () => {
+    const older = {
+      ...RECEIPT,
+      id: 'p8',
+      receiptNumber: 'R-2026-0001',
+      paidOn: '2026-09-28',
+      studentId: 's2',
+      studentName: 'Hugo Martín Castillo',
+      kind: 'membership',
+      concept: 'Cuota de socio',
+      method: 'transfer',
+      totalCents: 5000,
+    };
+    api({ 'GET /api/admin/billing/payments': [200, { items: [RECEIPT, older] }] });
+    renderApp('/panel/cobros?pestana=registro');
+
+    const table = await screen.findByRole('table', { name: 'Cobros registrados' });
+    const receipts = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[1]?.textContent);
+
+    expect(receipts()).toEqual(['R-2026-0002', 'R-2026-0001']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por fecha' }));
+    expect(receipts()).toEqual(['R-2026-0001', 'R-2026-0002']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por alumno' }));
+    expect(receipts()).toEqual(['R-2026-0001', 'R-2026-0002']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por forma de pago' }));
+    expect(receipts()).toEqual(['R-2026-0002', 'R-2026-0001']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    expect(receipts()).toEqual(['R-2026-0002', 'R-2026-0001']);
+    await userEvent.click(screen.getByRole('button', { name: 'Ordenar por importe' }));
+    expect(receipts()).toEqual(['R-2026-0001', 'R-2026-0002']);
   });
 
   it('edits and saves the tariffs', async () => {
