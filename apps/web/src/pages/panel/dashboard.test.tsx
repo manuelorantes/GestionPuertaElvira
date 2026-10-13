@@ -42,7 +42,9 @@ const SUMMARY = {
   pendingCents: 246000,
   membershipPendingCents: 275000,
   activeStudents: 157,
+  newStudents: 6,
   studentsInClasses: 142,
+  newInClasses: 4,
   cashChart: chart,
   // Cuotas vs gastos fijos: solo las categorías del mes, y las cuotas previstas de los meses que vienen.
   monthChart: chart.map((m, i) => ({
@@ -117,10 +119,13 @@ describe('Resumen', () => {
     expect(
       screen.getByText('Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio'),
     ).toBeInTheDocument();
-    // Los socios activos y, de ellos, los que están en alguna clase.
+    // Socios activos y socios en clases, cada uno con los nuevos del mes.
     expect(screen.getByText('Socios activos')).toBeInTheDocument();
     expect(screen.getByText('157')).toBeInTheDocument();
-    expect(screen.getByText('142 dando clases')).toBeInTheDocument();
+    expect(screen.getByText('+6 este mes')).toBeInTheDocument();
+    expect(screen.getByText('Socios en clases')).toBeInTheDocument();
+    expect(screen.getByText('142')).toBeInTheDocument();
+    expect(screen.getByText('+4 este mes')).toBeInTheDocument();
     // Dos gráficas: lo que entra y sale cada mes, y cuotas vs gastos fijos (lo que corresponde a cada mes).
     expect(
       screen.getByRole('img', { name: /Lo que entra y sale cada mes, por fecha/ }),

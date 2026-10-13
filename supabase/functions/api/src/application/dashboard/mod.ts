@@ -38,8 +38,12 @@ export interface ClubSummaryView {
   membershipPendingCents: number;
   /** Socios de alta hoy. */
   activeStudents: number;
-  /** De ellos, los que están en al menos una clase. */
+  /** De ellos, los dados de alta este mes. */
+  newStudents: number;
+  /** Socios de alta hoy que están en al menos una clase. */
   studentsInClasses: number;
+  /** De ellos, los que empezaron a tener clase este mes. */
+  newInClasses: number;
   /** Lo que entra y sale cada mes, por fecha (cuadra con Contabilidad). */
   cashChart: MonthBars[];
   /** Cuotas vs gastos fijos: lo que corresponde a cada mes, solo con las categorías «del mes» de Contabilidad. */
@@ -142,6 +146,11 @@ export class ClubSummary {
       year.openingCents;
     const groups = await this.classes.groups(today);
     const active = await this.students.list('active', null, today);
+    const inClasses = active.filter((s) => s.groups.length > 0);
+    // «+x este mes»: altas del mes y quienes empezaron este mes a tener clase (su inscripción vigente más antigua).
+    const monthStart = `${month.toString()}-01`;
+    const classesSince = (s: { groups: { since: string }[] }) =>
+      s.groups.map((g) => g.since).sort()[0] ?? '';
     const capacity = groups.reduce((sum, g) => sum + g.capacity, 0);
     const occupied = groups.reduce((sum, g) => sum + Math.min(g.occupied, g.capacity), 0);
     const emptiest = [...groups].sort((a: GroupSummary, b: GroupSummary) =>
@@ -155,7 +164,9 @@ export class ClubSummary {
       pendingCents: charges.expectedCents - charges.collectedCents,
       membershipPendingCents: memberships.expectedCents - memberships.collectedCents,
       activeStudents: active.length,
-      studentsInClasses: active.filter((s) => s.groups.length > 0).length,
+      newStudents: active.filter((s) => s.joinedOn >= monthStart).length,
+      studentsInClasses: inClasses.length,
+      newInClasses: inClasses.filter((s) => classesSince(s) >= monthStart).length,
       cashChart,
       monthChart,
       occupancy: {
