@@ -95,9 +95,9 @@ function Summary({ data }: { data: Dashboard }) {
           hint={`${formatCents(margin.fees)} de cuotas · ${formatCents(margin.fixed)} de gastos fijos`}
         />
         <Kpi
-          label="Alumnos activos"
+          label="Socios activos"
           value={String(data.activeStudents)}
-          hint={`de ${data.registeredStudents} registrados`}
+          hint={`${data.studentsInClasses} en alguna clase`}
         />
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">

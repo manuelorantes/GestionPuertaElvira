@@ -36,8 +36,10 @@ export interface ClubSummaryView {
   pendingCents: number;
   /** Cuotas de socio de la temporada sin cobrar: aparte de las cifras del mes. */
   membershipPendingCents: number;
+  /** Socios de alta hoy. */
   activeStudents: number;
-  registeredStudents: number;
+  /** De ellos, los que están en al menos una clase. */
+  studentsInClasses: number;
   /** Lo que entra y sale cada mes, por fecha (cuadra con Contabilidad). */
   cashChart: MonthBars[];
   /** Cuotas vs gastos fijos: lo que corresponde a cada mes, solo con las categorías «del mes» de Contabilidad. */
@@ -139,6 +141,7 @@ export class ClubSummary {
     const balance = year.months.find((m) => m.month === month.toString())?.accumulatedCents ??
       year.openingCents;
     const groups = await this.classes.groups(today);
+    const active = await this.students.list('active', null, today);
     const capacity = groups.reduce((sum, g) => sum + g.capacity, 0);
     const occupied = groups.reduce((sum, g) => sum + Math.min(g.occupied, g.capacity), 0);
     const emptiest = [...groups].sort((a: GroupSummary, b: GroupSummary) =>
@@ -151,8 +154,8 @@ export class ClubSummary {
       seasonResultCents: balance - year.openingCents,
       pendingCents: charges.expectedCents - charges.collectedCents,
       membershipPendingCents: memberships.expectedCents - memberships.collectedCents,
-      activeStudents: (await this.students.list('active', null, today)).length,
-      registeredStudents: await this.students.total(),
+      activeStudents: active.length,
+      studentsInClasses: active.filter((s) => s.groups.length > 0).length,
       cashChart,
       monthChart,
       occupancy: {

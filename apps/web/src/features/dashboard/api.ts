@@ -28,8 +28,10 @@ export interface Dashboard {
   pendingCents: number;
   /** Cuotas de socio de la temporada sin cobrar, aparte de las del mes. */
   membershipPendingCents: number;
+  /** Socios de alta hoy. */
   activeStudents: number;
-  registeredStudents: number;
+  /** De ellos, los que están en al menos una clase. */
+  studentsInClasses: number;
   /** Lo que entra y sale cada mes, por fecha. */
   cashChart: MonthBars[];
   /** Cuotas vs gastos fijos: lo que corresponde a cada mes, con las categorías «del mes» de Contabilidad. */
