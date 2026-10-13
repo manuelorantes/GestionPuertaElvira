@@ -162,7 +162,8 @@ vinculado no hay botón.
 Superadministración MUST tener una sección «Usuarios», que nadie más ve, con todas las cuentas: nombre, email,
 rol, estado (activa o desactivada, y si tiene contraseña temporal) y última conexión (último inicio de sesión
 o actividad; «Nunca» si no ha entrado). Por defecto muestra las activas, con filtros Activos, Desactivados y
-Todos. Desde ella MUST poder crear cuentas, restablecer contraseñas (se muestra una contraseña temporal una
+Todos. La lista MUST poder ordenarse desde las cabeceras por usuario (por defecto, de la A a la Z), rol, estado o
+última conexión, en ambos sentidos. Desde ella MUST poder crear cuentas, restablecer contraseñas (se muestra una contraseña temporal una
 sola vez y se cierran sus sesiones), desactivar y reactivar cuentas, cambiar su rol y, en las de profesorado, administración y superadministración (también la suya),
 elegir el profesor al que corresponden («Sin vincular» si ninguno). Nadie MUST poder
 desactivar su propia cuenta ni cambiar su propio rol. Cada acción queda en el historial.
