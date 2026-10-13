@@ -11,7 +11,7 @@ import {
 import { Fragment, useState } from 'react';
 import { Link, Navigate, useSearchParams } from 'react-router';
 
-import { fieldLabel, fieldValue } from '@/features/audit/fields';
+import { fieldLabel, fieldValue, isEmptyValue, type ValuePart } from '@/features/audit/fields';
 import { targetLink } from '@/features/audit/targets';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useSession } from '@/features/auth/useSession';
@@ -50,12 +50,33 @@ const COLUMNS: Record<Column, SortColumn<AuditAction>> = {
   affected: { label: 'Afecta a', name: 'afecta a', value: (a) => a.affected.join(', ') || null },
 };
 
+/** Un valor del detalle: sus trozos, con enlace los que son un registro de la aplicación. */
+function Value({ parts, muted = false }: { parts: ValuePart[]; muted?: boolean }) {
+  return (
+    <span className={muted ? 'text-ink-muted line-through' : ''}>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 && ', '}
+          {part.to ? (
+            <Link to={part.to} className="font-medium">
+              {part.text}
+            </Link>
+          ) : (
+            part.text
+          )}
+        </Fragment>
+      ))}
+    </span>
+  );
+}
+
 function ActionDetail({ id }: { id: string }) {
   const detail = useQuery({ queryKey: ['audit-action', id], queryFn: () => fetchAction(id) });
   if (detail.isPending) return <p className="text-sm text-ink-muted">Cargando detalle…</p>;
   if (detail.isError) return <Alert>{apiErrorMessage(detail.error)}</Alert>;
   if (detail.data.changes.length === 0)
     return <p className="text-sm text-ink-muted">Esta acción no cambió datos.</p>;
+  const { references } = detail.data;
 
   return (
     <div className="flex flex-col gap-3">
@@ -65,8 +86,11 @@ function ActionDetail({ id }: { id: string }) {
           className="rounded-sm border border-line-soft bg-surface p-3"
         >
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[13px] font-semibold">
-              {OPERATION[change.operation]} · {change.tableLabel}
+            <p className="text-[13px]">
+              <span className="font-semibold">
+                {OPERATION[change.operation]} · {change.tableLabel}
+              </span>
+              {change.title && <span className="text-ink-soft"> · {change.title}</span>}
             </p>
             {change.target && (
               <Link
@@ -79,22 +103,37 @@ function ActionDetail({ id }: { id: string }) {
             )}
           </div>
           <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-3 gap-y-1 text-[13px]">
-            {change.fields.map((f) => (
-              <Fragment key={f.field}>
-                <dt className="text-ink-muted">{fieldLabel(f.field)}</dt>
-                <dd className="break-all">
-                  {change.operation === 'U' && (
-                    <span className="text-ink-muted line-through">
-                      {fieldValue(f.field, f.before)}
-                    </span>
-                  )}
-                  {change.operation === 'U' && ' → '}
-                  {change.operation === 'D'
-                    ? fieldValue(f.field, f.before)
-                    : fieldValue(f.field, f.after)}
-                </dd>
-              </Fragment>
-            ))}
+            {change.fields
+              // En altas y bajas solo se enseña lo que tiene algo; en cambios, todo lo que cambió.
+              .filter(
+                (f) =>
+                  change.operation === 'U' ||
+                  !isEmptyValue(change.operation === 'D' ? f.before : f.after),
+              )
+              .map((f) => (
+                <Fragment key={f.field}>
+                  <dt className="text-ink-muted">{fieldLabel(f.field, change.table)}</dt>
+                  <dd className="break-words">
+                    {change.operation === 'U' && (
+                      <>
+                        <Value
+                          parts={fieldValue(f.field, f.before, change.table, references)}
+                          muted
+                        />
+                        {' → '}
+                      </>
+                    )}
+                    <Value
+                      parts={fieldValue(
+                        f.field,
+                        change.operation === 'D' ? f.before : f.after,
+                        change.table,
+                        references,
+                      )}
+                    />
+                  </dd>
+                </Fragment>
+              ))}
           </dl>
         </div>
       ))}

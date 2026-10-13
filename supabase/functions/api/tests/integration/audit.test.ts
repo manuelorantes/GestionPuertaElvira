@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from '@std/assert';
 
-import { newTeacher } from '../support/classes-http.ts';
+import { LocalDate } from '../../src/domain/common/mod.ts';
+import { newGroup, newTeacher } from '../support/classes-http.ts';
 import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
 
 async function superadmin(): Promise<ApiClient> {
@@ -169,4 +170,62 @@ Deno.test('audit should say where each change can be seen in the app', async () 
   await rename(client, teacherId, 'Lucía Moreno', '16');
   const teacherChange = (await detail()).changes.find((c) => c.table === 'teachers_teacher');
   assertEquals(teacherChange?.target, { kind: 'teacher', id: teacherId });
+});
+
+Deno.test('audit should describe each change with names instead of identifiers', async () => {
+  const client = await superadmin();
+  const teacherId = await newTeacher(client);
+  const group = await newGroup(client, teacherId, { capacity: 4 });
+  const created = await client.json('POST', '/api/admin/students', {
+    fullName: 'Martina López Herrera',
+    birthDate: '2014-03-12',
+    guardians: [{ name: 'Rocío Herrera', phone: '612481930' }],
+    imageConsent: true,
+    groupIds: [group],
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const studentId = (created.body as { id: string }).id;
+  const paid = await client.json('POST', '/api/admin/billing/payments', {
+    studentId,
+    kind: 'monthly',
+    months: 1,
+    method: 'cash',
+    date: LocalDate.fromInstant(new Date()).toString(),
+  });
+  assertEquals(paid.status, 201, JSON.stringify(paid.body));
+
+  type Change = {
+    table: string;
+    title: string | null;
+    fields: { field: string; after: unknown }[];
+  };
+  const detail = (await client.get(`/api/admin/audit/actions/${await latestId(client)}`)).body as {
+    changes: Change[];
+    references: Record<string, { kind: string; label: string; target: unknown }>;
+  };
+  const payment = detail.changes.find((c) => c.table === 'billing_payment');
+  // El cobro se presenta por su recibo y su alumno, sin su identificador.
+  assertStringIncludes(String(payment?.title), ' · Martina López Herrera');
+  assert(!payment?.fields.some((f) => f.field === 'id'));
+  assertEquals(detail.references[studentId], {
+    kind: 'student',
+    label: 'Martina López Herrera',
+    target: { kind: 'student', id: studentId },
+  });
+  // La cuota que paga apunta al cobro por su recibo, con enlace.
+  const charge = detail.changes.find((c) => c.table === 'billing_charge');
+  assertStringIncludes(String(charge?.title), 'Cuota de ');
+  const paidBy = String(charge?.fields.find((f) => f.field === 'paid_by')?.after);
+  assertEquals(detail.references[paidBy]?.kind, 'payment');
+  assertStringIncludes(String(detail.references[paidBy]?.label), 'R-');
+  assertEquals(detail.references[paidBy]?.target, { kind: 'payment', id: paidBy });
+
+  // Lo borrado conserva su nombre gracias a su última foto en el historial.
+  await client.json('DELETE', `/api/admin/students/${studentId}/enrolments/${group}`);
+  const removed = (await client.get(`/api/admin/audit/actions/${await latestId(client)}`)).body as {
+    changes: Change[];
+    references: Record<string, { label: string }>;
+  };
+  const enrolment = removed.changes.find((c) => c.table === 'classes_enrolment');
+  assertEquals(enrolment?.title, 'Martina López Herrera · ' + removed.references[group]?.label);
 });

@@ -107,6 +107,7 @@ export class AuditLabels {
   };
 
   private static readonly TABLES: Record<string, string> = {
+    accounting_category: 'Categoría del club',
     accounting_closing: 'Cierre de temporada',
     accounting_entry: 'Movimiento manual',
     accounting_invoice: 'Factura de proveedor',

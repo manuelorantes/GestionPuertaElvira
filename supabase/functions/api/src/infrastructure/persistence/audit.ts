@@ -2,11 +2,22 @@ import { generateUuidV7 } from '../../domain/common/mod.ts';
 import type {
   AuditActionView,
   AuditChangeView,
+  AuditDetail,
   AuditFilter,
   AuditLog,
+  AuditReference,
+  AuditReferenceKind,
   AuditReverter,
   AuditTarget,
 } from '../../application/audit/mod.ts';
+import {
+  type AuditRow,
+  isHiddenField,
+  monthLabel,
+  referencesOf,
+  referenceTarget,
+  titleOf,
+} from '../audit/describe.ts';
 import { AuditLabels } from '../audit/mod.ts';
 import { Row, type Sql } from './sql.ts';
 
@@ -89,37 +100,47 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
     return rows[0] ? view(new Row(rows[0])) : null;
   }
 
-  async changes(actionId: string): Promise<AuditChangeView[]> {
+  async changes(actionId: string): Promise<AuditDetail> {
     const rows = await this
       .sql`SELECT table_name, row_key, operation, before, after FROM audit_change
       WHERE action_id = ${actionId}::uuid ORDER BY id`;
-    return Row.all(rows).map((row) => {
-      const before = (row.json('before') ?? {}) as Record<string, unknown>;
-      const after = (row.json('after') ?? {}) as Record<string, unknown>;
-      const operation = row.string('operation');
+    const raw = Row.all(rows).map((row) => ({
+      table: row.string('table_name'),
+      key: (row.json('row_key') ?? {}) as AuditRow,
+      operation: row.string('operation'),
+      before: row.json('before') as AuditRow | null,
+      after: row.json('after') as AuditRow | null,
+    }));
+    const names = new AuditNames(this.sql);
+    // Lo que mencionan los cambios (y lo que necesitan sus títulos) se resuelve de una vez.
+    for (const change of raw) {
+      for (const snapshot of [change.before, change.after]) {
+        for (const ref of referencesOf(snapshot ?? {})) names.want(ref.kind, ref.id);
+      }
+    }
+    await names.resolve();
+    const name = (kind: AuditReferenceKind, id: string) => names.label(kind, id);
+    const changes = raw.map(({ table, key, operation, before, after }): AuditChangeView => {
       const fields: AuditChangeView['fields'] = [];
-      for (const field of new Set([...Object.keys(before), ...Object.keys(after)])) {
-        if (SECRET.test(field)) continue;
-        const old = before[field] ?? null;
-        const fresh = after[field] ?? null;
+      for (const field of new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])) {
+        if (SECRET.test(field) || isHiddenField(field)) continue;
+        const old = before?.[field] ?? null;
+        const fresh = after?.[field] ?? null;
         if (operation !== 'U' || JSON.stringify(old) !== JSON.stringify(fresh)) {
           fields.push({ field, before: old, after: fresh });
         }
       }
       return {
-        table: row.string('table_name'),
-        tableLabel: AuditLabels.table(row.string('table_name')),
-        key: (row.json('row_key') ?? {}) as Record<string, unknown>,
+        table,
+        tableLabel: AuditLabels.table(table),
+        title: titleOf(table, after ?? before ?? {}, name),
+        key,
         operation,
         fields,
-        target: auditTarget(
-          row.string('table_name'),
-          operation,
-          row.json('before') as Record<string, unknown> | null,
-          row.json('after') as Record<string, unknown> | null,
-        ),
+        target: auditTarget(table, operation, before, after),
       };
     });
+    return { changes, references: names.references() };
   }
 
   async people(): Promise<{ id: string; name: string }[]> {
@@ -230,5 +251,111 @@ export function auditTarget(
       return { kind: 'billing-settings' };
     default:
       return null;
+  }
+}
+
+/** Una tabla con nombre: de dónde sale la etiqueta de cada clase de registro referenciado. */
+const NAMED: Record<AuditReferenceKind, { table: string; sql: string }> = {
+  student: {
+    table: 'students_student',
+    sql: `SELECT id::text AS id, full_name AS label, '{}'::json AS row FROM students_student`,
+  },
+  teacher: {
+    table: 'teachers_teacher',
+    sql: `SELECT id::text AS id, full_name AS label, '{}'::json AS row FROM teachers_teacher`,
+  },
+  group: {
+    table: 'classes_group',
+    sql: `SELECT id::text AS id, name AS label, '{}'::json AS row FROM classes_group`,
+  },
+  user: {
+    table: 'identity_user',
+    sql: `SELECT id::text AS id, full_name AS label, '{}'::json AS row FROM identity_user`,
+  },
+  payment: {
+    table: 'billing_payment',
+    sql:
+      `SELECT p.id::text AS id, p.receipt_number || ' · ' || s.full_name AS label, '{}'::json AS row
+            FROM billing_payment p JOIN students_student s ON s.id = p.student_id`,
+  },
+  charge: {
+    table: 'billing_charge',
+    sql:
+      `SELECT c.id::text AS id, s.full_name AS label, json_build_object('period', c.period, 'kind', c.kind) AS row
+            FROM billing_charge c JOIN students_student s ON s.id = c.student_id`,
+  },
+  product: {
+    table: 'equipment_product',
+    sql: `SELECT id::text AS id, name AS label, '{}'::json AS row FROM equipment_product`,
+  },
+  order: {
+    table: 'equipment_order',
+    sql:
+      `SELECT o.id::text AS id, p.name || ' · ' || s.full_name AS label, json_build_object('student_id', o.student_id) AS row
+            FROM equipment_order o JOIN equipment_product p ON p.id = o.product_id JOIN students_student s ON s.id = o.student_id`,
+  },
+  duty: {
+    table: 'payroll_duty',
+    sql: `SELECT id::text AS id, label, '{}'::json AS row FROM payroll_duty`,
+  },
+};
+
+/**
+ * Nombres de los registros que menciona un detalle del historial. Primero por su tabla; lo que ya no existe,
+ * por su última foto en el propio historial (así un alumno borrado sigue teniendo nombre).
+ */
+class AuditNames {
+  private readonly wanted = new Map<AuditReferenceKind, Set<string>>();
+  private readonly found = new Map<string, AuditReference>();
+
+  constructor(private readonly sql: Sql) {}
+
+  want(kind: AuditReferenceKind, id: string): void {
+    if (!this.wanted.has(kind)) this.wanted.set(kind, new Set());
+    this.wanted.get(kind)?.add(id);
+  }
+
+  async resolve(): Promise<void> {
+    for (const [kind, ids] of this.wanted) {
+      const source = NAMED[kind];
+      const rows = await this.sql.unsafe(
+        `SELECT * FROM (${source.sql}) named WHERE named.id = ANY($1::text[])`,
+        [[...ids]],
+      );
+      for (const r of Row.all(rows)) {
+        this.add(kind, r.string('id'), r.string('label'), (r.json('row') ?? {}) as AuditRow);
+      }
+      const missing = [...ids].filter((id) => !this.found.has(id));
+      if (missing.length === 0) continue;
+      const snapshots = await this.sql.unsafe(
+        `SELECT DISTINCT ON (row_key->>'id') row_key->>'id' AS id, COALESCE(after, before) AS row
+           FROM audit_change WHERE table_name = $1 AND row_key->>'id' = ANY($2::text[])
+          ORDER BY row_key->>'id', id DESC`,
+        [source.table, missing],
+      );
+      for (const r of Row.all(snapshots)) {
+        const row = (r.json('row') ?? {}) as AuditRow;
+        const label = titleOf(source.table, row, (k, id) => this.label(k, id));
+        if (label !== null) this.add(kind, r.string('id'), label, row);
+      }
+    }
+  }
+
+  private add(kind: AuditReferenceKind, id: string, label: string, row: AuditRow): void {
+    const full = kind === 'charge'
+      ? `Cuota de ${
+        monthLabel(typeof row.period === 'string' ? row.period : null) ?? '?'
+      } · ${label}`
+      : label;
+    this.found.set(id, { kind, label: full, target: referenceTarget(kind, id, row) });
+  }
+
+  label(kind: AuditReferenceKind, id: string): string | null {
+    const ref = this.found.get(id);
+    return ref !== undefined && ref.kind === kind ? ref.label : null;
+  }
+
+  references(): Record<string, AuditReference> {
+    return Object.fromEntries(this.found);
   }
 }

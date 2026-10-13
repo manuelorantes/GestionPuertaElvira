@@ -24,15 +24,41 @@ export type AuditTarget =
   | { kind: 'hours'; month: string; teacherId: string }
   | { kind: 'invoices' | 'billing-settings' };
 
-/** Un registro tocado por una acción, con los campos que cambiaron (sin contraseñas). */
+/** Un registro tocado por una acción, con los campos que cambiaron (sin contraseñas ni columnas internas). */
 export interface AuditChangeView {
   table: string;
   tableLabel: string;
+  /** Cómo se llama lo tocado («R-2026-0401 · Martina López Herrera»); null si no hay nada mejor que la tabla. */
+  title: string | null;
   key: Record<string, unknown>;
   operation: string;
   fields: { field: string; before: unknown; after: unknown }[];
   /** null si no hay dónde ir (p. ej. el registro se borró o es una cuenta de usuario). */
   target: AuditTarget | null;
+}
+
+export type AuditReferenceKind =
+  | 'student'
+  | 'teacher'
+  | 'group'
+  | 'user'
+  | 'payment'
+  | 'charge'
+  | 'product'
+  | 'order'
+  | 'duty';
+
+/** Un registro al que apunta algún campo del detalle: su nombre y dónde verlo. */
+export interface AuditReference {
+  kind: AuditReferenceKind;
+  label: string;
+  target: AuditTarget | null;
+}
+
+/** El detalle de una acción: sus cambios y, por identificador, los registros que mencionan. */
+export interface AuditDetail {
+  changes: AuditChangeView[];
+  references: Record<string, AuditReference>;
 }
 
 export interface AuditFilter {
@@ -45,7 +71,7 @@ export interface AuditLog {
   /** Acciones del historial, de la más reciente a la más antigua. */
   actions(filter: AuditFilter): Promise<AuditActionView[]>;
   action(id: string): Promise<AuditActionView | null>;
-  changes(actionId: string): Promise<AuditChangeView[]>;
+  changes(actionId: string): Promise<AuditDetail>;
   /** Personas que aparecen en el historial. */
   people(): Promise<{ id: string; name: string }[]>;
 }

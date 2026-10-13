@@ -21,14 +21,31 @@ export type AuditTarget =
   | { kind: 'hours'; month: string; teacherId: string }
   | { kind: 'invoices' | 'billing-settings' };
 
-export interface AuditChange {
+interface AuditChange {
   table: string;
   tableLabel: string;
+  /** Cómo se llama lo tocado («R-2026-0401 · Martina López Herrera»); null si basta con la tabla. */
+  title: string | null;
   key: Record<string, unknown>;
   operation: 'I' | 'U' | 'D';
   fields: { field: string; before: unknown; after: unknown }[];
   /** null si no hay dónde ir (registro borrado, cuentas de usuario…). */
   target: AuditTarget | null;
+}
+
+/** Un registro que mencionan los campos de un detalle: su nombre y dónde verlo. */
+export interface AuditReference {
+  kind:
+    'student' | 'teacher' | 'group' | 'user' | 'payment' | 'charge' | 'product' | 'order' | 'duty';
+  label: string;
+  target: AuditTarget | null;
+}
+
+export interface AuditDetail {
+  action: AuditAction;
+  changes: AuditChange[];
+  /** Por identificador, lo que mencionan los cambios. */
+  references: Record<string, AuditReference>;
 }
 
 export interface AuditPage {
@@ -46,7 +63,7 @@ export function fetchActions(userId: string, before?: number): Promise<AuditPage
   return apiGet(`${BASE}${query ? `?${query}` : ''}`);
 }
 
-export function fetchAction(id: string): Promise<{ action: AuditAction; changes: AuditChange[] }> {
+export function fetchAction(id: string): Promise<AuditDetail> {
   return apiGet(`${BASE}/${id}`);
 }
 
