@@ -66,7 +66,9 @@ sustituye, y se planifica la sustitución de cada clase y turno suyo ese día. P
 un periodo largo (desde y hasta, como mucho 62 días), salvo festivos. Para casos especiales MUST poder planificarse una
 sola clase o turno (día, clase o turno de ese día y quién lo da). Los turnos de encargado del club se sustituyen igual
 que las clases. Cada sustitución lleva un motivo
-opcional, se puede anular y se ve en un calendario del mes junto con los festivos. Ese día la sesión se apunta a quien sustituye; si ya estaba apuntada,
+opcional, se puede anular y se ve en un calendario del mes junto con los festivos, que MUST destacar el día de hoy.
+Solo puede faltar quien tiene algo que dar: al elegir a quién se sustituye MUST ofrecerse únicamente el profesorado
+activo con alguna clase o turno ese día (o en el periodo), sin contar festivos. Ese día la sesión se apunta a quien sustituye; si ya estaba apuntada,
 pasa a quien sustituye (o vuelve al titular al anularla). Si quien sustituye ya tiene otra clase o un turno a esa hora,
 es un caso especial: MUST indicarse el motivo y no suma horas dobles.
 
