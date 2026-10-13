@@ -279,6 +279,9 @@ describe('Cobros y cuotas', () => {
     const rowsBefore = within(table).getAllByRole('row').length;
     await userEvent.click(within(table).getByRole('button', { name: /Estado/ }));
     const menu = screen.getByRole('dialog', { name: 'Ordenar y filtrar por estado' });
+    // Fuera de la tabla, que se desplaza en horizontal y lo recortaría con pocas filas.
+    expect(table).not.toContainElement(menu);
+    expect(menu).toHaveClass('fixed');
     const options = within(within(menu).getByRole('group', { name: 'Filtrar' })).getAllByRole(
       'checkbox',
     );
