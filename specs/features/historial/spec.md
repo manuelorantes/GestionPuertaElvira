@@ -25,6 +25,21 @@ las acciones más antiguas que trae «Ver más» se colocan en el orden elegido.
 - **WHEN** superadministración abre el historial
 - **THEN** ve las acciones de la más reciente a la más antigua con fecha y hora (de Madrid), persona, acción y lo que afectó, puede filtrar por persona y ver el detalle campo a campo (sin contraseñas)
 
+### Requirement: Detalle legible
+El detalle de un cambio MUST entenderse sin conocer la base de datos: cada registro tocado se presenta por su nombre
+(«Alta · Cobro · R-2026-0401 · Martina López Herrera», «Cambio · Cuota · Cuota de octubre 2026 · Martina López
+Herrera»); los campos llevan su nombre en español; los importes van en euros, las fechas y los meses en español, las
+horas como «17:00», los días por su nombre y los valores en clave traducidos («Efectivo», «Iniciación»); y lo que
+apunta a otro registro (alumno, profesor, grupo, cobro, cuota, producto, turno, familia directa) MUST mostrar su
+nombre con enlace a donde se ve, también si ese registro ya se borró. Los identificadores y las columnas internas
+no se muestran, y en altas y bajas tampoco los campos vacíos.
+
+#### Scenario: Registrar un cobro
+- **WHEN** superadministración abre el detalle de «Registrar cobro»
+- **THEN** ve «Alta · Cobro · R-2026-0401 · Martina López Herrera» con «Alumno: Martina López Herrera» (enlace a su
+  ficha), «Tipo: Cuotas», «Forma de pago: Efectivo», «Conceptos: 1,5 h semanales · 1 mes: 40 €» y «Meses: Octubre
+  2026», y en la cuota «Pagada con el cobro: — → R-2026-0401 · Martina López Herrera» (enlace al recibo)
+
 ### Requirement: Ir al elemento cambiado
 En el detalle de una acción, cada cambio MUST ofrecer un botón para ir al sitio de la aplicación donde se ve lo
 que tocó: el recibo del cobro, la ficha del alumno (también para sus datos de cobro e inscripciones), el grupo,
