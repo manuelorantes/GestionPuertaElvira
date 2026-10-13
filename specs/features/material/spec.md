@@ -79,6 +79,9 @@ unidades de cada variante (p. ej. 5 de talla 8, 10 de talla 10 y 5 de talla 12 p
 es el total entre sus unidades. Una compra se puede corregir o borrar si no deja ninguna variante con stock negativo.
 El stock de cada variante MUST ser lo comprado menos lo entregado (sin contar lo devuelto al stock al cancelar). Junto
 al stock se ve lo que hay apuntado y aún sin entregar, y cuánto falta comprar.
+La tabla de stock de cada producto MUST poder ordenarse desde las cabeceras por variante (por defecto, en el orden
+de las opciones del producto), compradas, entregadas, en stock, apuntadas sin entregar o faltan por comprar,
+en ambos sentidos.
 
 #### Scenario: Qué pedir al proveedor
 - **WHEN** hay 7 chándales de talla 10 reservados o pedidos sin entregar y quedan 4 en stock
@@ -89,6 +92,9 @@ Por producto MUST verse: unidades compradas y lo gastado, coste medio por unidad
 unidades compradas), unidades vendidas (pedidos con precio sin cancelar), ingresos (lo que se debe de esos pedidos) y lo
 ya cobrado, y el margen por unidad y total (ingresos menos el coste medio de las unidades vendidas). También los totales
 de todos los productos: lo comprado frente a lo vendido.
+La tabla MUST poder ordenarse desde las cabeceras por producto (por defecto), compradas, gastado, coste medio,
+vendidas, ingresos, cobrado, margen por unidad o margen, en ambos sentidos; lo que no se puede calcular (—) va primero
+de menor a mayor.
 
 #### Scenario: Margen de un lote
 - **WHEN** se compran 20 chándales por 600 € y se venden 10 a 45 €

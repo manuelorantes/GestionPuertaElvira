@@ -2,22 +2,35 @@ import { useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { monthLabel } from '@/features/billing/money';
-import type { PointsKind } from '@/features/points/api';
+import type { PointMovement, PointsKind } from '@/features/points/api';
 import { useMovements } from '@/features/points/hooks';
 import { formatDate } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import { KIND_LABEL, signed } from './labels';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const KINDS: (PointsKind | 'all')[] = ['all', 'friday', 'tournament', 'manual', 'redemption'];
 
+type Column = 'date' | 'student' | 'kind' | 'concept' | 'delta' | 'by';
+
+const COLUMNS: Record<Column, SortColumn<PointMovement>> = {
+  date: { label: 'Fecha', name: 'fecha', value: (m) => m.date },
+  student: { label: 'Alumno', name: 'alumno', value: (m) => m.studentName },
+  kind: { label: 'Tipo', name: 'tipo', value: (m) => KIND_LABEL[m.kind] },
+  concept: { label: 'Concepto', name: 'concepto', value: (m) => m.concept },
+  delta: { label: 'Puntos', name: 'puntos', value: (m) => m.delta },
+  by: { label: 'Quién', name: 'quién', value: (m) => m.by },
+};
+
 /** Todo lo que ha pasado con los puntos en el mes: lo ganado, los ajustes y los canjes. */
 export function MovementsTab({ month, kind }: { month: string; kind?: PointsKind }) {
   const [filter, setFilter] = useState<PointsKind | 'all'>(kind ?? 'all');
   const movements = useMovements({ month, ...(filter === 'all' ? {} : { kind: filter }) });
+  const { header, apply } = useTableSort(COLUMNS, { key: 'date', descending: true });
 
   return (
     <Card className="overflow-hidden">
@@ -56,15 +69,15 @@ export function MovementsTab({ month, kind }: { month: string; kind?: PointsKind
             <caption className="sr-only">Movimientos de {monthLabel(month).toLowerCase()}</caption>
             <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
               <tr>
-                {['Fecha', 'Alumno', 'Tipo', 'Concepto', 'Puntos', 'Quién'].map((h) => (
-                  <th key={h} scope="col" className="px-5 py-3 font-semibold">
-                    {h}
+                {(Object.keys(COLUMNS) as Column[]).map((key) => (
+                  <th key={key} scope="col" className="px-5 py-3 font-semibold">
+                    {header(key)}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {movements.data.map((m) => (
+              {apply(movements.data).map((m) => (
                 <tr key={m.id} className="border-b border-line-soft last:border-b-0">
                   <td className="px-5 py-2.5 tabular-nums">{formatDate(m.date)}</td>
                   <td className="px-5 py-2.5 font-medium">

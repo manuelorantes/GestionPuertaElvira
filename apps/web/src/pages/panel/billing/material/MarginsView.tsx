@@ -1,15 +1,48 @@
 import { formatCents } from '@/features/billing/money';
+import type { Margins } from '@/features/equipment/api';
 import { useMargins } from '@/features/equipment/hooks';
 import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 const HEAD = 'px-4 py-2.5 text-right font-semibold first:text-left';
 const CELL = 'px-4 py-2 text-right first:text-left';
 const money = (cents: number | null) => (cents === null ? '—' : formatCents(cents));
 
+type ProductMargin = Margins['products'][number];
+
+type Column =
+  | 'product'
+  | 'unitsBought'
+  | 'spent'
+  | 'averageCost'
+  | 'unitsSold'
+  | 'revenue'
+  | 'collected'
+  | 'marginPerUnit'
+  | 'margin';
+
+/** Los importes sin calcular (—, sin compras) van primero de menor a mayor. */
+const COLUMNS: Record<Column, SortColumn<ProductMargin>> = {
+  product: { label: 'Producto', name: 'producto', value: (m) => m.productName },
+  unitsBought: { label: 'Compradas', name: 'compradas', value: (m) => m.unitsBought },
+  spent: { label: 'Gastado', name: 'gastado', value: (m) => m.spentCents },
+  averageCost: { label: 'Coste medio', name: 'coste medio', value: (m) => m.averageCostCents },
+  unitsSold: { label: 'Vendidas', name: 'vendidas', value: (m) => m.unitsSold },
+  revenue: { label: 'Ingresos', name: 'ingresos', value: (m) => m.revenueCents },
+  collected: { label: 'Cobrado', name: 'cobrado', value: (m) => m.collectedCents },
+  marginPerUnit: {
+    label: 'Margen/unidad',
+    name: 'margen por unidad',
+    value: (m) => m.marginPerUnitCents,
+  },
+  margin: { label: 'Margen', name: 'margen', value: (m) => m.marginCents },
+};
+
 /** Comprado frente a vendido por producto, con el coste medio de todo lo comprado. */
 export function MarginsView() {
   const margins = useMargins();
+  const { header, apply } = useTableSort(COLUMNS, { key: 'product' });
   if (margins.isPending) return <p className="text-ink-muted">Calculando márgenes…</p>;
   if (margins.isError) return <Alert>No se han podido calcular los márgenes.</Alert>;
   const { products, totals } = margins.data;
@@ -53,25 +86,15 @@ export function MarginsView() {
           <caption className="sr-only">Margen por producto</caption>
           <thead className="border-b border-line text-xs tracking-[0.06em] text-ink-muted uppercase">
             <tr>
-              {[
-                'Producto',
-                'Compradas',
-                'Gastado',
-                'Coste medio',
-                'Vendidas',
-                'Ingresos',
-                'Cobrado',
-                'Margen/unidad',
-                'Margen',
-              ].map((heading) => (
-                <th key={heading} scope="col" className={HEAD}>
-                  {heading}
+              {(Object.keys(COLUMNS) as Column[]).map((key) => (
+                <th key={key} scope="col" className={HEAD}>
+                  {header(key)}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {products.map((m) => (
+            {apply(products).map((m) => (
               <tr key={m.productId} className="border-b border-line-soft">
                 <td className={`${CELL} font-medium`}>{m.productName}</td>
                 <td className={CELL}>{m.unitsBought}</td>

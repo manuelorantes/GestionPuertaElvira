@@ -14,12 +14,24 @@ import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import { SessionDialog } from './SessionDialog';
 import { TeacherLink } from './TeacherLink';
 
 const ICON_BUTTON =
   'flex size-9 cursor-pointer items-center justify-center rounded-sm border border-line-strong hover:bg-surface-muted';
+
+type Column = 'date' | 'teacher' | 'label' | 'hours' | 'cost';
+
+const COLUMNS: Record<Column, SortColumn<Session>> = {
+  date: { label: 'Fecha', name: 'fecha', value: (s) => s.date },
+  teacher: { label: 'Profesor', name: 'profesor', value: (s) => s.teacherName },
+  label: { label: 'Clase', name: 'clase', value: (s) => s.label },
+  // Las horas que cuentan, como salen en la tabla.
+  hours: { label: 'Horas', name: 'horas', value: (s) => s.countedMinutes },
+  cost: { label: 'Coste', name: 'coste', value: (s) => s.costCents },
+};
 
 interface SessionsTabProps {
   month: string;
@@ -34,6 +46,8 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
   const [removing, setRemoving] = useState<Session | null>(null);
   const remove = usePayrollMutation(deleteSession);
   const toast = useToast();
+  // De lo más reciente a lo más antiguo, salvo que se elija otra columna.
+  const { header, apply } = useTableSort(COLUMNS, { key: 'date', descending: true });
   const items = sessions.data ?? [];
   const summer = ['07', '08'].includes(month.slice(5));
 
@@ -57,13 +71,13 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
           <caption className="sr-only">Sesiones de {monthLabel(month).toLowerCase()}</caption>
           <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
             <tr>
-              {['Fecha', 'Profesor', 'Clase', 'Horas'].map((h) => (
-                <th key={h} scope="col" className="px-5 py-3 font-semibold">
-                  {h}
+              {(['date', 'teacher', 'label', 'hours'] as const).map((key) => (
+                <th key={key} scope="col" className="px-5 py-3 font-semibold">
+                  {header(key)}
                 </th>
               ))}
               <th scope="col" className="px-5 py-3 text-right font-semibold">
-                Coste
+                {header('cost')}
               </th>
               <th scope="col">
                 <span className="sr-only">Acciones</span>
@@ -71,7 +85,7 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
             </tr>
           </thead>
           <tbody>
-            {items.map((s) => (
+            {apply(items).map((s) => (
               <tr key={s.id} className="border-b border-line-soft last:border-b-0">
                 <td className="px-5 py-2.5 text-ink-muted">{formatDate(s.date)}</td>
                 <td className="px-5 py-2.5">

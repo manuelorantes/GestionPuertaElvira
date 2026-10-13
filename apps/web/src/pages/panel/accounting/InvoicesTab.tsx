@@ -17,6 +17,21 @@ import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
 import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
+
+type Column = 'date' | 'number' | 'supplier' | 'concept' | 'category' | 'amount' | 'status';
+
+const statusLabel = (invoice: Invoice) => (invoice.paidOn ? 'Pagada' : 'Pendiente');
+
+const COLUMNS: Record<Column, SortColumn<Invoice>> = {
+  date: { label: 'Fecha', name: 'fecha', value: (i) => i.date },
+  number: { label: 'Nº', name: 'número', value: (i) => i.number || null },
+  supplier: { label: 'Proveedor', name: 'proveedor', value: (i) => i.supplier },
+  concept: { label: 'Concepto', name: 'concepto', value: (i) => i.concept },
+  category: { label: 'Categoría', name: 'categoría', value: (i) => i.categoryLabel },
+  amount: { label: 'Importe', name: 'importe', value: (i) => i.amountCents },
+  status: { label: 'Estado', name: 'estado', value: statusLabel },
+};
 
 function PayInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const [date, setDate] = useState(todayIso());
@@ -77,6 +92,7 @@ export function InvoicesTab() {
   const remove = useAccountingMutation(deleteInvoice);
   const toast = useToast();
   const spotlight = useSpotlight('factura');
+  const { header, apply } = useTableSort(COLUMNS, { key: 'date', descending: true });
   const items = invoices.data ?? [];
 
   if (invoices.isPending) return <p className="text-ink-muted">Cargando facturas…</p>;
@@ -88,16 +104,16 @@ export function InvoicesTab() {
         <caption className="sr-only">Facturas de proveedores</caption>
         <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
           <tr>
-            {['Fecha', 'Nº', 'Proveedor', 'Concepto', 'Categoría'].map((h) => (
-              <th key={h} scope="col" className="px-4 py-3 font-semibold">
-                {h}
+            {(['date', 'number', 'supplier', 'concept', 'category'] as const).map((key) => (
+              <th key={key} scope="col" className="px-4 py-3 font-semibold">
+                {header(key)}
               </th>
             ))}
             <th scope="col" className="px-4 py-3 text-right font-semibold">
-              Importe
+              {header('amount')}
             </th>
             <th scope="col" className="px-4 py-3 font-semibold">
-              Estado
+              {header('status')}
             </th>
             <th scope="col">
               <span className="sr-only">Acciones</span>
@@ -105,7 +121,7 @@ export function InvoicesTab() {
           </tr>
         </thead>
         <tbody>
-          {items.map((invoice) => (
+          {apply(items).map((invoice) => (
             <tr
               key={invoice.id}
               ref={invoice.id === spotlight.id ? spotlight.attach : undefined}
@@ -124,11 +140,7 @@ export function InvoicesTab() {
                 {formatCents(invoice.amountCents)}
               </td>
               <td className="px-4 py-3">
-                {invoice.paidOn ? (
-                  <Badge tone="success">Pagada</Badge>
-                ) : (
-                  <Badge tone="warning">Pendiente</Badge>
-                )}
+                <Badge tone={invoice.paidOn ? 'success' : 'warning'}>{statusLabel(invoice)}</Badge>
               </td>
               <td className="px-4 py-3">
                 <span className="flex items-center justify-end gap-2">

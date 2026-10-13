@@ -12,6 +12,7 @@ import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import type { BillingDialog } from './BillingPage';
 import { CancelledCharges } from './CancelledCharges';
@@ -47,7 +48,27 @@ const URGENCY: ChargeStatus[] = [
   'cancelled',
 ];
 
+/** Lo que se elige en el menú «Estado»: por alumno, por urgencia o lo cobrado primero. */
 type StatusSort = 'none' | 'urgent' | 'paid';
+
+function concept(charge: Charge) {
+  if (charge.kind === 'material') return charge.concept ?? 'Material deportivo';
+  if (charge.kind === 'membership') {
+    const year = Number(charge.period.slice(0, 4));
+    return `Cuota de socio ${year}/${String((year + 1) % 100).padStart(2, '0')}`;
+  }
+  return `Cuota de ${monthName(charge.period)}`;
+}
+
+type Column = 'student' | 'concept' | 'amount' | 'status';
+
+/** Un solo orden para la tabla: las tres cabeceras o, desde el menú «Estado», la urgencia (sin cabecera propia). */
+const COLUMNS: Record<Column, SortColumn<Charge>> = {
+  student: { label: 'Alumno', name: 'alumno', value: (c) => c.studentName },
+  concept: { label: 'Concepto', name: 'concepto', value: concept },
+  amount: { label: 'Importe', name: 'importe', value: (c) => c.amountCents },
+  status: { label: 'Estado', name: 'estado', value: (c) => URGENCY.indexOf(c.status) },
+};
 
 /** Meses con clase de la temporada que contiene `month`: de septiembre a junio. */
 interface ChargesTabProps {
@@ -62,24 +83,34 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
   const charges = useMonthlyCharges(month, membership ? 'membership' : 'monthly');
   const data = charges.data;
   const [statusFilter, setStatusFilter] = useState<ChargeStatus[]>([]);
-  const [statusSort, setStatusSort] = useState<StatusSort>('none');
+  const { sort, setSort, header, apply } = useTableSort(COLUMNS, { key: 'student' });
   const all = data?.items ?? [];
   const filtered =
     statusFilter.length === 0 ? all : all.filter((c) => statusFilter.includes(c.status));
-  const items =
-    statusSort === 'none'
-      ? filtered
-      : [...filtered].sort((a, b) => {
-          const order = URGENCY.indexOf(a.status) - URGENCY.indexOf(b.status);
-          return statusSort === 'urgent' ? order : -order;
-        });
+  const items = apply(filtered);
+  // La última elección manda, sea en una cabecera o en el menú: el menú refleja el orden actual
+  // (ninguna opción marcada si se ordena por concepto o importe).
+  const statusSort: StatusSort | null =
+    sort.key === 'status'
+      ? sort.descending
+        ? 'paid'
+        : 'urgent'
+      : sort.key === 'student'
+        ? 'none'
+        : null;
   const menu = (
     <StatusMenu
       charges={all}
       filter={statusFilter}
       onFilter={setStatusFilter}
       sort={statusSort}
-      onSort={setStatusSort}
+      onSort={(choice) =>
+        setSort(
+          choice === 'none'
+            ? { key: 'student', descending: false }
+            : { key: 'status', descending: choice === 'paid' },
+        )
+      }
     />
   );
   const paid = items.filter((c) => c.status === 'paid').length;
@@ -87,15 +118,6 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
     data && data.totals.expectedCents > 0
       ? (data.totals.collectedCents / data.totals.expectedCents) * 100
       : 0;
-
-  function concept(charge: Charge) {
-    if (charge.kind === 'material') return charge.concept ?? 'Material deportivo';
-    if (charge.kind === 'membership') {
-      const year = Number(charge.period.slice(0, 4));
-      return `Cuota de socio ${year}/${String((year + 1) % 100).padStart(2, '0')}`;
-    }
-    return `Cuota de ${monthName(charge.period)}`;
-  }
 
   function actions(charge: Charge) {
     if (charge.status === 'paid')
@@ -231,9 +253,9 @@ export function ChargesTab({ month, view, onMonthChange, onAction }: ChargesTabP
             </caption>
             <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
               <tr>
-                {['Alumno', 'Concepto', 'Importe'].map((heading) => (
-                  <th key={heading} scope="col" className="px-5 py-3 font-semibold">
-                    {heading}
+                {(['student', 'concept', 'amount'] as const).map((key) => (
+                  <th key={key} scope="col" className="px-5 py-3 font-semibold">
+                    {header(key)}
                   </th>
                 ))}
                 <th scope="col" className="px-5 py-3 font-semibold">
@@ -366,7 +388,10 @@ function Missing({ charge }: { charge: Charge }) {
   );
 }
 
-/** Cabecera «Estado» con menú: ordenar por urgencia y filtrar por los estados que hay. */
+/**
+ * Cabecera «Estado» con menú: ordenar por urgencia y filtrar por los estados que hay. `sort` es `null` cuando la
+ * tabla está ordenada por otra cabecera (concepto o importe).
+ */
 function StatusMenu({
   charges,
   filter,
@@ -377,14 +402,15 @@ function StatusMenu({
   charges: Charge[];
   filter: ChargeStatus[];
   onFilter: (filter: ChargeStatus[]) => void;
-  sort: StatusSort;
+  sort: StatusSort | null;
   onSort: (sort: StatusSort) => void;
 }) {
   const [open, setOpen] = useState(false);
   const counts = new Map<ChargeStatus, number>();
   for (const c of charges) counts.set(c.status, (counts.get(c.status) ?? 0) + 1);
   const present = URGENCY.filter((s) => counts.has(s));
-  const active = filter.length > 0 || sort !== 'none';
+  const byStatus = sort === 'urgent' || sort === 'paid';
+  const active = filter.length > 0 || byStatus;
   const toggle = (status: ChargeStatus) =>
     onFilter(filter.includes(status) ? filter.filter((s) => s !== status) : [...filter, status]);
 
@@ -399,7 +425,7 @@ function StatusMenu({
       >
         Estado
         {filter.length > 0 && <span className="normal-case">({filter.length})</span>}
-        {sort !== 'none' && <ArrowDownUp aria-hidden size={12} />}
+        {byStatus && <ArrowDownUp aria-hidden size={12} />}
         <ChevronDown aria-hidden size={13} />
       </button>
       {open && (

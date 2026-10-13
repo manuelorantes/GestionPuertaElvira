@@ -23,6 +23,11 @@ MUST poder elegirse además la forma de pago: «Todos» (por defecto), «Tarjeta
 «Efectivo». Con un filtro activo se indica cuántos movimientos se ven y su suma. El filtro se conserva en la
 dirección de la página.
 
+Los movimientos MUST poder ordenarse desde las cabeceras por fecha
+(por defecto, del más reciente al más antiguo), concepto, categoría,
+forma de pago o importe (con su signo), en ambos sentidos;
+el orden elegido se mantiene al cambiar el filtro.
+
 #### Scenario: Ingresos en efectivo
 - **WHEN** administración elige «Ingresos» y luego «Efectivo»
 - **THEN** solo ve los ingresos cobrados en efectivo de ese mes, con su número y su suma
@@ -100,6 +105,9 @@ Otros gastos), de mayor a menor, con su total.
 ### Requirement: Facturas de proveedores
 Una factura MUST tener fecha, número, proveedor, concepto, categoría de gasto, importe y mes al que corresponde, y MAY llevar un documento (PDF, JPG, PNG o WEBP de hasta 10 MB),
 que se puede abrir o sustituir. Se marca como pagada con fecha y forma de pago; solo una factura pendiente se puede quitar.
+La lista MUST poder ordenarse desde las cabeceras por fecha
+(por defecto, de la más reciente a la más antigua), número, proveedor,
+concepto, categoría, importe o estado, en ambos sentidos.
 
 #### Scenario: Documento no válido
 - **WHEN** se intenta adjuntar un archivo que no es un PDF ni una foto, o que pasa de 10 MB

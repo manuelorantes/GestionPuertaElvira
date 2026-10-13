@@ -32,12 +32,23 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
+import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 const OPERATION = { I: 'Alta', U: 'Cambio', D: 'Baja' } as const;
 const ICON_BUTTON =
   'inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-sm border border-line-strong px-2.5 text-[13px] font-semibold whitespace-nowrap hover:bg-surface-muted';
 
 const when = madridDateTime;
+
+type Column = 'when' | 'user' | 'label' | 'affected';
+
+const COLUMNS: Record<Column, SortColumn<AuditAction>> = {
+  // El número de orden sigue la fecha y hora y nunca empata: el orden exacto en que pasaron las cosas.
+  when: { label: 'Fecha y hora', name: 'fecha y hora', value: (a) => a.seq },
+  user: { label: 'Persona', name: 'persona', value: (a) => a.userName },
+  label: { label: 'Acción', name: 'acción', value: (a) => a.label },
+  affected: { label: 'Afecta a', name: 'afecta a', value: (a) => a.affected.join(', ') || null },
+};
 
 function ActionDetail({ id }: { id: string }) {
   const detail = useQuery({ queryKey: ['audit-action', id], queryFn: () => fetchAction(id) });
@@ -107,6 +118,7 @@ function AuditHistory() {
   const [pending, setPending] = useState<Pending>(null);
   const toast = useToast();
   const refresh = useRefreshClubData();
+  const { header, apply } = useTableSort(COLUMNS, { key: 'when', descending: true });
   const actions = useInfiniteQuery({
     queryKey: ['audit', userId],
     queryFn: ({ pageParam }) => fetchActions(userId, pageParam),
@@ -160,9 +172,9 @@ function AuditHistory() {
               <th scope="col" className="w-12">
                 <span className="sr-only">Detalle</span>
               </th>
-              {['Fecha y hora', 'Persona', 'Acción', 'Afecta a'].map((h) => (
-                <th key={h} scope="col" className="px-4 py-3 font-semibold">
-                  {h}
+              {(Object.keys(COLUMNS) as Column[]).map((key) => (
+                <th key={key} scope="col" className="px-4 py-3 font-semibold">
+                  {header(key)}
                 </th>
               ))}
               <th scope="col">
@@ -171,7 +183,7 @@ function AuditHistory() {
             </tr>
           </thead>
           <tbody>
-            {items.map((a) => (
+            {apply(items).map((a) => (
               <Fragment key={a.id}>
                 <tr className="border-b border-line-soft">
                   <td className="px-2 py-2.5">
