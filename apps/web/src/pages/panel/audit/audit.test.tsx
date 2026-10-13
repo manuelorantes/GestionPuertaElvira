@@ -40,10 +40,21 @@ const DETAIL = {
     {
       table: 'billing_payment',
       tableLabel: 'Cobro',
+      title: 'R-2026-0027 · Martina López Herrera',
       key: { id: 'p1' },
       operation: 'I',
       fields: [
         { field: 'receipt_number', before: null, after: 'R-2026-0027' },
+        { field: 'student_id', before: null, after: 's1' },
+        { field: 'kind', before: null, after: 'monthly' },
+        { field: 'method', before: null, after: 'cash' },
+        {
+          field: 'lines',
+          before: null,
+          after: [{ label: '1,5 h semanales · 1 mes', amountCents: 4500 }],
+        },
+        { field: 'periods', before: null, after: ['2026-10'] },
+        { field: 'invoice', before: null, after: null },
         { field: 'total_cents', before: null, after: 4500 },
       ],
       target: { kind: 'payment', id: 'p1' },
@@ -51,12 +62,21 @@ const DETAIL = {
     {
       table: 'billing_charge',
       tableLabel: 'Cuota',
+      title: 'Cuota de octubre 2026 · Martina López Herrera',
       key: { id: 'c1' },
       operation: 'U',
       fields: [{ field: 'paid_by', before: null, after: 'p1' }],
       target: { kind: 'charges', month: '2026-10' },
     },
   ],
+  references: {
+    s1: { kind: 'student', label: 'Martina López Herrera', target: { kind: 'student', id: 's1' } },
+    p1: {
+      kind: 'payment',
+      label: 'R-2026-0027 · Martina López Herrera',
+      target: { kind: 'payment', id: 'p1' },
+    },
+  },
 };
 
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
@@ -89,6 +109,21 @@ describe('Historial', () => {
     expect(screen.getByText('45 €')).toBeInTheDocument();
     expect(screen.getByText('Alta · Cobro')).toBeInTheDocument();
     expect(screen.getByText('Cambio · Cuota')).toBeInTheDocument();
+    // Nombres y cantidades, no identificadores ni claves: el alumno con enlace, los valores traducidos.
+    expect(screen.getByText('· R-2026-0027 · Martina López Herrera')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s1',
+    );
+    expect(screen.getByText('Cuotas')).toBeInTheDocument();
+    expect(screen.getByText('Efectivo')).toBeInTheDocument();
+    expect(screen.getByText('1,5 h semanales · 1 mes: 45 €')).toBeInTheDocument();
+    expect(screen.getByText('Octubre 2026')).toBeInTheDocument();
+    expect(screen.queryByText('Datos de la factura')).not.toBeInTheDocument();
+    expect(screen.queryByText('p1')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('link', { name: 'R-2026-0027 · Martina López Herrera' }),
+    ).toHaveAttribute('href', '/panel/cobros?pestana=registro&recibo=p1');
     expect(screen.getByRole('link', { name: 'Ir al cobro' })).toHaveAttribute(
       'href',
       '/panel/cobros?pestana=registro&recibo=p1',

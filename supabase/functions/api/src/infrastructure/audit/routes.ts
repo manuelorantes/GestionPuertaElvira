@@ -37,7 +37,7 @@ export function registerAuditRoutes(api: ApiApp): void {
     const id = param(c, 'id');
     const action = await log(scope).action(id);
     if (action === null) throw new AuditActionNotFound();
-    return c.json({ action, changes: await log(scope).changes(id) });
+    return c.json({ action, ...(await log(scope).changes(id)) });
   });
 
   api.defineRoute(superadmin('POST', '/api/admin/audit/actions/:id/undo'), async (c, scope) => {
