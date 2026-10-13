@@ -20,6 +20,7 @@ import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
+import { SortHeader } from '@/shared/ui/SortHeader';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
 
@@ -37,6 +38,42 @@ const FILTERS: { id: StatusFilter; label: string }[] = [
 ];
 
 const ROLES = Object.keys(ROLE_LABEL) as Role[];
+
+type SortKey = 'name' | 'role' | 'status' | 'lastSeen';
+interface Sort {
+  key: SortKey;
+  descending: boolean;
+}
+
+const COLUMNS: { key: SortKey; label: string; name: string }[] = [
+  { key: 'name', label: 'Usuario', name: 'usuario' },
+  { key: 'role', label: 'Rol', name: 'rol' },
+  { key: 'status', label: 'Estado', name: 'estado' },
+  { key: 'lastSeen', label: 'Última conexión', name: 'última conexión' },
+];
+
+const collator = new Intl.Collator('es', { sensitivity: 'base' });
+
+/** Por nombre, por el nombre del rol, activas antes que desactivadas, o por última conexión («Nunca» al principio). */
+function compare(a: ClubUser, b: ClubUser, key: SortKey): number {
+  switch (key) {
+    case 'role':
+      return collator.compare(ROLE_LABEL[a.role], ROLE_LABEL[b.role]);
+    case 'status':
+      return Number(a.status !== 'active') - Number(b.status !== 'active');
+    case 'lastSeen':
+      return (a.lastSeenAt ?? '').localeCompare(b.lastSeenAt ?? '');
+    default:
+      return 0;
+  }
+}
+
+function sorted(users: ClubUser[], sort: Sort): ClubUser[] {
+  const result = [...users].sort(
+    (a, b) => compare(a, b, sort.key) || collator.compare(a.fullName, b.fullName),
+  );
+  return sort.descending ? result.reverse() : result;
+}
 
 /** Acciones de cada cuenta: solo el icono; lo que hacen sale al pasar por encima. */
 const ROW_ACTION =
@@ -84,6 +121,7 @@ export function UsersPage() {
   const users = useUsers();
   const toast = useToast();
   const [filter, setFilter] = useState<StatusFilter>('active');
+  const [sort, setSort] = useState<Sort>({ key: 'name', descending: false });
   const [creating, setCreating] = useState(false);
   const [pending, setPending] = useState<Pending>(null);
   /** Cuenta cuyos emails adicionales se están gestionando (se lee de la lista para ver los cambios al momento). */
@@ -102,7 +140,7 @@ export function UsersPage() {
   if (session && session.role !== 'superadministrator') return <Navigate to="/panel" replace />;
 
   const all = users.data ?? [];
-  const shown = filter === 'all' ? all : all.filter((u) => u.status === filter);
+  const shown = sorted(filter === 'all' ? all : all.filter((u) => u.status === filter), sort);
   const activeCount = all.filter((u) => u.status === 'active').length;
 
   function confirm() {
@@ -177,9 +215,20 @@ export function UsersPage() {
               <caption className="sr-only">Cuentas de usuario</caption>
               <thead className="border-b border-line text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
                 <tr>
-                  {['Usuario', 'Rol', 'Estado', 'Última conexión'].map((h) => (
-                    <th key={h} scope="col" className="px-5 py-3 font-semibold">
-                      {h}
+                  {COLUMNS.map((column) => (
+                    <th key={column.key} scope="col" className="px-5 py-3 font-semibold">
+                      <SortHeader
+                        label={column.label}
+                        name={column.name}
+                        active={sort.key === column.key}
+                        descending={sort.descending}
+                        onSort={() =>
+                          setSort((current) => ({
+                            key: column.key,
+                            descending: current.key === column.key ? !current.descending : false,
+                          }))
+                        }
+                      />
                     </th>
                   ))}
                   <th scope="col">

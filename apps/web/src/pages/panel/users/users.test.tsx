@@ -107,6 +107,49 @@ describe('Usuarios', () => {
     expect(screen.getByRole('row', { name: /Cuenta Antigua/ })).toHaveTextContent('Desactivada');
   });
 
+  it('sorts the accounts from the headers, by name unless another column is chosen', async () => {
+    const user = userEvent.setup();
+    api();
+    renderApp('/panel/usuarios');
+
+    const table = await screen.findByRole('table', { name: 'Cuentas de usuario' });
+    const names = () =>
+      within(table)
+        .getAllByRole('row')
+        .slice(1)
+        .map((row) => within(row).getAllByRole('cell')[0]?.querySelector('span')?.textContent)
+        .map((name) => name?.replace(' (tú)', ''));
+    expect(names()).toEqual([
+      'Administración Pruebas',
+      'Asistente IA',
+      'Club Ajedrez',
+      'Lucía Moreno Gil',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Ordenar por última conexión' }));
+    expect(names()).toEqual([
+      'Asistente IA',
+      'Club Ajedrez',
+      'Lucía Moreno Gil',
+      'Administración Pruebas',
+    ]);
+    await user.click(screen.getByRole('button', { name: 'Ordenar por última conexión' }));
+    expect(names()[0]).toBe('Administración Pruebas');
+
+    await user.click(screen.getByRole('button', { name: 'Ordenar por rol' }));
+    expect(names()).toEqual([
+      'Club Ajedrez',
+      'Asistente IA',
+      'Lucía Moreno Gil',
+      'Administración Pruebas',
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Todos' }));
+    await user.click(screen.getByRole('button', { name: 'Ordenar por estado' }));
+    await user.click(screen.getByRole('button', { name: 'Ordenar por estado' }));
+    expect(names()[0]).toBe('Cuenta Antigua');
+  });
+
   it('creates an account and shows its temporary password once', async () => {
     const spy = api({
       'POST /api/admin/users': [201, { id: 'u9', temporaryPassword: 'Temporal-123456' }],
