@@ -9,6 +9,7 @@ Solo administración (ruta dentro de `/panel`). Las peticiones `/api/admin/billi
    - Al entrar se cargan las del mes actual; el servidor genera las que falten.
    - Con «Mes anterior» y «Mes siguiente» se navega entre meses; el mes va en `?mes=AAAA-MM`.
    - Estados (con `Badge`): Cobrada (success), En plazo (warning), Vencida (danger) y Próxima (neutral).
+   - El menú «Estado» se abre bajo su cabecera, por encima de la tabla y sin que esta lo recorte aunque haya una sola fila; se cierra al mover la página.
      Si la cuota se ha avisado, aparece «Avisado» con un check.
 2. **Registrar un cobro.**
    - Se abre desde la cabecera (sin alumno), desde una fila (con el alumno y el concepto) o desde la ficha.
