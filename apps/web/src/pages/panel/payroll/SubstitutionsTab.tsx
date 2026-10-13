@@ -12,7 +12,7 @@ import {
   type Substitution,
 } from '@/features/payroll/api';
 import { useHolidays, usePayrollMutation, useSubstitutions } from '@/features/payroll/hooks';
-import { formatDate } from '@/features/students/format';
+import { formatDate, todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -58,6 +58,7 @@ export function SubstitutionsTab({ month, teachers }: { month: string; teachers:
   const byDate = new Map<string, Substitution[]>();
   for (const s of substitutions.data ?? []) byDate.set(s.date, [...(byDate.get(s.date) ?? []), s]);
   const holidayOn = new Map((holidays.data ?? []).map((h) => [h.date, h.name]));
+  const today = todayIso();
 
   return (
     <div className="flex flex-col gap-6">
@@ -96,12 +97,15 @@ export function SubstitutionsTab({ month, teachers }: { month: string; teachers:
                 {week.map((date, i) => (
                   <td
                     key={date ?? `vacío-${i}`}
-                    className="h-24 border-r border-line-soft p-2 last:border-r-0"
+                    aria-current={date === today ? 'date' : undefined}
+                    className={`h-24 border-r border-line-soft p-2 last:border-r-0 ${date === today ? 'bg-brand-soft/50' : ''}`}
                   >
                     {date && (
                       <div className="flex h-full flex-col gap-1">
-                        <span className="flex items-center justify-between text-[13px] text-ink-muted">
-                          {Number(date.slice(8))}
+                        <span
+                          className={`flex items-center justify-between text-[13px] ${date === today ? 'font-semibold text-brand-strong' : 'text-ink-muted'}`}
+                        >
+                          {date === today ? `Hoy, ${Number(date.slice(8))}` : Number(date.slice(8))}
                           <button
                             type="button"
                             aria-label={`Nueva sustitución el ${formatDate(date)}`}
