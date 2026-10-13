@@ -78,9 +78,12 @@ export interface StudentSummary {
   /** null si no consta la fecha de nacimiento. */
   age: number | null;
   status: string;
+  /** Su última alta (la del periodo actual). */
+  joinedOn: string;
   /** Su última baja (pasada o futura), o null si no tiene. */
   withdrawnOn: string | null;
-  groups: { id: string; name: string; slotLabel: string }[];
+  /** `since`: desde cuándo está en el grupo. */
+  groups: { id: string; name: string; slotLabel: string; since: string }[];
   hasSiblings: boolean;
 }
 

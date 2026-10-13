@@ -308,6 +308,7 @@ const summary = (fullName: string, withdrawnOn: string | null = null): StudentSu
   fullName,
   age: 12,
   status: withdrawnOn === null ? 'active' : 'withdrawn',
+  joinedOn: '2026-09-01',
   withdrawnOn,
   groups: [],
   hasSiblings: false,

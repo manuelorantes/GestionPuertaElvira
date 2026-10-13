@@ -221,7 +221,7 @@ export class SqlStudentQuery implements StudentQuery {
       }%`})`
       : this.sql`AND s.search_name LIKE ${`%${searchText(term)}%`}`;
     const rows = await this.sql`
-      SELECT s.id, s.member_number, s.full_name, s.birth_date, s.withdrawn_on, s.sibling_ids
+      SELECT s.id, s.member_number, s.full_name, s.birth_date, s.joined_on, s.withdrawn_on, s.sibling_ids
         FROM students_student s WHERE 1 = 1 ${byFilter} ${bySearch} ORDER BY s.search_name`;
     const groupsByStudent = await this.activeGroupsByStudent(on);
     return Row.all(rows).map((row) => ({
@@ -230,11 +230,13 @@ export class SqlStudentQuery implements StudentQuery {
       fullName: row.string('full_name'),
       age: age(row, on),
       status: status(row.nullableString('withdrawn_on'), on),
+      joinedOn: row.string('joined_on'),
       withdrawnOn: row.nullableString('withdrawn_on'),
       groups: (groupsByStudent.get(row.string('id')) ?? []).map((g) => ({
         id: g.id,
         name: g.name,
         slotLabel: g.slotLabel,
+        since: g.since,
       })),
       hasSiblings: row.stringList('sibling_ids').length > 0,
     }));
