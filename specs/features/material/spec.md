@@ -80,6 +80,16 @@ El cobro de material solo se cancela cancelando su pedido.
 Por defecto MUST verse los pedidos abiertos de cualquier fecha (reservados, pedidos sin pagar o sin entregar), con
 filtro por estado, producto y temporada para ver también los cerrados. El filtro de temporada empieza en la 2026/27, la
 primera con material: no ofrece temporadas anteriores.
+Desde los pedidos MUST poder generarse un listado (en una ventana emergente) de lo que hay que pedir: por defecto los
+reservados, y si se quiere los pedidos o ambos, agrupados por producto, con el alumno, la cantidad y el valor de cada
+campo del producto; lo que falta por rellenar se marca con «-». Se elige qué productos listar y si se muestran los
+precios (el del pedido o, si aún no lo tiene, el del producto por la cantidad, con el total de cada producto).
+Cada tabla del listado MUST poder ordenarse desde sus cabeceras por alumno (por defecto), cantidad, cada campo o precio.
+
+#### Scenario: Listado de lo reservado
+- **WHEN** hay reservados un chándal de talla 10 para Martina y dos polos sin talla para Hugo, y se genera el listado
+- **THEN** el chándal y el polo salen en tablas aparte, el de Hugo con «-» en la talla y 2 de cantidad, sin precios hasta
+  activarlos; al quitar el chándal solo queda la tabla del polo
 
 ### Requirement: Compras al proveedor y stock
 Administración MUST poder registrar compras por lotes: un producto, la fecha, lo que costó el lote entero y cuántas

@@ -11,7 +11,7 @@ MaterialTab (?vista=pedidos|stock|margen|productos)
 ├── Botones «Pedidos · Stock y compras · Margen · Productos» + a la derecha la acción de la vista:
 │   «Apuntar pedido» · «Registrar compra» · (ninguna) · «Nuevo producto»
 ├── OrdersView
-│   ├── Filtros: «Abiertos | Todos» · Estado · Producto · Temporada
+│   ├── Filtros: «Abiertos | Todos» · Estado · Producto · Temporada · «Generar listado» (a la derecha)
 │   └── Lista: avatar + alumno · «2 × Chándal · Talla 10 · Nombre a estampar: Pepe» · «Apuntado el …» (+ nota) |
 │       importe (o «Sin precio»; «Faltan X» si está pagado en parte) | badge Reservado/Pedido/Pagado/Cancelado
 │       + badge «Entregado dd/mm/aaaa» | acciones:
@@ -36,6 +36,9 @@ Diálogos
 ├── «Pasar a pedido» / «Cambiar precio»: Precio total (propuesto: precio del producto × cantidad)
 ├── «Entregar»: Día de la entrega
 ├── «Cancelar pedido»: lo que se cancela del cobro + interruptor «Lo ha devuelto: vuelve al stock» si estaba entregado
+├── «Listado de pedidos» (ancho): «Qué listar» (Reservados | Pedidos | Reservados y pedidos) · interruptor «Con precios»
+│   · botones de los productos con pedidos (apagar uno lo quita) · una tabla por producto: Alumno · Cantidad · un campo
+│   por columna («-» si falta) · Precio y total del producto si están activados · «Cerrar»
 ├── «Nuevo producto» / «Editar producto»: Nombre · Precio de venta · Campos (nombre, Lista/Texto, opciones separadas
 │   por comas, quitar) · «Añadir campo» · interruptor «Se ofrece para pedidos nuevos» al editar
 └── «Registrar compra» / «Corregir compra»: Producto · Fecha · Coste del lote entero · unidades por variante ·
