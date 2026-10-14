@@ -1,7 +1,8 @@
-import { Paperclip, Trash2 } from 'lucide-react';
+import { Paperclip, Pencil, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { useSession } from '@/features/auth/useSession';
 import { attachmentUrl, deleteInvoice, payInvoice, type Invoice } from '@/features/accounting/api';
 import { METHODS } from '@/features/accounting/categories';
 import { useAccountingMutation, useInvoices } from '@/features/accounting/hooks';
@@ -18,6 +19,8 @@ import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
 import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
+
+import { EditInvoiceDialog } from './EditInvoiceDialog';
 
 type Column = 'date' | 'number' | 'supplier' | 'concept' | 'category' | 'amount' | 'status';
 
@@ -89,6 +92,9 @@ export function InvoicesTab() {
   const invoices = useInvoices();
   const [paying, setPaying] = useState<Invoice | null>(null);
   const [removing, setRemoving] = useState<Invoice | null>(null);
+  const [editing, setEditing] = useState<Invoice | null>(null);
+  // Editar una factura (también pagada) es cosa de superadministración.
+  const canEdit = useSession().data?.role === 'superadministrator';
   const remove = useAccountingMutation(deleteInvoice);
   const toast = useToast();
   const spotlight = useSpotlight('factura');
@@ -175,6 +181,17 @@ export function InvoicesTab() {
                       </button>
                     </>
                   )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      aria-label={`Editar factura ${invoice.number || invoice.supplier}`}
+                      title="Editar"
+                      onClick={() => setEditing(invoice)}
+                      className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                    >
+                      <Pencil aria-hidden size={16} />
+                    </button>
+                  )}
                 </span>
               </td>
             </tr>
@@ -182,6 +199,7 @@ export function InvoicesTab() {
         </tbody>
       </table>
       {paying && <PayInvoiceDialog invoice={paying} onClose={() => setPaying(null)} />}
+      {editing && <EditInvoiceDialog invoice={editing} onClose={() => setEditing(null)} />}
       {removing && (
         <ConfirmDialog
           title="Quitar factura"
