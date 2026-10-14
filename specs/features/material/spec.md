@@ -16,8 +16,8 @@ defecto y los campos que se le quieran poner:
 
 Un producto MUST poder retirarse (deja de ofrecerse para pedidos nuevos) y volver a ofrecerse.
 
-Las opciones de un campo de lista MUST poder editarse una a una: renombrarse (se indica cuál pasa a cuál), quitarse y
-añadirse. Al renombrar una opción, los pedidos y las compras que la usan pasan a la nueva; para las reservas (pedidos
+Las opciones de un campo de lista MUST poder editarse una a una: renombrarse (se indica cuál pasa a cuál), quitarse,
+añadirse y reordenarse (su orden es el de las tallas en los desplegables y en el stock). Al renombrar una opción, los pedidos y las compras que la usan pasan a la nueva; para las reservas (pedidos
 sin precio) se pregunta antes si pasan a la nueva o se quedan sin elegirla. Al quitar una opción, se avisa y sus
 reservas se quedan sin elegirla (habrá que volver a elegirla antes de pasarlas a pedido); no se puede quitar si la usan
 pedidos con precio o compras. Cuando ninguna opción cambiada está en uso, se guarda sin preguntar.

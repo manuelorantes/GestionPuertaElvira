@@ -583,6 +583,10 @@ describe('Material deportivo', () => {
     await userEvent.click(within(talla).getByRole('button', { name: 'Quitar la opción 12' }));
     await userEvent.click(within(talla).getByRole('button', { name: 'Añadir opción' }));
     await userEvent.type(within(talla).getByLabelText('Opción 3'), 'S');
+    // «S» se adelanta a «XS»: el orden es el de las tallas; la primera no se adelanta más.
+    await userEvent.click(within(talla).getByRole('button', { name: 'Adelantar la opción S' }));
+    expect(within(talla).getByLabelText('Opción 2')).toHaveValue('S');
+    expect(within(talla).getByRole('button', { name: 'Adelantar la opción 8' })).toBeDisabled();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
 
     // Segundo paso: qué pasa con las reservas de cada opción que cambia.
@@ -604,7 +608,7 @@ describe('Material deportivo', () => {
             id: 'talla',
             name: 'Talla',
             kind: 'options',
-            options: ['8', 'XS', 'S'],
+            options: ['8', 'S', 'XS'],
             renamed: [{ from: '10', to: 'XS' }],
           },
           { id: 'nombre', name: 'Nombre a estampar', kind: 'text', options: [], renamed: [] },

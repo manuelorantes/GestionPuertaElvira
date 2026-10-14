@@ -1,4 +1,4 @@
-import { Plus, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 
 import { centsFromText, centsToText } from '@/features/billing/money';
@@ -45,6 +45,9 @@ interface OptionChange {
 }
 
 const NO_USAGE = { reservations: 0, orders: 0, purchases: 0 };
+
+const ARROW =
+  'inline-flex size-6 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent';
 
 const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -115,6 +118,14 @@ export function ProductDialog({
 
   function removeOption(field: FieldDraft, option: OptionDraft) {
     change(field.key, { options: field.options.filter((o) => o.key !== option.key) });
+  }
+
+  /** Cambia una opción de sitio (el orden es el de las tallas en el stock y en los desplegables). */
+  function moveOption(field: FieldDraft, index: number, by: -1 | 1) {
+    const options = [...field.options];
+    const [moved] = options.splice(index, 1);
+    if (moved) options.splice(index + by, 0, moved);
+    change(field.key, { options });
   }
 
   function input(changes: OptionChange[]) {
@@ -291,7 +302,17 @@ export function ProductDialog({
             )}
             <ul className="flex flex-wrap gap-2">
               {field.options.map((option, index) => (
-                <li key={option.key} className="flex items-center gap-1">
+                <li key={option.key} className="flex items-center gap-0.5">
+                  <button
+                    type="button"
+                    aria-label={`Adelantar la opción ${option.value || index + 1}`}
+                    title="Adelantar"
+                    disabled={index === 0}
+                    onClick={() => moveOption(field, index, -1)}
+                    className={ARROW}
+                  >
+                    <ChevronLeft aria-hidden size={14} />
+                  </button>
                   <input
                     aria-label={`Opción ${index + 1}`}
                     value={option.value}
@@ -308,6 +329,16 @@ export function ProductDialog({
                     className="inline-flex size-7 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-raised hover:text-danger-fg"
                   >
                     <X aria-hidden size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Atrasar la opción ${option.value || index + 1}`}
+                    title="Atrasar"
+                    disabled={index === field.options.length - 1}
+                    onClick={() => moveOption(field, index, 1)}
+                    className={ARROW}
+                  >
+                    <ChevronRight aria-hidden size={14} />
                   </button>
                 </li>
               ))}
