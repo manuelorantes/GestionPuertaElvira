@@ -126,6 +126,13 @@ adelantado).
 Administración MUST poder fijar a mano el importe de una cuota con un motivo, eligiendo si afecta solo a ese mes o
 a ese y a todos los siguientes de la temporada, y MUST poder devolverla al importe calculado. Los cobros y sus recibos
 no cambian; el reparto se rehace solo.
+Lo que se sube a mano a una cuota MUST cubrirse lo último: si el alumno ya la tenía cubierta, esa cuota queda
+«Pagada en parte» con la diferencia y los meses siguientes no cambian de estado. Al devolverla al importe calculado
+(o fijar su descuento) vuelve a cubrirse como las demás.
+
+#### Scenario: Subir a mano un mes ya pagado
+- **WHEN** un alumno pagó el curso entero (octubre a 32 € y el resto a 44 €) y administración fija octubre en 35 €
+- **THEN** octubre queda «Pagada en parte» con 3 € pendientes y junio sigue «Cobrada»
 
 #### Scenario: Un mes cobrado de más y el siguiente de menos
 - **WHEN** un alumno pagó 50 € por septiembre (debían ser 25 €) y 25 € por octubre, y administración fija septiembre en 25 € y octubre en 50 €

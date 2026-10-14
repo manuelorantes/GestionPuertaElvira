@@ -211,6 +211,30 @@ Deno.test('Charge should keep a manual amount with its reason and ignore automat
   assertEquals(charge.paidBy(), payment, 'recuerda el primer cobro que la cubrió');
 });
 
+Deno.test('Charge should tell how much of it was raised by hand over what it had before', () => {
+  const charge = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-10'),
+    Money.euros(32),
+  );
+  assertEquals(charge.raisedByHand().cents, 0);
+  charge.adjust(Money.euros(35), 'Empieza dos días tarde');
+  assertEquals(charge.raisedByHand().cents, 300);
+  charge.adjust(Money.euros(36), 'Otro ajuste');
+  assertEquals(charge.raisedByHand().cents, 400, 'respecto a lo que tenía antes de tocarla a mano');
+  charge.adjust(Money.euros(30), 'Rebaja');
+  assertEquals(charge.raisedByHand().cents, 0);
+  charge.adjust(Money.euros(35), 'Subida');
+  assertEquals(charge.raisedByHand().cents, 500, 'respecto al importe más bajo que tuvo');
+  charge.resetTo(Money.euros(44));
+  assertEquals(charge.raisedByHand().cents, 0, 'al volver al importe calculado se olvida');
+  charge.adjust(Money.euros(50), 'Subida');
+  charge.setDiscount(10, Money.euros(44));
+  assertEquals(charge.raisedByHand().cents, 0, 'fijar el descuento también lo deja calculado');
+});
+
 Deno.test('Charge should keep its prepayment discount when it is repriced', () => {
   const charge = Charge.create(
     ChargeId.generate(),
@@ -257,6 +281,19 @@ Deno.test('allocateCredit should cover the oldest charges first and keep what is
 
   const extra = allocateCredit([charge('2026-09', 25)], Money.euros(40));
   assertEquals(extra.balance.cents, 1500, 'saldo a favor');
+
+  // Octubre subido a mano de 32 a 35 € con el curso ya pagado (32 + 44 cubiertos): los 3 € faltan en octubre.
+  const raised = charge('2026-10', 32);
+  raised.adjust(Money.euros(35), 'Empieza dos días tarde');
+  const next = charge('2026-11', 44);
+  const hand = allocateCredit([next, raised], Money.euros(76));
+  assertEquals(
+    [hand.covered(raised).cents, hand.covered(next).cents, hand.pendingTotal.cents],
+    [3200, 4400, 300],
+  );
+  // Con dinero de sobra también se cubre lo subido a mano.
+  const enough = allocateCredit([next, raised], Money.euros(80));
+  assertEquals([enough.covered(raised).cents, enough.balance.cents], [3500, 100]);
 });
 
 function payment(total: Money): Payment {
