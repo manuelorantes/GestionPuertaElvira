@@ -50,6 +50,30 @@ Deno.test('audit should be reserved to superadministrators', async () => {
   assertEquals((await admin.get('/api/admin/students?filter=all')).status, 200);
 });
 
+Deno.test('audit should let the assistant read the history but never undo or restore', async () => {
+  await superadmin();
+  await createUser('ia@club.es', 'assistant');
+  const assistant = new ApiClient();
+  await assistant.logIn('ia@club.es');
+  assertEquals((await assistant.get('/api/admin/audit/actions')).status, 200);
+  assertError(
+    await assistant.json(
+      'POST',
+      '/api/admin/audit/actions/01990000-0000-7000-8000-000000000000/undo',
+    ),
+    403,
+    'forbidden',
+  );
+  assertError(
+    await assistant.json(
+      'POST',
+      '/api/admin/audit/actions/01990000-0000-7000-8000-000000000000/restore',
+    ),
+    403,
+    'forbidden',
+  );
+});
+
 Deno.test('audit should record who did each action with a field by field detail', async () => {
   const client = await superadmin();
   const id = await newTeacher(client, 'Lucía Moreno Gil');

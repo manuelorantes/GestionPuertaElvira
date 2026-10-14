@@ -53,8 +53,17 @@ export type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
  * toman el profesor de la sesión).
  * `clubReader`: consultas del club (grupos, alumnos y sus fichas, cobros incluidos) que administración comparte con el
  * profesorado; solo lectura (ver specs/decisions/profesorado-lee-datos-del-club.md).
+ * `auditReader`: consultas del historial, de superadministración y del asistente; solo lectura (deshacer y volver a
+ * un punto siguen siendo de superadministración).
  */
-export type Access = 'public' | 'user' | 'admin' | 'superadmin' | 'teacher' | 'clubReader';
+export type Access =
+  | 'public'
+  | 'user'
+  | 'admin'
+  | 'superadmin'
+  | 'teacher'
+  | 'clubReader'
+  | 'auditReader';
 
 export interface RouteOptions {
   method: Method;
@@ -138,6 +147,9 @@ export class ApiApp {
     if (options.access === 'clubReader' && options.method !== 'GET') {
       throw new Error(`${options.method} ${options.path}: el profesorado solo lee datos del club.`);
     }
+    if (options.access === 'auditReader' && options.method !== 'GET') {
+      throw new Error(`${options.method} ${options.path}: el asistente solo lee el historial.`);
+    }
     this.remember(options.method, options.path);
     this.hono.on(options.method, options.path, async (c) => {
       const scope = c.get('scope');
@@ -203,6 +215,9 @@ const ADMIN_ROLES: ReadonlySet<string> = new Set([
   'assistant',
 ]);
 
+/** Quienes consultan el historial: superadministración y el asistente (que no deshace ni restaura). */
+const AUDIT_READERS: ReadonlySet<string> = new Set(['superadministrator', 'assistant']);
+
 /**
  * El profesorado (vinculado o no, para avisarle si no lo está) y cualquier otra cuenta vinculada a un profesor
  * (solo se vinculan los roles que dan clases).
@@ -218,7 +233,8 @@ function enforceAccess(user: AuthenticatedUser | null, options: RouteOptions): v
     (options.access === 'admin' && ADMIN_ROLES.has(user.role)) ||
     (options.access === 'superadmin' && user.role === 'superadministrator') ||
     (options.access === 'teacher' && canUseTeacherSpace(user)) ||
-    (options.access === 'clubReader' && (ADMIN_ROLES.has(user.role) || user.role === 'teacher'));
+    (options.access === 'clubReader' && (ADMIN_ROLES.has(user.role) || user.role === 'teacher')) ||
+    (options.access === 'auditReader' && AUDIT_READERS.has(user.role));
   if (!allowed) throw httpError(403);
   if (options.access === 'teacher' && user.teacherId === null) {
     throw new ApiProblem(
