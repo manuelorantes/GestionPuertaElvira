@@ -150,6 +150,10 @@ Table billing_charge {
   cancelled_on date [note: 'día en que se canceló; nulo = no cancelada']
   kept_cents int [note: 'lo que se conserva al cancelarla (lo cobrado; 0 = cancelada entera); se debe LEAST(amount_cents, kept_cents)']
   concept text [note: 'en las de material, el producto pedido']
+  manual boolean [not null, default: false, note: 'importe fijado a mano: el recálculo no lo toca']
+  note varchar(160) [note: 'motivo del importe fijado a mano']
+  discount_percent int [not null, default: 0, note: 'descuento por pago adelantado de este mes']
+  base_cents int [note: 'importe más bajo que tuvo antes de fijarla a mano; lo que pasa de él se cubre lo último']
 
   indexes {
     (student_id, kind, period) [unique, name: 'billing_charge_unique', note: 'salvo kind = material']
