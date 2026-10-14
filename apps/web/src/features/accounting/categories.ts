@@ -6,6 +6,11 @@ export const METHODS = [
   { value: 'card', label: 'Tarjeta' },
 ];
 
+/** «Efectivo», «Transferencia» o «Tarjeta»; el código tal cual si no es ninguna. */
+export function methodLabel(method: string | null): string {
+  return METHODS.find((m) => m.value === method)?.label ?? method ?? '—';
+}
+
 const DOCUMENT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 const MAX_DOCUMENT_BYTES = 10 * 1024 * 1024;
 
