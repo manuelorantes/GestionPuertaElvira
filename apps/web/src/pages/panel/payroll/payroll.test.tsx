@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 
 import { currentMonth } from '@/features/billing/money';
 import { todayIso } from '@/features/students/format';
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
 const TEACHERS = [
   { id: 't1', fullName: 'Lucía Moreno Gil', active: true, groupCount: 2, hourlyRate: '16.00' },
@@ -676,7 +676,12 @@ describe('Profesorado', () => {
       screen.getByRole('button', { name: 'Cambiar la fecha de pago de septiembre 2026' }),
     );
     const dialog = await screen.findByRole('dialog', { name: 'Fecha de pago' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Día'), '29');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    // Cambiar la fecha de un pago hecho se confirma viendo el cambio.
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
+    expect(confirm).toHaveTextContent('Fecha de pago: 30/09/2026 → 29/09/2026');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
     await waitFor(() =>
       expect(
         fetch.mock.calls.some(
@@ -779,6 +784,10 @@ describe('Profesorado', () => {
     expect(within(table).getByRole('row', { name: /Carlos/ })).toHaveTextContent(
       'Pagada el 02/10/2026',
     );
+    // Editar una liquidación pagada es cosa de superadministración.
+    expect(
+      within(table).queryByRole('button', { name: /Editar liquidación/ }),
+    ).not.toBeInTheDocument();
     const lucia = within(table).getByRole('row', { name: /Lucía/ });
     await userEvent.click(
       within(lucia).getByRole('button', { name: 'Ver detalle de Lucía Moreno Gil' }),
@@ -791,6 +800,38 @@ describe('Profesorado', () => {
       '/api/admin/payroll/settlements/t1/2026-09/payment',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('lets superadministration change the payment date of a paid settlement, after confirming', async () => {
+    const fetch = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'PUT /api/admin/payroll/settlements/t2/2026-09/payment': [204],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
+
+    const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
+    const lucia = within(table).getByRole('row', { name: /Lucía/ });
+    expect(
+      within(lucia).queryByRole('button', { name: /Editar liquidación/ }),
+    ).not.toBeInTheDocument();
+    const carlos = within(table).getByRole('row', { name: /Carlos/ });
+    await userEvent.click(
+      within(carlos).getByRole('button', { name: 'Editar liquidación de Carlos Ruiz Márquez' }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Fecha de pago' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Día'), '5');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
+    expect(confirm).toHaveTextContent('Fecha de pago: 02/10/2026 → 05/10/2026');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
+
+    expect(await screen.findByText('Fecha de pago cambiada')).toBeInTheDocument();
+    const call = fetch.mock.calls.find(
+      ([url]) => url === '/api/admin/payroll/settlements/t2/2026-09/payment',
+    );
+    expect(call?.[1]?.method).toBe('PUT');
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ date: '2026-10-05' });
   });
 
   it('sorts the sessions from the headers, most recent first unless another column is chosen', async () => {
