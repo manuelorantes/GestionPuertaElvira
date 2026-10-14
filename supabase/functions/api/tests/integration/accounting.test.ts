@@ -102,6 +102,80 @@ Deno.test('accounting should register an invoice with its document, pay it and s
   assertError(await client.get('/api/admin/accounting/ledger'), 422, 'unprocessable');
 });
 
+Deno.test('only superadministration amends an invoice, its payment included', async () => {
+  const client = await admin();
+  const registered = await client.request('POST', '/api/admin/accounting/invoices', {
+    body: invoiceForm(null),
+    headers: { 'X-Requested-With': 'fetch' },
+  });
+  const id = body<{ id: string }>(registered).id;
+  await client.json('POST', `/api/admin/accounting/invoices/${id}/payment`, {
+    date: '2025-10-02',
+    method: 'transfer',
+  });
+  const amendment = {
+    date: '2025-10-03',
+    number: 'R-2025-10-B',
+    supplier: 'Casero',
+    concept: 'Alquiler de octubre',
+    category: 'rent',
+    amount: '900',
+    period: '2025-09',
+    paidOn: '2025-10-09',
+    method: 'cash',
+  };
+  assertError(
+    await client.json('PUT', `/api/admin/accounting/invoices/${id}`, amendment),
+    403,
+    'forbidden',
+  );
+
+  await createUser('super@club.es', 'superadministrator');
+  const superadmin = new ApiClient();
+  await superadmin.logIn('super@club.es');
+  assertEquals(
+    (await superadmin.json('PUT', `/api/admin/accounting/invoices/${id}`, amendment)).status,
+    204,
+  );
+  const invoice = body<{ items: Record<string, unknown>[] }>(
+    await superadmin.get('/api/admin/accounting/invoices'),
+  ).items[0];
+  assertEquals(
+    [
+      invoice?.date,
+      invoice?.number,
+      invoice?.supplier,
+      invoice?.concept,
+      invoice?.amountCents,
+      invoice?.period,
+      invoice?.paidOn,
+      invoice?.method,
+    ],
+    [
+      '2025-10-03',
+      'R-2025-10-B',
+      'Casero',
+      'Alquiler de octubre',
+      90000,
+      '2025-09',
+      '2025-10-09',
+      'cash',
+    ],
+  );
+  const ledger = body<{ items: Record<string, unknown>[] }>(
+    await superadmin.get('/api/admin/accounting/ledger?month=2025-10'),
+  );
+  assertEquals([ledger.items[0]?.date, ledger.items[0]?.amountCents], ['2025-10-09', 90000]);
+  assertError(
+    await superadmin.json('PUT', `/api/admin/accounting/invoices/${id}`, {
+      ...amendment,
+      supplier: ' ',
+    }),
+    422,
+    'unprocessable',
+  );
+});
+
 Deno.test('accounting should refuse uploads without the fetch header or of the wrong type', async () => {
   const client = await admin();
   const noHeader = await client.request('POST', '/api/admin/accounting/invoices', {

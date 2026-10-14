@@ -134,6 +134,56 @@ Deno.test('SupplierInvoice should be paid once and replace its attachment', () =
   );
 });
 
+Deno.test('SupplierInvoice should let its header be amended, and its payment only once paid', () => {
+  const invoice = SupplierInvoice.register(
+    SupplierInvoiceId.generate(),
+    LocalDate.fromString('2026-10-01'),
+    'E-0912',
+    'Escaque Material Didáctico',
+    'Tablero mural',
+    cat('material'),
+    Money.cents(8600),
+  );
+  const amendment = {
+    date: LocalDate.fromString('2026-10-02'),
+    number: 'E-0913',
+    supplier: 'Escaque',
+    concept: 'Tablero mural grande',
+    category: cat('rent'),
+    amount: Money.cents(9000),
+    period: YearMonth.fromString('2026-09'),
+    paidOn: LocalDate.fromString('2026-10-09'),
+    method: 'cash' as const,
+  };
+
+  invoice.amend(amendment);
+  assertEquals(
+    [
+      invoice.date.toString(),
+      invoice.number,
+      invoice.supplier,
+      invoice.concept,
+      invoice.category,
+      invoice.amount.cents,
+      invoice.period.toString(),
+    ],
+    ['2026-10-02', 'E-0913', 'Escaque', 'Tablero mural grande', 'rent', 9000, '2026-09'],
+  );
+  // Pendiente: el pago no se toca.
+  assertFalse(invoice.isPaid());
+
+  invoice.pay(LocalDate.fromString('2026-10-03'), 'transfer');
+  invoice.amend(amendment);
+  assertEquals([invoice.paidOn()?.toString(), invoice.method()], ['2026-10-09', 'cash']);
+  // Pagada, la corrección no puede dejarla sin fecha ni sin forma de pago.
+  assertThrows(() => invoice.amend({ ...amendment, paidOn: null }), InvalidValue);
+  assertThrows(() => invoice.amend({ ...amendment, method: null }), InvalidValue);
+  assertThrows(() => invoice.amend({ ...amendment, supplier: ' ' }), InvalidValue);
+  assertThrows(() => invoice.amend({ ...amendment, concept: '' }), InvalidValue);
+  assertThrows(() => invoice.amend({ ...amendment, category: cat('grants') }), InvalidValue);
+  assertThrows(() => invoice.amend({ ...amendment, amount: Money.cents(0) }), InvalidValue);
+});
+
 Deno.test('Attachment should only accept documents and photos up to ten megabytes', () => {
   assertThrows(
     () => new Attachment('invoices/a.exe', 'virus.exe', 'application/x-msdownload', 1000),

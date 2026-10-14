@@ -2,6 +2,7 @@ import { InvalidValue } from '../../domain/common/mod.ts';
 import { methodFromName, methodLabel, SupplierInvoiceId } from '../../domain/accounting/mod.ts';
 import {
   AddCategory,
+  AmendInvoice,
   AttachDocument,
   CloseSeason,
   DeleteEntry,
@@ -234,6 +235,27 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     );
     return c.json({ id }, 201);
   });
+
+  // Corrección completa de una factura: solo superadministración.
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/accounting/invoices/:id', access: 'superadmin' },
+    async (c, scope) => {
+      const b = await JsonBody.from(c.req.raw);
+      const { accounting, closed } = repos(scope);
+      await new AmendInvoice(accounting, closed, accounting).execute(param(c, 'id'), {
+        date: b.requiredString('date'),
+        number: b.optionalString('number') ?? '',
+        supplier: b.requiredString('supplier'),
+        concept: b.requiredString('concept'),
+        category: b.requiredString('category'),
+        amount: b.requiredString('amount'),
+        period: b.requiredString('period'),
+        paidOn: b.optionalString('paidOn') ?? null,
+        method: b.optionalString('method') ?? null,
+      });
+      return c.body(null, 204);
+    },
+  );
 
   api.defineRoute(admin('POST', '/api/admin/accounting/invoices/:id/payment'), async (c, scope) => {
     const b = await JsonBody.from(c.req.raw);

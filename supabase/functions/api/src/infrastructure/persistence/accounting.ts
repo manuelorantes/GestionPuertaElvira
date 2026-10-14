@@ -168,6 +168,9 @@ export class SqlAccountingRepository
       ON CONFLICT (id) DO UPDATE SET ${
       this.sql(
         record,
+        'invoice_date',
+        'number',
+        'supplier',
         'concept',
         'category',
         'amount_cents',

@@ -12,6 +12,7 @@ import {
   CategoryCatalog,
   type EntryKind,
   FiscalYear,
+  type InvoiceAmendment,
   LedgerCorrection,
   ManualEntry,
   ManualEntryId,
@@ -524,6 +525,60 @@ export class PayInvoice {
     await PeriodClosed.guard(this.closed, paidOn);
     invoice.pay(paidOn, methodFromName(method));
     await this.invoices.saveInvoice(invoice);
+  }
+}
+
+export interface InvoiceAmendmentInput {
+  date: string;
+  number: string;
+  supplier: string;
+  concept: string;
+  category: string;
+  amount: string;
+  period: string;
+  paidOn: string | null;
+  method: string | null;
+}
+
+/**
+ * Corrección completa de una factura por superadministración: cabecera, importe, mes al que corresponde y, si está
+ * pagada, fecha y forma de pago. Ni la factura puede estar en una temporada cerrada ni moverse a una.
+ */
+export class AmendInvoice {
+  constructor(
+    private readonly invoices: SupplierInvoiceRepository,
+    private readonly closed: ClosedPeriods,
+    private readonly categories: AccountingCategoryRepository,
+  ) {}
+
+  async execute(id: string, input: InvoiceAmendmentInput): Promise<void> {
+    const invoice = await this.invoices.invoice(SupplierInvoiceId.fromString(id));
+    if (invoice === null) throw new SupplierInvoiceNotFound();
+    const amendment = await this.amendmentFrom(input, invoice.isPaid());
+    for (const date of [invoice.paidOn() ?? invoice.date, amendment.date, amendment.paidOn]) {
+      if (date !== null) await PeriodClosed.guard(this.closed, date);
+    }
+    invoice.amend(amendment);
+    await this.invoices.saveInvoice(invoice);
+  }
+
+  private async amendmentFrom(
+    input: InvoiceAmendmentInput,
+    paid: boolean,
+  ): Promise<InvoiceAmendment> {
+    const catalog = await this.categories.catalog();
+    return {
+      date: LocalDate.fromString(input.date),
+      number: input.number,
+      supplier: input.supplier,
+      concept: input.concept,
+      category: catalog.require(input.category),
+      amount: Money.fromDecimal(input.amount),
+      period: YearMonth.fromString(input.period),
+      // El pago solo cuenta en una factura pagada; en una pendiente se ignora.
+      paidOn: paid && input.paidOn !== null ? LocalDate.fromString(input.paidOn) : null,
+      method: paid && input.method !== null ? methodFromName(input.method) : null,
+    };
   }
 }
 
