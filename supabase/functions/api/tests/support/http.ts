@@ -51,6 +51,7 @@ function app(): Shared {
     api.defineRoute({ method: 'GET', path: '/api/_ping', access: 'user' }, pong);
     api.defineRoute({ method: 'GET', path: '/api/admin/_ping', access: 'admin' }, pong);
     api.defineRoute({ method: 'GET', path: '/api/admin/audit/_ping', access: 'superadmin' }, pong);
+    api.defineRoute({ method: 'GET', path: '/api/admin/audit/_read', access: 'auditReader' }, pong);
     shared = { db, fetch: (request) => Promise.resolve(api.hono.fetch(request)) };
   }
   return shared;
