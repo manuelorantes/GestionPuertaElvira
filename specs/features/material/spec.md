@@ -44,6 +44,9 @@ no se permite si no hay unidades suficientes: hay que registrar antes la compra.
 elige si la unidad vuelve al stock.
 El precio de un pedido MUST poder corregirse mientras no tenga nada cobrado. Los campos y la cantidad se pueden
 corregir mientras no esté entregado ni cancelado.
+Un pedido MUST poder volver a reservado mientras no tenga nada cobrado ni esté entregado: pierde el precio y la
+fecha en que se pasó a pedido, y su cobro desaparece de «Cuotas» (no queda como cancelado). Se puede volver a pasar a
+pedido después.
 
 #### Scenario: De reserva a pagado
 - **WHEN** se reserva un chándal de talla 10 para un alumno, se pasa a pedido por 45 € y se registra el cobro
@@ -56,6 +59,11 @@ corregir mientras no esté entregado ni cancelado.
 #### Scenario: Entrega sin stock
 - **WHEN** se intenta entregar un chándal de talla 10 y no queda ninguno de esa talla
 - **THEN** no se permite y se pide registrar la compra antes
+
+#### Scenario: Volver a reservado sin nada cobrado
+- **WHEN** un pedido de 45 € sin nada cobrado ni entregado vuelve a reservado
+- **THEN** queda reservado sin precio, el alumno ya no debe esos 45 € y el cobro no aparece en «Cuotas» ni entre los
+  cancelados
 
 #### Scenario: Cancelar con parte cobrada
 - **WHEN** un pedido de 45 € tiene 20 € cobrados y se cancela

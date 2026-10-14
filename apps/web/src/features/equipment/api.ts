@@ -189,6 +189,11 @@ export function undoDelivery(id: string): Promise<void> {
   return apiSend('POST', `${BASE}/orders/${id}/undo-delivery`, {});
 }
 
+/** Vuelve a reservado: pierde el precio y su cobro desaparece (solo sin nada cobrado ni entregado). */
+export function unplaceOrder(id: string): Promise<void> {
+  return apiSend('POST', `${BASE}/orders/${id}/unplace`, {});
+}
+
 export function cancelOrder({
   id,
   returnToStock,
