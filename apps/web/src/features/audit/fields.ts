@@ -77,6 +77,7 @@ const LABELS: Record<string, string> = {
   reminded_on: 'Avisado el',
   cancelled_on: 'Cancelada el',
   manual: 'Fijada a mano',
+  base_cents: 'Importe antes de fijarla a mano',
   discount_percent: 'Descuento',
   entry_date: 'Fecha',
   invoice_date: 'Fecha de la factura',

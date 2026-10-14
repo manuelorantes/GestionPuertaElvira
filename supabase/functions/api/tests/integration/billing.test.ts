@@ -586,6 +586,51 @@ Deno.test({
 });
 
 Deno.test({
+  name: 'what is raised by hand on a paid month stays pending on that month',
+  // Dos meses no caben en junio.
+  ignore: outsideSeason || today.slice(5, 7) === '06',
+  async fn() {
+    const fx = await fixture();
+    const month = today.slice(0, 7);
+    const next = YearMonth.fromString(month).next().toString();
+    type Item = { period: string; status: string; coveredCents: number; pendingCents?: number };
+    const account = async () =>
+      body<{ charges: Item[] }>(await fx.client.get(`/api/admin/billing/accounts/${fx.student}`))
+        .charges.filter((c) => c.period === month || c.period === next)
+        .map((c) => [c.period, c.status, c.coveredCents, c.pendingCents]);
+    const listed = async () =>
+      body<{ items: Item[] }>(
+        await fx.client.get(`/api/admin/billing/charges?kind=monthly&month=${month}`),
+      ).items.map((c) => [c.status, c.coveredCents]);
+    const paid = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'monthly',
+      months: 2,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(paid.status, 201, JSON.stringify(paid.body));
+    assertEquals(await account(), [[month, 'paid', 4500, 0], [next, 'paid', 4500, 0]]);
+
+    // Se sube a mano el mes pagado: faltan 5 € en ese mes, no en el siguiente.
+    await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}/charges/${month}`, {
+      amountCents: 5000,
+      reason: 'Empieza dos días tarde',
+      scope: 'one',
+    });
+    assertEquals(await account(), [[month, 'partial', 4500, 500], [next, 'paid', 4500, 0]]);
+    assertEquals(await listed(), [['partial', 4500]]);
+
+    // Al volver al importe calculado, todo cubierto otra vez.
+    await fx.client.json(
+      'POST',
+      `/api/admin/billing/accounts/${fx.student}/charges/${month}/reset`,
+    );
+    assertEquals(await account(), [[month, 'paid', 4500, 0], [next, 'paid', 4500, 0]]);
+  },
+});
+
+Deno.test({
   name: 'a payment corrected in accounting keeps its receipt, except the payment method',
   ignore: outsideSeason,
   async fn() {
