@@ -133,6 +133,23 @@ export function payInvoice(id: string, date: string, method: string): Promise<vo
   return apiSend('POST', `${BASE}/invoices/${id}/payment`, { date, method });
 }
 
+/** Lo que superadministración corrige de una factura; el pago solo cuenta si está pagada. */
+export interface InvoiceAmendment {
+  date: string;
+  number: string;
+  supplier: string;
+  concept: string;
+  category: string;
+  amount: string;
+  period: string;
+  paidOn: string | null;
+  method: string | null;
+}
+
+export function amendInvoice(input: { id: string; amendment: InvoiceAmendment }): Promise<void> {
+  return apiSend('PUT', `${BASE}/invoices/${input.id}`, input.amendment);
+}
+
 export function deleteInvoice(id: string): Promise<void> {
   return apiSend('DELETE', `${BASE}/invoices/${id}`);
 }

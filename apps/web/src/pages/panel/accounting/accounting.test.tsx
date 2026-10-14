@@ -2,7 +2,7 @@ import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
 const LEDGER = {
   month: '2026-10',
@@ -67,6 +67,7 @@ const INVOICES = [
     paidOn: '2026-10-01',
     method: 'transfer',
     attachmentName: 'alquiler.pdf',
+    period: '2026-10',
   },
   {
     id: 'i2',
@@ -80,6 +81,7 @@ const INVOICES = [
     paidOn: null,
     method: null,
     attachmentName: null,
+    period: '2026-09',
   },
 ];
 
@@ -592,6 +594,8 @@ describe('Contabilidad', () => {
       'href',
       '/api/admin/accounting/invoices/i1/attachment',
     );
+    // Editar facturas es cosa de superadministración.
+    expect(within(table).queryByRole('button', { name: /Editar factura/ })).not.toBeInTheDocument();
     const pending = within(table).getByRole('row', { name: /TP-044/ });
     await userEvent.click(within(pending).getByRole('button', { name: 'Pagar' }));
     await userEvent.click(
@@ -605,6 +609,47 @@ describe('Contabilidad', () => {
       '/api/admin/accounting/invoices/i2/payment',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  it('lets superadministration edit a paid invoice from its pencil, after confirming the changes', async () => {
+    const fetch = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'PUT /api/admin/accounting/invoices/i1': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=facturas');
+
+    const table = await screen.findByRole('table', { name: 'Facturas de proveedores' });
+    const paid = within(table).getByRole('row', { name: /R-2026-10/ });
+    await userEvent.click(within(paid).getByRole('button', { name: 'Editar factura R-2026-10' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar factura' });
+    const amount = within(dialog).getByLabelText('Importe (€)');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '900');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Forma de pago'), 'cash');
+    const paidOn = within(dialog).getByRole('group', { name: 'Fecha de pago' });
+    await userEvent.selectOptions(within(paidOn).getByLabelText('Día'), '3');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
+
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
+    expect(confirm).toHaveTextContent('Importe: 950 € → 900 €');
+    expect(confirm).toHaveTextContent('Forma de pago: Transferencia → Efectivo');
+    expect(confirm).toHaveTextContent('Fecha de pago: 01/10/2026 → 03/10/2026');
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
+
+    expect(await screen.findByText('Factura editada')).toBeInTheDocument();
+    const call = fetch.mock.calls.find(([url]) => url === '/api/admin/accounting/invoices/i1');
+    expect(call?.[1]?.method).toBe('PUT');
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+      date: '2026-10-01',
+      number: 'R-2026-10',
+      supplier: 'Propietario del local',
+      concept: 'Alquiler octubre',
+      category: 'rent',
+      amount: '900',
+      period: '2026-10',
+      paidOn: '2026-10-03',
+      method: 'cash',
+    });
   });
 
   it('sorts the invoices from the headers, most recent first unless another column is chosen', async () => {
