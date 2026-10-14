@@ -139,6 +139,15 @@ sentidos.
 - **WHEN** administración marca como pagada una liquidación
 - **THEN** sus horas, tarifa e importe quedan congelados aunque después cambie la tarifa, y las sesiones de ese profesor y mes ya no se pueden cambiar
 
+### Requirement: Editar una liquidación pagada
+Solo superadministración MUST poder cambiar, desde «Liquidación mensual», la fecha de pago de una liquidación ya pagada,
+con un botón de editar (lápiz) a la derecha del todo de su fila que administración no ve.
+Antes de guardar MUST pedirse confirmación con el cambio («Fecha de pago: 02/10/2026 → 05/10/2026»).
+
+#### Scenario: Corregir el día en que se pagó
+- **WHEN** superadministración edita la liquidación de Carlos pagada el 2 de octubre, pone el 5 y confirma
+- **THEN** la liquidación sale «Pagada el 05/10/2026» y su movimiento de Contabilidad pasa a ese día
+
 ### Requirement: Rentabilidad
 Para cada mes, el sistema MUST mostrar por profesor: alumnos, horas, tarifa, coste, ingresos atribuidos, margen, € por hora y ocupación de sus grupos,
 con los totales del mes. La tabla MUST poder ordenarse desde las cabeceras por cualquiera de esas columnas, en ambos
@@ -189,7 +198,8 @@ antiguo, las clases asignadas por horario y los alumnos por nombre.
 Administración MUST poder apuntar un anticipo a un profesor (importe, mes del que se descuenta, día en que se pagó y
 nota) mientras la liquidación de ese mes no esté pagada, y quitarlo en las mismas condiciones. El anticipo sale en
 Contabilidad el día que se paga y se descuenta de la liquidación de su mes (lo que queda por pagar y lo que sale en
-Contabilidad al pagarla). Administración MUST poder corregir el día en que se pagó una liquidación.
+Contabilidad al pagarla). Administración MUST poder corregir el día en que se pagó una liquidación desde la ficha
+del profesor, tras confirmar el cambio.
 
 #### Scenario: Pago de más
 - **WHEN** a un profesor se le pagaron 90 € de más en septiembre y se apuntan como anticipo de octubre

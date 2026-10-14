@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Printer } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Printer } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
 import { formatCents, monthLabel } from '@/features/billing/money';
@@ -7,6 +7,7 @@ import { usePayrollMutation, useSettlements } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
 import { formatDate } from '@/features/students/format';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { useSession } from '@/features/auth/useSession';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
@@ -15,6 +16,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { useToast } from '@/shared/ui/Toast';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
+import { SettlementPaymentDateDialog } from './SettlementPaymentDateDialog';
 import { SettlementSheetDialog } from './SettlementSheetDialog';
 import { TeacherLink } from './TeacherLink';
 
@@ -37,6 +39,9 @@ export function SettlementsTab({ month }: { month: string }) {
   const [open, setOpen] = useState<string | null>(null);
   const [printing, setPrinting] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [editing, setEditing] = useState<Settlement | null>(null);
+  // Cambiar una liquidación ya pagada es cosa de superadministración.
+  const canEdit = useSession().data?.role === 'superadministrator';
   const pay = usePayrollMutation((s: Settlement) => paySettlement(s.teacherId, month));
   const payAll = usePayrollMutation(() => payAllSettlements(month));
   const toast = useToast();
@@ -158,6 +163,17 @@ export function SettlementsTab({ month }: { month: string }) {
                           Marcar como pagada
                         </button>
                       )}
+                      {s.status === 'paid' && canEdit && (
+                        <button
+                          type="button"
+                          aria-label={`Editar liquidación de ${s.teacherName}`}
+                          title="Editar"
+                          onClick={() => setEditing(s)}
+                          className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+                        >
+                          <Pencil aria-hidden size={16} />
+                        </button>
+                      )}
                     </span>
                   </td>
                 </tr>
@@ -191,6 +207,15 @@ export function SettlementsTab({ month }: { month: string }) {
           teacherId={printing}
           month={month}
           onClose={() => setPrinting(null)}
+        />
+      )}
+      {editing?.paidOn && (
+        <SettlementPaymentDateDialog
+          teacherId={editing.teacherId}
+          month={month}
+          amountCents={editing.amountCents}
+          paidOn={editing.paidOn}
+          onClose={() => setEditing(null)}
         />
       )}
       {confirmAll && (
