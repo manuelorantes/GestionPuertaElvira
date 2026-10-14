@@ -107,6 +107,70 @@ describe('Material deportivo', () => {
     expect(within(hugo).getByRole('button', { name: /Deshacer la entrega/ })).toBeInTheDocument();
   });
 
+  it('generates a list of the reserved orders by product, choosing products and showing prices on demand', async () => {
+    const polo = { ...TRACKSUIT, id: 'p2', name: 'Polo', priceCents: 2500 };
+    api({
+      'GET /api/admin/equipment/products': [200, { items: [TRACKSUIT, polo] }],
+      'GET /api/admin/equipment/orders?open=1&status=reserved': [
+        200,
+        {
+          items: [
+            order({ values: { talla: '10' }, missing: [] }),
+            order({
+              id: 'o3',
+              studentId: 's2',
+              studentName: 'Hugo Martín Castillo',
+              productId: 'p2',
+              productName: 'Polo',
+              quantity: 2,
+              values: { nombre: 'Hugo' },
+              detail: 'Nombre a estampar: Hugo',
+              variantLabel: '',
+              missing: ['Talla'],
+            }),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/cobros?pestana=material');
+
+    await screen.findByRole('list', { name: 'Pedidos de material' });
+    await userEvent.click(screen.getByRole('button', { name: 'Generar listado' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Listado de pedidos' });
+    expect(within(dialog).getByLabelText('Qué listar')).toHaveValue('reserved');
+
+    const tracksuit = await within(dialog).findByRole('table', { name: 'Listado de Chándal' });
+    const martina = within(tracksuit).getByRole('row', { name: /Martina/ });
+    expect(
+      within(martina)
+        .getAllByRole('cell')
+        .map((c) => c.textContent),
+    ).toEqual(['Martina López Herrera', '1', '10', '-']);
+    const poloTable = within(dialog).getByRole('table', { name: 'Listado de Polo' });
+    const hugo = within(poloTable).getByRole('row', { name: /Hugo/ });
+    expect(
+      within(hugo)
+        .getAllByRole('cell')
+        .map((c) => c.textContent),
+    ).toEqual(['Hugo Martín Castillo', '2', '-', 'Hugo']);
+    expect(within(dialog).queryByText('Precio')).toBeNull();
+
+    // Los precios se añaden al listado (el del producto por la cantidad cuando aún no lo tiene).
+    await userEvent.click(within(dialog).getByRole('switch', { name: 'Con precios' }));
+    expect(within(poloTable).getByRole('row', { name: /Hugo/ })).toHaveTextContent('50 €');
+    expect(within(poloTable).getByText('Total polo').closest('tr')).toHaveTextContent('50 €');
+
+    // Se elige qué productos listar.
+    await userEvent.click(
+      within(within(dialog).getByRole('group', { name: 'Productos a listar' })).getByRole(
+        'button',
+        { name: 'Chándal' },
+      ),
+    );
+    expect(within(dialog).queryByRole('table', { name: 'Listado de Chándal' })).toBeNull();
+    expect(within(dialog).getByRole('table', { name: 'Listado de Polo' })).toBeInTheDocument();
+  });
+
   it('turns a reservation into an order proposing the product price', async () => {
     const spy = api({ 'POST /api/admin/equipment/orders/o1/place': [204] });
     renderApp('/panel/cobros?pestana=material');

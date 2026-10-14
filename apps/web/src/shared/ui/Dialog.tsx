@@ -1,10 +1,13 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from 'react';
 
+const WIDTH = { narrow: 'max-w-[400px]', wide: 'max-w-[560px]', large: 'max-w-[900px]' } as const;
+
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
 
 interface DialogProps {
-  size?: 'narrow' | 'wide';
+  /** `large`: listados con tablas. */
+  size?: 'narrow' | 'wide' | 'large';
   open: boolean;
   onClose: () => void;
   labelledBy: string;
@@ -63,7 +66,7 @@ export function Dialog({ open, onClose, labelledBy, children, size = 'narrow' }:
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className={`max-h-full w-full overflow-auto rounded-md bg-surface shadow-overlay ${size === 'wide' ? 'max-w-[560px]' : 'max-w-[400px]'}`}
+        className={`max-h-full w-full overflow-auto rounded-md bg-surface shadow-overlay ${WIDTH[size]}`}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleKeyDown}
       >
