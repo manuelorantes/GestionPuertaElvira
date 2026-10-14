@@ -113,6 +113,22 @@ concepto, categoría, importe o estado, en ambos sentidos.
 - **WHEN** se intenta adjuntar un archivo que no es un PDF ni una foto, o que pasa de 10 MB
 - **THEN** se rechaza con un mensaje que lo explica
 
+### Requirement: Editar una factura
+Solo superadministración MUST poder editar una factura desde «Facturas», también si ya está pagada,
+con un botón de editar (lápiz) a la derecha del todo de su fila que administración no ve.
+Se cambian la fecha, el número, el proveedor, el concepto, la categoría, el importe y el mes al que corresponde
+y, en una factura pagada, la fecha y la forma de pago; el documento no cambia.
+Antes de guardar MUST pedirse confirmación con la lista de lo que cambia («Importe: 950 € → 900 €»).
+No se puede editar una factura de una temporada cerrada ni moverla a una.
+
+#### Scenario: Corregir el pago de una factura pagada
+- **WHEN** superadministración edita la factura del alquiler pagada el 1 de octubre por transferencia, la deja en 900 € pagados el 3 en efectivo y confirma
+- **THEN** la factura y su movimiento del libro salen con 900 €, el 3 de octubre y en efectivo
+
+#### Scenario: Administración no edita facturas
+- **WHEN** administración abre «Facturas»
+- **THEN** no ve el botón de editar en ninguna fila
+
 ### Requirement: Mes a mes y cierre
 El sistema MUST mostrar los 12 meses del ejercicio con ingresos, gastos, resultado y acumulado, y el total.
 Un ejercicio MUST poder cerrarse a partir de su último mes (agosto), en orden y una sola vez.
