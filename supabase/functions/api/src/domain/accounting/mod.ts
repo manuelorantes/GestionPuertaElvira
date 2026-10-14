@@ -368,12 +368,25 @@ export class Attachment {
  * Factura de un proveedor del club, pendiente o pagada, con su documento. `period` es el mes al que corresponde; por
  * defecto, el de la factura.
  */
+/** Lo que superadministración puede corregir de una factura: también la cabecera y, si está pagada, el pago. */
+export interface InvoiceAmendment {
+  date: LocalDate;
+  number: string;
+  supplier: string;
+  concept: string;
+  category: Category;
+  amount: Money;
+  period: YearMonth;
+  paidOn: LocalDate | null;
+  method: Method | null;
+}
+
 export class SupplierInvoice {
   private constructor(
     readonly id: SupplierInvoiceId,
-    readonly date: LocalDate,
-    readonly number: string,
-    readonly supplier: string,
+    private currentDate: LocalDate,
+    private currentNumber: string,
+    private currentSupplier: string,
     private currentConcept: string,
     private currentCategory: string,
     private currentAmount: Money,
@@ -393,13 +406,8 @@ export class SupplierInvoice {
     amount: Money,
     period: YearMonth | null = null,
   ): SupplierInvoice {
-    if (supplier.trim() === '' || concept.trim() === '') {
-      throw new InvalidValue('supplier', 'Indica el proveedor y el concepto.');
-    }
-    if (category.kind !== 'expense') {
-      throw new InvalidValue('category', 'Una factura de proveedor es un gasto.');
-    }
-    if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
+    SupplierInvoice.checkSupplier(supplier);
+    SupplierInvoice.checkDetails(concept, category, amount);
     return new SupplierInvoice(
       id,
       date,
@@ -443,6 +451,18 @@ export class SupplierInvoice {
     );
   }
 
+  get date(): LocalDate {
+    return this.currentDate;
+  }
+
+  get number(): string {
+    return this.currentNumber;
+  }
+
+  get supplier(): string {
+    return this.currentSupplier;
+  }
+
   get concept(): string {
     return this.currentConcept;
   }
@@ -459,7 +479,7 @@ export class SupplierInvoice {
     return this.currentPeriod;
   }
 
-  /** Corrige sus datos; la forma de pago, solo si ya está pagada. */
+  /** Corrige sus datos desde el libro; la forma de pago, solo si ya está pagada. */
   revise(
     concept: string,
     category: Category,
@@ -467,16 +487,44 @@ export class SupplierInvoice {
     period: YearMonth,
     method: Method | null,
   ): void {
-    if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
-    if (category.kind !== 'expense') {
-      throw new InvalidValue('category', 'Una factura de proveedor es un gasto.');
-    }
-    if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
+    SupplierInvoice.checkDetails(concept, category, amount);
     this.currentConcept = concept.trim();
     this.currentCategory = category.code;
     this.currentAmount = amount;
     this.currentPeriod = period;
     if (this.paid !== null && method !== null) this.paymentMethod = method;
+  }
+
+  /** Corrección completa (superadministración). Pagada, el pago se corrige y no puede quedar incompleto. */
+  amend(amendment: InvoiceAmendment): void {
+    SupplierInvoice.checkSupplier(amendment.supplier);
+    SupplierInvoice.checkDetails(amendment.concept, amendment.category, amendment.amount);
+    if (this.paid !== null && (amendment.paidOn === null || amendment.method === null)) {
+      throw new InvalidValue('paidOn', 'Indica la fecha y la forma de pago.');
+    }
+    this.currentDate = amendment.date;
+    this.currentNumber = amendment.number.trim();
+    this.currentSupplier = amendment.supplier.trim();
+    this.currentConcept = amendment.concept.trim();
+    this.currentCategory = amendment.category.code;
+    this.currentAmount = amendment.amount;
+    this.currentPeriod = amendment.period;
+    if (this.paid !== null) {
+      this.paid = amendment.paidOn;
+      this.paymentMethod = amendment.method;
+    }
+  }
+
+  private static checkSupplier(supplier: string): void {
+    if (supplier.trim() === '') throw new InvalidValue('supplier', 'Indica el proveedor.');
+  }
+
+  private static checkDetails(concept: string, category: Category, amount: Money): void {
+    if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
+    if (category.kind !== 'expense') {
+      throw new InvalidValue('category', 'Una factura de proveedor es un gasto.');
+    }
+    if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
   }
 
   pay(on: LocalDate, method: Method): void {

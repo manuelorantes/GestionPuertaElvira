@@ -4,6 +4,7 @@ import { InvalidValue, LocalDate, Money } from '../../src/domain/common/mod.ts';
 import { FiscalYear, SeasonClosing, SupplierInvoiceId } from '../../src/domain/accounting/mod.ts';
 import {
   AddCategory,
+  AmendInvoice,
   AttachDocument,
   CategoryInUse,
   CloseSeason,
@@ -21,6 +22,7 @@ import {
   RenameCategory,
   SeasonAlreadyClosed,
   SeasonNotFinished,
+  SupplierInvoiceNotFound,
   type UploadedDocument,
 } from '../../src/application/accounting/mod.ts';
 import { PeriodClosed } from '../../src/application/common/mod.ts';
@@ -237,6 +239,70 @@ Deno.test('the club adds and renames its own categories, and removes them only w
   const unused = await new AddCategory(fx).execute('income', 'Rifa');
   await new RemoveCategory(fx).execute(unused.code);
   assertEquals((await new ListCategories(fx).execute()).filter((c) => c.custom).length, 1);
+});
+
+Deno.test('AmendInvoice should correct the whole invoice, its payment included, within open seasons', async () => {
+  const { fx, registerInvoice } = setUp();
+  const amend = new AmendInvoice(fx, fx, fx);
+  const invoice = await registerInvoice('2026-10-01', 'Alquiler', 'rent', '950');
+  await new PayInvoice(fx, fx).execute(invoice, '2026-10-05', 'transfer');
+  const input = {
+    date: '2026-10-02',
+    number: 'F-2',
+    supplier: 'Casero',
+    concept: 'Alquiler de octubre',
+    category: 'rent',
+    amount: '900',
+    period: '2026-09',
+    paidOn: '2026-10-09',
+    method: 'cash',
+  };
+
+  await amend.execute(invoice, input);
+  const stored = await fx.invoice(SupplierInvoiceId.fromString(invoice));
+  assertEquals(
+    [
+      stored?.date.toString(),
+      stored?.number,
+      stored?.supplier,
+      stored?.concept,
+      stored?.amount.cents,
+      stored?.period.toString(),
+      stored?.paidOn()?.toString(),
+      stored?.method(),
+    ],
+    ['2026-10-02', 'F-2', 'Casero', 'Alquiler de octubre', 90000, '2026-09', '2026-10-09', 'cash'],
+  );
+  // En el libro sale el día del pago corregido.
+  const ledger = await new MonthLedger(fx, fx).execute('2026-10');
+  assertEquals(ledger.lines.find((l) => l.sourceId === invoice)?.date, '2026-10-09');
+
+  // Pendiente: el pago no se toca, aunque venga.
+  const pending = await registerInvoice('2026-10-03', 'Luz', 'electricity', '80');
+  await amend.execute(pending, { ...input, paidOn: '2026-10-09', method: 'cash' });
+  assertEquals((await fx.invoice(SupplierInvoiceId.fromString(pending)))?.isPaid(), false);
+
+  await assertRejects(() => amend.execute(invoice, { ...input, category: 'fees' }), InvalidValue);
+  await assertRejects(() => amend.execute(invoice, { ...input, paidOn: null }), InvalidValue);
+  await assertRejects(
+    () => amend.execute(SupplierInvoiceId.generate().value, input),
+    SupplierInvoiceNotFound,
+  );
+  // Ni la factura de una temporada cerrada ni moverla a una.
+  await fx.saveClosing(
+    SeasonClosing.close(
+      new FiscalYear(2025),
+      Money.euros(0),
+      Money.euros(0),
+      LocalDate.fromString('2026-09-01'),
+    ),
+  );
+  await assertRejects(
+    () => amend.execute(invoice, { ...input, paidOn: '2026-08-31' }),
+    PeriodClosed,
+  );
+  await assertRejects(() => amend.execute(invoice, { ...input, date: '2026-08-31' }), PeriodClosed);
+  await amend.execute(invoice, input);
 });
 
 Deno.test('EditMovement should edit entries and invoices, and correct payments only in accounting', async () => {
