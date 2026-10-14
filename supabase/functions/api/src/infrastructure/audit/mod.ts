@@ -19,6 +19,7 @@ export class AuditLabels {
     'DELETE /api/admin/accounting/entries/:id': 'Quitar movimiento',
     'POST /api/admin/accounting/invoices': 'Registrar factura de proveedor',
     'POST /api/admin/accounting/invoices/:id/payment': 'Pagar factura de proveedor',
+    'PUT /api/admin/accounting/invoices/:id': 'Editar factura de proveedor',
     'POST /api/admin/accounting/invoices/:id/attachment': 'Adjuntar documento a factura',
     'DELETE /api/admin/accounting/invoices/:id': 'Quitar factura de proveedor',
     'POST /api/admin/accounting/years/:year/closing': 'Cerrar temporada',
