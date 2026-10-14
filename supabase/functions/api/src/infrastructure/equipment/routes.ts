@@ -173,6 +173,11 @@ export function registerEquipmentRoutes(api: ApiApp): void {
     return c.body(null, 204);
   });
 
+  api.defineRoute(admin('POST', '/orders/:id/unplace'), async (c, scope) => {
+    await equipment(api, scope).orders.unplace(param(c, 'id'));
+    return c.body(null, 204);
+  });
+
   api.defineRoute(admin('POST', '/orders/:id/deliver'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
     await equipment(api, scope).orders.deliver(param(c, 'id'), body.optionalString('date'));

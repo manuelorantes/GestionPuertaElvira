@@ -134,6 +134,25 @@ Deno.test('ManageOrders should change the price only while nothing is paid, and 
   await assertRejects(() => fx.manageOrders().changePrice(id, 3000), InvalidValue, 'algo cobrado');
 });
 
+Deno.test('ManageOrders should take an order back to reservation and drop its charge while nothing is paid', async () => {
+  const { fx, student, reserve } = await setUp();
+  const id = await reserve({ talla: '10' }, 4500);
+  const chargeId = (await chargeOf(fx, id)).id;
+  await fx.manageOrders().unplace(id);
+  assertEquals([orderOf(fx, id).status, orderOf(fx, id).price, orderOf(fx, id).charge], [
+    'reserved',
+    null,
+    null,
+  ]);
+  assertEquals(await fx.billing.charge(chargeId), null);
+
+  const paid = await reserve({ talla: '12' }, 2000);
+  await fx.payPart(student, (await chargeOf(fx, paid)).id.value, 500);
+  await assertRejects(() => fx.manageOrders().unplace(paid), InvalidValue, 'algo cobrado');
+  assertEquals(orderOf(fx, paid).status, 'ordered');
+  await assertRejects(() => fx.manageOrders().unplace(OrderId.generate().value), OrderNotFound);
+});
+
 Deno.test('ManageOrders should cancel only what is pending, refuse a fully paid order, and reactivate it whole', async () => {
   const { fx, student, reserve } = await setUp();
   const id = await reserve({ talla: '10' }, 4500);

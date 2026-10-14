@@ -98,6 +98,7 @@ export class AuditLabels {
     'PUT /api/admin/equipment/orders/:id': 'Corregir pedido de material',
     'POST /api/admin/equipment/orders/:id/place': 'Pasar a pedido el material',
     'PUT /api/admin/equipment/orders/:id/price': 'Cambiar el precio de un pedido de material',
+    'POST /api/admin/equipment/orders/:id/unplace': 'Volver a reservado un pedido de material',
     'POST /api/admin/equipment/orders/:id/deliver': 'Entregar material',
     'POST /api/admin/equipment/orders/:id/undo-delivery': 'Deshacer la entrega de material',
     'POST /api/admin/equipment/orders/:id/cancel': 'Cancelar pedido de material',

@@ -380,6 +380,19 @@ export class Order {
     this.orderedDay = today;
   }
 
+  /** De pedido a reservado: pierde el precio y su cobro (la aplicación comprueba que no tenga nada cobrado). */
+  unplace(): void {
+    this.mustBeOpen();
+    if (this.state !== 'ordered') throw new InvalidValue('id', 'El pedido no tiene precio.');
+    if (this.deliveredDay !== null) {
+      throw new InvalidValue('id', 'El pedido ya está entregado: deshaz antes la entrega.');
+    }
+    this.state = 'reserved';
+    this.agreed = null;
+    this.chargeRef = null;
+    this.orderedDay = null;
+  }
+
   /** Corrige el precio (la aplicación comprueba que no tenga nada cobrado). */
   changePrice(price: Money): void {
     this.mustBeOpen();
