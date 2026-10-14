@@ -169,6 +169,21 @@ describe('Material deportivo', () => {
     );
     expect(within(dialog).queryByRole('table', { name: 'Listado de Chándal' })).toBeNull();
     expect(within(dialog).getByRole('table', { name: 'Listado de Polo' })).toBeInTheDocument();
+
+    // «Imprimir» abre la impresión del navegador (desde ahí se guarda en PDF) con lo que se ve.
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Imprimir' }));
+    expect(print).toHaveBeenCalledOnce();
+    print.mockRestore();
+
+    // Sin ningún producto elegido no hay nada que imprimir.
+    await userEvent.click(
+      within(within(dialog).getByRole('group', { name: 'Productos a listar' })).getByRole(
+        'button',
+        { name: 'Polo' },
+      ),
+    );
+    expect(within(dialog).getByRole('button', { name: 'Imprimir' })).toBeDisabled();
   });
 
   it('turns a reservation into an order proposing the product price', async () => {

@@ -327,7 +327,7 @@ export function OrdersView({ onDialog }: { onDialog: (dialog: MaterialDialog) =>
             options={[{ value: '', label: 'Cualquiera' }, ...seasons()]}
           />
         </div>
-        <Button variant="secondary" className="ml-auto" onClick={() => setListing(true)}>
+        <Button variant="surface" className="ml-auto" onClick={() => setListing(true)}>
           <ClipboardList aria-hidden size={18} />
           Generar listado
         </Button>
