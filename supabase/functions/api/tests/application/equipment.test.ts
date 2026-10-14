@@ -201,33 +201,51 @@ Deno.test('ManageOrders should deliver from stock and purchases should never lea
   await fx.manageOrders().deliver(third, null);
 });
 
-Deno.test('SaveProduct should keep the options in use and retire a product from new orders', async () => {
+Deno.test('SaveProduct should carry renamed options to orders and purchases, and blank the reservations of removed ones', async () => {
   const { fx, product, reserve } = await setUp();
-  await reserve({ talla: '10', nombre: 'Pepe' });
-  const fields = (options: string[]) => [
-    { id: 'talla', name: 'Talla', kind: 'options', options },
-    { id: 'numero', name: 'Número', kind: 'text', options: [] },
+  const reservation = await reserve({ talla: '10', nombre: 'Pepe' });
+  const kept = await reserve({ talla: '10' });
+  const placed = await reserve({ talla: '10' }, 4500);
+  const loose = await reserve({ talla: '12' });
+  const bought = await purchase(fx, product, 2, '10');
+  const fields = (
+    options: string[],
+    renamed: { from: string; to: string }[] = [],
+  ) => [
+    { id: 'talla', name: 'Talla', kind: 'options', options, renamed },
+    { id: 'numero', name: 'Número', kind: 'text', options: [], renamed: [] },
   ];
-  await assertRejects(
-    () =>
-      fx.saveProducts().update(product, {
-        name: 'Chándal',
-        priceCents: 4500,
-        active: true,
-        fields: fields(['8', '12']),
-      }),
-    InvalidValue,
-    '«10»',
-  );
-  // Quitar el campo de texto (aunque un pedido lo use) sí se puede.
+  // «10» pasa a «XS» (una reserva se queda en blanco), «12» se quita y el campo de texto cambia.
   await fx.saveProducts().update(product, {
     name: 'Chándal',
     priceCents: 5000,
     active: false,
-    fields: fields(['10', '14']),
+    fields: fields(['8', 'XS', '14'], [{ from: '10', to: 'XS' }]),
+    blankReservations: [{ fieldId: 'talla', option: '10' }],
   });
+  // (El campo de texto «nombre» ya no existe: su valor se pierde.)
+  assertEquals(orderOf(fx, reservation).selection.values, {});
+  assertEquals(orderOf(fx, kept).selection.values, {});
+  assertEquals(orderOf(fx, placed).selection.detail, 'Talla XS');
+  assertEquals(orderOf(fx, loose).selection.values, {});
+  assertEquals(fx.purchaseList.get(bought)?.lines[0]?.selection.variantLabel, 'Talla XS');
   await assertRejects(() => reserve({ talla: '14' }), InvalidValue, 'ya no se ofrece');
   assertEquals(fx.products.get(product)?.price.equals(Money.euros(50)), true);
+
+  // Una opción con pedidos con precio o compras no se puede quitar.
+  await assertRejects(
+    () =>
+      fx.saveProducts().update(product, {
+        name: 'Chándal',
+        priceCents: 5000,
+        active: false,
+        fields: fields(['8', '14']),
+        blankReservations: [],
+      }),
+    InvalidValue,
+    'No se puede quitar «XS» de «Talla»',
+  );
+  assertEquals(orderOf(fx, placed).selection.detail, 'Talla XS');
 });
 
 Deno.test('ManageOrders should reserve with the size still to choose and ask for it before ordering', async () => {

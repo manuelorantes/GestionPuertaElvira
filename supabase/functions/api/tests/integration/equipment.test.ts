@@ -267,11 +267,44 @@ Deno.test('equipment should cancel only the pending part of an order and refuse 
     'unprocessable',
   );
 
+  // Al editar el producto, «8» pasa a «XS»: el pedido con precio la sigue y la reserva se pide en blanco.
+  const small = body<{ id: string }>(
+    await c.json('POST', '/api/admin/equipment/orders', {
+      studentId: fx.student,
+      productId: fx.product,
+      values: { [fx.talla]: '8' },
+    }),
+  ).id;
+  const usage = body<{ items: { value: string; reservations: number; orders: number }[] }>(
+    await c.get(`/api/admin/equipment/products/${fx.product}/usage`),
+  ).items;
+  assertEquals(usage.map((u) => [u.value, u.reservations, u.orders]), [['8', 1, 1]]);
+  assertEquals(
+    (await c.json('PUT', `/api/admin/equipment/products/${fx.product}`, {
+      name: 'Chándal',
+      priceCents: 4500,
+      fields: [{
+        id: fx.talla,
+        name: 'Talla',
+        kind: 'options',
+        options: ['XS', '12'],
+        renamed: [{ from: '8', to: 'XS' }],
+      }],
+      blankReservations: [{ fieldId: fx.talla, option: '8' }],
+    })).status,
+    204,
+  );
+  assertEquals(body<OrderRow>(await c.get(`/api/admin/equipment/orders/${id}`)).detail, 'Talla XS');
+  assertEquals(
+    body<{ missing: string[] }>(await c.get(`/api/admin/equipment/orders/${small}`)).missing,
+    ['Talla'],
+  );
+  // «XS» ya la usa un pedido con precio: no se puede quitar.
   await assertError(
     await c.json('PUT', `/api/admin/equipment/products/${fx.product}`, {
       name: 'Chándal',
       priceCents: 4500,
-      fields: [{ id: fx.talla, name: 'Talla', kind: 'options', options: ['10', '12'] }],
+      fields: [{ id: fx.talla, name: 'Talla', kind: 'options', options: ['12'] }],
     }),
     422,
     'unprocessable',

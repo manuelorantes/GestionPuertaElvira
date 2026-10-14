@@ -2,6 +2,7 @@ import { type Clock, InvalidValue, LocalDate, Money, YearMonth } from '../../dom
 import { Charge, ChargeId, StudentRef as BillingStudentRef } from '../../domain/billing/mod.ts';
 import {
   ChargeRef,
+  type OptionRename,
   Order,
   OrderId,
   Product,
@@ -24,20 +25,21 @@ export interface ProductRepository {
 export interface OrderRepository {
   order(id: OrderId): Promise<Order | null>;
   saveOrder(order: Order): Promise<void>;
+  /** Todos los pedidos de un producto, del estado que sean. */
+  ordersOf(product: ProductId): Promise<Order[]>;
 }
 
 export interface PurchaseRepository {
   purchase(id: PurchaseId): Promise<Purchase | null>;
   savePurchase(purchase: Purchase): Promise<void>;
   deletePurchase(id: PurchaseId): Promise<void>;
+  purchasesOf(product: ProductId): Promise<Purchase[]>;
 }
 
-/** Comprado y entregado de cada variante de un producto, y las opciones que usan sus pedidos y compras. */
+/** Comprado y entregado de cada variante de un producto. */
 export interface StockLedger {
   /** Por `variantKey`: unidades compradas y unidades entregadas (sin las devueltas al stock). */
   variants(product: ProductId): Promise<Map<string, { bought: number; taken: number }>>;
-  /** Valores por id de campo que aparecen en sus pedidos y compras («idCampo=valor»). */
-  usedValues(product: ProductId): Promise<Set<string>>;
 }
 
 export interface StudentLookup {
@@ -135,8 +137,18 @@ export interface MarginView {
   marginPerUnitCents: number | null;
 }
 
+/** Cuántas reservas (pedidos sin precio), pedidos con precio y compras usan un valor de un campo. */
+export interface ValueUsage {
+  fieldId: string;
+  value: string;
+  reservations: number;
+  orders: number;
+  purchases: number;
+}
+
 export interface EquipmentQuery {
   products(): Promise<ProductView[]>;
+  valueUsage(productId: string): Promise<ValueUsage[]>;
   orders(filter: OrderFilter): Promise<OrderView[]>;
   order(id: string): Promise<OrderView | null>;
   purchases(productId: string | null): Promise<PurchaseView[]>;
@@ -203,13 +215,23 @@ export interface ProductInput {
   name: string;
   priceCents: number;
   active: boolean;
-  fields: { id: string | null; name: string; kind: string; options: string[] }[];
+  fields: {
+    id: string | null;
+    name: string;
+    kind: string;
+    options: string[];
+    /** Al editar: qué opción que había pasa a llamarse cómo (si no, se entiende quitada y añadida). */
+    renamed: { from: string; to: string }[];
+  }[];
+  /** Opciones renombradas cuyas reservas se quedan sin elegir en vez de pasar a la nueva. */
+  blankReservations: { fieldId: string; option: string }[];
 }
 
 export class SaveProduct {
   constructor(
     private readonly products: ProductRepository,
-    private readonly stock: StockLedger,
+    private readonly orders: OrderRepository,
+    private readonly purchases: PurchaseRepository,
   ) {}
 
   async create(input: ProductInput): Promise<string> {
@@ -220,27 +242,40 @@ export class SaveProduct {
       input.fields.map((f) => ProductField.of(f)),
     );
     if (!input.active) {
-      product.update(product.name, product.price, [...product.fields], false, new Set());
+      product.update(product.name, product.price, [...product.fields], false);
     }
     await this.products.saveProduct(product);
     return product.id.value;
   }
 
+  /**
+   * Las opciones renombradas pasan a la nueva en reservas, pedidos y compras (salvo las reservas que se piden en
+   * blanco); las quitadas dejan las reservas sin elegirlas, y no se pueden quitar si las usan pedidos con precio o
+   * compras.
+   */
   async update(id: string, input: ProductInput): Promise<void> {
     const product = await this.products.product(ProductId.fromString(id));
     if (product === null) throw new ProductNotFound();
-    // Solo cuentan las opciones de los campos que hoy son de lista (los textos libres no se «quitan»).
-    const lists = new Set(product.fields.filter((f) => f.kind === 'options').map((f) => f.id));
-    const used = [...(await this.stock.usedValues(product.id))].filter((v) =>
-      lists.has(v.split('=')[0] ?? '')
+    const fields = input.fields.map((f) => ProductField.of(f));
+    const renames: OptionRename[] = input.fields.flatMap((f, i) =>
+      f.renamed.map((r) => ({ fieldId: fields[i]?.id ?? '', from: r.from, to: r.to }))
     );
-    product.update(
+    const changes = product.update(
       input.name,
       Money.cents(input.priceCents),
-      input.fields.map((f) => ProductField.of(f)),
+      fields,
       input.active,
-      new Set(used),
+      renames,
     );
+    if (changes.length > 0) {
+      const blank = new Set(input.blankReservations.map((b) => `${b.fieldId}=${b.option}`));
+      for (const order of await this.orders.ordersOf(product.id)) {
+        if (order.followOptions(product, changes, blank)) await this.orders.saveOrder(order);
+      }
+      for (const purchase of await this.purchases.purchasesOf(product.id)) {
+        if (purchase.followOptions(product, changes)) await this.purchases.savePurchase(purchase);
+      }
+    }
     await this.products.saveProduct(product);
   }
 }
@@ -551,6 +586,14 @@ export class ManagePurchases {
 
 export class EquipmentReports {
   constructor(private readonly query: EquipmentQuery) {}
+
+  /** Qué usa cada opción de los campos de lista de un producto (para avisar al editarlas). */
+  async optionUsage(productId: string): Promise<ValueUsage[]> {
+    const product = (await this.query.products()).find((p) => p.id === productId);
+    if (product === undefined) throw new ProductNotFound();
+    const lists = new Set(product.fields.filter((f) => f.kind === 'options').map((f) => f.id));
+    return (await this.query.valueUsage(productId)).filter((u) => lists.has(u.fieldId));
+  }
 
   /** Stock por producto y variante, con lo que falta comprar para entregar lo apuntado. */
   async stock(): Promise<StockView[]> {

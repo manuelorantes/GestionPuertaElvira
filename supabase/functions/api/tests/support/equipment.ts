@@ -54,6 +54,10 @@ export class EquipmentFixture
     return Promise.resolve();
   }
 
+  ordersOf(product: ProductId): Promise<Order[]> {
+    return Promise.resolve([...this.orders.values()].filter((o) => o.product.equals(product)));
+  }
+
   purchase(id: PurchaseId): Promise<Purchase | null> {
     return Promise.resolve(this.purchaseList.get(id.value) ?? null);
   }
@@ -66,6 +70,12 @@ export class EquipmentFixture
   deletePurchase(id: PurchaseId): Promise<void> {
     this.purchaseList.delete(id.value);
     return Promise.resolve();
+  }
+
+  purchasesOf(product: ProductId): Promise<Purchase[]> {
+    return Promise.resolve(
+      [...this.purchaseList.values()].filter((p) => p.product.equals(product)),
+    );
   }
 
   variants(product: ProductId): Promise<Map<string, { bought: number; taken: number }>> {
@@ -87,26 +97,12 @@ export class EquipmentFixture
     return Promise.resolve(result);
   }
 
-  usedValues(product: ProductId): Promise<Set<string>> {
-    const used = new Set<string>();
-    const add = (values: Readonly<Record<string, string>>) => {
-      for (const [field, value] of Object.entries(values)) used.add(`${field}=${value}`);
-    };
-    for (const order of this.orders.values()) {
-      if (order.product.equals(product)) add(order.selection.values);
-    }
-    for (const purchase of this.purchaseList.values()) {
-      if (purchase.product.equals(product)) purchase.lines.forEach((l) => add(l.selection.values));
-    }
-    return Promise.resolve(used);
-  }
-
   exists(studentId: string): Promise<boolean> {
     return Promise.resolve(this.billing.students.has(studentId));
   }
 
   saveProducts(): SaveProduct {
-    return new SaveProduct(this, this);
+    return new SaveProduct(this, this, this);
   }
 
   manageOrders(): ManageOrders {
@@ -169,9 +165,10 @@ export class EquipmentFixture
       priceCents: 4500,
       active: true,
       fields: [
-        { id: 'talla', name: 'Talla', kind: 'options', options: ['8', '10', '12'] },
-        { id: 'nombre', name: 'Nombre a estampar', kind: 'text', options: [] },
+        { id: 'talla', name: 'Talla', kind: 'options', options: ['8', '10', '12'], renamed: [] },
+        { id: 'nombre', name: 'Nombre a estampar', kind: 'text', options: [], renamed: [] },
       ],
+      blankReservations: [],
     });
   }
 }

@@ -540,19 +540,97 @@ describe('Material deportivo', () => {
     await userEvent.type(within(dialog).getByLabelText('Precio de venta (€)'), '20');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir campo' }));
     await userEvent.type(within(dialog).getByLabelText('Nombre del campo'), 'Talla');
-    await userEvent.type(
-      within(dialog).getByLabelText('Opciones (separadas por comas)'),
-      'S, M, L',
-    );
+    for (const option of ['S', 'M', 'L']) {
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Añadir opción' }));
+      const inputs = within(dialog).getAllByLabelText(/^Opción \d$/);
+      await userEvent.type(inputs[inputs.length - 1] as HTMLElement, option);
+    }
     await userEvent.click(within(dialog).getByRole('button', { name: 'Crear producto' }));
     await waitFor(() =>
       expect(bodyOf(spy, 'POST', '/api/admin/equipment/products')).toEqual({
         name: 'Polo',
         priceCents: 2000,
         active: true,
-        fields: [{ id: '', name: 'Talla', kind: 'options', options: ['S', 'M', 'L'] }],
+        fields: [{ id: '', name: 'Talla', kind: 'options', options: ['S', 'M', 'L'], renamed: [] }],
+        blankReservations: [],
       }),
     );
+  });
+
+  it('renames and removes options of a product, deciding what happens to the reservations', async () => {
+    const spy = api({
+      'GET /api/admin/equipment/products/p1/usage': [
+        200,
+        {
+          items: [
+            { fieldId: 'talla', value: '10', reservations: 2, orders: 1, purchases: 0 },
+            { fieldId: 'talla', value: '12', reservations: 1, orders: 0, purchases: 0 },
+          ],
+        },
+      ],
+      'PUT /api/admin/equipment/products/p1': [204],
+    });
+    renderApp('/panel/cobros?pestana=material&vista=productos');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar Chándal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar producto' });
+    const talla = within(dialog).getByRole('group', { name: 'Campo Talla' });
+    // «10» pasa a «XS», «12» se quita y se añade «S».
+    const second = within(talla).getByLabelText('Opción 2');
+    expect(second).toHaveValue('10');
+    await userEvent.clear(second);
+    await userEvent.type(second, 'XS');
+    await userEvent.click(within(talla).getByRole('button', { name: 'Quitar la opción 12' }));
+    await userEvent.click(within(talla).getByRole('button', { name: 'Añadir opción' }));
+    await userEvent.type(within(talla).getByLabelText('Opción 3'), 'S');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    // Segundo paso: qué pasa con las reservas de cada opción que cambia.
+    const ten = await within(dialog).findByRole('group', { name: 'Talla 10' });
+    expect(ten).toHaveTextContent('pasa a «XS»');
+    expect(ten).toHaveTextContent('También 1 pedido con precio con «10»: pasan a «XS».');
+    await userEvent.selectOptions(within(ten).getByLabelText('2 reservas con «10»'), 'blank');
+    expect(within(dialog).getByRole('group', { name: 'Talla 12' })).toHaveTextContent(
+      '1 reserva se queda sin talla',
+    );
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    await waitFor(() =>
+      expect(bodyOf(spy, 'PUT', '/api/admin/equipment/products/p1')).toEqual({
+        name: 'Chándal',
+        priceCents: 4500,
+        active: true,
+        fields: [
+          {
+            id: 'talla',
+            name: 'Talla',
+            kind: 'options',
+            options: ['8', 'XS', 'S'],
+            renamed: [{ from: '10', to: 'XS' }],
+          },
+          { id: 'nombre', name: 'Nombre a estampar', kind: 'text', options: [], renamed: [] },
+        ],
+        blankReservations: [{ fieldId: 'talla', option: '10' }],
+      }),
+    );
+  });
+
+  it('refuses to remove an option that priced orders or purchases use', async () => {
+    api({
+      'GET /api/admin/equipment/products/p1/usage': [
+        200,
+        { items: [{ fieldId: 'talla', value: '10', reservations: 0, orders: 0, purchases: 1 }] },
+      ],
+    });
+    renderApp('/panel/cobros?pestana=material&vista=productos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar Chándal' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar producto' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Quitar la opción 10' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+    expect(
+      await within(dialog).findByText(
+        'No se puede quitar «10» de «Talla»: hay pedidos con precio o compras con esa opción.',
+      ),
+    ).toBeInTheDocument();
   });
 
   it('charges a material order from Cuotas like any other fee, without cancelling it there', async () => {

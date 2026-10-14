@@ -10,6 +10,9 @@
 - Cada acción correcta muestra un aviso breve («Reserva apuntada», «Cobro de 45 € generado», «Entregado», «Vuelve a
   estar reservado»…) y refresca los datos del club (cuotas, ficha, stock, margen).
 - Sin productos, «Productos» invita a crear el primero; sin compras ni pedidos, «Stock y compras» lo explica.
+- Al editar un producto, cambiar el texto de una opción la renombra (sus pedidos la siguen) y quitarla deja sus
+  reservas sin ella; si alguna opción cambiada está en uso, antes de guardar se decide qué pasa con las reservas, y si
+  la usan pedidos con precio o compras no se puede quitar (se avisa sin salir del formulario).
 - Las acciones de cada pedido que son solo un icono dicen lo que hacen al pasar por encima.
 - «Imprimir» en el listado de pedidos abre la impresión del navegador (donde se guarda en PDF) solo con las tablas que
   se ven, como los recibos: ni la ventana, ni los filtros ni los botones salen en el papel.

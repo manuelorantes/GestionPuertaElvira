@@ -77,6 +77,21 @@ export class Selection {
   ) {}
 }
 
+/** Al editar un producto: la opción `from` de un campo de lista pasa a llamarse `to`. */
+export interface OptionRename {
+  fieldId: string;
+  from: string;
+  to: string;
+}
+
+/** Lo que le pasa a una opción en uso al revisar el producto: pasa a `to`, o se queda sin elegir si `to` es ''. */
+export interface OptionChange {
+  fieldId: string;
+  fieldName: string;
+  from: string;
+  to: string;
+}
+
 /** Un producto de material: nombre, precio de venta por defecto y sus campos, definidos desde la aplicación. */
 export class Product {
   private constructor(
@@ -89,7 +104,7 @@ export class Product {
 
   static create(id: ProductId, name: string, price: Money, fields: ProductField[]): Product {
     const product = new Product(id, '', Money.zero(), [], true);
-    product.update(name, price, fields, true, new Set());
+    product.update(name, price, fields, true);
     return product;
   }
 
@@ -104,16 +119,17 @@ export class Product {
   }
 
   /**
-   * `inUse`: las opciones que ya usan pedidos o compras («idCampo=opción»); no se pueden quitar ni dejar sin su campo de
-   * lista.
+   * Revisa el producto. `renames`: qué opción de cada campo de lista pasa a llamarse cómo (así se distingue de quitar una
+   * y añadir otra). Devuelve lo que cambia para las opciones que había: las renombradas y las que desaparecen (quitadas,
+   * o de un campo que ya no es de lista), para que pedidos y compras las sigan.
    */
   update(
     name: string,
     price: Money,
     fields: ProductField[],
     active: boolean,
-    inUse: ReadonlySet<string>,
-  ): void {
+    renames: readonly OptionRename[] = [],
+  ): OptionChange[] {
     const title = trimmed(name, MAX_NAME);
     if (title === '') throw new InvalidValue('name', 'Indica el nombre del producto.');
     if (price.isNegative()) throw new InvalidValue('price', 'El precio no puede ser negativo.');
@@ -124,26 +140,56 @@ export class Product {
     if (new Set(fields.map((f) => f.id)).size !== fields.length) {
       throw new InvalidValue('fields', 'Hay dos campos iguales.');
     }
-    const kept = new Set(
-      fields.filter((f) => f.kind === 'options').flatMap((f) =>
-        f.options.map((o) => `${f.id}=${o}`)
-      ),
-    );
-    const removed = [...inUse].find((used) => !kept.has(used));
-    if (removed !== undefined) {
-      const [fieldId, option] = removed.split(/=(.*)/s);
-      const field = this.fieldList.find((f) => f.id === fieldId);
-      throw new InvalidValue(
-        'fields',
-        `No se puede quitar «${option}»${
-          field ? ` de «${field.name}»` : ''
-        }: hay pedidos o compras con esa opción.`,
-      );
-    }
+    const changes = this.optionChanges(fields, renames);
     this.title = title;
     this.salePrice = price;
     this.fieldList = fields;
     this.offered = active;
+    return changes;
+  }
+
+  private optionChanges(fields: ProductField[], renames: readonly OptionRename[]): OptionChange[] {
+    const changes: OptionChange[] = [];
+    for (const before of this.fieldList) {
+      if (before.kind !== 'options') continue;
+      const after = fields.find((f) => f.id === before.id);
+      const kept = after?.kind === 'options' ? after.options : [];
+      const own = renames.filter((r) => r.fieldId === before.id);
+      for (const rename of own) {
+        if (!before.options.includes(rename.from)) {
+          throw new InvalidValue(
+            'fields',
+            `«${rename.from}» no es una opción de «${before.name}».`,
+          );
+        }
+        if (rename.to === rename.from || !kept.includes(rename.to)) {
+          throw new InvalidValue(
+            'fields',
+            `«${rename.from}» de «${before.name}» pasaría a «${rename.to}», que no está entre sus opciones.`,
+          );
+        }
+        if (own.some((r) => r !== rename && r.to === rename.to)) {
+          throw new InvalidValue(
+            'fields',
+            `Dos opciones de «${before.name}» pasarían a llamarse «${rename.to}».`,
+          );
+        }
+        if (before.options.includes(rename.to) && !own.some((r) => r.from === rename.to)) {
+          throw new InvalidValue(
+            'fields',
+            `«${rename.to}» ya es una opción de «${before.name}».`,
+          );
+        }
+      }
+      for (const option of before.options) {
+        const renamed = own.find((r) => r.from === option);
+        const to = renamed ? renamed.to : kept.includes(option) ? option : '';
+        if (to !== option) {
+          changes.push({ fieldId: before.id, fieldName: before.name, from: option, to });
+        }
+      }
+    }
+    return changes;
   }
 
   get name(): string {
@@ -355,6 +401,39 @@ export class Order {
     // Mientras está reservado puede quedar algo por elegir; con precio, ya no.
     this.chosen = this.state === 'reserved' ? product.selectSoFar(values) : product.select(values);
     this.remark = noteOf(note);
+  }
+
+  /**
+   * Sigue los cambios de opciones del producto: la renombrada pasa a la nueva, y la quitada (o la renombrada que se
+   * indica en `blank`, «idCampo=opción») deja la reserva sin elegirla. Un pedido con precio no puede quedarse sin ella.
+   * Devuelve si cambió algo.
+   */
+  followOptions(
+    product: Product,
+    changes: readonly OptionChange[],
+    blank: ReadonlySet<string>,
+  ): boolean {
+    const values = { ...this.chosen.values };
+    let touched = false;
+    for (const change of changes) {
+      if (values[change.fieldId] !== change.from) continue;
+      touched = true;
+      const placed = this.agreed !== null;
+      if (change.to === '' || (!placed && blank.has(`${change.fieldId}=${change.from}`))) {
+        if (placed) {
+          throw new InvalidValue(
+            'fields',
+            `No se puede quitar «${change.from}» de «${change.fieldName}»: hay pedidos con precio con esa opción.`,
+          );
+        }
+        delete values[change.fieldId];
+      } else {
+        values[change.fieldId] = change.to;
+      }
+    }
+    if (!touched) return false;
+    this.chosen = product.selectSoFar(values);
+    return true;
   }
 
   /** De reservado a pedido: ya tiene precio y su cobro. */
@@ -574,6 +653,31 @@ export class Purchase {
     this.total = fields.cost;
     this.lineList = lines;
     this.remark = noteOf(fields.note);
+  }
+
+  /** Sigue los cambios de opciones del producto: una compra no puede quedarse sin la opción de una línea. */
+  followOptions(product: Product, changes: readonly OptionChange[]): boolean {
+    let touched = false;
+    const lines = this.lineList.map((line) => {
+      const values = { ...line.selection.values };
+      let changed = false;
+      for (const change of changes) {
+        if (values[change.fieldId] !== change.from) continue;
+        if (change.to === '') {
+          throw new InvalidValue(
+            'fields',
+            `No se puede quitar «${change.from}» de «${change.fieldName}»: hay compras con esa opción.`,
+          );
+        }
+        values[change.fieldId] = change.to;
+        changed = true;
+      }
+      if (!changed) return line;
+      touched = true;
+      return new PurchaseLine(product.variant(values), line.quantity);
+    });
+    if (touched) this.lineList = lines;
+    return touched;
   }
 
   get boughtOn(): LocalDate {
