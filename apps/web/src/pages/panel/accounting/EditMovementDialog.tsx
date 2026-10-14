@@ -2,15 +2,16 @@ import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { editMovement, type LedgerItem } from '@/features/accounting/api';
-import { METHODS } from '@/features/accounting/categories';
+import { METHODS, methodLabel } from '@/features/accounting/categories';
 import {
   useAccountingMutation,
   useCategories,
   useCategoryOptions,
 } from '@/features/accounting/hooks';
-import { formatCents, monthLabel } from '@/features/billing/money';
-import { Alert } from '@/shared/ui/Alert';
+import { centsFromText, centsToText, formatCents, monthLabel } from '@/features/billing/money';
 import { Button } from '@/shared/ui/Button';
+import { ConfirmChangesDialog } from '@/shared/ui/ConfirmChangesDialog';
+import { changedFields } from '@/shared/ui/fieldChanges';
 import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
@@ -25,19 +26,6 @@ const ELSEWHERE: Record<string, string> = {
   settlement: 'La nómina del profesor no cambia: la corrección solo afecta a contabilidad.',
   advance: 'La nómina del profesor no cambia: la corrección solo afecta a contabilidad.',
 };
-
-const TITLE = 'font-display text-2xl font-bold tracking-[0.04em] uppercase';
-
-/** «45» o «40,50» a partir de céntimos, como se escribe un importe. */
-function amountText(cents: number): string {
-  return (cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2)).replace('.', ',');
-}
-
-/** Céntimos de un importe escrito («40,5», «40.50»), o null si no es un número. */
-function centsOf(text: string): number | null {
-  const value = Number(text.trim().replace(',', '.'));
-  return Number.isFinite(value) && text.trim() !== '' ? Math.round(value * 100) : null;
-}
 
 /**
  * Editar un movimiento del libro: concepto, categoría, forma de pago, importe y mes al que corresponde. Antes de guardar
@@ -57,26 +45,25 @@ export function EditMovementDialog({
   const [concept, setConcept] = useState(item.concept);
   const [category, setCategory] = useState(item.category);
   const [method, setMethod] = useState(item.method);
-  const [amount, setAmount] = useState(amountText(item.amountCents));
+  const [amount, setAmount] = useState(centsToText(item.amountCents));
   const [period, setPeriod] = useState(item.period && item.period !== dateMonth ? item.period : '');
   const [confirming, setConfirming] = useState(false);
   const categories = useCategories().data ?? [];
   const categoryOptions = useCategoryOptions(item.kind === 'income' ? 'income' : 'expense');
   const save = useAccountingMutation(editMovement);
   const toast = useToast();
-  const cents = centsOf(amount);
+  const cents = centsFromText(amount);
   const invalid = !concept.trim() || !category || cents === null || cents <= 0;
 
   const label = (code: string) => categories.find((c) => c.code === code)?.label ?? code;
-  const methodLabel = (value: string) => METHODS.find((m) => m.value === value)?.label ?? value;
   const newPeriod = period || dateMonth;
-  const changes = [
+  const changes = changedFields([
     ['Concepto', item.concept, concept.trim()],
     ['Categoría', label(item.category), label(category)],
     ['Forma de pago', methodLabel(item.method), methodLabel(method)],
     ['Importe', formatCents(item.amountCents), formatCents(cents ?? 0)],
     ['Mes al que corresponde', monthLabel(item.period || dateMonth), monthLabel(newPeriod)],
-  ].filter(([, before, after]) => before !== after);
+  ]);
 
   function review(event: FormEvent) {
     event.preventDefault();
@@ -108,35 +95,24 @@ export function EditMovementDialog({
 
   if (confirming) {
     return (
-      <Dialog open onClose={() => setConfirming(false)} labelledBy="edit-confirm-title">
-        <div className="flex flex-col gap-4 p-6">
-          <h2 id="edit-confirm-title" className={TITLE}>
-            ¿Guardar estos cambios?
-          </h2>
-          {save.isError && <Alert>{apiErrorMessage(save.error)}</Alert>}
-          <ul className="flex flex-col gap-1 text-sm">
-            {changes.map(([field, before, after]) => (
-              <li key={field}>{`${field}: ${before} → ${after}`}</li>
-            ))}
-          </ul>
-          {ELSEWHERE[item.source] && <Alert tone="warning">{ELSEWHERE[item.source]}</Alert>}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setConfirming(false)}>
-              Volver
-            </Button>
-            <Button busy={save.isPending} busyLabel="Guardando…" onClick={confirm}>
-              Confirmar
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+      <ConfirmChangesDialog
+        changes={changes}
+        warning={ELSEWHERE[item.source]}
+        busy={save.isPending}
+        error={save.isError ? apiErrorMessage(save.error) : null}
+        onBack={() => setConfirming(false)}
+        onConfirm={confirm}
+      />
     );
   }
 
   return (
     <Dialog open onClose={onClose} labelledBy="edit-movement-title">
       <form onSubmit={review} className="flex flex-col gap-4 p-6">
-        <h2 id="edit-movement-title" className={TITLE}>
+        <h2
+          id="edit-movement-title"
+          className="font-display text-2xl font-bold tracking-[0.04em] uppercase"
+        >
           Editar movimiento
         </h2>
         <TextField label="Concepto" value={concept} onChange={(e) => setConcept(e.target.value)} />
