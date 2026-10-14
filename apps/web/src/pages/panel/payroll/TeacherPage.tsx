@@ -8,7 +8,6 @@ import { SeasonMonths } from '@/features/billing/SeasonMonths';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { WEEKDAYS } from '@/features/classes/schedule';
 import {
-  changeSettlementPaymentDate,
   deleteAdvance,
   recordAdvance,
   type Session,
@@ -33,6 +32,8 @@ import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
+
+import { SettlementPaymentDateDialog } from './SettlementPaymentDateDialog';
 
 const DUTY_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 const TH = 'px-4 py-2.5 font-semibold';
@@ -510,7 +511,13 @@ function PaymentsSection({
         </table>
       )}
       {moving && (
-        <PaymentDateDialog teacherId={teacherId} payment={moving} onClose={() => setMoving(null)} />
+        <SettlementPaymentDateDialog
+          teacherId={teacherId}
+          month={moving.month}
+          amountCents={moving.amountCents}
+          paidOn={moving.date}
+          onClose={() => setMoving(null)}
+        />
       )}
       {removing?.id && (
         <ConfirmDialog
@@ -653,65 +660,6 @@ function AdvanceDialog({ teacherId, onClose }: { teacherId: string; onClose: () 
             busy={save.isPending}
             busyLabel="Guardando…"
           >
-            Guardar
-          </Button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
-function PaymentDateDialog({
-  teacherId,
-  payment,
-  onClose,
-}: {
-  teacherId: string;
-  payment: TeacherPayment;
-  onClose: () => void;
-}) {
-  const [date, setDate] = useState(payment.date);
-  const change = usePayrollMutation(changeSettlementPaymentDate);
-  const toast = useToast();
-  const year = new Date().getFullYear();
-
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    void change.mutateAsync({ teacherId, month: payment.month, date }).then(
-      () => {
-        toast('Fecha de pago cambiada');
-        onClose();
-      },
-      () => undefined,
-    );
-  }
-
-  return (
-    <Dialog open onClose={onClose} labelledBy="payment-date-title">
-      <form noValidate onSubmit={submit} className="flex flex-col gap-4 p-6">
-        <h2
-          id="payment-date-title"
-          className="font-display text-2xl font-bold tracking-[0.04em] uppercase"
-        >
-          Fecha de pago
-        </h2>
-        {change.isError && <Alert>{apiErrorMessage(change.error)}</Alert>}
-        <p className="text-sm text-ink-soft">
-          Liquidación de {monthLabel(payment.month).toLowerCase()} ·{' '}
-          {formatCents(payment.amountCents)}
-        </p>
-        <DateField
-          label="Pagada el"
-          value={date}
-          onChange={setDate}
-          fromYear={year - 1}
-          toYear={year + 1}
-        />
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="submit" busy={change.isPending} busyLabel="Guardando…">
             Guardar
           </Button>
         </div>
