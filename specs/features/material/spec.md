@@ -85,11 +85,18 @@ reservados, y si se quiere los pedidos o ambos, agrupados por producto, con el a
 campo del producto; lo que falta por rellenar se marca con «-». Se elige qué productos listar y si se muestran los
 precios (el del pedido o, si aún no lo tiene, el del producto por la cantidad, con el total de cada producto).
 Cada tabla del listado MUST poder ordenarse desde sus cabeceras por alumno (por defecto), cantidad, cada campo o precio.
+El listado MUST poder imprimirse (y guardarse en PDF desde la impresión del navegador) tal como se ve: solo las tablas
+de los productos elegidos, con los precios si están activados, encabezadas por lo que se lista y la fecha.
 
 #### Scenario: Listado de lo reservado
 - **WHEN** hay reservados un chándal de talla 10 para Martina y dos polos sin talla para Hugo, y se genera el listado
 - **THEN** el chándal y el polo salen en tablas aparte, el de Hugo con «-» en la talla y 2 de cantidad, sin precios hasta
   activarlos; al quitar el chándal solo queda la tabla del polo
+
+#### Scenario: Imprimir el listado
+- **WHEN** se quita el chándal del listado y se pulsa «Imprimir»
+- **THEN** se abre la impresión del navegador solo con la tabla del polo (sin los filtros ni los botones), desde la que
+  se guarda en PDF; sin ningún producto elegido, «Imprimir» está desactivado
 
 ### Requirement: Compras al proveedor y stock
 Administración MUST poder registrar compras por lotes: un producto, la fecha, lo que costó el lote entero y cuántas
