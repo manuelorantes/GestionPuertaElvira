@@ -163,6 +163,7 @@ function toCharge(row: Row): Charge {
   const paidBy = row.nullableString('paid_by');
   const remindedOn = row.nullableString('reminded_on');
   const cancelledOn = row.nullableString('cancelled_on');
+  const baseCents = row.nullableInt('base_cents');
   return Charge.restore({
     id: ChargeId.fromString(row.string('id')),
     student: StudentRef.fromString(row.string('student_id')),
@@ -179,6 +180,7 @@ function toCharge(row: Row): Charge {
       kept: Money.cents(row.int('kept_cents')),
     },
     concept: row.nullableString('concept'),
+    base: baseCents === null ? null : Money.cents(baseCents),
   });
 }
 
@@ -186,24 +188,33 @@ function toCharge(row: Row): Charge {
 const DUE =
   `CASE WHEN c.cancelled_on IS NULL THEN c.amount_cents ELSE LEAST(c.amount_cents, c.kept_cents) END`;
 
+/** Lo que se cubre en su turno: lo que debe, salvo lo que se le subió a mano (por encima de `base_cents`). */
+const FIRST = `LEAST(${DUE}, COALESCE(c.base_cents, ${DUE}))`;
+/** Lo que se le subió a mano, que se cubre lo último. */
+const RAISED = `(${DUE} - ${FIRST})`;
+const BY_STUDENT = `PARTITION BY c.student_id, c.kind, CASE WHEN c.kind = 'material' THEN c.id END`;
+const BEFORE = `ORDER BY c.period ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING`;
+
 /**
  * Cuotas con lo que tienen cubierto: lo que cubren los cobros del alumno (por tipo) se reparte entre sus cuotas de la
- * más antigua a la más reciente (ver cuotas-separadas-de-los-cobros.md); las de material, solo con los cobros que
- * apuntan a cada una (ver material-deportivo-como-cobro.md). Se usa como CTE `allocated`.
+ * más antigua a la más reciente, y lo que se subió a mano a una cuota se cubre lo último, para que lo que falte se
+ * quede en ese mes (ver cuotas-separadas-de-los-cobros.md); las de material, solo con los cobros que apuntan a cada
+ * una (ver material-deportivo-como-cobro.md). Se usa como CTE `allocated`.
  */
 export const ALLOCATED = `allocated AS (
   SELECT c.*, c.cancelled_on::text AS cancelled_day, (${DUE})::integer AS due_cents,
-         LEAST(${DUE}, GREATEST(0,
-           COALESCE(CASE WHEN c.kind = 'material' THEN mc.credit ELSE cr.credit END, 0)
-           - COALESCE(SUM(${DUE}) OVER (
-             PARTITION BY c.student_id, c.kind, CASE WHEN c.kind = 'material' THEN c.id END ORDER BY c.period
-             ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING), 0)))::integer AS covered_cents
+         (LEAST(${FIRST}, GREATEST(0, credit.total - COALESCE(SUM(${FIRST}) OVER (${BY_STUDENT} ${BEFORE}), 0)))
+          + LEAST(${RAISED}, GREATEST(0, credit.total - SUM(${FIRST}) OVER (${BY_STUDENT})
+              - COALESCE(SUM(${RAISED}) OVER (${BY_STUDENT} ${BEFORE}), 0))))::integer AS covered_cents
     FROM billing_charge c
     LEFT JOIN (SELECT student_id, kind, SUM(credit_cents) AS credit FROM billing_payment
                 WHERE charge_id IS NULL GROUP BY student_id, kind) cr
       ON cr.student_id = c.student_id AND cr.kind = c.kind
     LEFT JOIN (SELECT charge_id, SUM(credit_cents) AS credit FROM billing_payment
                 WHERE charge_id IS NOT NULL GROUP BY charge_id) mc ON mc.charge_id = c.id
+    CROSS JOIN LATERAL (
+      SELECT COALESCE(CASE WHEN c.kind = 'material' THEN mc.credit ELSE cr.credit END, 0) AS total
+    ) credit
 )`;
 
 export class SqlChargeRepository implements ChargeRepository {
@@ -269,12 +280,13 @@ export class SqlChargeRepository implements ChargeRepository {
       cancelled_on: charge.cancelledOn()?.toString() ?? null,
       kept_cents: charge.keptOnCancellation()?.cents ?? null,
       concept: charge.concept(),
+      base_cents: charge.amountBeforeHand()?.cents ?? null,
     };
     await this.sql`INSERT INTO billing_charge ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET amount_cents = EXCLUDED.amount_cents, paid_by = EXCLUDED.paid_by,
         reminded_on = EXCLUDED.reminded_on, manual = EXCLUDED.manual, note = EXCLUDED.note,
         discount_percent = EXCLUDED.discount_percent, cancelled_on = EXCLUDED.cancelled_on,
-        kept_cents = EXCLUDED.kept_cents, concept = EXCLUDED.concept`;
+        kept_cents = EXCLUDED.kept_cents, concept = EXCLUDED.concept, base_cents = EXCLUDED.base_cents`;
   }
 }
 

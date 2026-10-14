@@ -290,6 +290,11 @@ export class Charge {
     private cancellation: { on: LocalDate; kept: Money } | null = null,
     /** Concepto propio (las de material: el producto pedido); las demás lo sacan de su tipo y mes. */
     private label: string | null = null,
+    /**
+     * El importe más bajo que tuvo antes de fijarla a mano (null si no se ha fijado): lo que la cuota pasa de él se
+     * subió a mano y se cubre lo último, para que lo que falte se quede en este mes.
+     */
+    private base: Money | null = null,
   ) {}
 
   static create(
@@ -342,6 +347,7 @@ export class Charge {
     discountPercent?: number;
     cancellation?: { on: LocalDate; kept: Money } | null;
     concept?: string | null;
+    base?: Money | null;
   }): Charge {
     return new Charge(
       fields.id,
@@ -356,6 +362,7 @@ export class Charge {
       fields.discountPercent ?? 0,
       fields.cancellation ?? null,
       fields.concept ?? null,
+      fields.base ?? null,
     );
   }
 
@@ -460,6 +467,7 @@ export class Charge {
     this.prepaid = percent;
     this.manual = false;
     this.reason = null;
+    this.base = null;
     this.value = Charge.discounted(fee, percent, family);
   }
 
@@ -505,6 +513,7 @@ export class Charge {
       throw new InvalidValue('amountCents', 'El importe no puede ser negativo.');
     }
     if (reason.trim() === '') throw new InvalidValue('reason', 'Indica el motivo del cambio.');
+    this.base = this.base !== null && this.base.cents < this.value.cents ? this.base : this.value;
     this.value = amount;
     this.manual = true;
     this.reason = [...reason.trim()].slice(0, 160).join('');
@@ -515,6 +524,18 @@ export class Charge {
     this.value = Charge.discounted(fee, this.prepaid);
     this.manual = false;
     this.reason = null;
+    this.base = null;
+  }
+
+  /** Lo que se le subió a mano respecto a lo que tenía: se cubre lo último (ver `allocateCredit`). */
+  raisedByHand(): Money {
+    if (this.base === null || this.amount.cents <= this.base.cents) return Money.zero();
+    return this.amount.minus(this.base);
+  }
+
+  /** El importe más bajo que tuvo antes de fijarla a mano (para guardarlo), o null. */
+  amountBeforeHand(): Money | null {
+    return this.base;
   }
 
   /** Recuerda el primer cobro que la cubrió (para enlazar el recibo); el estado no depende de esto. */
@@ -571,7 +592,8 @@ export class CreditAllocation {
 
 /**
  * Reparte lo que cubren los cobros de un alumno (de un mismo tipo) entre sus cuotas, de la más antigua a la más
- * reciente. Lo que sobra queda como saldo a favor.
+ * reciente. Lo que se subió a mano a una cuota se cubre lo último (también de la más antigua a la más reciente), para
+ * que lo que falte tras subirla se quede en ese mes. Lo que sobra queda como saldo a favor.
  */
 export function allocateCredit(charges: readonly Charge[], credit: Money): CreditAllocation {
   const ordered = [...charges].sort((a, b) =>
@@ -580,12 +602,16 @@ export function allocateCredit(charges: readonly Charge[], credit: Money): Credi
   let left = credit.isNegative() ? Money.zero() : credit;
   const covered = new Map<string, Money>();
   const amounts = new Map<string, Money>();
+  const cover = (charge: Charge, due: Money) => {
+    const share = left.cents >= due.cents ? due : left;
+    covered.set(charge.id.value, (covered.get(charge.id.value) ?? Money.zero()).plus(share));
+    left = left.minus(share);
+  };
   for (const charge of ordered) {
     amounts.set(charge.id.value, charge.amount);
-    const share = left.cents >= charge.amount.cents ? charge.amount : left;
-    covered.set(charge.id.value, share);
-    left = left.minus(share);
+    cover(charge, charge.amount.minus(charge.raisedByHand()));
   }
+  for (const charge of ordered) cover(charge, charge.raisedByHand());
   return new CreditAllocation(covered, amounts, left);
 }
 

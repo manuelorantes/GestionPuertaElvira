@@ -20,6 +20,11 @@ obligaba a tocar recibos o descuentos. El club quiere reorganizar las cuotas sin
   (importadas de la hoja) se deduce comparando su importe con la cuota que tenía el alumno antes del cambio.
 - **Importe de una cuota editable**: se puede fijar a mano con un motivo, solo ese mes o ese y los siguientes de la
   temporada (se crean las cuotas que falten). Las fijadas a mano no cambian con el recálculo automático.
+- **Lo subido a mano se cubre lo último** (`billing_charge.base_cents`, el importe más bajo que tuvo antes de
+  fijarla a mano): el reparto cubre primero lo que cada cuota debía por sí misma, de la más antigua a la más reciente,
+  y después lo que se subió a mano, en el mismo orden. Así, subir a mano un mes ya cubierto lo deja «pagado en parte»
+  en vez de mover la falta al mes más reciente (que es lo que se quiere cuando cambia la tarifa, no cuando se corrige
+  un mes). Al volver al importe calculado se olvida.
 - **Recálculo automático**: al cambiar lo que determina la cuota de un alumno (grupos, horario especial, familia
   directa, precio de particulares o tarifa de un grupo), las cuotas no fijadas a mano se recalculan desde el mes
   siguiente, o desde el actual si es del día 1 al 10, hasta junio, estén cobradas o no. La diferencia aparece como
