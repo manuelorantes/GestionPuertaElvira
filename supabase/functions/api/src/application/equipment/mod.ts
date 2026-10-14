@@ -398,6 +398,19 @@ export class ManageOrders {
     await this.o.orders.saveOrder(order);
   }
 
+  /** Vuelve a reservado: su cobro desaparece de Cobros (solo mientras no tenga nada cobrado). */
+  async unplace(id: string): Promise<void> {
+    const order = await this.o.order(id);
+    const charge = await this.o.charge(order);
+    if (charge === null) throw new InvalidValue('id', 'El pedido no tiene precio.');
+    if ((await this.o.covered(charge)).cents > 0) {
+      throw new InvalidValue('id', 'El pedido ya tiene algo cobrado: no puede volver a reservado.');
+    }
+    order.unplace();
+    await this.o.orders.saveOrder(order);
+    await this.o.charges.deleteCharge(charge.id);
+  }
+
   async undoDelivery(id: string): Promise<void> {
     const order = await this.o.order(id);
     order.undoDelivery();

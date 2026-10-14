@@ -288,6 +288,10 @@ export class SqlChargeRepository implements ChargeRepository {
         discount_percent = EXCLUDED.discount_percent, cancelled_on = EXCLUDED.cancelled_on,
         kept_cents = EXCLUDED.kept_cents, concept = EXCLUDED.concept, base_cents = EXCLUDED.base_cents`;
   }
+
+  async deleteCharge(id: ChargeId): Promise<void> {
+    await this.sql`DELETE FROM billing_charge WHERE id = ${id.value}`;
+  }
 }
 
 function invoiceData(i: Invoice): Record<string, string | number> {

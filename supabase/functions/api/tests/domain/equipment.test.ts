@@ -100,6 +100,24 @@ Deno.test('Order should go from reserved to ordered and describe its charge', ()
   );
 });
 
+Deno.test('Order should go back to reserved only while it is ordered and not delivered', () => {
+  const order = reserve(tracksuit());
+  assertThrows(() => order.unplace(), InvalidValue, 'no tiene precio');
+  order.place(tracksuit(), Money.euros(45), ChargeRef.generate(), today);
+  order.deliver(today, today, 1);
+  assertThrows(() => order.unplace(), InvalidValue, 'entregado');
+  order.undoDelivery();
+  order.unplace();
+  assertEquals([order.status, order.price, order.charge, order.orderedOn()], [
+    'reserved',
+    null,
+    null,
+    null,
+  ]);
+  order.cancel(today, false);
+  assertThrows(() => order.unplace(), InvalidValue, 'cancelado');
+});
+
 Deno.test('Order should deliver only with a price and enough stock, and undo it', () => {
   const order = reserve(tracksuit(), 2);
   assertThrows(() => order.deliver(today, today, 5), InvalidValue, 'pedido');
