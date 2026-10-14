@@ -1,4 +1,4 @@
-import { Ban, Euro, Pencil, RotateCcw, Undo2 } from 'lucide-react';
+import { Ban, Bookmark, Euro, Pencil, RotateCcw, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -10,6 +10,7 @@ import {
   type OrderState,
   reactivateOrder,
   undoDelivery,
+  unplaceOrder,
 } from '@/features/equipment/api';
 import { useOrders, useProducts } from '@/features/equipment/hooks';
 import { ORDER_STATE, orderLabel } from '@/features/equipment/labels';
@@ -190,6 +191,20 @@ export function OrdersView({ onDialog }: { onDialog: (dialog: MaterialDialog) =>
             className={ICON}
           >
             <Euro aria-hidden size={16} />
+          </button>
+        )}
+        {order.status === 'ordered' && order.coveredCents === 0 && !order.deliveredOn && (
+          <button
+            type="button"
+            aria-label={`Volver a reservado ${who}`}
+            title="Volver a reservado"
+            disabled={disabled}
+            onClick={() =>
+              void run(order.id, () => unplaceOrder(order.id), 'Vuelve a estar reservado')
+            }
+            className={ICON}
+          >
+            <Bookmark aria-hidden size={16} />
           </button>
         )}
         {order.status !== 'paid' && (

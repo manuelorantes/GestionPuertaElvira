@@ -16,7 +16,8 @@ MaterialTab (?vista=pedidos|stock|margen|productos)
 │       importe (o «Sin precio»; «Faltan X» si está pagado en parte) | badge Reservado/Pedido/Pagado/Cancelado
 │       + badge «Entregado dd/mm/aaaa» | acciones:
 │       - reservado: «Pasar a pedido» · ✎ Corregir · ⊘ Cancelar pedido
-│       - pedido: «Cobrar» · «Entregar» · ✎ Corregir (sin entregar) · € Cambiar precio (sin nada cobrado) · ⊘ Cancelar
+│       - pedido: «Cobrar» · «Entregar» · ✎ Corregir (sin entregar) · € Cambiar precio (sin nada cobrado) ·
+│         🔖 Volver a reservado (sin nada cobrado ni entregado) · ⊘ Cancelar
 │       - pagado: «Entregar» (si falta) · ↶ Deshacer la entrega (si está entregado)
 │       - cancelado: «Reactivar»
 ├── StockView
