@@ -1,4 +1,4 @@
-import { Ban, Bookmark, Euro, Pencil, RotateCcw, Undo2 } from 'lucide-react';
+import { Ban, Bookmark, ClipboardList, Euro, Pencil, RotateCcw, Undo2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -19,12 +19,14 @@ import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import { Alert } from '@/shared/ui/Alert';
 import { Avatar } from '@/shared/ui/Avatar';
 import { Badge } from '@/shared/ui/Badge';
+import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { Select } from '@/shared/ui/Select';
 import { useToast } from '@/shared/ui/Toast';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
 import type { MaterialDialog } from './MaterialTab';
+import { OrderListDialog } from './OrderListDialog';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 const ACTION =
@@ -100,6 +102,7 @@ export function OrdersView({ onDialog }: { onDialog: (dialog: MaterialDialog) =>
   const toast = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [listing, setListing] = useState(false);
 
   async function run(id: string, action: () => Promise<void>, done: string) {
     setBusy(id);
@@ -324,6 +327,10 @@ export function OrdersView({ onDialog }: { onDialog: (dialog: MaterialDialog) =>
             options={[{ value: '', label: 'Cualquiera' }, ...seasons()]}
           />
         </div>
+        <Button variant="secondary" className="ml-auto" onClick={() => setListing(true)}>
+          <ClipboardList aria-hidden size={18} />
+          Generar listado
+        </Button>
       </div>
       {filter.open && (
         <p className="text-[13px] text-ink-muted">
@@ -332,6 +339,7 @@ export function OrdersView({ onDialog }: { onDialog: (dialog: MaterialDialog) =>
       )}
       {error && <Alert>{error}</Alert>}
       <Card>{renderBody()}</Card>
+      {listing && <OrderListDialog onClose={() => setListing(false)} />}
     </div>
   );
 }
