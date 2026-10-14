@@ -1,6 +1,8 @@
+import { Printer } from 'lucide-react';
 import { useState } from 'react';
 
 import { formatCents } from '@/features/billing/money';
+import { formatDate, todayIso } from '@/features/students/format';
 import type { Order, OrderState, Product } from '@/features/equipment/api';
 import { useOrders, useProducts } from '@/features/equipment/hooks';
 import { Alert } from '@/shared/ui/Alert';
@@ -108,6 +110,7 @@ function ProductOrdersTable({
 /**
  * «Generar listado»: los pedidos reservados (o los pedidos, o ambos) agrupados por producto, con el alumno y los
  * campos de cada uno («-» en lo que falta por rellenar), eligiendo qué productos listar y si se ven los precios.
+ * «Imprimir» saca solo lo que se ve (y desde ahí se guarda en PDF).
  */
 export function OrderListDialog({ onClose }: { onClose: () => void }) {
   const [scope, setScope] = useState<Scope>('reserved');
@@ -121,6 +124,7 @@ export function OrderListDialog({ onClose }: { onClose: () => void }) {
   const listedProducts = (products.data ?? []).filter((p) =>
     listed.some((o) => o.productId === p.id),
   );
+  const canPrint = listedProducts.some((p) => !hidden.has(p.id));
 
   function toggleProduct(id: string) {
     setHidden((current) => {
@@ -145,7 +149,14 @@ export function OrderListDialog({ onClose }: { onClose: () => void }) {
     const shown = listedProducts.filter((p) => !hidden.has(p.id));
     return (
       <>
-        <div role="group" aria-label="Productos a listar" className="flex flex-wrap gap-2">
+        <h2 className="hidden font-display text-xl font-bold tracking-[0.04em] uppercase print:block">
+          {SCOPES.find((s) => s.value === scope)?.label} · {formatDate(todayIso())}
+        </h2>
+        <div
+          role="group"
+          aria-label="Productos a listar"
+          className="flex flex-wrap gap-2 print:hidden"
+        >
           {listedProducts.map((p) => (
             <ToggleButton
               key={p.id}
@@ -193,10 +204,15 @@ export function OrderListDialog({ onClose }: { onClose: () => void }) {
           <Switch label="Con precios" checked={withPrices} onChange={setWithPrices} />
         </div>
       </div>
-      <div className="flex flex-col gap-5 p-6">{renderBody()}</div>
-      <div className="flex justify-end border-t border-line px-6 py-4">
+      {/* `receipt-sheet`: al imprimir solo sale el listado, como con los recibos. */}
+      <div className="receipt-sheet flex flex-col gap-5 p-6 print:p-0">{renderBody()}</div>
+      <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4 print:hidden">
         <Button variant="secondary" onClick={onClose}>
           Cerrar
+        </Button>
+        <Button onClick={() => window.print()} disabled={!canPrint}>
+          <Printer aria-hidden size={18} />
+          Imprimir
         </Button>
       </div>
     </Dialog>

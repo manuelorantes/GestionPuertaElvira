@@ -1,11 +1,13 @@
 import type { ButtonHTMLAttributes, Ref } from 'react';
 
-type Variant = 'primary' | 'secondary' | 'outline' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'surface' | 'outline' | 'ghost';
 type Size = 'md' | 'lg';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-brand text-surface-raised hover:bg-brand-strong',
   secondary: 'border border-line-strong bg-transparent text-ink hover:bg-surface-muted',
+  /** Como `secondary` pero con fondo de tarjeta: junto a filtros sobre el fondo general. */
+  surface: 'border border-line-strong bg-surface text-ink hover:bg-surface-muted',
   outline: 'border border-ink-strong bg-transparent text-ink-strong hover:bg-sand',
   ghost: 'bg-transparent text-ink-soft hover:bg-surface-muted',
 };
