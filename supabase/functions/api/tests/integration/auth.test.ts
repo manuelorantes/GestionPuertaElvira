@@ -167,6 +167,11 @@ Deno.test('administration should be reserved to administrators; the history to s
   await client.logIn('ia@club.es');
   assertEquals((await client.get('/api/admin/_ping')).status, 200, 'el asistente administra');
   assertError(await client.get('/api/admin/audit/_ping'), 403, 'forbidden');
+  assertEquals(
+    (await client.get('/api/admin/audit/_read')).status,
+    200,
+    'el asistente lee el historial',
+  );
   await client.logIn('super@club.es');
   assertEquals((await client.get('/api/admin/audit/_ping')).status, 200);
   assertError(await new ApiClient().get('/api/admin/_ping'), 401, 'unauthorized');

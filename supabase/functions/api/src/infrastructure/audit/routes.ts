@@ -5,7 +5,7 @@ import { registerDomainErrors } from '../http/errors.ts';
 import { SqlAuditLog } from '../persistence/audit.ts';
 import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
 
-/** Rutas del historial (solo superadministración): /api/admin/audit */
+/** Rutas del historial: /api/admin/audit. Consultarlo, superadministración y el asistente; deshacer, solo la primera. */
 export function registerAuditRoutes(api: ApiApp): void {
   registerDomainErrors({
     AuditActionNotFound: [404, 'not_found'],
@@ -13,13 +13,18 @@ export function registerAuditRoutes(api: ApiApp): void {
     UndoConflict: [409, 'undo_conflict'],
   });
   const log = (scope: RequestScope) => new SqlAuditLog(scope.tx);
-  const superadmin = (method: 'GET' | 'POST', path: string) => ({
-    method,
+  const superadmin = (path: string) => ({
+    method: 'POST' as const,
     path,
     access: 'superadmin' as const,
   });
+  const reader = (path: string) => ({
+    method: 'GET' as const,
+    path,
+    access: 'auditReader' as const,
+  });
 
-  api.defineRoute(superadmin('GET', '/api/admin/audit/actions'), async (c, scope) => {
+  api.defineRoute(reader('/api/admin/audit/actions'), async (c, scope) => {
     const user = c.req.query('userId');
     const before = c.req.query('before');
     return c.json({
@@ -33,14 +38,14 @@ export function registerAuditRoutes(api: ApiApp): void {
     });
   });
 
-  api.defineRoute(superadmin('GET', '/api/admin/audit/actions/:id'), async (c, scope) => {
+  api.defineRoute(reader('/api/admin/audit/actions/:id'), async (c, scope) => {
     const id = param(c, 'id');
     const action = await log(scope).action(id);
     if (action === null) throw new AuditActionNotFound();
     return c.json({ action, ...(await log(scope).changes(id)) });
   });
 
-  api.defineRoute(superadmin('POST', '/api/admin/audit/actions/:id/undo'), async (c, scope) => {
+  api.defineRoute(superadmin('/api/admin/audit/actions/:id/undo'), async (c, scope) => {
     await new UndoAction(
       log(scope),
       log(scope),
@@ -50,7 +55,7 @@ export function registerAuditRoutes(api: ApiApp): void {
     return c.body(null, 204);
   });
 
-  api.defineRoute(superadmin('POST', '/api/admin/audit/actions/:id/restore'), async (c, scope) => {
+  api.defineRoute(superadmin('/api/admin/audit/actions/:id/restore'), async (c, scope) => {
     const restore = new RestoreToPoint(
       log(scope),
       log(scope),

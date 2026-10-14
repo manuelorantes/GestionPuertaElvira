@@ -2,8 +2,8 @@
 
 La inteligencia artificial que ayuda a mantener la aplicación puede entrar en ella con una cuenta propia,
 de rol **asistente**, para consultar datos y hacer los cambios que se le pidan. Tiene los mismos permisos
-que administración (ni historial ni importación de hojas) y todo lo que hace queda en el historial con su
-nombre, como cualquier otra cuenta.
+que administración (sin importación de hojas), puede consultar el historial (no deshacer ni volver a un
+punto) y todo lo que hace queda en el historial con su nombre, como cualquier otra cuenta.
 
 ## Alta de la cuenta (una vez, desde el ordenador de quien administra)
 

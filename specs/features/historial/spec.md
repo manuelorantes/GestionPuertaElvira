@@ -2,7 +2,8 @@
 
 Registro de todo lo que cambia los datos del club, con quién lo hizo y cómo estaban los datos antes y después,
 para poder deshacer una acción o volver a cualquier punto.
-Solo superadministración puede verlo y usarlo; administración no lo ve.
+Solo superadministración puede verlo y usarlo; administración no lo ve. La cuenta de asistente puede consultarlo
+(no deshacer ni volver a un punto).
 Decisión de diseño: [historial de cambios con triggers](../../decisions/historial-de-cambios-con-triggers.md).
 
 ### Requirement: Registro de acciones
