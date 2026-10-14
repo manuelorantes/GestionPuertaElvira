@@ -53,6 +53,18 @@ test('should sell a product to a student: product, purchase, order, payment and 
     .filter({ hasText: 'Mateo Cano Robles' })
     .filter({ hasText: name });
   await expect(row.getByText('Pedido', { exact: true })).toBeVisible();
+
+  // Sin nada cobrado, vuelve a reservado (sin precio) y se vuelve a pasar a pedido.
+  await row.getByRole('button', { name: /Volver a reservado/ }).click();
+  await expect(row.getByText('Reservado', { exact: true })).toBeVisible();
+  await expect(row.getByText('Sin precio')).toBeVisible();
+  await row.getByRole('button', { name: 'Pasar a pedido' }).click();
+  await page
+    .getByRole('dialog', { name: 'Pasar a pedido' })
+    .getByRole('button', { name: 'Pasar a pedido' })
+    .click();
+  await expect(row.getByText('Pedido', { exact: true })).toBeVisible();
+
   await row.getByRole('button', { name: 'Cobrar' }).click();
   const payment = page.getByRole('dialog', { name: 'Registrar cobro' });
   await expect(payment.getByText('Total a cobrar')).toBeVisible();

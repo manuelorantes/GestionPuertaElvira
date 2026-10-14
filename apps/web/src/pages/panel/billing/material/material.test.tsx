@@ -123,6 +123,38 @@ describe('Material deportivo', () => {
     );
   });
 
+  it('takes an order with nothing paid back to reservation', async () => {
+    const spy = api({
+      'GET /api/admin/equipment/orders?open=1': [
+        200,
+        {
+          items: [
+            order({
+              status: 'ordered',
+              priceCents: 4500,
+              dueCents: 4500,
+              chargeId: 'c1',
+              orderedOn: '2026-10-09',
+            }),
+          ],
+        },
+      ],
+      'POST /api/admin/equipment/orders/o1/unplace': [204],
+    });
+    renderApp('/panel/cobros?pestana=material');
+
+    const list = await screen.findByRole('list', { name: 'Pedidos de material' });
+    await userEvent.click(within(list).getByRole('button', { name: /Volver a reservado/ }));
+    await waitFor(() =>
+      expect(
+        spy.mock.calls.some(
+          ([u, init]) => u === '/api/admin/equipment/orders/o1/unplace' && init?.method === 'POST',
+        ),
+      ).toBe(true),
+    );
+    expect(await screen.findByText('Vuelve a estar reservado')).toBeInTheDocument();
+  });
+
   it('asks for the size still to choose before turning a reservation into an order', async () => {
     const spy = api({
       'GET /api/admin/equipment/orders?open=1': [
