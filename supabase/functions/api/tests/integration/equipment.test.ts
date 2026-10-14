@@ -179,6 +179,48 @@ Deno.test('equipment should take an order from reservation to payment, with stoc
   });
 });
 
+Deno.test('equipment should take an order back to reservation and remove its charge from Billing', async () => {
+  const fx = await fixture();
+  const c = fx.client;
+  const created = await c.json('POST', '/api/admin/equipment/orders', {
+    studentId: fx.student,
+    productId: fx.product,
+    quantity: 1,
+    values: { [fx.talla]: '10' },
+    priceCents: 4500,
+  });
+  const id = body<{ id: string }>(created).id;
+  const chargeId = body<OrderRow>(await c.get(`/api/admin/equipment/orders/${id}`)).chargeId;
+  assertEquals(
+    (await c.json('POST', `/api/admin/equipment/orders/${id}/unplace`, {})).status,
+    204,
+  );
+  const order = body<OrderRow>(await c.get(`/api/admin/equipment/orders/${id}`));
+  assertEquals([order.status, order.chargeId, order.dueCents], ['reserved', null, 0]);
+  const account = body<{
+    materialCharges: unknown[];
+    totals: { kind: string; paidCents: number; pendingCents: number }[];
+  }>(
+    await c.get(`/api/admin/billing/accounts/${fx.student}`),
+  );
+  assertEquals(account.materialCharges.length, 0);
+  assertEquals(account.totals.find((t) => t.kind === 'material'), {
+    kind: 'material',
+    paidCents: 0,
+    pendingCents: 0,
+  });
+  assertError(
+    await c.json('POST', `/api/admin/billing/charges/${chargeId}/cancel`, {}),
+    404,
+    'not_found',
+  );
+  assertError(
+    await c.json('POST', `/api/admin/equipment/orders/${id}/unplace`, {}),
+    422,
+    'unprocessable',
+  );
+});
+
 Deno.test('equipment should cancel only the pending part of an order and refuse to drop options in use', async () => {
   const fx = await fixture();
   const c = fx.client;

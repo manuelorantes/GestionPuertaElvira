@@ -187,6 +187,11 @@ export class BillingFixture
     return Promise.resolve();
   }
 
+  deleteCharge(id: ChargeId): Promise<void> {
+    this.charges.delete(id.value);
+    return Promise.resolve();
+  }
+
   payment(id: PaymentId): Promise<Payment | null> {
     return Promise.resolve(this.payments.get(id.value) ?? null);
   }

@@ -97,6 +97,8 @@ export interface ChargeRepository {
   /** Lo cobrado de verdad (importe de los recibos) de ese tipo al alumno. */
   paidTotal(student: StudentRef, kind: ChargeKind): Promise<Money>;
   saveCharge(charge: Charge): Promise<void>;
+  /** Borra una cuota sin cobros (la de un pedido de material que vuelve a reservado). */
+  deleteCharge(id: ChargeId): Promise<void>;
 }
 
 /** Los puntos de un alumno (sección Puntos): valen solo en el mes en que se ganan. */
