@@ -69,20 +69,152 @@ Deno.test('Product should describe a selection, requiring list options and keepi
   assertEquals(product.variant({ talla: '10', nombre: 'Pepe' }).values, { talla: '10' });
 });
 
-Deno.test('Product should not drop options already used by orders or purchases', () => {
+Deno.test('Product should tell what happens to each option when its lists change', () => {
   const product = tracksuit();
-  const fields = [
-    ProductField.of({ id: 'talla', name: 'Talla', kind: 'options', options: ['8', '12'] }),
-  ];
-  assertThrows(
-    () => product.update('Chándal', Money.euros(45), fields, true, new Set(['talla=10'])),
-    InvalidValue,
-    'No se puede quitar «10» de «Talla»',
+  const talla = (options: string[]) =>
+    ProductField.of({ id: 'talla', name: 'Talla', kind: 'options', options });
+  // «10» pasa a «XS», «12» se quita y «8» sigue.
+  const changes = product.update(
+    'Chándal oficial',
+    Money.euros(50),
+    [talla(['8', 'XS', 'S'])],
+    false,
+    [
+      { fieldId: 'talla', from: '10', to: 'XS' },
+    ],
   );
-  product.update('Chándal oficial', Money.euros(50), fields, false, new Set(['talla=8']));
+  assertEquals(changes, [
+    { fieldId: 'talla', fieldName: 'Talla', from: '10', to: 'XS' },
+    { fieldId: 'talla', fieldName: 'Talla', from: '12', to: '' },
+  ]);
   assertEquals(product.name, 'Chándal oficial');
   assertEquals(product.isActive(), false);
   assertThrows(() => reserve(product, 1, { talla: '8' }), InvalidValue, 'ya no se ofrece');
+
+  // Un campo que deja de ser de lista pierde todas sus opciones.
+  assertEquals(
+    product.update('Chándal', Money.euros(45), [
+      ProductField.of({ id: 'talla', name: 'Talla', kind: 'text' }),
+    ], true).map((c) => c.from),
+    ['8', 'XS', 'S'],
+  );
+});
+
+Deno.test('Product should check that renamed options exist and end up in the list', () => {
+  const update = (options: string[], renames: { from: string; to: string }[]) => {
+    const product = tracksuit();
+    return product.update(
+      'Chándal',
+      Money.euros(45),
+      [ProductField.of({ id: 'talla', name: 'Talla', kind: 'options', options })],
+      true,
+      renames.map((r) => ({ fieldId: 'talla', ...r })),
+    );
+  };
+  assertThrows(
+    () => update(['XS'], [{ from: '14', to: 'XS' }]),
+    InvalidValue,
+    '«14» no es una opción',
+  );
+  assertThrows(
+    () => update(['8', '12'], [{ from: '10', to: 'XS' }]),
+    InvalidValue,
+    'no está entre sus opciones',
+  );
+  assertThrows(
+    () => update(['XS'], [{ from: '10', to: 'XS' }, { from: '12', to: 'XS' }]),
+    InvalidValue,
+    'Dos opciones',
+  );
+  assertThrows(
+    () => update(['8', '12'], [{ from: '10', to: '12' }]),
+    InvalidValue,
+    '«12» ya es una opción',
+  );
+  // Intercambiar dos opciones sí se puede.
+  assertEquals(
+    update(['8', '10', '12'], [{ from: '10', to: '12' }, { from: '12', to: '10' }]).map((c) =>
+      c.to
+    ),
+    ['12', '10'],
+  );
+});
+
+Deno.test('Order should follow the renamed options, and only a reservation can be left blank', () => {
+  const product = tracksuit();
+  const renamed = reserve(product, 1, { talla: '10', nombre: 'Pepe' });
+  const blank = reserve(product, 1, { talla: '10' });
+  const removed = reserve(product, 1, { talla: '12' });
+  const placed = reserve(product, 1, { talla: '10' });
+  placed.place(product, Money.euros(45), ChargeRef.generate(), today);
+  const gone = reserve(product, 1, { talla: '12' });
+  gone.place(product, Money.euros(45), ChargeRef.generate(), today);
+
+  const changes = product.update(
+    'Chándal',
+    Money.euros(45),
+    [
+      ProductField.of({ id: 'talla', name: 'Talla', kind: 'options', options: ['8', 'XS'] }),
+      ProductField.of({ id: 'nombre', name: 'Nombre a estampar', kind: 'text' }),
+    ],
+    true,
+    [{ fieldId: 'talla', from: '10', to: 'XS' }],
+  );
+  const none = new Set<string>();
+
+  assertEquals(renamed.followOptions(product, changes, none), true);
+  assertEquals(renamed.selection.detail, 'Talla XS · Nombre a estampar: Pepe');
+  assertEquals(renamed.followOptions(product, changes, none), false);
+
+  assertEquals(blank.followOptions(product, changes, new Set(['talla=10'])), true);
+  assertEquals(blank.selection.values, {});
+  assertEquals(product.missingIn(blank.selection.values), ['Talla']);
+
+  removed.followOptions(product, changes, none);
+  assertEquals(removed.selection.variantLabel, '');
+
+  // Con precio, la reserva en blanco no se aplica: pasa a la nueva.
+  placed.followOptions(product, changes, new Set(['talla=10']));
+  assertEquals(placed.selection.detail, 'Talla XS');
+  assertThrows(
+    () => gone.followOptions(product, changes, none),
+    InvalidValue,
+    'No se puede quitar «12» de «Talla»: hay pedidos con precio',
+  );
+});
+
+Deno.test('Purchase should follow the renamed options and refuse to lose one', () => {
+  const product = tracksuit();
+  const purchase = Purchase.register({
+    id: PurchaseId.generate(),
+    product,
+    boughtOn: today,
+    cost: Money.euros(60),
+    lines: [{ values: { talla: '10' }, quantity: 1 }, { values: { talla: '8' }, quantity: 1 }],
+    note: null,
+    today,
+  });
+  const changes = product.update(
+    'Chándal',
+    Money.euros(45),
+    [
+      ProductField.of({ id: 'talla', name: 'Talla', kind: 'options', options: ['8', 'XS'] }),
+    ],
+    true,
+    [{ fieldId: 'talla', from: '10', to: 'XS' }],
+  );
+  assertEquals(purchase.followOptions(product, changes), true);
+  assertEquals(purchase.lines.map((l) => l.selection.variantLabel), ['Talla XS', 'Talla 8']);
+  assertEquals(purchase.unitsOf(product.variant({ talla: 'XS' }).variantKey), 1);
+  assertEquals(purchase.followOptions(product, changes), false);
+  const dropped = product.update('Chándal', Money.euros(45), [
+    ProductField.of({ id: 'talla', name: 'Talla', kind: 'options', options: ['XS'] }),
+  ], true);
+  assertThrows(
+    () => purchase.followOptions(product, dropped),
+    InvalidValue,
+    'No se puede quitar «8» de «Talla»: hay compras',
+  );
 });
 
 Deno.test('Order should go from reserved to ordered and describe its charge', () => {

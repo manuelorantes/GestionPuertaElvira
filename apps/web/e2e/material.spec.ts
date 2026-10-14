@@ -24,7 +24,10 @@ test('should sell a product to a student: product, purchase, order, payment and 
   await product.getByLabel('Precio de venta (€)').fill('30');
   await product.getByRole('button', { name: 'Añadir campo' }).click();
   await product.getByLabel('Nombre del campo').fill('Talla');
-  await product.getByLabel('Opciones (separadas por comas)').fill('S, M');
+  await product.getByRole('button', { name: 'Añadir opción' }).click();
+  await product.getByLabel('Opción 1', { exact: true }).fill('S');
+  await product.getByRole('button', { name: 'Añadir opción' }).click();
+  await product.getByLabel('Opción 2', { exact: true }).fill('M');
   await product.getByRole('button', { name: 'Crear producto' }).click();
   await expect(page.getByRole('list', { name: 'Productos' })).toContainText(name);
 

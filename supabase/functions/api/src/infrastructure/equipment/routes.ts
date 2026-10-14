@@ -25,20 +25,22 @@ import {
 function equipment(api: ApiApp, scope: RequestScope) {
   const tx = scope.tx;
   const products = new SqlProductRepository(tx);
+  const orders = new SqlOrderRepository(tx);
+  const purchases = new SqlPurchaseRepository(tx);
   const stock = new SqlStockLedger(tx);
   const query = new SqlEquipmentQuery(tx);
   return {
     query,
-    products: new SaveProduct(products, stock),
+    products: new SaveProduct(products, orders, purchases),
     orders: new ManageOrders(
-      new SqlOrderRepository(tx),
+      orders,
       products,
       new SqlChargeRepository(tx),
       stock,
       new SqlStudentLookup(tx),
       api.deps.clock,
     ),
-    purchases: new ManagePurchases(new SqlPurchaseRepository(tx), products, stock, api.deps.clock),
+    purchases: new ManagePurchases(purchases, products, stock, api.deps.clock),
     reports: new EquipmentReports(query),
   };
 }
@@ -53,6 +55,14 @@ function productInput(body: JsonBody): ProductInput {
       name: f.requiredString('name'),
       kind: f.requiredString('kind'),
       options: f.stringList('options'),
+      renamed: f.objectList('renamed').map((r) => ({
+        from: r.requiredString('from'),
+        to: r.requiredString('to'),
+      })),
+    })),
+    blankReservations: body.objectList('blankReservations').map((b) => ({
+      fieldId: b.requiredString('fieldId'),
+      option: b.requiredString('option'),
     })),
   };
 }
@@ -93,6 +103,10 @@ export function registerEquipmentRoutes(api: ApiApp): void {
       productInput(await JsonBody.from(c.req.raw)),
     );
     return c.json({ id }, 201);
+  });
+
+  api.defineRoute(admin('GET', '/products/:id/usage'), async (c, scope) => {
+    return c.json({ items: await equipment(api, scope).reports.optionUsage(param(c, 'id')) });
   });
 
   api.defineRoute(admin('PUT', '/products/:id'), async (c, scope) => {

@@ -19,7 +19,25 @@ export interface Product {
   fields: ProductField[];
 }
 
-export type ProductInput = Omit<Product, 'id'>;
+export interface ProductFieldInput extends ProductField {
+  /** Al editar: qué opción que había pasa a llamarse cómo (si no, cuenta como quitada y añadida). */
+  renamed: { from: string; to: string }[];
+}
+
+export interface ProductInput extends Omit<Product, 'id' | 'fields'> {
+  fields: ProductFieldInput[];
+  /** Opciones renombradas cuyas reservas se quedan sin elegir en vez de pasar a la nueva. */
+  blankReservations: { fieldId: string; option: string }[];
+}
+
+/** Cuántas reservas (sin precio), pedidos con precio y compras usan una opción de un campo de lista. */
+export interface OptionUsage {
+  fieldId: string;
+  value: string;
+  reservations: number;
+  orders: number;
+  purchases: number;
+}
 
 /** «paid»: pedido con su cobro cubierto. */
 export type OrderState = 'reserved' | 'ordered' | 'paid' | 'cancelled';
@@ -142,8 +160,12 @@ export async function createProduct(input: ProductInput): Promise<string> {
   return (await apiSend<{ id: string }>('POST', `${BASE}/products`, input)).id;
 }
 
-export function updateProduct({ id, ...input }: Product): Promise<void> {
+export function updateProduct({ id, ...input }: ProductInput & { id: string }): Promise<void> {
   return apiSend('PUT', `${BASE}/products/${id}`, input);
+}
+
+export async function fetchProductUsage(id: string): Promise<OptionUsage[]> {
+  return (await apiGet<{ items: OptionUsage[] }>(`${BASE}/products/${id}/usage`)).items;
 }
 
 export async function fetchOrders(filter: OrderFilter): Promise<Order[]> {

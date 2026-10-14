@@ -41,8 +41,11 @@ Diálogos
 │   · botones de los productos con pedidos (apagar uno lo quita) · una tabla por producto: Alumno · Cantidad · un campo
 │   por columna («-» si falta) · Precio y total del producto si están activados · «Cerrar» · «Imprimir» (desactivado
 │   sin productos elegidos). Al imprimir solo sale la hoja: título con lo listado y la fecha, y las tablas
-├── «Nuevo producto» / «Editar producto»: Nombre · Precio de venta · Campos (nombre, Lista/Texto, opciones separadas
-│   por comas, quitar) · «Añadir campo» · interruptor «Se ofrece para pedidos nuevos» al editar
+├── «Nuevo producto» / «Editar producto»: Nombre · Precio de venta · Campos (nombre, Lista/Texto, quitar; en los de
+│   lista, las opciones una a una con su ✕ y «Añadir opción») · «Añadir campo» · interruptor «Se ofrece para pedidos
+│   nuevos» al editar. Al guardar con opciones cambiadas en uso, segundo paso: por cada una, «Talla «10» pasa a «XS»» o
+│   «se quita», un desplegable para sus reservas (Pasan a «XS» | Se quedan sin talla) o el aviso de que se quedan sin
+│   ella, y cuántos pedidos con precio y compras la siguen · «Volver» · «Cancelar» · «Guardar»
 └── «Registrar compra» / «Corregir compra»: Producto · Fecha · Coste del lote entero · unidades por variante ·
     «N unidades · X € cada una» · Nota
 ```
