@@ -10,8 +10,13 @@ interface FormDialogProps {
   confirmLabel: string;
   size?: 'narrow' | 'wide';
   onClose: () => void;
-  /** Devuelve un error de validación (y no envía), o hace la petición; si falla, se queda abierto con el error. */
-  onSubmit: () => string | Promise<unknown>;
+  /** Con un paso previo: «Volver» a él. */
+  onBack?: (() => void) | undefined;
+  /**
+   * Devuelve un error de validación (y no envía), `null` si el formulario pasa a otro paso, o hace la petición; si
+   * falla, se queda abierto con el error.
+   */
+  onSubmit: () => string | null | Promise<unknown>;
   children: ReactNode;
 }
 
@@ -21,6 +26,7 @@ export function FormDialog({
   confirmLabel,
   size = 'narrow',
   onClose,
+  onBack,
   onSubmit,
   children,
 }: FormDialogProps) {
@@ -32,6 +38,7 @@ export function FormDialog({
     setBusy(true);
     try {
       const result = onSubmit();
+      if (result === null) return setError(null);
       if (typeof result === 'string') return setError(result);
       await result;
       onClose();
@@ -58,6 +65,11 @@ export function FormDialog({
           {children}
         </div>
         <div className="flex justify-end gap-2 border-t border-line px-6 py-4">
+          {onBack && (
+            <Button variant="secondary" className="mr-auto" onClick={onBack}>
+              Volver
+            </Button>
+          )}
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>

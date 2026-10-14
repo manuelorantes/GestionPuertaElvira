@@ -14,16 +14,30 @@ defecto y los campos que se le quieran poner:
   de lista, aunque una reserva puede quedar con alguno sin elegir todavía;
 - de texto: texto libre y opcional (p. ej. «Nombre a estampar»).
 
-Un producto MUST poder retirarse (deja de ofrecerse para pedidos nuevos) y volver a ofrecerse. No se puede quitar un
-campo de lista ni una opción que ya usan pedidos o compras.
+Un producto MUST poder retirarse (deja de ofrecerse para pedidos nuevos) y volver a ofrecerse.
+
+Las opciones de un campo de lista MUST poder editarse una a una: renombrarse (se indica cuál pasa a cuál), quitarse y
+añadirse. Al renombrar una opción, los pedidos y las compras que la usan pasan a la nueva; para las reservas (pedidos
+sin precio) se pregunta antes si pasan a la nueva o se quedan sin elegirla. Al quitar una opción, se avisa y sus
+reservas se quedan sin elegirla (habrá que volver a elegirla antes de pasarlas a pedido); no se puede quitar si la usan
+pedidos con precio o compras. Cuando ninguna opción cambiada está en uso, se guarda sin preguntar.
 
 #### Scenario: Nuevo producto
 - **WHEN** administración crea «Chándal» a 45 € con «Talla» (8, 10, 12) y «Nombre a estampar»
 - **THEN** puede apuntar pedidos de chándal eligiendo talla y, si quiere, el nombre
 
-#### Scenario: Opción en uso
-- **WHEN** hay un pedido de chándal de talla 10 y se intenta quitar esa talla
-- **THEN** no se permite y se explica que hay pedidos o compras con esa opción
+#### Scenario: Renombrar una opción con reservas
+- **WHEN** la talla 10 del chándal pasa a llamarse «XS» y hay dos reservas y un pedido con precio de esa talla
+- **THEN** antes de guardar se pregunta si las reservas pasan a «XS» o se quedan sin talla; el pedido con precio
+  pasa a «XS» en todo caso, y el stock de esa variante sigue siendo el mismo
+
+#### Scenario: Quitar una opción
+- **WHEN** se quita la talla 12 y hay una reserva de esa talla
+- **THEN** se avisa de que esa reserva se queda sin talla y, al guardar, aparece como «Falta talla»
+
+#### Scenario: Opción con pedidos con precio o compras
+- **WHEN** se intenta quitar la talla 10 y hay un pedido con precio o una compra de esa talla
+- **THEN** no se permite y se explica que hay pedidos con precio o compras con esa opción
 
 ### Requirement: Pedidos de un alumno
 Cada pedido MUST ser de un producto para un alumno, con cantidad y los valores de sus campos. Sus estados:

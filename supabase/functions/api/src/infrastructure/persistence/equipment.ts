@@ -25,6 +25,7 @@ import type {
   PurchaseView,
   StockLedger,
   StudentLookup,
+  ValueUsage,
 } from '../../application/equipment/mod.ts';
 import { ALLOCATED } from './billing.ts';
 import { Row, type Sql } from './sql.ts';
@@ -134,6 +135,15 @@ export class SqlOrderRepository implements OrderRepository {
     return rows[0] ? toOrder(new Row(rows[0])) : null;
   }
 
+  async ordersOf(product: ProductId): Promise<Order[]> {
+    const rows = await this.sql.unsafe(
+      `SELECT ${ORDER_COLUMNS} FROM equipment_order o WHERE o.product_id = $1
+        ORDER BY o.created_on, o.id`,
+      [product.value],
+    );
+    return Row.all(rows).map(toOrder);
+  }
+
   async saveOrder(order: Order): Promise<void> {
     const record = {
       id: order.id.value,
@@ -167,27 +177,35 @@ function linesOf(row: Row): StoredLine[] {
   return row.json('lines') as StoredLine[];
 }
 
+function toPurchase(row: Row): Purchase {
+  return Purchase.restore(
+    PurchaseId.fromString(row.string('id')),
+    ProductId.fromString(row.string('product_id')),
+    LocalDate.fromString(row.string('day')),
+    Money.cents(row.int('cost_cents')),
+    linesOf(row).map((l) =>
+      new PurchaseLine(
+        new Selection(l.values, l.variantKey, l.variantLabel, l.variantLabel),
+        l.quantity,
+      )
+    ),
+    row.nullableString('note'),
+  );
+}
+
 export class SqlPurchaseRepository implements PurchaseRepository {
   constructor(private readonly sql: Sql) {}
 
   async purchase(id: PurchaseId): Promise<Purchase | null> {
     const rows = await this.sql`SELECT *, bought_on::text AS day FROM equipment_purchase
       WHERE id = ${id.value}`;
-    if (!rows[0]) return null;
-    const row = new Row(rows[0]);
-    return Purchase.restore(
-      PurchaseId.fromString(row.string('id')),
-      ProductId.fromString(row.string('product_id')),
-      LocalDate.fromString(row.string('day')),
-      Money.cents(row.int('cost_cents')),
-      linesOf(row).map((l) =>
-        new PurchaseLine(
-          new Selection(l.values, l.variantKey, l.variantLabel, l.variantLabel),
-          l.quantity,
-        )
-      ),
-      row.nullableString('note'),
-    );
+    return rows[0] ? toPurchase(new Row(rows[0])) : null;
+  }
+
+  async purchasesOf(product: ProductId): Promise<Purchase[]> {
+    const rows = await this.sql`SELECT *, bought_on::text AS day FROM equipment_purchase
+      WHERE product_id = ${product.value} ORDER BY bought_on, id`;
+    return Row.all(rows).map(toPurchase);
   }
 
   async savePurchase(purchase: Purchase): Promise<void> {
@@ -234,19 +252,6 @@ export class SqlStockLedger implements StockLedger {
         r,
       ) => [r.string('variant_key'), { bought: r.int('bought'), taken: r.int('taken') }]),
     );
-  }
-
-  async usedValues(product: ProductId): Promise<Set<string>> {
-    const rows = await this.sql`
-      SELECT kv.key || '=' || kv.value AS used
-        FROM equipment_order o CROSS JOIN jsonb_each_text(o.field_values) kv
-       WHERE o.product_id = ${product.value}
-      UNION
-      SELECT kv.key || '=' || kv.value
-        FROM equipment_purchase p CROSS JOIN jsonb_array_elements(p.lines) l
-        CROSS JOIN jsonb_each_text(l->'values') kv
-       WHERE p.product_id = ${product.value}`;
-    return new Set(Row.all(rows).map((r) => r.string('used')));
   }
 }
 
@@ -306,6 +311,35 @@ export class SqlEquipmentQuery implements EquipmentQuery {
       priceCents: r.int('price_cents'),
       active: r.bool('active'),
       fields: fieldsOf(r),
+    }));
+  }
+
+  async valueUsage(productId: string): Promise<ValueUsage[]> {
+    const rows = await this.sql`
+      SELECT field_id, value, SUM(reservations)::integer AS reservations, SUM(orders)::integer AS orders,
+             SUM(purchases)::integer AS purchases
+        FROM (
+          SELECT kv.key AS field_id, kv.value AS value,
+                 COUNT(*) FILTER (WHERE o.price_cents IS NULL) AS reservations,
+                 COUNT(*) FILTER (WHERE o.price_cents IS NOT NULL) AS orders, 0 AS purchases
+            FROM equipment_order o CROSS JOIN jsonb_each_text(o.field_values) kv
+           WHERE o.product_id = ${productId}
+           GROUP BY kv.key, kv.value
+          UNION ALL
+          SELECT kv.key, kv.value, 0, 0, COUNT(*)
+            FROM equipment_purchase p CROSS JOIN jsonb_array_elements(p.lines) l
+            CROSS JOIN jsonb_each_text(l->'values') kv
+           WHERE p.product_id = ${productId}
+           GROUP BY kv.key, kv.value
+        ) uses
+       GROUP BY field_id, value
+       ORDER BY field_id, value`;
+    return Row.all(rows).map((r) => ({
+      fieldId: r.string('field_id'),
+      value: r.string('value'),
+      reservations: r.int('reservations'),
+      orders: r.int('orders'),
+      purchases: r.int('purchases'),
     }));
   }
 
