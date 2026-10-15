@@ -37,9 +37,10 @@ La lista general MUST quedar como está: todas las acciones, filtrables por pers
 «Alumnos» MUST verse como la general (detalle, deshacer y volver aquí).
 «Asistencia y notas» MUST mostrar una fila por clase (grupo y día; o turno de encargado y día para las
 confirmaciones de actividad), con el día, la clase, quién actuó y un resumen de lo que pasó («Pasar lista ×2 ·
-Comentar una clase · 2 notas»). Al abrir una clase MUST verse todo lo que se hizo ese día ya desplegado (fecha y
-hora, persona, acción, el detalle campo a campo, deshacer y volver aquí) y, al final, las notas que la clase tiene
-ahora (alumno si es de uno, texto y autor) o «Sin notas». En esta sección el periodo va por el día de la clase, no
+Comentar una clase · 2 notas»). Al abrir una clase MUST verse el cuadro de asistencia del grupo en ese mes (el mismo
+de Clases, con la columna de ese día resaltada y cada nombre abriendo la ficha del alumno), después las notas que la
+clase tiene ahora (alumno si es de uno, texto y autor) o «Sin notas», y al final qué se hizo ese día (fecha y hora,
+persona, acción, deshacer y volver aquí; el detalle campo a campo queda en la general). En esta sección el periodo va por el día de la clase, no
 por cuándo se hizo cada cosa.
 «Pagos» MUST verse como los movimientos de contabilidad: un cobro por fila con fecha y hora, recibo, alumno
 (enlace a su ficha), concepto, forma de pago, quién lo registró e importe, con enlace al recibo; un cobro quitado
@@ -57,7 +58,7 @@ Cuando una sección no tiene nada en el periodo MUST decirlo («No hay cobros ho
 
 #### Scenario: Abrir una clase
 - **WHEN** superadministración abre «Martes 17:00 · 15/10/2026», donde Carlos pasó lista a las 19:47 y comentó a las 19:50
-- **THEN** ve las dos acciones con su detalle y sus botones de deshacer, y debajo las notas de esa clase
+- **THEN** ve el cuadro de asistencia de octubre del grupo con el 15/10 resaltado, las notas de esa clase y las dos acciones con sus botones de deshacer
 
 ### Requirement: Detalle legible
 El detalle de un cambio MUST entenderse sin conocer la base de datos: cada registro tocado se presenta por su nombre
