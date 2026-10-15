@@ -3,7 +3,7 @@ import {
   AuditActionNotFound,
   auditPeriodFrom,
   auditSectionFrom,
-  periodStart,
+  periodFirstDay,
   RestoreToPoint,
   SECTION_TABLES,
   UndoAction,
@@ -37,16 +37,25 @@ export function registerAuditRoutes(api: ApiApp): void {
     const user = c.req.query('userId');
     const before = c.req.query('before');
     const section = c.req.query('section');
+    const firstDay = periodFirstDay(
+      auditPeriodFrom(c.req.query('period') ?? 'all'),
+      api.deps.clock.now(),
+    );
     const filter = {
       userId: user ? parseUuid(user) : null,
       beforeSeq: before !== undefined && before !== '' && Number.isFinite(Number(before))
         ? Number(before)
         : null,
       tables: section ? SECTION_TABLES[auditSectionFrom(section)] : null,
-      since: periodStart(auditPeriodFrom(c.req.query('period') ?? 'all'), api.deps.clock.now()),
+      since: firstDay?.startInMadrid() ?? null,
+      sinceDay: firstDay,
     };
     const people = await log(scope).people();
     if (section === 'payments') return c.json({ ...(await log(scope).payments(filter)), people });
+    // Asistencia: una clase por fila (grupo y día), filtrada por el día de la clase.
+    if (section === 'attendance') {
+      return c.json({ items: await log(scope).classes(filter), people });
+    }
     return c.json({ items: await log(scope).actions(filter), people });
   });
 

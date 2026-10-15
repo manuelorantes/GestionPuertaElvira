@@ -99,19 +99,24 @@ export function auditPeriodFrom(value: string): AuditPeriod {
   return value as AuditPeriod;
 }
 
-/** Desde qué instante (hora de Madrid) abarca un periodo; null si abarca todo. */
-export function periodStart(period: AuditPeriod, now: Date): Date | null {
+/** El primer día de un periodo (hoy, el lunes o el día 1); null si abarca todo. */
+export function periodFirstDay(period: AuditPeriod, now: Date): LocalDate | null {
   const today = LocalDate.fromInstant(now);
   switch (period) {
     case 'today':
-      return today.startInMadrid();
+      return today;
     case 'week':
-      return today.startOfWeek().startInMadrid();
+      return today.startOfWeek();
     case 'month':
-      return today.startOfMonth().startInMadrid();
+      return today.startOfMonth();
     case 'all':
       return null;
   }
+}
+
+/** Desde qué instante (hora de Madrid) abarca un periodo; null si abarca todo. */
+export function periodStart(period: AuditPeriod, now: Date): Date | null {
+  return periodFirstDay(period, now)?.startInMadrid() ?? null;
 }
 
 export interface AuditFilter {
@@ -122,6 +127,26 @@ export interface AuditFilter {
   tables?: readonly string[] | null;
   /** Solo las acciones desde este instante (null: desde siempre). */
   since?: Date | null;
+  /** Solo las clases desde este día (null: todas); ver `classes`. */
+  sinceDay?: LocalDate | null;
+}
+
+/** Una nota de una clase tal como está ahora. */
+export interface AuditClassNote {
+  id: string;
+  studentName: string | null;
+  text: string;
+  author: string;
+}
+
+/** Una clase (grupo y día, o turno de encargado y día) con todo lo que el historial registró de ella. */
+export interface AuditClassView {
+  groupId: string | null;
+  label: string;
+  date: string;
+  /** De la más reciente a la más antigua. */
+  actions: AuditActionView[];
+  notes: AuditClassNote[];
 }
 
 /** Un cobro tal como lo registró (o lo quitó, al deshacer) una acción: el importe lleva el signo. */
@@ -146,6 +171,8 @@ export interface AuditLog {
   actions(filter: AuditFilter): Promise<AuditActionView[]>;
   /** Cobros registrados o deshechos, de la más reciente a la más antigua, con la suma del periodo. */
   payments(filter: AuditFilter): Promise<AuditPaymentsPage>;
+  /** Las clases que tocaron las acciones de asistencia (por `tables` y `sinceDay`), de la más reciente a la más antigua. */
+  classes(filter: AuditFilter): Promise<AuditClassView[]>;
   action(id: string): Promise<AuditActionView | null>;
   changes(actionId: string): Promise<AuditDetail>;
   /** Personas que aparecen en el historial. */
