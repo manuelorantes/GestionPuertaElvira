@@ -62,3 +62,25 @@ Deno.test('Season should place months in a september to june season', () => {
     'el verano cuenta para la temporada que empieza',
   );
 });
+
+Deno.test('LocalDate should find the Monday of its week and the first day of its month', () => {
+  assertEquals(LocalDate.fromString('2026-10-15').startOfWeek().toString(), '2026-10-12');
+  assertEquals(LocalDate.fromString('2026-10-12').startOfWeek().toString(), '2026-10-12');
+  assertEquals(LocalDate.fromString('2026-10-18').startOfWeek().toString(), '2026-10-12');
+  assertEquals(LocalDate.fromString('2026-10-15').startOfMonth().toString(), '2026-10-01');
+});
+
+Deno.test('LocalDate should give the instant its day starts in Madrid, also across the clock change', () => {
+  assertEquals(
+    LocalDate.fromString('2026-10-15').startInMadrid().toISOString(),
+    '2026-10-14T22:00:00.000Z',
+  );
+  assertEquals(
+    LocalDate.fromString('2026-10-25').startInMadrid().toISOString(),
+    '2026-10-24T22:00:00.000Z',
+  );
+  assertEquals(
+    LocalDate.fromString('2026-10-26').startInMadrid().toISOString(),
+    '2026-10-25T23:00:00.000Z',
+  );
+});

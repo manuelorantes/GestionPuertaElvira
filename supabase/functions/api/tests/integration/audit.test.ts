@@ -2,7 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from '@std/assert';
 
 import { LocalDate } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
-import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
+import { ApiClient, assertError, createUser, db, resetDatabase } from '../support/http.ts';
 
 async function superadmin(): Promise<ApiClient> {
   await resetDatabase();
@@ -252,4 +252,103 @@ Deno.test('audit should describe each change with names instead of identifiers',
   };
   const enrolment = removed.changes.find((c) => c.table === 'classes_enrolment');
   assertEquals(enrolment?.title, 'Martina López Herrera · ' + removed.references[group]?.label);
+});
+
+/** Da de alta un alumno y le cobra la cuota de socio: devuelve su identificador y lo cobrado. */
+async function studentWithPayment(
+  client: ApiClient,
+  name: string,
+  groupIds: string[] = [],
+): Promise<{ studentId: string; cents: number }> {
+  const created = await client.json('POST', '/api/admin/students', { fullName: name, groupIds });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const studentId = (created.body as { id: string }).id;
+  const paid = await client.json('POST', '/api/admin/billing/payments', {
+    studentId,
+    kind: 'membership',
+    method: 'cash',
+    date: LocalDate.fromInstant(new Date()).toString(),
+  });
+  assertEquals(paid.status, 201, JSON.stringify(paid.body));
+  const payments = items(
+    (await client.get(`/api/admin/billing/payments?studentId=${studentId}`)).body,
+  );
+  return { studentId, cents: Number(payments[0]?.totalCents) };
+}
+
+Deno.test('audit should list each section by what its actions touched', async () => {
+  const client = await superadmin();
+  const teacherId = await newTeacher(client, 'Lucía Moreno Gil');
+  const group = await newGroup(client, teacherId, { capacity: 4 });
+  const { studentId } = await studentWithPayment(client, 'Martina López Herrera', [group]);
+  const commented = await client.json('POST', `/api/admin/attendance/groups/${group}/comments`, {
+    date: LocalDate.fromInstant(new Date()).toString(),
+    studentId,
+    text: 'Ha venido con el reloj nuevo',
+  });
+  assertEquals(commented.status, 201, JSON.stringify(commented.body));
+
+  const section = async (name: string) =>
+    items((await client.get(`/api/admin/audit/actions?section=${name}&period=all`)).body)
+      .map((a) => a.label);
+  assertEquals(await section('students'), ['Dar de alta alumno']);
+  assertEquals(await section('attendance'), ['Comentar una clase']);
+  assertEquals(await section('payments'), ['Registrar cobro']);
+  assertError(await client.get('/api/admin/audit/actions?section=nope'), 422, 'unprocessable');
+  assertError(await client.get('/api/admin/audit/actions?period=nope'), 422, 'unprocessable');
+});
+
+Deno.test('audit should filter a section by today, this week or this month in Madrid time', async () => {
+  const client = await superadmin();
+  await studentWithPayment(client, 'Martina López Herrera');
+  const count = async (period: string) =>
+    items((await client.get(`/api/admin/audit/actions?section=students&period=${period}`)).body)
+      .length;
+  const movedTo = (instant: Date) =>
+    db()`UPDATE audit_action SET occurred_at = ${instant} WHERE label = 'Dar de alta alumno'`;
+  const today = LocalDate.fromInstant(new Date());
+  const minute = 60_000;
+
+  assertEquals([await count('today'), await count('week'), await count('month')], [1, 1, 1]);
+
+  // Un minuto antes de las 00:00 de hoy en Madrid ya es ayer.
+  await movedTo(new Date(today.startInMadrid().getTime() - minute));
+  const yesterday = today.plusDays(-1);
+  assertEquals(await count('today'), 0);
+  assertEquals(await count('week'), yesterday.isBefore(today.startOfWeek()) ? 0 : 1);
+  assertEquals(await count('month'), yesterday.month === today.month ? 1 : 0);
+
+  await movedTo(new Date(today.startInMadrid().getTime() - 40 * 24 * 60 * minute));
+  assertEquals([await count('today'), await count('week'), await count('month')], [0, 0, 0]);
+  assertEquals(await count('all'), 1);
+});
+
+Deno.test('audit should sum the payments of the period, taking back the ones undone', async () => {
+  const client = await superadmin();
+  const martina = await studentWithPayment(client, 'Martina López Herrera');
+  const hugo = await studentWithPayment(client, 'Hugo Navarro Peña');
+  const undone = await client.json(
+    'POST',
+    `/api/admin/audit/actions/${await latestId(client)}/undo`,
+  );
+  assertEquals(undone.status, 204, JSON.stringify(undone.body));
+
+  const page = (await client.get('/api/admin/audit/actions?section=payments&period=today'))
+    .body as { items: Record<string, unknown>[]; totalCents: number };
+  assert(martina.cents > 0);
+  assertEquals(page.totalCents, martina.cents);
+  assertEquals(page.items.map((p) => [p.label, p.totalCents, p.studentName]), [
+    ['Deshacer: Registrar cobro', -hugo.cents, 'Hugo Navarro Peña'],
+    ['Registrar cobro', hugo.cents, 'Hugo Navarro Peña'],
+    ['Registrar cobro', martina.cents, 'Martina López Herrera'],
+  ]);
+  const first = page.items[2];
+  assertEquals(first?.studentId, martina.studentId);
+  assertEquals(first?.method, 'cash');
+  assertEquals(
+    (await client.get(`/api/admin/billing/payments/${first?.paymentId}`)).status,
+    200,
+  );
+  assertStringIncludes(String(first?.receiptNumber), 'R-');
+  assertStringIncludes(String(first?.concept).toLowerCase(), 'socio');
 });

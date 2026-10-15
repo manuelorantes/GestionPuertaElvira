@@ -1,16 +1,21 @@
-import { assertEquals, assertRejects } from '@std/assert';
+import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 
 import {
   AuditActionNotFound,
   type AuditActionView,
   type AuditDetail,
   type AuditLog,
+  type AuditPaymentsPage,
+  auditPeriodFrom,
   type AuditReverter,
+  auditSectionFrom,
   NothingToUndo,
+  periodStart,
   RestoreToPoint,
   UndoAction,
   UndoConflict,
 } from '../../src/application/audit/mod.ts';
+import { InvalidValue } from '../../src/domain/common/mod.ts';
 import { RecordingLocks } from '../support/billing.ts';
 import { ImmediateTransactionRunner } from '../support/classes.ts';
 
@@ -40,6 +45,10 @@ class FakeAudit implements AuditLog, AuditReverter {
 
   actions(): Promise<AuditActionView[]> {
     return Promise.resolve([...this.actionsById.values()].sort((a, b) => b.seq - a.seq));
+  }
+
+  payments(): Promise<AuditPaymentsPage> {
+    return Promise.resolve({ items: [], totalCents: 0 });
   }
 
   action(id: string): Promise<AuditActionView | null> {
@@ -131,4 +140,16 @@ Deno.test('RestoreToPoint should revert everything after the point and report ho
   });
   await assertRejects(() => restore.execute('a3'), NothingToUndo);
   await assertRejects(() => restore.execute('nope'), AuditActionNotFound);
+});
+
+Deno.test('periodStart should start today, the week and the month at Madrid midnight, or nowhere at all', () => {
+  const thursday = new Date('2026-10-15T10:00:00Z');
+  assertEquals(periodStart('today', thursday)?.toISOString(), '2026-10-14T22:00:00.000Z');
+  assertEquals(periodStart('week', thursday)?.toISOString(), '2026-10-11T22:00:00.000Z');
+  assertEquals(periodStart('month', thursday)?.toISOString(), '2026-09-30T22:00:00.000Z');
+  assertEquals(periodStart('all', thursday), null);
+  assertEquals(auditPeriodFrom('week'), 'week');
+  assertThrows(() => auditPeriodFrom('ayer'), InvalidValue);
+  assertEquals(auditSectionFrom('payments'), 'payments');
+  assertThrows(() => auditSectionFrom('profesores'), InvalidValue);
 });
