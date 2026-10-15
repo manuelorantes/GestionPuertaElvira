@@ -304,6 +304,11 @@ export function fieldValue(
 }
 
 /** En altas y bajas, lo vacío no cuenta nada. */
+/** «Efectivo», «Tarjeta»…: la forma de pago de un cobro. */
+export function paymentMethodLabel(method: string): string {
+  return VALUES.method?.[method] ?? method;
+}
+
 export function isEmptyValue(raw: unknown): boolean {
   return (
     raw === null || raw === undefined || raw === '' || (Array.isArray(raw) && raw.length === 0)
