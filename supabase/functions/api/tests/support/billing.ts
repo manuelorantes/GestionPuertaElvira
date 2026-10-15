@@ -196,6 +196,14 @@ export class BillingFixture
     return Promise.resolve(this.payments.get(id.value) ?? null);
   }
 
+  paymentsFor(student: StudentRef, kind: ChargeKind): Promise<Payment[]> {
+    return Promise.resolve(
+      [...this.payments.values()]
+        .filter((p) => p.student.equals(student) && p.kind === kind)
+        .sort((a, b) => b.paidOn.toString().localeCompare(a.paidOn.toString())),
+    );
+  }
+
   savePayment(payment: Payment): Promise<void> {
     this.payments.set(payment.id.value, payment);
     return Promise.resolve();

@@ -351,6 +351,12 @@ export class SqlPaymentRepository implements PaymentRepository {
     return rows[0] ? toPayment(new Row(rows[0])) : null;
   }
 
+  async paymentsFor(student: StudentRef, kind: ChargeKind): Promise<Payment[]> {
+    const rows = await this.sql`SELECT * FROM billing_payment
+      WHERE student_id = ${student.value} AND kind = ${kind} ORDER BY paid_on DESC, receipt_number DESC`;
+    return Row.all(rows).map(toPayment);
+  }
+
   async savePayment(payment: Payment): Promise<void> {
     const invoice = payment.invoice();
     const record = {

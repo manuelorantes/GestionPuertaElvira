@@ -13,6 +13,7 @@ import {
   ListCancelledCharges,
   ListMonthlyCharges,
   MarkReminded,
+  paidChargePolicyFrom,
   PaymentNotFound,
   type PaymentRequest,
   QuotePayment,
@@ -293,13 +294,15 @@ export function registerBillingRoutes(api: ApiApp): void {
     admin('PUT', '/api/admin/billing/accounts/:id/charges/:month'),
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
-      await new AdjustCharge(billing(api, scope).charges).execute(
-        param(c, 'id'),
-        param(c, 'month'),
-        body.requiredInt('amountCents'),
-        body.requiredString('reason'),
-        body.requiredString('scope') as 'one' | 'rest',
-      );
+      await new AdjustCharge(billing(api, scope).charges, new SqlPaymentRepository(scope.tx))
+        .execute(
+          param(c, 'id'),
+          param(c, 'month'),
+          body.requiredInt('amountCents'),
+          body.requiredString('reason'),
+          body.requiredString('scope') as 'one' | 'rest',
+          paidChargePolicyFrom(body.optionalString('onPaid') ?? null),
+        );
       return c.body(null, 204);
     },
   );

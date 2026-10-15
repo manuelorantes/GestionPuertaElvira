@@ -116,6 +116,8 @@ export interface PointsWallet {
 
 export interface PaymentRepository {
   payment(id: PaymentId): Promise<Payment | null>;
+  /** Los cobros de ese tipo del alumno, del más reciente al más antiguo. */
+  paymentsFor(student: StudentRef, kind: ChargeKind): Promise<Payment[]>;
   savePayment(payment: Payment): Promise<void>;
 }
 
@@ -1313,8 +1315,23 @@ export class RecalculateCharges {
  * Fija a mano el importe de una cuota mensual con un motivo: solo ese mes o ese y los siguientes de la temporada
  * (creando las cuotas que falten). Los cobros no cambian; el reparto se rehace solo.
  */
+/**
+ * Qué hacer al bajar una cuota por debajo de lo que ya tenía cubierto: corregir el cobro que la cubrió (el recibo
+ * baja la diferencia) o dejar la diferencia como saldo a favor del alumno.
+ */
+export type PaidChargePolicy = 'correct_payment' | 'keep_credit';
+
+export function paidChargePolicyFrom(value: string | null): PaidChargePolicy {
+  if (value === null || value === 'keep_credit') return 'keep_credit';
+  if (value === 'correct_payment') return 'correct_payment';
+  throw new InvalidValue('onPaid', 'Elige si se corrige el cobro o se deja como saldo a favor.');
+}
+
 export class AdjustCharge {
-  constructor(private readonly charges: ChargeRepository) {}
+  constructor(
+    private readonly charges: ChargeRepository,
+    private readonly payments: PaymentRepository,
+  ) {}
 
   async execute(
     studentId: string,
@@ -1322,6 +1339,7 @@ export class AdjustCharge {
     amountCents: number,
     reason: string,
     scope: 'one' | 'rest',
+    onPaid: PaidChargePolicy = 'keep_credit',
   ): Promise<void> {
     if (scope !== 'one' && scope !== 'rest') {
       throw new InvalidValue('scope', 'Elige si afecta solo a ese mes o también a los siguientes.');
@@ -1333,11 +1351,39 @@ export class AdjustCharge {
     const amount = Money.cents(amountCents);
     const last = scope === 'one' ? first : season.lastMonth();
     for (let period = first; !last.isBefore(period); period = period.next()) {
-      const charge = (await this.charges.chargeFor(ref, 'monthly', period)) ??
-        Charge.create(ChargeId.generate(), ref, 'monthly', period, amount);
+      const existing = await this.charges.chargeFor(ref, 'monthly', period);
+      const charge = existing ?? Charge.create(ChargeId.generate(), ref, 'monthly', period, amount);
+      const before = existing === null ? Money.zero() : existing.amount;
+      const covered = existing === null ? Money.zero() : await coveredOf(this.charges, existing);
       charge.adjust(amount, reason);
       await this.charges.saveCharge(charge);
+      if (onPaid === 'correct_payment' && covered.cents > amount.cents) {
+        await this.takeBack(ref, period, covered.minus(amount), before, amount, reason);
+      }
     }
+  }
+
+  /**
+   * Quita de un cobro lo que la cuota ya no necesita: del recibo que pagó ese mes o, si no lo hay, del más reciente.
+   * Sin cobros que corregir, la diferencia queda como saldo a favor.
+   */
+  private async takeBack(
+    student: StudentRef,
+    period: YearMonth,
+    surplus: Money,
+    before: Money,
+    after: Money,
+    reason: string,
+  ): Promise<void> {
+    const payments = await this.payments.paymentsFor(student, 'monthly');
+    const payment = payments.find((p) => p.periods.some((m) => m.equals(period))) ?? payments[0];
+    if (payment === undefined) return;
+    const refund = surplus.cents > payment.total.cents ? payment.total : surplus;
+    payment.correctTotal(
+      payment.total.minus(refund),
+      `cuota de ${period.label()} de ${before.format()} a ${after.format()} (${reason.trim()})`,
+    );
+    await this.payments.savePayment(payment);
   }
 }
 
