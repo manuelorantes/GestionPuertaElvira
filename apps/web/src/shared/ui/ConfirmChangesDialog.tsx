@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { Alert } from './Alert';
 import { Button } from './Button';
 import { Dialog } from './Dialog';
@@ -7,6 +9,8 @@ interface ConfirmChangesDialogProps {
   changes: FieldChange[];
   /** Aviso de lo que no cambia en otra parte (p. ej. el recibo). */
   warning?: string | null | undefined;
+  /** Opciones sobre cómo guardar (p. ej. una casilla), entre la lista y el aviso. */
+  children?: ReactNode;
   busy: boolean;
   error: string | null;
   onBack: () => void;
@@ -17,6 +21,7 @@ interface ConfirmChangesDialogProps {
 export function ConfirmChangesDialog({
   changes,
   warning = null,
+  children,
   busy,
   error,
   onBack,
@@ -37,6 +42,7 @@ export function ConfirmChangesDialog({
             <li key={field}>{`${field}: ${before} → ${after}`}</li>
           ))}
         </ul>
+        {children}
         {warning && <Alert tone="warning">{warning}</Alert>}
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onBack}>

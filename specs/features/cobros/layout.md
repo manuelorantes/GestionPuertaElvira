@@ -56,6 +56,7 @@ StudentPanel (ficha de alumno) → nueva tarjeta «Cuotas y cobros»
 ├── Forma de pago preferida (Select) · Socio (Switch) · Precio por hora de particulares (opcional, €/h) · «Guardar»
 ├── «Cuotas de la temporada»: fila por mes (mes · importe · «Fijada a mano · motivo» · Cobrada / Faltan X / Pendiente / Vencida / Próxima · lápiz «Editar la cuota de <mes>») + «Saldo a favor» si sobra
 │   └── ChargeDialog «Cuota de <mes>»: Importe (€) · Motivo · «Solo este mes | Este y los siguientes» · «Volver a la calculada» (si está fijada a mano) · Cancelar · Guardar
+│       └── Paso de confirmación (al bajar una cuota con algo cubierto): «¿Guardar estos cambios?» · «Importe: 55 € → 40 €» · casilla «Cambiar la cantidad pagada» (marcada) con «El recibo que cubrió la cuota pasa a tener 15 € menos, con una línea de corrección.» o, desmarcada, «La diferencia (15 €) se quedará como saldo a favor del alumno.» · Volver · Confirmar
 ├── Puntos: valor + botones «−1» / «+1» (aria-label «Restar un punto» / «Sumar un punto»)
 ├── «Registrar cobro» (abre PaymentDialog con el alumno elegido)
 └── Historial: últimos cobros (fecha · concepto · importe) con «Ver recibo»

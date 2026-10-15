@@ -7,11 +7,13 @@ import {
   setChargeDiscount,
   type AccountCharge,
   type ChargeScope,
+  type PaidChargePolicy,
 } from '@/features/billing/api';
 import { useBillingMutation } from '@/features/billing/hooks';
 import { centsFromText, formatCents, monthLabel } from '@/features/billing/money';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { ConfirmChangesDialog } from '@/shared/ui/ConfirmChangesDialog';
 import { Dialog } from '@/shared/ui/Dialog';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
@@ -24,7 +26,8 @@ const SCOPES: { id: ChargeScope; label: string }[] = [
 
 /**
  * Fija a mano el importe de una cuota con un motivo (solo ese mes o también los siguientes de la temporada), o la
- * devuelve al importe calculado. Los cobros no cambian: lo cubierto se reparte solo.
+ * devuelve al importe calculado. Al bajarla por debajo de lo que ya tiene cubierto se confirma antes qué pasa con la
+ * diferencia: corregir el cobro que la pagó (por defecto) o dejarla como saldo a favor.
  */
 export function ChargeDialog({
   studentId,
@@ -40,8 +43,12 @@ export function ChargeDialog({
   const [amount, setAmount] = useState(String(charge.amountCents / 100).replace('.', ','));
   const [reason, setReason] = useState(charge.note ?? '');
   const [scope, setScope] = useState<ChargeScope>('one');
-  const save = useBillingMutation((input: { amountCents: number; reason: string }) =>
-    adjustCharge(studentId, charge.period, { ...input, scope }),
+  /** Segundo paso, al bajar una cuota con algo cubierto: si se corrige el cobro que la pagó. */
+  const [confirming, setConfirming] = useState(false);
+  const [correctPayment, setCorrectPayment] = useState(true);
+  const save = useBillingMutation(
+    (input: { amountCents: number; reason: string; onPaid?: PaidChargePolicy }) =>
+      adjustCharge(studentId, charge.period, { ...input, scope }),
   );
   const reset = useBillingMutation(() => resetCharge(studentId, charge.period));
   const [discount, setDiscount] = useState(String(charge.discountPercent));
@@ -53,12 +60,57 @@ export function ChargeDialog({
   const month = monthLabel(charge.period).toLowerCase();
   const error = save.error ?? reset.error ?? applyDiscount.error;
 
+  const surplusCents = cents === null ? 0 : charge.coveredCents - cents;
+
+  function store(onPaid?: PaidChargePolicy) {
+    if (cents === null || !ready) return;
+    void save
+      .mutateAsync({ amountCents: cents, reason: reason.trim(), ...(onPaid && { onPaid }) })
+      .then(
+        () => onDone('Cuota cambiada'),
+        () => undefined,
+      );
+  }
+
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (cents === null || !ready) return;
-    void save.mutateAsync({ amountCents: cents, reason: reason.trim() }).then(
-      () => onDone('Cuota cambiada'),
-      () => undefined,
+    if (surplusCents > 0) setConfirming(true);
+    else store();
+  }
+
+  if (confirming && cents !== null) {
+    return (
+      <ConfirmChangesDialog
+        changes={[['Importe', formatCents(charge.amountCents), formatCents(cents)]]}
+        busy={save.isPending}
+        error={save.isError ? apiErrorMessage(save.error) : null}
+        onBack={() => {
+          save.reset();
+          setConfirming(false);
+        }}
+        onConfirm={() => store(correctPayment ? 'correct_payment' : 'keep_credit')}
+      >
+        <p className="text-sm text-ink-muted">
+          Esta cuota ya tiene cubiertos {formatCents(charge.coveredCents)}
+          {scope === 'rest' && ', y puede que alguno de los meses siguientes también'}.
+        </p>
+        <label className="flex cursor-pointer items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={correctPayment}
+            onChange={(e) => setCorrectPayment(e.target.checked)}
+            className="mt-0.5"
+          />
+          <span>
+            <span className="font-medium">Cambiar la cantidad pagada</span>
+            <span className="block text-[13px] text-ink-muted">
+              {correctPayment
+                ? `El recibo que cubrió la cuota pasa a tener ${formatCents(surplusCents)} menos, con una línea de corrección.`
+                : `La diferencia (${formatCents(surplusCents)}) se quedará como saldo a favor del alumno.`}
+            </span>
+          </span>
+        </label>
+      </ConfirmChangesDialog>
     );
   }
 
@@ -75,8 +127,9 @@ export function ChargeDialog({
         <p className="text-sm text-ink-muted">
           Ahora: {formatCents(charge.amountCents)}
           {charge.coveredCents > 0 && ` · cubiertos ${formatCents(charge.coveredCents)}`}
-          {charge.manual && ' · fijada a mano'}. Los cobros y sus recibos no cambian: lo cubierto se
-          reparte solo entre las cuotas, de la más antigua a la más reciente.
+          {charge.manual && ' · fijada a mano'}. Lo cubierto se reparte solo entre las cuotas, de la
+          más antigua a la más reciente; si bajas una cuota ya cubierta, antes de guardar se elige
+          qué pasa con la diferencia.
         </p>
         <TextField
           label="Importe (€)"
