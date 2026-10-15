@@ -34,7 +34,13 @@ especiales, confirmaciones de clase y comentarios de clase).
 Cada sección MUST filtrarse por periodo, en hora de Madrid: «Hoy» (por defecto), «Esta semana» (desde el lunes),
 «Este mes» (desde el día 1) o «Todo». El periodo elegido se mantiene al pasar de una sección a otra.
 La lista general MUST quedar como está: todas las acciones, filtrables por persona, sin filtro de periodo.
-«Alumnos» y «Asistencia y notas» MUST verse como la general (detalle, deshacer y volver aquí).
+«Alumnos» MUST verse como la general (detalle, deshacer y volver aquí).
+«Asistencia y notas» MUST mostrar una fila por clase (grupo y día; o turno de encargado y día para las
+confirmaciones de actividad), con el día, la clase, quién actuó y un resumen de lo que pasó («Pasar lista ×2 ·
+Comentar una clase · 2 notas»). Al abrir una clase MUST verse todo lo que se hizo ese día ya desplegado (fecha y
+hora, persona, acción, el detalle campo a campo, deshacer y volver aquí) y, al final, las notas que la clase tiene
+ahora (alumno si es de uno, texto y autor) o «Sin notas». En esta sección el periodo va por el día de la clase, no
+por cuándo se hizo cada cosa.
 «Pagos» MUST verse como los movimientos de contabilidad: un cobro por fila con fecha y hora, recibo, alumno
 (enlace a su ficha), concepto, forma de pago, quién lo registró e importe, con enlace al recibo; un cobro quitado
 al deshacer o volver atrás aparece con importe negativo y sin enlace. Al pie MUST verse cuántos cobros hay en el
@@ -47,7 +53,11 @@ Cuando una sección no tiene nada en el periodo MUST decirlo («No hay cobros ho
 
 #### Scenario: Cambiar de periodo y de sección
 - **WHEN** en «Alumnos» elige «Esta semana» y pasa a «Asistencia y notas»
-- **THEN** ve las listas, faltas y comentarios desde el lunes, con «Esta semana» marcado
+- **THEN** ve las clases desde el lunes, una por fila, con «Esta semana» marcado
+
+#### Scenario: Abrir una clase
+- **WHEN** superadministración abre «Martes 17:00 · 15/10/2026», donde Carlos pasó lista a las 19:47 y comentó a las 19:50
+- **THEN** ve las dos acciones con su detalle y sus botones de deshacer, y debajo las notas de esa clase
 
 ### Requirement: Detalle legible
 El detalle de un cambio MUST entenderse sin conocer la base de datos: cada registro tocado se presenta por su nombre

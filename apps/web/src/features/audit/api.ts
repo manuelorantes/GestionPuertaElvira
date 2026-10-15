@@ -80,6 +80,23 @@ export interface AuditPaymentsPage {
   totalCents: number;
 }
 
+/** Una nota de una clase tal como está ahora. */
+interface AuditClassNote {
+  id: string;
+  studentName: string | null;
+  text: string;
+  author: string;
+}
+
+/** Una clase (grupo y día) con todo lo que el historial registró de ella y sus notas. */
+export interface AuditClass {
+  groupId: string | null;
+  label: string;
+  date: string;
+  actions: AuditAction[];
+  notes: AuditClassNote[];
+}
+
 const BASE = '/api/admin/audit/actions';
 
 function url(query: AuditQuery, before: number | undefined): string {
@@ -98,6 +115,10 @@ export function fetchActions(query: AuditQuery, before?: number): Promise<AuditP
 
 export function fetchPayments(period: AuditPeriod, before?: number): Promise<AuditPaymentsPage> {
   return apiGet(url({ section: 'payments', period }, before));
+}
+
+export function fetchClasses(period: AuditPeriod): Promise<{ items: AuditClass[] }> {
+  return apiGet(url({ section: 'attendance', period }, undefined));
 }
 
 export function fetchAction(id: string): Promise<AuditDetail> {
