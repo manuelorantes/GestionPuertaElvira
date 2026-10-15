@@ -124,8 +124,20 @@ adelantado).
 
 ### Requirement: Editar una cuota
 Administración MUST poder fijar a mano el importe de una cuota con un motivo, eligiendo si afecta solo a ese mes o
-a ese y a todos los siguientes de la temporada, y MUST poder devolverla al importe calculado. Los cobros y sus recibos
-no cambian; el reparto se rehace solo.
+a ese y a todos los siguientes de la temporada, y MUST poder devolverla al importe calculado. Por defecto los cobros
+y sus recibos no cambian; el reparto se rehace solo.
+Al bajar una cuota por debajo de lo que ya tiene cubierto, administración MUST confirmar antes qué pasa con la
+diferencia: cambiar la cantidad pagada (marcado por defecto), con lo que el recibo que pagó ese mes (o, si no lo
+hay, el cobro mensual más reciente del alumno) baja esa diferencia con una línea de corrección que lleva el motivo,
+o dejarla como saldo a favor del alumno. Con «este y los siguientes» se corrige así cada mes que tuviera algo
+cubierto. Subir una cuota pagada no toca ningún cobro: queda pagada en parte. Sin ningún cobro que corregir, la
+diferencia queda como saldo a favor.
+
+#### Scenario: Bajar una cuota ya cobrada
+- **WHEN** la cuota de octubre de Alvaro es de 55 € y está cobrada con el recibo R-2026-0412, y administración la
+  fija en 40 € confirmando «Cambiar la cantidad pagada»
+- **THEN** el recibo pasa a 40 € con la línea «Corrección: cuota de octubre 2026 de 55 € a 40 € (motivo)», la cuota
+  queda cobrada y el alumno sin saldo a favor; si se desmarca, el recibo sigue en 55 € y quedan 15 € a su favor
 Lo que se sube a mano a una cuota MUST cubrirse lo último: si el alumno ya la tenía cubierta, esa cuota queda
 «Pagada en parte» con la diferencia y los meses siguientes no cambian de estado. Al devolverla al importe calculado
 (o fijar su descuento) vuelve a cubrirse como las demás.

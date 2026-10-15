@@ -260,10 +260,13 @@ export function updateSettings(settings: BillingSettings): Promise<void> {
 export type ChargeScope = 'one' | 'rest';
 
 /** Fija a mano el importe de una cuota: solo ese mes o ese y los siguientes de la temporada. */
+/** Al bajar una cuota por debajo de lo cubierto: corregir el cobro que la pagó o dejar la diferencia a favor. */
+export type PaidChargePolicy = 'correct_payment' | 'keep_credit';
+
 export function adjustCharge(
   studentId: string,
   month: string,
-  input: { amountCents: number; reason: string; scope: ChargeScope },
+  input: { amountCents: number; reason: string; scope: ChargeScope; onPaid?: PaidChargePolicy },
 ): Promise<void> {
   return apiSend('PUT', `${BASE}/accounts/${studentId}/charges/${month}`, input);
 }
