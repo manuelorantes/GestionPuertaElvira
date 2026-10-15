@@ -681,3 +681,62 @@ Deno.test({
     assertEquals([receipt.totalCents, receipt.method], [5000, 'transfer']);
   },
 });
+
+Deno.test({
+  name:
+    'billing should lower the receipt that paid a charge when the charge is lowered and asked to',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const month = today.slice(0, 7);
+    const paid = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'monthly',
+      months: 1,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(paid.status, 201, JSON.stringify(paid.body));
+    const paymentId = body<{ id: string }>(paid).id;
+    const receipt = async () =>
+      body<{ totalCents: number; lines: { label: string; amountCents: number }[] }>(
+        await fx.client.get(`/api/admin/billing/payments/${paymentId}`),
+      );
+    const before = (await receipt()).totalCents;
+    const account = async () =>
+      body<{ balanceCents: number }>(
+        await fx.client.get(`/api/admin/billing/accounts/${fx.student}`),
+      ).balanceCents;
+
+    assertError(
+      await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}/charges/${month}`, {
+        amountCents: before - 500,
+        reason: 'Entró tarde',
+        scope: 'one',
+        onPaid: 'nope',
+      }),
+      422,
+      'unprocessable',
+    );
+    const lowered = await fx.client.json(
+      'PUT',
+      `/api/admin/billing/accounts/${fx.student}/charges/${month}`,
+      { amountCents: before - 500, reason: 'Entró tarde', scope: 'one', onPaid: 'correct_payment' },
+    );
+    assertEquals(lowered.status, 204, JSON.stringify(lowered.body));
+    const after = await receipt();
+    assertEquals(after.totalCents, before - 500);
+    assertMatch(String(after.lines.at(-1)?.label), /^Corrección: cuota de .* \(Entró tarde\)$/);
+    assertEquals(after.lines.at(-1)?.amountCents, -500);
+    assertEquals(await account(), 0);
+
+    // Sin pedirlo, el recibo no cambia y la diferencia queda a favor del alumno.
+    await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}/charges/${month}`, {
+      amountCents: before - 1000,
+      reason: 'Entró más tarde',
+      scope: 'one',
+    });
+    assertEquals((await receipt()).totalCents, before - 500);
+    assertEquals(await account(), 500);
+  },
+});
