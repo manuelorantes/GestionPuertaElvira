@@ -11,6 +11,7 @@ import { Select } from '@/shared/ui/Select';
 import { Tabs } from '@/shared/ui/Tabs';
 
 import { ActionsHistory } from './ActionsHistory';
+import { ClassesHistory } from './ClassesHistory';
 import { PaymentsHistory } from './PaymentsHistory';
 import { PeriodFilter } from './PeriodFilter';
 
@@ -78,6 +79,7 @@ function AuditSections() {
         />
       );
     if (tab.section === 'payments') return <PaymentsHistory period={period} />;
+    if (tab.section === 'attendance') return <ClassesHistory period={period} />;
     return (
       <ActionsHistory
         query={{ section: tab.section, period }}
@@ -95,9 +97,12 @@ function AuditSections() {
             {renderFilter()}
             <p className="flex flex-1 items-center gap-2 text-[13px] text-ink-muted">
               <History aria-hidden size={16} />
-              {tab.section === 'payments'
-                ? 'Cada cobro tal como se registró; los deshechos restan de la suma.'
-                : 'Cada acción guarda cómo estaban los datos antes y después. Deshacer y volver atrás también quedan registrados.'}
+              {tab.section === 'payments' &&
+                'Cada cobro tal como se registró; los deshechos restan de la suma.'}
+              {tab.section === 'attendance' &&
+                'Una fila por clase y día: al abrirla, todo lo que se hizo con su lista y sus notas.'}
+              {(tab.section === null || tab.section === 'students') &&
+                'Cada acción guarda cómo estaban los datos antes y después. Deshacer y volver atrás también quedan registrados.'}
             </p>
           </div>
           {renderSection()}

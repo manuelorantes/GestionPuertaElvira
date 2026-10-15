@@ -9,7 +9,11 @@
 | `features/audit/fields.ts` | Etiquetas y valores legibles del detalle; `paymentMethodLabel` |
 | `features/audit/targets.ts` | Enlaces a donde se ve cada registro |
 | `pages/panel/audit/AuditPage.tsx` | Guardia de rol, pestañas, filtros (persona o periodo) y qué sección se muestra; estado en la URL |
-| `pages/panel/audit/ActionsHistory.tsx` | Lista paginada de acciones con detalle, deshacer y volver aquí; recibe la consulta y el mensaje de vacío |
+| `pages/panel/audit/ActionsHistory.tsx` | Lista paginada de acciones con detalle desplegable; recibe la consulta y el mensaje de vacío |
+| `pages/panel/audit/ActionDetail.tsx` | Detalle campo a campo de una acción (`useQuery` por identificador) |
+| `pages/panel/audit/useRevert.tsx` | Estado, mutación y diálogo de deshacer / volver aquí |
+| `pages/panel/audit/RevertButtons.tsx` | «Deshacer» y «Volver aquí» de una acción |
+| `pages/panel/audit/ClassesHistory.tsx` | Una fila por clase; al abrirla, `ClassDay` con las acciones desplegadas y las notas |
 | `pages/panel/audit/PaymentsHistory.tsx` | Lista paginada de cobros con la suma del periodo |
 | `pages/panel/audit/PeriodFilter.tsx` | Chips Hoy · Esta semana · Este mes · Todo |
 
@@ -19,7 +23,7 @@
 - `ActionsHistory` y `PaymentsHistory` usan `useInfiniteQuery` con la consulta en la clave; el detalle de una
   acción, `useQuery` por identificador.
 - La lista de personas del Select la da la propia respuesta de la general (`onPeople`).
-- Los diálogos de confirmación viven en `ActionsHistory` (`pending: undo | restore`).
+- Los diálogos de confirmación los da `useRevert`, usado por `ActionsHistory` y por cada `ClassDay`.
 
 ## Reutilización
 

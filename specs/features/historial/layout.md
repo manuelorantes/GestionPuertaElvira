@@ -13,13 +13,18 @@ AuditPage (/panel/historial)
     ├── Barra de filtros (borde inferior)
     │   ├── General: Select «Persona» (Todas + quien aparece en el historial; ?persona=<id>)
     │   ├── Secciones: PeriodFilter, grupo «Periodo» de chips: Hoy · Esta semana · Este mes · Todo (?periodo=hoy|semana|mes|todo; sin parámetro, Hoy)
-    │   └── Nota con icono history: «Cada acción guarda cómo estaban los datos antes y después…» (en Pagos: «Cada cobro tal como se registró; los deshechos restan de la suma.»)
-    ├── ActionsHistory (General, Alumnos, Asistencia y notas): tabla «Historial de acciones»
+    │   └── Nota con icono history: «Cada acción guarda cómo estaban los datos antes y después…» (en Pagos: «Cada cobro tal como se registró; los deshechos restan de la suma.»; en Asistencia y notas: «Una fila por clase y día: al abrirla, todo lo que se hizo con su lista y sus notas.»)
+    ├── ActionsHistory (General, Alumnos): tabla «Historial de acciones»
     │   ├── Cabeceras ordenables: Fecha y hora | Persona | Acción | Afecta a
     │   ├── Fila: botón «Ver detalle de <acción>» (chevron) | fecha y hora de Madrid | persona | acción (+ Badge «Deshacer» o «Vuelta atrás») | tablas afectadas · N cambios | «Deshacer» · «Volver aquí»
     │   ├── Fila de detalle (desplegada): por cada registro, «Alta/Cambio/Baja · <tabla> · <título>», botón «Ir a…» y lista campo: antes → después
     │   ├── «Ver más» (secundario) cuando hay más de 50
     │   └── Vacío: «Todavía no hay acciones registradas.» / «No hay cambios de alumnos hoy.» / «No hay asistencias ni notas esta semana.» / «Todavía no hay … registrados.»
+    ├── ClassesHistory (Asistencia y notas): tabla «Clases»
+    │   ├── Cabeceras ordenables: Día | Clase | Quién | Qué pasó
+    │   ├── Fila: botón «Ver la clase <clase> · <día>» (chevron) | 15/10/2026 | Martes 17:00 | personas que actuaron | «Pasar lista ×2 · Comentar una clase · 2 notas»
+    │   ├── Fila desplegada (ClassDay): por cada acción del día, «<hora> <persona> <acción>» (+ Badge Deshacer / Vuelta atrás) con «Deshacer» · «Volver aquí» y su ActionDetail ya abierto; al final sección «Notas»: «<alumno>: <texto> · <autor>» o «Sin notas.»
+    │   └── Vacío: «No hay clases con lista o notas hoy.» / «Todavía no hay clases con lista o notas.»
     ├── PaymentsHistory (Pagos): tabla «Cobros registrados»
     │   ├── Cabeceras ordenables: Fecha y hora | Recibo | Alumno | Concepto | Forma de pago | Registrado por | Importe (derecha)
     │   ├── Fila: fecha y hora | R-AAAA-NNNN | alumno (enlace a /panel/alumnos/<id>) | concepto (+ línea «Deshacer: Registrar cobro» en warning si se quitó) | Efectivo/Tarjeta/Transferencia | persona | +45 € (success) o −45 € (danger) | flecha «Ir al cobro R-…» (solo los que existen)
