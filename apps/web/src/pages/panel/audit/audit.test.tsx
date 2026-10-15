@@ -353,9 +353,10 @@ describe('Historial', () => {
     expect(rows[2]).toHaveTextContent('Efectivo');
     expect(rows[2]).toHaveTextContent('Lucía Moreno Gil');
     expect(rows[2]).toHaveTextContent('+45 €');
+    // El alumno se abre encima del historial, sin irse a Alumnos.
     expect(within(table).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
       'href',
-      '/panel/alumnos/s1',
+      '/panel/historial?seccion=pagos&ficha=s1',
     );
     expect(within(table).getByRole('link', { name: 'Ir al cobro R-2026-0027' })).toHaveAttribute(
       'href',
