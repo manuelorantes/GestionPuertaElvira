@@ -90,6 +90,22 @@ export class LocalDate {
     const day = new Date(this.ordinal()).getUTCDay();
     return day === 0 ? 7 : day;
   }
+
+  /** El lunes de su semana. */
+  startOfWeek(): LocalDate {
+    return this.plusDays(1 - this.isoWeekday());
+  }
+
+  startOfMonth(): LocalDate {
+    return new LocalDate(this.year, this.month, 1);
+  }
+
+  /** Instante en que empieza este día en Madrid (sus 00:00, con el cambio de hora que toque). */
+  startInMadrid(): Date {
+    // A las 00:00 UTC en Madrid ya es este día (01:00 o 02:00): se retrocede lo que lleve andado.
+    const utcMidnight = new Date(this.ordinal());
+    return new Date(utcMidnight.getTime() - minutesOfDayInMadrid(utcMidnight) * 60_000);
+  }
 }
 
 export class YearMonth {

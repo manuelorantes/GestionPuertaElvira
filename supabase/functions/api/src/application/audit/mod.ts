@@ -1,4 +1,4 @@
-import type { HasErrorDetails } from '../../domain/common/mod.ts';
+import { type HasErrorDetails, InvalidValue, LocalDate } from '../../domain/common/mod.ts';
 import type { Locks, TransactionRunner } from '../common/mod.ts';
 
 /** Una acción del historial: quién, cuándo, qué y cuántos registros tocó. */
@@ -61,15 +61,91 @@ export interface AuditDetail {
   references: Record<string, AuditReference>;
 }
 
+/** Una sección del historial: las acciones que tocaron alguna de sus tablas. */
+export type AuditSection = 'students' | 'payments' | 'attendance';
+
+export const SECTION_TABLES: Record<AuditSection, readonly string[]> = {
+  // Datos, altas y bajas, grupos (inscripciones) y datos de cobro de los alumnos.
+  students: [
+    'students_student',
+    'students_past_membership',
+    'classes_enrolment',
+    'billing_account',
+  ],
+  payments: ['billing_payment'],
+  // Listas, faltas, asistencias especiales, confirmaciones y las notas (comentarios) de las clases.
+  attendance: [
+    'attendance_roll_call',
+    'attendance_absence',
+    'attendance_guest',
+    'attendance_activity_check',
+    'attendance_comment',
+  ],
+};
+
+export function auditSectionFrom(value: string): AuditSection {
+  if (!(value in SECTION_TABLES)) throw new InvalidValue('section', 'Sección desconocida.');
+  return value as AuditSection;
+}
+
+export type AuditPeriod = 'today' | 'week' | 'month' | 'all';
+
+const PERIODS: readonly AuditPeriod[] = ['today', 'week', 'month', 'all'];
+
+export function auditPeriodFrom(value: string): AuditPeriod {
+  if (!PERIODS.includes(value as AuditPeriod)) {
+    throw new InvalidValue('period', 'Periodo desconocido.');
+  }
+  return value as AuditPeriod;
+}
+
+/** Desde qué instante (hora de Madrid) abarca un periodo; null si abarca todo. */
+export function periodStart(period: AuditPeriod, now: Date): Date | null {
+  const today = LocalDate.fromInstant(now);
+  switch (period) {
+    case 'today':
+      return today.startInMadrid();
+    case 'week':
+      return today.startOfWeek().startInMadrid();
+    case 'month':
+      return today.startOfMonth().startInMadrid();
+    case 'all':
+      return null;
+  }
+}
+
 export interface AuditFilter {
   userId?: string | null;
   beforeSeq?: number | null;
   limit?: number;
+  /** Solo las acciones que tocaron alguna de estas tablas (null: todas). */
+  tables?: readonly string[] | null;
+  /** Solo las acciones desde este instante (null: desde siempre). */
+  since?: Date | null;
+}
+
+/** Un cobro tal como lo registró (o lo quitó, al deshacer) una acción: el importe lleva el signo. */
+export interface AuditPaymentView extends AuditActionView {
+  paymentId: string;
+  receiptNumber: string;
+  studentId: string;
+  studentName: string;
+  concept: string;
+  method: string;
+  totalCents: number;
+}
+
+export interface AuditPaymentsPage {
+  items: AuditPaymentView[];
+  /** Suma de todo el periodo, no solo de la página. */
+  totalCents: number;
 }
 
 export interface AuditLog {
   /** Acciones del historial, de la más reciente a la más antigua. */
   actions(filter: AuditFilter): Promise<AuditActionView[]>;
+  /** Cobros registrados o deshechos, de la más reciente a la más antigua, con la suma del periodo. */
+  payments(filter: AuditFilter): Promise<AuditPaymentsPage>;
   action(id: string): Promise<AuditActionView | null>;
   changes(actionId: string): Promise<AuditDetail>;
   /** Personas que aparecen en el historial. */

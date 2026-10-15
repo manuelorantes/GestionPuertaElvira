@@ -5,6 +5,8 @@ import type {
   AuditDetail,
   AuditFilter,
   AuditLog,
+  AuditPaymentsPage,
+  AuditPaymentView,
   AuditReference,
   AuditReferenceKind,
   AuditReverter,
@@ -77,19 +79,80 @@ function view(row: Row): AuditActionView {
 const PERSISTED =
   `a.kind <> 'security' AND EXISTS (SELECT 1 FROM audit_change c WHERE c.action_id = a.id)`;
 
+/** Persona ($1), tablas de la sección ($2) y desde cuándo ($3): ver `filterParams`. */
+const FILTERED = `($1::uuid IS NULL OR a.user_id = $1::uuid)
+  AND ($2::text[] IS NULL OR EXISTS (SELECT 1 FROM audit_change t WHERE t.action_id = a.id AND t.table_name = ANY($2::text[])))
+  AND ($3::timestamptz IS NULL OR a.occurred_at >= $3::timestamptz)`;
+/** Página: anterior a ($4) y cuántas ($5), tras los parámetros de `FILTERED`. */
+const PAGED = `($4::bigint IS NULL OR a.seq < $4::bigint) ORDER BY a.seq DESC`;
+
+function filterParams(filter: AuditFilter): (string | string[] | Date | null)[] {
+  return [filter.userId ?? null, filter.tables ? [...filter.tables] : null, filter.since ?? null];
+}
+
+function pageParams(filter: AuditFilter): (string | number | string[] | Date | null)[] {
+  return [
+    ...filterParams(filter),
+    filter.beforeSeq ?? null,
+    Math.max(1, Math.min(200, filter.limit ?? 50)),
+  ];
+}
+
+/** Un cobro que una acción registró (alta) o quitó (baja, al deshacer o volver atrás). */
+const PAYMENT_CHANGE =
+  `c.action_id = a.id AND c.table_name = 'billing_payment' AND c.operation IN ('I', 'D')`;
+const SIGNED_CENTS =
+  `CASE WHEN c.operation = 'I' THEN (c.after->>'total_cents')::int ELSE -(c.before->>'total_cents')::int END`;
+const PAYMENT_COLUMNS = `
+  c.row_key->>'id' AS payment_id,
+  COALESCE(c.after, c.before)->>'receipt_number' AS receipt_number,
+  COALESCE(c.after, c.before)->>'student_id' AS student_id,
+  COALESCE(c.after, c.before)->>'concept' AS concept,
+  COALESCE(c.after, c.before)->>'method' AS method,
+  ${SIGNED_CENTS} AS signed_cents`;
+
 export class SqlAuditLog implements AuditLog, AuditReverter {
   constructor(private readonly sql: Sql) {}
 
   async actions(filter: AuditFilter): Promise<AuditActionView[]> {
-    const limit = Math.max(1, Math.min(200, filter.limit ?? 50));
     const rows = await this.sql.unsafe(
       `SELECT ${ACTION_COLUMNS} FROM audit_action a
-        WHERE ${PERSISTED} AND ($1::uuid IS NULL OR a.user_id = $1::uuid)
-          AND ($2::bigint IS NULL OR a.seq < $2::bigint)
-        ORDER BY a.seq DESC LIMIT $3`,
-      [filter.userId ?? null, filter.beforeSeq ?? null, limit],
+        WHERE ${PERSISTED} AND ${FILTERED} AND ${PAGED} LIMIT $5`,
+      pageParams(filter),
     );
     return Row.all(rows).map(view);
+  }
+
+  async payments(filter: AuditFilter): Promise<AuditPaymentsPage> {
+    const rows = await this.sql.unsafe(
+      `SELECT ${ACTION_COLUMNS}, ${PAYMENT_COLUMNS} FROM audit_action a JOIN audit_change c ON ${PAYMENT_CHANGE}
+        WHERE ${PERSISTED} AND ${FILTERED} AND ${PAGED}, c.id LIMIT $5`,
+      pageParams(filter),
+    );
+    const totals = await this.sql.unsafe(
+      `SELECT COALESCE(SUM(${SIGNED_CENTS}), 0)::int AS total_cents
+         FROM audit_action a JOIN audit_change c ON ${PAYMENT_CHANGE}
+        WHERE ${PERSISTED} AND ${FILTERED}`,
+      filterParams(filter),
+    );
+    const names = new AuditNames(this.sql);
+    const payments = Row.all(rows);
+    for (const row of payments) names.want('student', row.string('student_id'));
+    await names.resolve();
+    const items = payments.map((row): AuditPaymentView => {
+      const studentId = row.string('student_id');
+      return {
+        ...view(row),
+        paymentId: row.string('payment_id'),
+        receiptNumber: row.string('receipt_number'),
+        studentId,
+        studentName: names.label('student', studentId) ?? '',
+        concept: row.string('concept'),
+        method: row.string('method'),
+        totalCents: row.int('signed_cents'),
+      };
+    });
+    return { items, totalCents: Row.all(totals)[0]?.int('total_cents') ?? 0 };
   }
 
   async action(id: string): Promise<AuditActionView | null> {
