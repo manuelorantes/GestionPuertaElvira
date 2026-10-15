@@ -45,8 +45,8 @@ const NOTHING: Record<AuditSection, { some: string; none: string }> = {
   students: { some: 'cambios de alumnos', none: 'Todavía no hay cambios de alumnos registrados.' },
   payments: { some: 'cobros', none: 'Todavía no hay cobros registrados.' },
   attendance: {
-    some: 'asistencias ni notas',
-    none: 'Todavía no hay asistencias ni notas registradas.',
+    some: 'clases con lista o notas',
+    none: 'Todavía no hay clases con lista o notas.',
   },
 };
 

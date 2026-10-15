@@ -291,7 +291,9 @@ describe('Historial', () => {
 
     // El periodo elegido se mantiene al cambiar de sección.
     await userEvent.click(within(tabs).getByRole('tab', { name: 'Asistencia y notas' }));
-    expect(await screen.findByText('No hay asistencias ni notas esta semana.')).toBeInTheDocument();
+    expect(
+      await screen.findByText('No hay clases con lista o notas esta semana.'),
+    ).toBeInTheDocument();
   });
 
   it('lists the payments of the period like the ledger, with their sum at the bottom', async () => {
@@ -367,6 +369,85 @@ describe('Historial', () => {
     expect(screen.getByText('2 cobros (1 deshecho) hoy')).toBeInTheDocument();
     expect(screen.getByText('Total +45 €')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Deshacer/ })).not.toBeInTheDocument();
+  });
+
+  it('shows one row per class in «Asistencia y notas» and, open, the whole day with its notes', async () => {
+    api({
+      'GET /api/admin/audit/actions?section=attendance&period=today': [
+        200,
+        {
+          items: [
+            {
+              groupId: 'g1',
+              label: 'Martes 17:00',
+              date: '2026-10-15',
+              actions: [
+                action({
+                  id: 'a2',
+                  seq: 12,
+                  userName: 'Carlos Ruiz Márquez',
+                  label: 'Comentar una clase',
+                  occurredAt: '2026-10-15T19:50:00+02:00',
+                  changeCount: 1,
+                  affected: ['Comentario de clase'],
+                }),
+                action({
+                  id: 'a1',
+                  seq: 11,
+                  userName: 'Carlos Ruiz Márquez',
+                  label: 'Pasar lista',
+                  occurredAt: '2026-10-15T19:47:00+02:00',
+                  changeCount: 2,
+                  affected: ['Falta a clase', 'Lista de clase'],
+                }),
+              ],
+              notes: [
+                {
+                  id: 'n1',
+                  studentName: null,
+                  text: 'Mates de torres',
+                  author: 'Carlos Ruiz Márquez',
+                },
+                {
+                  id: 'n2',
+                  studentName: 'Martina López Herrera',
+                  text: 'Ha venido con reloj nuevo',
+                  author: 'Carlos Ruiz Márquez',
+                },
+              ],
+            },
+          ],
+          people: [],
+        },
+      ],
+      'GET /api/admin/audit/actions/a2': [200, { ...DETAIL, changes: [], references: {} }],
+    });
+    renderApp('/panel/historial?seccion=asistencia');
+
+    const table = await screen.findByRole('table', { name: 'Clases' });
+    const row = within(table).getByRole('row', { name: /Martes 17:00/ });
+    expect(row).toHaveTextContent('15/10/2026');
+    expect(row).toHaveTextContent('Carlos Ruiz Márquez');
+    expect(row).toHaveTextContent('Comentar una clase · Pasar lista · 2 notas');
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+
+    await userEvent.click(
+      within(row).getByRole('button', { name: 'Ver la clase Martes 17:00 · 15/10/2026' }),
+    );
+    // Las acciones del día, ya desplegadas, con deshacer; y las notas al final.
+    const rollCall = await screen.findByRole('region', {
+      name: /Pasar lista · 15\/10\/2026 19:47/,
+    });
+    expect(await within(rollCall).findByText('Alta · Cobro')).toBeInTheDocument();
+    expect(
+      within(rollCall).getByRole('button', { name: 'Deshacer Pasar lista' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Volver a este punto: Comentar una clase' }),
+    ).toBeInTheDocument();
+    const notes = screen.getByRole('region', { name: 'Notas' });
+    expect(notes).toHaveTextContent('Mates de torres');
+    expect(notes).toHaveTextContent('Martina López Herrera: Ha venido con reloj nuevo');
   });
 
   it('says when a section has nothing in the period', async () => {
