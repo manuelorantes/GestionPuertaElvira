@@ -461,7 +461,7 @@ Deno.test('RecalculateCharges should reprice from this month until the 10th, kee
   const late = new BillingFixture('2026-10-15T10:00:00+02:00');
   const other = late.student({ regularHours: 1 });
   await generate(late, '2026-10');
-  await new AdjustCharge(late).execute(other, '2026-11', 2000, 'Media mensualidad', 'one');
+  await new AdjustCharge(late, late).execute(other, '2026-11', 2000, 'Media mensualidad', 'one');
   late.changeHours(other, 2);
   await new RecalculateCharges(late, late, late, late, late.clock).execute(other);
   const amounts = (await account(late, other)).charges.map((c) => [c.period, c.amountCents]);
@@ -479,12 +479,12 @@ Deno.test('AdjustCharge should move what was charged between months without touc
   await generate(fx, '2026-09');
   await generate(fx, '2026-10');
   await register(fx, id, 1);
-  await new AdjustCharge(fx).execute(id, '2026-10', 2250, 'Compensa septiembre', 'one');
+  await new AdjustCharge(fx, fx).execute(id, '2026-10', 2250, 'Compensa septiembre', 'one');
   await register(fx, id, 1);
   assertEquals((await account(fx, id)).charges.map((c) => c.pendingCents), [0, 0]);
 
-  await new AdjustCharge(fx).execute(id, '2026-09', 2250, 'Entró a mitad de mes', 'one');
-  await new AdjustCharge(fx).execute(id, '2026-10', 4500, 'Mes completo', 'one');
+  await new AdjustCharge(fx, fx).execute(id, '2026-09', 2250, 'Entró a mitad de mes', 'one');
+  await new AdjustCharge(fx, fx).execute(id, '2026-10', 4500, 'Mes completo', 'one');
   const view = await account(fx, id);
   assertEquals(view.charges.map((c) => [c.amountCents, c.pendingCents, c.manual, c.note]), [
     [2250, 0, true, 'Entró a mitad de mes'],
@@ -494,7 +494,7 @@ Deno.test('AdjustCharge should move what was charged between months without touc
   assertEquals(fx.payments.size, 2);
 
   // «Este y los siguientes» crea las cuotas que faltan hasta junio; volver a la calculada quita la marca.
-  await new AdjustCharge(fx).execute(id, '2027-03', 3000, 'Beca', 'rest');
+  await new AdjustCharge(fx, fx).execute(id, '2027-03', 3000, 'Beca', 'rest');
   const rest = (await account(fx, id)).charges.filter((c) => c.period >= '2027-03');
   assertEquals(rest.map((c) => [c.period, c.amountCents]), [
     ['2027-03', 3000],
@@ -506,7 +506,7 @@ Deno.test('AdjustCharge should move what was charged between months without touc
   const april = (await account(fx, id)).charges.find((c) => c.period === '2027-04');
   assertEquals([april?.amountCents, april?.manual], [4500, false]);
   await assertRejects(
-    () => new AdjustCharge(fx).execute(id, '2027-07', 1000, 'Verano', 'one'),
+    () => new AdjustCharge(fx, fx).execute(id, '2027-07', 1000, 'Verano', 'one'),
     InvalidValue,
   );
 });
@@ -582,4 +582,82 @@ Deno.test('NoteChargeDiscount should note the discount of any month without chan
     ['2026-11', 3600, 20],
   ]);
   await assertRejects(() => new NoteChargeDiscount(fx).execute(id, '2026-12', 20), ChargeNotFound);
+});
+
+Deno.test('AdjustCharge should take the difference off the payment that covered the charge when asked', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-10');
+  const paymentId = await register(fx, id, 1);
+  assertEquals((await fx.payment(PaymentId.fromString(paymentId)))?.total.cents, 4500);
+
+  // Por defecto, el cobro no cambia y la diferencia queda como saldo a favor.
+  await new AdjustCharge(fx, fx).execute(id, '2026-10', 4000, 'Entró el día 5', 'one');
+  assertEquals((await account(fx, id)).balanceCents, 500);
+  assertEquals((await fx.payment(PaymentId.fromString(paymentId)))?.total.cents, 4500);
+
+  // Si se pide, el recibo que pagó ese mes baja lo que sobra, con el motivo como línea de corrección.
+  await new AdjustCharge(fx, fx).execute(
+    id,
+    '2026-10',
+    3500,
+    'Entró el día 8',
+    'one',
+    'correct_payment',
+  );
+  const payment = await fx.payment(PaymentId.fromString(paymentId));
+  assertEquals(payment?.total.cents, 4000, 'solo baja lo que estaba cubierto de más: 4000 − 3500');
+  assertEquals(payment?.credit.cents, 4000);
+  assertEquals(
+    payment?.lines.at(-1)?.label,
+    'Corrección: cuota de octubre 2026 de 40 € a 35 € (Entró el día 8)',
+  );
+  assertEquals(payment?.lines.at(-1)?.amount.cents, -500);
+  const view = await account(fx, id);
+  assertEquals(view.balanceCents, 500, 'lo que ya se dejó como saldo a favor sigue ahí');
+  assertEquals(view.charges.map((c) => [c.amountCents, c.coveredCents, c.pendingCents]), [[
+    3500,
+    3500,
+    0,
+  ]]);
+
+  // Subir una cuota pagada no toca el cobro: queda pagada en parte.
+  await new AdjustCharge(fx, fx).execute(
+    id,
+    '2026-10',
+    4500,
+    'Mes completo',
+    'one',
+    'correct_payment',
+  );
+  assertEquals((await fx.payment(PaymentId.fromString(paymentId)))?.total.cents, 4000);
+  assertEquals((await account(fx, id)).charges.map((c) => c.pendingCents), [500]);
+});
+
+Deno.test('AdjustCharge should correct each covered month of «this and the following» and leave credit when no payment covers it', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-10');
+  // Tres meses pagados de golpe (10 %): 40,50 € cada mes, un solo recibo.
+  const paymentId = await register(fx, id, 3);
+  const total = (await fx.payment(PaymentId.fromString(paymentId)))?.total.cents ?? 0;
+  assertEquals(total, 12150);
+
+  await new AdjustCharge(fx, fx).execute(id, '2026-11', 3000, 'Beca', 'rest', 'correct_payment');
+  const payment = await fx.payment(PaymentId.fromString(paymentId));
+  // Noviembre y diciembre bajan 10,50 € cada uno; de enero a junio no había nada cubierto.
+  assertEquals(payment?.total.cents, 12150 - 2100);
+  assertEquals(payment?.lines.filter((l) => l.label.startsWith('Corrección')).length, 2);
+  const view = await account(fx, id);
+  assertEquals(view.balanceCents, 0);
+  assertEquals(
+    view.charges.slice(0, 4).map((c) => [c.period, c.amountCents, c.pendingCents]),
+    [['2026-10', 4050, 0], ['2026-11', 3000, 0], ['2026-12', 3000, 0], ['2027-01', 3000, 3000]],
+  );
+
+  // Sin ningún cobro no hay nada que corregir: la cuota simplemente cambia.
+  const other = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-10');
+  await new AdjustCharge(fx, fx).execute(other, '2026-10', 2000, 'Media', 'one', 'correct_payment');
+  assertEquals((await account(fx, other)).charges.map((c) => c.amountCents), [2000]);
 });
