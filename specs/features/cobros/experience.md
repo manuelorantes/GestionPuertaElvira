@@ -19,6 +19,12 @@ Solo administración (ruta dentro de `/panel`). Las peticiones `/api/admin/billi
      y «Guardar cobro» queda desactivado.
    - Al guardar se refrescan cuotas, cobros y la ficha, aparece el toast «Cobro registrado · R-2026-0001 · 45 €»
      y se abre el recibo.
+2b. **Editar una cuota desde la ficha.**
+   - Si el importe nuevo es menor que lo que la cuota tiene cubierto, «Guardar» abre `ConfirmChangesDialog` con la
+     casilla «Cambiar la cantidad pagada» marcada; el texto bajo la casilla cambia al desmarcarla. «Confirmar» envía
+     `onPaid: correct_payment | keep_credit`; «Volver» regresa al formulario sin perder lo escrito.
+   - Si el importe no baja de lo cubierto, se guarda directamente (sin `onPaid`).
+   - Al guardar: toast «Cuota cambiada» y se refrescan cuotas, cobros y ficha (el recibo corregido muestra la línea de corrección).
 3. **Recibo.**
    - «Imprimir» llama a `window.print()`; los estilos de impresión ocultan todo excepto la hoja.
    - «Emitir factura» abre `InvoiceDialog`.
