@@ -13,7 +13,7 @@
 | `pages/panel/audit/ActionDetail.tsx` | Detalle campo a campo de una acción (`useQuery` por identificador) |
 | `pages/panel/audit/useRevert.tsx` | Estado, mutación y diálogo de deshacer / volver aquí |
 | `pages/panel/audit/RevertButtons.tsx` | «Deshacer» y «Volver aquí» de una acción |
-| `pages/panel/audit/ClassesHistory.tsx` | Una fila por clase; al abrirla, `ClassDay` con las acciones desplegadas y las notas |
+| `pages/panel/audit/ClassesHistory.tsx` | Una fila por clase; al abrirla, `ClassDay` con `GroupAttendanceTable` (de Clases, `highlight` del día), las notas y la lista corta de acciones |
 | `pages/panel/audit/PaymentsHistory.tsx` | Lista paginada de cobros con la suma del periodo |
 | `pages/panel/audit/PeriodFilter.tsx` | Chips Hoy · Esta semana · Este mes · Todo |
 
