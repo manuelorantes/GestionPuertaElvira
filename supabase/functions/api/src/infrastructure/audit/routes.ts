@@ -1,5 +1,13 @@
 import { parseUuid } from '../../domain/common/mod.ts';
-import { AuditActionNotFound, RestoreToPoint, UndoAction } from '../../application/audit/mod.ts';
+import {
+  AuditActionNotFound,
+  auditPeriodFrom,
+  auditSectionFrom,
+  periodStart,
+  RestoreToPoint,
+  SECTION_TABLES,
+  UndoAction,
+} from '../../application/audit/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { SqlAuditLog } from '../persistence/audit.ts';
@@ -24,18 +32,22 @@ export function registerAuditRoutes(api: ApiApp): void {
     access: 'auditReader' as const,
   });
 
+  // ?section=students|payments|attendance (sin ella, todo) y ?period=today|week|month|all (sin él, todo).
   api.defineRoute(reader('/api/admin/audit/actions'), async (c, scope) => {
     const user = c.req.query('userId');
     const before = c.req.query('before');
-    return c.json({
-      items: await log(scope).actions({
-        userId: user ? parseUuid(user) : null,
-        beforeSeq: before !== undefined && before !== '' && Number.isFinite(Number(before))
-          ? Number(before)
-          : null,
-      }),
-      people: await log(scope).people(),
-    });
+    const section = c.req.query('section');
+    const filter = {
+      userId: user ? parseUuid(user) : null,
+      beforeSeq: before !== undefined && before !== '' && Number.isFinite(Number(before))
+        ? Number(before)
+        : null,
+      tables: section ? SECTION_TABLES[auditSectionFrom(section)] : null,
+      since: periodStart(auditPeriodFrom(c.req.query('period') ?? 'all'), api.deps.clock.now()),
+    };
+    const people = await log(scope).people();
+    if (section === 'payments') return c.json({ ...(await log(scope).payments(filter)), people });
+    return c.json({ items: await log(scope).actions(filter), people });
   });
 
   api.defineRoute(reader('/api/admin/audit/actions/:id'), async (c, scope) => {
