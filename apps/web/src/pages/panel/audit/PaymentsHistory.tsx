@@ -8,6 +8,7 @@ import { emptyMessage, periodPhrase } from '@/features/audit/sections';
 import { targetLink } from '@/features/audit/targets';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { formatCents } from '@/features/billing/money';
+import { StudentLink } from '@/pages/panel/students/StudentLink';
 import { madridDateTime } from '@/shared/dateTime';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -64,9 +65,9 @@ function PaymentsTable({ items }: { items: AuditPayment[] }) {
                 </td>
                 <td className="px-3 py-3 font-medium whitespace-nowrap">{p.receiptNumber}</td>
                 <td className="px-3 py-3">
-                  <Link to={`/panel/alumnos/${p.studentId}`} className="font-medium">
+                  <StudentLink id={p.studentId} className="font-medium">
                     {p.studentName}
-                  </Link>
+                  </StudentLink>
                 </td>
                 <td className="px-3 py-3">
                   {p.concept}
