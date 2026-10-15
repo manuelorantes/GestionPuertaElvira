@@ -15,8 +15,9 @@ tiene web.
 3. **Alumnos.** Misma tabla que la general, con detalle desplegable, «Deshacer» y «Volver aquí» (confirmación en
    diálogo, toast al terminar, se refrescan los datos del club).
 3b. **Asistencia y notas.** Una fila por clase y día, sin paginar; el periodo filtra por el día de la clase. Al
-   abrir una fila se cargan a la vez los detalles de todas sus acciones (ya desplegados) y se ven las notas
-   actuales de la clase. Deshacer y volver aquí funcionan igual que en la general.
+   abrir una fila se pide la asistencia del grupo en el mes de la clase (cuadro de Clases, con ese día resaltado) y
+   se ven las notas actuales de la clase y la lista corta de lo que se hizo ese día. Deshacer y volver aquí
+   funcionan igual que en la general; el detalle campo a campo se consulta en General.
 4. **Pagos.** Tabla de cobros al estilo de los movimientos. Los cobros deshechos (una «Deshacer» o una «Vuelta
    atrás» que los borró) salen en negativo, en rojo, con la etiqueta de la acción bajo el concepto y sin enlace
    al recibo. La suma del pie la calcula el servidor sobre todo el periodo, aunque solo haya una página cargada.

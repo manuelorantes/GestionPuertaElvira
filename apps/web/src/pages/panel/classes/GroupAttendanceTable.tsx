@@ -50,17 +50,36 @@ const percent = (s: Student) =>
  * Asistencia de un grupo en un mes: un alumno por fila, un día de clase por columna (✓ vino, ✗ faltó, ? sin lista,
  * vacío si ese día no le tocaba) y el porcentaje de las clases con lista. Se ordena por nombre o por porcentaje.
  */
-export function GroupAttendanceTable({ groupId, month }: { groupId: string; month: string }) {
-  return <GroupAttendanceGrid attendance={useGroupAttendance(groupId, month)} month={month} />;
+export function GroupAttendanceTable({
+  groupId,
+  month,
+  highlight,
+}: {
+  groupId: string;
+  month: string;
+  /** Día (AAAA-MM-DD) cuya columna se resalta. */
+  highlight?: string;
+}) {
+  return (
+    <GroupAttendanceGrid
+      attendance={useGroupAttendance(groupId, month)}
+      month={month}
+      highlight={highlight}
+    />
+  );
 }
+
+const HIGHLIGHT = 'bg-brand-soft';
 
 /** La tabla de asistencia de un mes ya pedida; cada nombre abre la ficha del alumno. */
 export function GroupAttendanceGrid({
   attendance,
   month,
+  highlight,
 }: {
   attendance: UseQueryResult<GroupAttendance>;
   month: string;
+  highlight?: string | undefined;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({
     key: 'name',
@@ -117,7 +136,11 @@ export function GroupAttendanceGrid({
               {header('name', 'Alumno', 'alumno')}
             </th>
             {data.days.map((d) => (
-              <th key={d.date} scope="col" className="px-2 py-2 text-center font-semibold">
+              <th
+                key={d.date}
+                scope="col"
+                className={`px-2 py-2 text-center font-semibold ${d.date === highlight ? HIGHLIGHT : ''}`}
+              >
                 <span className="block text-[11px] font-normal tracking-normal normal-case">
                   {weekday(d.date)}
                 </span>
@@ -151,7 +174,10 @@ export function GroupAttendanceGrid({
                 {s.marks.map((m, i) => {
                   const day = data.days[i];
                   return (
-                    <td key={day?.date ?? i} className="px-2 py-2 text-center">
+                    <td
+                      key={day?.date ?? i}
+                      className={`px-2 py-2 text-center ${day?.date === highlight ? HIGHLIGHT : ''}`}
+                    >
                       {m && (
                         <span
                           aria-label={`${s.name} ${MARK[m].label} el ${dayMonth(day?.date ?? '')}`}

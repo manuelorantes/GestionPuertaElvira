@@ -6,12 +6,12 @@ import { type AuditClass, type AuditPeriod, fetchClasses } from '@/features/audi
 import { emptyMessage } from '@/features/audit/sections';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { formatDate } from '@/features/students/format';
+import { GroupAttendanceTable } from '@/pages/panel/classes/GroupAttendanceTable';
 import { madridDateTime } from '@/shared/dateTime';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
-import { ActionDetail } from './ActionDetail';
 import { RevertButtons } from './RevertButtons';
 import { useRevert } from './useRevert';
 
@@ -39,30 +39,18 @@ const COLUMNS: Record<Column, SortColumn<AuditClass>> = {
   summary: { label: 'Qué pasó', name: 'qué pasó', value: summary },
 };
 
-/** Todo lo que pasó en una clase, ya desplegado, y sus notas. */
+/** La clase desplegada: el cuadro de asistencia del grupo ese mes (su día resaltado), las notas y lo que se hizo. */
 function ClassDay({ klass }: { klass: AuditClass }) {
   const revert = useRevert();
   return (
-    <div className="flex flex-col gap-3">
-      {klass.actions.map((a) => (
-        <section
-          key={a.id}
-          aria-label={`${a.label} · ${madridDateTime(a.occurredAt)}`}
-          className="flex flex-col gap-2"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-ink-muted">{madridDateTime(a.occurredAt)}</span>
-              <span className="font-medium">{a.userName}</span>
-              <span>{a.label}</span>
-              {a.kind === 'undo' && <Badge tone="warning">Deshacer</Badge>}
-              {a.kind === 'restore' && <Badge tone="danger">Vuelta atrás</Badge>}
-            </p>
-            <RevertButtons action={a} onAsk={revert.ask} />
-          </div>
-          {a.changeCount > 0 && <ActionDetail id={a.id} />}
-        </section>
-      ))}
+    <div className="flex flex-col gap-4">
+      {klass.groupId && (
+        <GroupAttendanceTable
+          groupId={klass.groupId}
+          month={klass.date.slice(0, 7)}
+          highlight={klass.date}
+        />
+      )}
       <section aria-label="Notas" className="border-t border-line-soft pt-3">
         <h3 className="mb-1.5 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
           Notas
@@ -80,6 +68,25 @@ function ClassDay({ klass }: { klass: AuditClass }) {
             ))}
           </ul>
         )}
+      </section>
+      <section aria-label="Qué se hizo" className="border-t border-line-soft pt-3">
+        <h3 className="mb-1.5 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+          Qué se hizo
+        </h3>
+        <ul className="flex flex-col gap-1.5">
+          {klass.actions.map((a) => (
+            <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-ink-muted">{madridDateTime(a.occurredAt)}</span>
+                <span className="font-medium">{a.userName}</span>
+                <span>{a.label}</span>
+                {a.kind === 'undo' && <Badge tone="warning">Deshacer</Badge>}
+                {a.kind === 'restore' && <Badge tone="danger">Vuelta atrás</Badge>}
+              </span>
+              <RevertButtons action={a} onAsk={revert.ask} />
+            </li>
+          ))}
+        </ul>
       </section>
       {revert.dialog}
     </div>

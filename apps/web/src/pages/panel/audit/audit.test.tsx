@@ -420,7 +420,28 @@ describe('Historial', () => {
           people: [],
         },
       ],
-      'GET /api/admin/audit/actions/a2': [200, { ...DETAIL, changes: [], references: {} }],
+      'GET /api/admin/attendance/groups/g1?month=2026-10': [
+        200,
+        {
+          groupId: 'g1',
+          name: 'Martes 17:00',
+          month: '2026-10',
+          days: [
+            { date: '2026-10-13', status: 'taken' },
+            { date: '2026-10-15', status: 'taken' },
+          ],
+          students: [
+            {
+              id: 's1',
+              name: 'Martina López Herrera',
+              marks: ['present', 'absent'],
+              attended: 1,
+              classes: 2,
+              member: true,
+            },
+          ],
+        },
+      ],
     });
     renderApp('/panel/historial?seccion=asistencia');
 
@@ -434,20 +455,25 @@ describe('Historial', () => {
     await userEvent.click(
       within(row).getByRole('button', { name: 'Ver la clase Martes 17:00 · 15/10/2026' }),
     );
-    // Las acciones del día, ya desplegadas, con deshacer; y las notas al final.
-    const rollCall = await screen.findByRole('region', {
-      name: /Pasar lista · 15\/10\/2026 19:47/,
+    // El cuadro de asistencia del grupo ese mes, con el día de la clase; las notas; y lo que se hizo, con deshacer.
+    const grid = await screen.findByRole('table', {
+      name: 'Asistencia de Martes 17:00 en octubre 2026',
     });
-    expect(await within(rollCall).findByText('Alta · Cobro')).toBeInTheDocument();
-    expect(
-      within(rollCall).getByRole('button', { name: 'Deshacer Pasar lista' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Volver a este punto: Comentar una clase' }),
-    ).toBeInTheDocument();
+    expect(within(grid).getByLabelText('Martina López Herrera faltó el 15/10')).toBeInTheDocument();
+    expect(within(grid).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
+      'href',
+      '/panel/historial?seccion=asistencia&ficha=s1',
+    );
     const notes = screen.getByRole('region', { name: 'Notas' });
     expect(notes).toHaveTextContent('Mates de torres');
     expect(notes).toHaveTextContent('Martina López Herrera: Ha venido con reloj nuevo');
+    const done = screen.getByRole('region', { name: 'Qué se hizo' });
+    expect(done).toHaveTextContent('15/10/2026 19:47Carlos Ruiz MárquezPasar lista');
+    expect(within(done).getByRole('button', { name: 'Deshacer Pasar lista' })).toBeInTheDocument();
+    expect(
+      within(done).getByRole('button', { name: 'Volver a este punto: Comentar una clase' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Alta · Cobro')).not.toBeInTheDocument();
   });
 
   it('says when a section has nothing in the period', async () => {

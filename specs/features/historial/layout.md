@@ -23,7 +23,7 @@ AuditPage (/panel/historial)
     ├── ClassesHistory (Asistencia y notas): tabla «Clases»
     │   ├── Cabeceras ordenables: Día | Clase | Quién | Qué pasó
     │   ├── Fila: botón «Ver la clase <clase> · <día>» (chevron) | 15/10/2026 | Martes 17:00 | personas que actuaron | «Pasar lista ×2 · Comentar una clase · 2 notas»
-    │   ├── Fila desplegada (ClassDay): por cada acción del día, «<hora> <persona> <acción>» (+ Badge Deshacer / Vuelta atrás) con «Deshacer» · «Volver aquí» y su ActionDetail ya abierto; al final sección «Notas»: «<alumno>: <texto> · <autor>» o «Sin notas.»
+    │   ├── Fila desplegada (ClassDay): GroupAttendanceTable del grupo y mes de la clase (columna del día en `brand-soft`) · sección «Notas»: «<alumno>: <texto> · <autor>» o «Sin notas.» · sección «Qué se hizo»: por acción «<hora> <persona> <acción>» (+ Badge Deshacer / Vuelta atrás) con «Deshacer» · «Volver aquí»
     │   └── Vacío: «No hay clases con lista o notas hoy.» / «Todavía no hay clases con lista o notas.»
     ├── PaymentsHistory (Pagos): tabla «Cobros registrados»
     │   ├── Cabeceras ordenables: Fecha y hora | Recibo | Alumno | Concepto | Forma de pago | Registrado por | Importe (derecha)
