@@ -1,7 +1,9 @@
 import { generateUuidV7 } from '../../domain/common/mod.ts';
+import { LocalDate } from '../../domain/common/mod.ts';
 import type {
   AuditActionView,
   AuditChangeView,
+  AuditClassView,
   AuditDetail,
   AuditFilter,
   AuditLog,
@@ -21,6 +23,7 @@ import {
   titleOf,
 } from '../audit/describe.ts';
 import { AuditLabels } from '../audit/mod.ts';
+import { SqlClassCommentQuery } from './rollcalls.ts';
 import { Row, type Sql } from './sql.ts';
 
 /** Las cuentas de usuario se registran pero no se revierten. */
@@ -97,6 +100,14 @@ function pageParams(filter: AuditFilter): (string | number | string[] | Date | n
     Math.max(1, Math.min(200, filter.limit ?? 50)),
   ];
 }
+
+/** A qué clase (grupo o turno, y día) apunta cada cambio de asistencia de una acción ($2: sus tablas). */
+const CLASS_KEYS = `SELECT DISTINCT
+    COALESCE(c.after, c.before)->>'group_id' AS group_id,
+    COALESCE(c.after, c.before)->>'duty_id' AS duty_id,
+    COALESCE(COALESCE(c.after, c.before)->>'roll_date', COALESCE(c.after, c.before)->>'class_date',
+             COALESCE(c.after, c.before)->>'check_date') AS day
+  FROM audit_change c WHERE c.action_id = a.id AND c.table_name = ANY($2::text[])`;
 
 /** Un cobro que una acción registró (alta) o quitó (baja, al deshacer o volver atrás). */
 const PAYMENT_CHANGE =
@@ -204,6 +215,56 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
       };
     });
     return { changes, references: names.references() };
+  }
+
+  async classes(filter: AuditFilter): Promise<AuditClassView[]> {
+    const rows = await this.sql.unsafe(
+      `SELECT ${ACTION_COLUMNS}, k.group_id, k.duty_id, k.day, g.name AS group_name, d.label AS duty_label
+         FROM audit_action a
+         JOIN LATERAL (${CLASS_KEYS}) k ON k.day IS NOT NULL
+         LEFT JOIN classes_group g ON g.id::text = k.group_id
+         LEFT JOIN payroll_duty d ON d.id::text = k.duty_id
+        WHERE ${PERSISTED} AND ($1::uuid IS NULL OR a.user_id = $1::uuid)
+          AND ($3::date IS NULL OR k.day::date >= $3::date)
+        ORDER BY k.day DESC, a.seq DESC`,
+      [
+        filter.userId ?? null,
+        filter.tables ? [...filter.tables] : null,
+        filter.sinceDay?.toString() ?? null,
+      ],
+    );
+    const names = new AuditNames(this.sql);
+    const all = Row.all(rows);
+    for (const row of all) {
+      const groupId = row.nullableString('group_id');
+      if (groupId !== null && row.nullableString('group_name') === null) {
+        names.want('group', groupId);
+      }
+    }
+    await names.resolve();
+    const classes = new Map<string, AuditClassView>();
+    for (const row of all) {
+      const groupId = row.nullableString('group_id');
+      const day = row.string('day');
+      const key = `${groupId ?? row.nullableString('duty_id') ?? ''}|${day}`;
+      const existing = classes.get(key);
+      if (existing) {
+        existing.actions.push(view(row));
+        continue;
+      }
+      const label = row.nullableString('group_name') ??
+        (groupId === null ? null : names.label('group', groupId)) ??
+        row.nullableString('duty_label') ?? 'Clase borrada';
+      classes.set(key, { groupId, label, date: day, actions: [view(row)], notes: [] });
+    }
+    const comments = new SqlClassCommentQuery(this.sql);
+    for (const klass of classes.values()) {
+      if (klass.groupId === null) continue;
+      klass.notes = (await comments.ofClass(klass.groupId, LocalDate.fromString(klass.date))).map(
+        (c) => ({ id: c.id, studentName: c.studentName, text: c.text, author: c.author }),
+      );
+    }
+    return [...classes.values()];
   }
 
   async people(): Promise<{ id: string; name: string }[]> {

@@ -292,8 +292,15 @@ Deno.test('audit should list each section by what its actions touched', async ()
     items((await client.get(`/api/admin/audit/actions?section=${name}&period=all`)).body)
       .map((a) => a.label);
   assertEquals(await section('students'), ['Dar de alta alumno']);
-  assertEquals(await section('attendance'), ['Comentar una clase']);
   assertEquals(await section('payments'), ['Registrar cobro']);
+  const classes = items(
+    (await client.get('/api/admin/audit/actions?section=attendance&period=all')).body,
+  );
+  assertEquals(classes.length, 1);
+  assertEquals(
+    (classes[0]?.actions as { label: string }[]).map((a) => a.label),
+    ['Comentar una clase'],
+  );
   assertError(await client.get('/api/admin/audit/actions?section=nope'), 422, 'unprocessable');
   assertError(await client.get('/api/admin/audit/actions?period=nope'), 422, 'unprocessable');
 });
@@ -351,4 +358,63 @@ Deno.test('audit should sum the payments of the period, taking back the ones und
   );
   assertStringIncludes(String(first?.receiptNumber), 'R-');
   assertStringIncludes(String(first?.concept).toLowerCase(), 'socio');
+});
+
+Deno.test('audit should gather what happened in each class, with its notes, filtered by the class day', async () => {
+  const client = await superadmin();
+  const teacherId = await newTeacher(client, 'Lucía Moreno Gil');
+  const group = await newGroup(client, teacherId, { name: 'Martes 17:00', capacity: 4 });
+  const { studentId } = await studentWithPayment(client, 'Martina López Herrera', [group]);
+  const today = LocalDate.fromInstant(new Date());
+  const comment = async (date: string, text: string, student: string | null = null) => {
+    const response = await client.json('POST', `/api/admin/attendance/groups/${group}/comments`, {
+      date,
+      studentId: student,
+      text,
+    });
+    assertEquals(response.status, 201, JSON.stringify(response.body));
+    return (response.body as { id: string }).id;
+  };
+  await comment(today.toString(), 'Hoy hemos dado mates de torres');
+  const personal = await comment(today.toString(), 'Ha venido con el reloj nuevo', studentId);
+  await comment(today.plusDays(-40).toString(), 'Clase de hace más de un mes');
+  const edited = await client.json('PUT', `/api/admin/attendance/comments/${personal}`, {
+    text: 'Ha venido con reloj nuevo',
+  });
+  assertEquals(edited.status, 204, JSON.stringify(edited.body));
+
+  type ClassView = {
+    groupId: string;
+    label: string;
+    date: string;
+    actions: { label: string; userName: string }[];
+    notes: { studentName: string | null; text: string; author: string }[];
+  };
+  const classes = async (period: string) =>
+    items(
+      (await client.get(`/api/admin/audit/actions?section=attendance&period=${period}`)).body,
+    ) as unknown as ClassView[];
+
+  const all = await classes('all');
+  assertEquals(all.map((c) => [c.label, c.date, c.actions.length]), [
+    ['Martes 17:00', today.toString(), 3],
+    ['Martes 17:00', today.plusDays(-40).toString(), 1],
+  ]);
+  assertEquals(all[0]?.groupId, group);
+  assertEquals(all[0]?.actions.map((a) => a.label), [
+    'Cambiar comentario de una clase',
+    'Comentar una clase',
+    'Comentar una clase',
+  ]);
+  // Las notas son las que tiene la clase ahora, con el texto ya corregido.
+  assertEquals(all[0]?.notes.map((n) => [n.studentName, n.text]), [
+    [null, 'Hoy hemos dado mates de torres'],
+    ['Martina López Herrera', 'Ha venido con reloj nuevo'],
+  ]);
+  assertEquals(all[0]?.notes[0]?.author, 'Lucía Moreno Gil');
+  assertEquals(all[1]?.notes.length, 1);
+
+  // El periodo va por el día de la clase, no por cuándo se escribió.
+  assertEquals((await classes('today')).map((c) => c.date), [today.toString()]);
+  assertEquals((await classes('month')).length, today.day > 40 ? 2 : 1);
 });
