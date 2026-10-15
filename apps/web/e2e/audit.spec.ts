@@ -41,3 +41,45 @@ test('should record an action with its author and undo it', async ({ page }) => 
     page.getByRole('cell', { name: 'Gasto para probar el historial', exact: true }),
   ).toHaveCount(0);
 });
+
+test('should open the sections of the history with today as the default period', async ({
+  page,
+}) => {
+  await page.goto('/?acceso=1');
+  await page.getByLabel('Email').fill('admin@puertaelvira.test');
+  await page.getByLabel('Contraseña').fill('desarrollo-admin');
+  await page.getByRole('button', { name: 'Entrar' }).click();
+  await page.getByRole('link', { name: /historial/i }).click();
+
+  const tabs = page.getByRole('tablist', { name: 'Secciones del historial' });
+  await expect(tabs.getByRole('tab')).toHaveText([
+    'General',
+    'Alumnos',
+    'Pagos',
+    'Asistencia y notas',
+  ]);
+  await expect(page.getByLabel('Persona', { exact: true })).toBeVisible();
+
+  await tabs.getByRole('tab', { name: 'Pagos' }).click();
+  const period = page.getByRole('group', { name: 'Periodo' });
+  await expect(period.getByRole('button', { name: 'Hoy' })).toHaveAttribute('aria-pressed', 'true');
+  await period.getByRole('button', { name: 'Todo' }).click();
+  await expect(page).toHaveURL(/seccion=pagos&periodo=todo/);
+  await expect(
+    page
+      .getByRole('table', { name: 'Cobros registrados' })
+      .or(page.getByText('Todavía no hay cobros registrados.')),
+  ).toBeVisible();
+
+  // El periodo elegido se mantiene al cambiar de sección.
+  await tabs.getByRole('tab', { name: 'Alumnos' }).click();
+  await expect(period.getByRole('button', { name: 'Todo' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(
+    page
+      .getByRole('table', { name: 'Historial de acciones' })
+      .or(page.getByText('Todavía no hay cambios de alumnos registrados.')),
+  ).toBeVisible();
+});

@@ -26,6 +26,29 @@ las acciones más antiguas que trae «Ver más» se colocan en el orden elegido.
 - **WHEN** superadministración abre el historial
 - **THEN** ve las acciones de la más reciente a la más antigua con fecha y hora (de Madrid), persona, acción y lo que afectó, puede filtrar por persona y ver el detalle campo a campo (sin contraseñas)
 
+### Requirement: Secciones del historial
+Además de la lista general, el historial MUST ofrecer tres secciones que muestran solo una parte de las acciones:
+«Alumnos» (las que tocaron a un alumno: sus datos, su alta o baja, sus grupos o sus datos de cobro),
+«Pagos» (las que registraron o quitaron un cobro) y «Asistencia y notas» (listas de clase, faltas, asistencias
+especiales, confirmaciones de clase y comentarios de clase).
+Cada sección MUST filtrarse por periodo, en hora de Madrid: «Hoy» (por defecto), «Esta semana» (desde el lunes),
+«Este mes» (desde el día 1) o «Todo». El periodo elegido se mantiene al pasar de una sección a otra.
+La lista general MUST quedar como está: todas las acciones, filtrables por persona, sin filtro de periodo.
+«Alumnos» y «Asistencia y notas» MUST verse como la general (detalle, deshacer y volver aquí).
+«Pagos» MUST verse como los movimientos de contabilidad: un cobro por fila con fecha y hora, recibo, alumno
+(enlace a su ficha), concepto, forma de pago, quién lo registró e importe, con enlace al recibo; un cobro quitado
+al deshacer o volver atrás aparece con importe negativo y sin enlace. Al pie MUST verse cuántos cobros hay en el
+periodo (y cuántos deshechos) y la suma de todos ellos, no solo de los cargados.
+Cuando una sección no tiene nada en el periodo MUST decirlo («No hay cobros hoy»).
+
+#### Scenario: Los cobros de hoy con su suma
+- **WHEN** superadministración abre «Pagos» tras registrar hoy dos cobros de 30 € y 45 € y deshacer el segundo
+- **THEN** ve «Hoy» marcado, tres filas (+30 €, +45 € y −45 € señalada como deshecha) y al pie «2 cobros (1 deshecho) hoy · Total +30 €»
+
+#### Scenario: Cambiar de periodo y de sección
+- **WHEN** en «Alumnos» elige «Esta semana» y pasa a «Asistencia y notas»
+- **THEN** ve las listas, faltas y comentarios desde el lunes, con «Esta semana» marcado
+
 ### Requirement: Detalle legible
 El detalle de un cambio MUST entenderse sin conocer la base de datos: cada registro tocado se presenta por su nombre
 («Alta · Cobro · R-2026-0401 · Martina López Herrera», «Cambio · Cuota · Cuota de octubre 2026 · Martina López

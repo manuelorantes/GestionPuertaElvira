@@ -251,6 +251,136 @@ describe('Historial', () => {
     );
   });
 
+  it('opens a section with today as the default period and asks the server for the chosen one', async () => {
+    const fetch = api({
+      'GET /api/admin/audit/actions?section=students&period=today': [
+        200,
+        { items: [action({ label: 'Dar de alta alumno', affected: ['Alumno'] })], people: [] },
+      ],
+      'GET /api/admin/audit/actions?section=students&period=week': [200, { items: [], people: [] }],
+      'GET /api/admin/audit/actions?section=attendance&period=week': [
+        200,
+        { items: [], people: [] },
+      ],
+    });
+    renderApp('/panel/historial');
+
+    const tabs = await screen.findByRole('tablist', { name: 'Secciones del historial' });
+    expect(
+      within(tabs)
+        .getAllByRole('tab')
+        .map((t) => t.textContent),
+    ).toEqual(['General', 'Alumnos', 'Pagos', 'Asistencia y notas']);
+    expect(screen.queryByRole('group', { name: 'Periodo' })).not.toBeInTheDocument();
+
+    await userEvent.click(within(tabs).getByRole('tab', { name: 'Alumnos' }));
+    const period = await screen.findByRole('group', { name: 'Periodo' });
+    expect(within(period).getByRole('button', { name: 'Hoy' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.queryByLabelText('Persona')).not.toBeInTheDocument();
+    expect(await screen.findByRole('row', { name: /Dar de alta alumno/ })).toBeInTheDocument();
+
+    await userEvent.click(within(period).getByRole('button', { name: 'Esta semana' }));
+    expect(await screen.findByText('No hay cambios de alumnos esta semana.')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/admin/audit/actions?section=students&period=week',
+      expect.anything(),
+    );
+
+    // El periodo elegido se mantiene al cambiar de sección.
+    await userEvent.click(within(tabs).getByRole('tab', { name: 'Asistencia y notas' }));
+    expect(await screen.findByText('No hay asistencias ni notas esta semana.')).toBeInTheDocument();
+  });
+
+  it('lists the payments of the period like the ledger, with their sum at the bottom', async () => {
+    const payment = (overrides: Record<string, unknown>) => ({
+      ...action({ affected: ['Cobro', 'Cuota'] }),
+      paymentId: 'p1',
+      receiptNumber: 'R-2026-0027',
+      studentId: 's1',
+      studentName: 'Martina López Herrera',
+      concept: 'Cuota de octubre 2026',
+      method: 'cash',
+      totalCents: 4500,
+      ...overrides,
+    });
+    api({
+      'GET /api/admin/audit/actions?section=payments&period=today': [
+        200,
+        {
+          items: [
+            payment({
+              id: 'a3',
+              seq: 12,
+              kind: 'undo',
+              label: 'Deshacer: Registrar cobro',
+              paymentId: 'p2',
+              receiptNumber: 'R-2026-0028',
+              studentId: 's2',
+              studentName: 'Hugo Navarro Peña',
+              method: 'transfer',
+              totalCents: -3000,
+            }),
+            payment({
+              id: 'a2',
+              seq: 11,
+              paymentId: 'p2',
+              receiptNumber: 'R-2026-0028',
+              studentId: 's2',
+              studentName: 'Hugo Navarro Peña',
+              method: 'transfer',
+              totalCents: 3000,
+            }),
+            payment({}),
+          ],
+          totalCents: 4500,
+          people: [],
+        },
+      ],
+    });
+    renderApp('/panel/historial?seccion=pagos');
+
+    const table = await screen.findByRole('table', { name: 'Cobros registrados' });
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toHaveTextContent('R-2026-0028');
+    expect(rows[0]).toHaveTextContent('Deshacer: Registrar cobro');
+    expect(rows[0]).toHaveTextContent('−30 €');
+    expect(rows[1]).toHaveTextContent('Transferencia');
+    expect(rows[1]).toHaveTextContent('+30 €');
+    expect(rows[2]).toHaveTextContent('Efectivo');
+    expect(rows[2]).toHaveTextContent('Lucía Moreno Gil');
+    expect(rows[2]).toHaveTextContent('+45 €');
+    expect(within(table).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
+      'href',
+      '/panel/alumnos/s1',
+    );
+    expect(within(table).getByRole('link', { name: 'Ir al cobro R-2026-0027' })).toHaveAttribute(
+      'href',
+      '/panel/cobros?pestana=registro&recibo=p1',
+    );
+    // El cobro deshecho ya no existe: no hay recibo al que ir.
+    expect(within(table).getAllByRole('link', { name: /Ir al cobro/ })).toHaveLength(2);
+    expect(screen.getByText('2 cobros (1 deshecho) hoy')).toBeInTheDocument();
+    expect(screen.getByText('Total +45 €')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Deshacer/ })).not.toBeInTheDocument();
+  });
+
+  it('says when a section has nothing in the period', async () => {
+    api({
+      'GET /api/admin/audit/actions?section=payments&period=all': [
+        200,
+        { items: [], totalCents: 0, people: [] },
+      ],
+    });
+    renderApp('/panel/historial?seccion=pagos&periodo=todo');
+
+    expect(await screen.findByText('Todavía no hay cobros registrados.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Todo' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('sends a plain administrator back to the summary', async () => {
     mockApi({
       'GET /api/auth/me': [200, { user: ADMIN }],

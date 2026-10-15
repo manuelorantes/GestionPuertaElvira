@@ -53,14 +53,51 @@ export interface AuditPage {
   people: { id: string; name: string }[];
 }
 
+/** Una sección del historial: solo las acciones que tocaron lo suyo. */
+export type AuditSection = 'students' | 'payments' | 'attendance';
+export type AuditPeriod = 'today' | 'week' | 'month' | 'all';
+
+export interface AuditQuery {
+  userId?: string;
+  section?: AuditSection;
+  period?: AuditPeriod;
+}
+
+/** Un cobro tal como lo registró (o lo quitó, al deshacer) una acción: el importe lleva el signo. */
+export interface AuditPayment extends AuditAction {
+  paymentId: string;
+  receiptNumber: string;
+  studentId: string;
+  studentName: string;
+  concept: string;
+  method: string;
+  totalCents: number;
+}
+
+export interface AuditPaymentsPage {
+  items: AuditPayment[];
+  /** Suma de todo el periodo, no solo de lo cargado. */
+  totalCents: number;
+}
+
 const BASE = '/api/admin/audit/actions';
 
-export function fetchActions(userId: string, before?: number): Promise<AuditPage> {
+function url(query: AuditQuery, before: number | undefined): string {
   const params = new URLSearchParams();
-  if (userId) params.set('userId', userId);
+  if (query.userId) params.set('userId', query.userId);
+  if (query.section) params.set('section', query.section);
+  if (query.period) params.set('period', query.period);
   if (before) params.set('before', String(before));
-  const query = params.toString();
-  return apiGet(`${BASE}${query ? `?${query}` : ''}`);
+  const search = params.toString();
+  return `${BASE}${search ? `?${search}` : ''}`;
+}
+
+export function fetchActions(query: AuditQuery, before?: number): Promise<AuditPage> {
+  return apiGet(url(query, before));
+}
+
+export function fetchPayments(period: AuditPeriod, before?: number): Promise<AuditPaymentsPage> {
+  return apiGet(url({ section: 'payments', period }, before));
 }
 
 export function fetchAction(id: string): Promise<AuditDetail> {
