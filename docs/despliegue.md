@@ -55,6 +55,16 @@ La función recibe sola `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`; el workflo
 Después lanza el workflow **Despliegue** a mano (*Run workflow*) o haz una release.
 Al terminar, `https://<ref>.supabase.co/functions/v1/api/health` debe responder `{"status":"healthy",...}`.
 
+### Seguridad de la base de datos
+
+Supabase expone el esquema `public` por su API REST automática con la clave pública `anon`. La aplicación no la
+usa (la web habla con la Edge Function, que entra como el rol `postgres`), así que una migración activa **Row
+Level Security en todas las tablas** sin políticas y revoca los privilegios de `anon` y `authenticated` sobre el
+esquema: por esa vía nadie lee ni escribe nada. Toda tabla nueva debe activar RLS en su migración
+(`ALTER TABLE public.<tabla> ENABLE ROW LEVEL SECURITY`); un test de integración falla si alguna se queda sin él.
+Si Supabase avisa de «Table publicly accessible» o «Sensitive data publicly accessible», comprueba que la última
+release se desplegó (las migraciones se aplican en el workflow) y que ninguna tabla nueva se quedó fuera.
+
 ## 3. CloudFront (una vez)
 
 Hace falta una cuenta de AWS; la distribución entra en la capa gratuita permanente
