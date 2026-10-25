@@ -124,6 +124,41 @@ describe('Puntos', () => {
     expect(screen.getAllByRole('row')).toHaveLength(3);
   });
 
+  it('prints a blank attendance sheet of one Friday with every enrolled student', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      [`GET /api/admin/points/students?month=${month}`]: [200, { month, items: [] }],
+      [`GET /api/admin/points/fridays?month=${month}`]: [200, grid([])],
+    });
+    renderApp('/panel/puntos?pestana=viernes');
+    await screen.findByRole('checkbox', { name: 'Pablo Gil Ruiz vino el viernes 07/01' });
+
+    // Los festivos no tienen hoja; los viernes que aún no han llegado sí (se imprime antes de ir).
+    expect(screen.queryByRole('button', { name: 'Imprimir la hoja del viernes 14/01' })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Imprimir la hoja del viernes 21/01' }),
+    ).toBeEnabled();
+
+    // La hoja lleva a todos los alumnos de alta, aunque la tabla esté filtrada, y sin marcar a nadie.
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar alumno' }), 'Pablo');
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Imprimir la hoja del viernes 07/01' }),
+    );
+    expect(print).toHaveBeenCalledOnce();
+    const sheet = screen.getByRole('region', { name: 'Viernes 07/01/2000' });
+    expect(sheet).toHaveTextContent('apuntar la asistencia');
+    const list = within(sheet).getByRole('table', {
+      name: 'Hoja de asistencia del viernes 07/01/2000',
+    });
+    const names = within(list)
+      .getAllByRole('rowheader')
+      .map((cell) => cell.textContent);
+    expect(names).toEqual(['Natan Rodriguez Raposo', 'Pablo Gil Ruiz']);
+    expect(within(list).queryByRole('checkbox')).toBeNull();
+    print.mockRestore();
+  });
+
   it('shows the month gallery of tournament photos and adds one to a student found by name', async () => {
     const spy = mockApi({
       'GET /api/auth/me': [200, { user: ADMIN }],
