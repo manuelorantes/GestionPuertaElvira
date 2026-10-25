@@ -582,3 +582,21 @@ Table attendance_activity_check {
 
 Ref: payroll_duty.teacher_id > teachers_teacher.id
 Ref: attendance_activity_check.duty_id > payroll_duty.id [delete: cascade]
+
+Table attendance_missed_review {
+  id uuid [pk]
+  user_id uuid [not null, note: 'cuenta de administración que la revisó']
+  group_id uuid [note: 'la clase (o null si es una actividad del club)']
+  duty_id uuid [note: 'la actividad del club (o null si es una clase)']
+  class_date date [not null]
+  reviewed_at timestamptz [not null]
+
+  indexes {
+    (user_id, `COALESCE(group_id, duty_id)`, class_date) [unique, name: 'attendance_missed_review_once']
+  }
+  Note: 'Lo que cada cuenta ya revisó de «Listas sin pasar» («Se dio» o «Visto»): el aviso sigue para las demás.'
+}
+
+Ref: attendance_missed_review.user_id > identity_user.id [delete: cascade]
+Ref: attendance_missed_review.group_id > classes_group.id [delete: cascade]
+Ref: attendance_missed_review.duty_id > payroll_duty.id [delete: cascade]
