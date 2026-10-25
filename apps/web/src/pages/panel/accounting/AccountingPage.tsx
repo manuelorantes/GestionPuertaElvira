@@ -10,17 +10,20 @@ import { Alert } from '@/shared/ui/Alert';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
 
+import { BalanceCards } from './BalanceCards';
 import { DiagnosticsTab } from './DiagnosticsTab';
 import { InvoiceDialog } from './InvoiceDialog';
 import { InvoicesTab } from './InvoicesTab';
 import { LedgerTab } from './LedgerTab';
 import { MonthlyCategoriesTab } from './MonthlyCategoriesTab';
+import { TransfersTab } from './TransfersTab';
 import { YearTab } from './YearTab';
 
 const TABS = [
   { id: 'movimientos', label: 'Movimientos' },
   { id: 'facturas', label: 'Facturas' },
   { id: 'cierre', label: 'Mes a mes y cierre' },
+  { id: 'traspasos', label: 'Traspasos' },
   { id: 'ajustes', label: 'Ajustes' },
   { id: 'diagnostico', label: 'Diagnóstico' },
 ];
@@ -69,6 +72,7 @@ export function AccountingPage() {
 
   function renderTab() {
     if (tab === 'facturas') return <InvoicesTab />;
+    if (tab === 'traspasos') return <TransfersTab />;
     if (tab === 'ajustes') return <MonthlyCategoriesTab />;
     if (tab === 'diagnostico') return <DiagnosticsTab />;
     if (tab === 'cierre')
@@ -102,6 +106,7 @@ export function AccountingPage() {
           onClick: () => setAddingInvoice(true),
         }}
       />
+      <BalanceCards />
       <Tabs
         label="Vistas de contabilidad"
         tabs={TABS}

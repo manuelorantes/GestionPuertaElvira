@@ -46,6 +46,15 @@ export function useCategoryOptions(kind: 'income' | 'expense', except: string[] 
     .map((c) => ({ value: c.code, label: c.label }));
 }
 
+/** Saldos del club, del banco y de caja. */
+export function useBalances() {
+  return useQuery({ queryKey: ['accounting-balances'], queryFn: api.fetchBalances });
+}
+
+export function useTransfers() {
+  return useQuery({ queryKey: ['accounting-transfers'], queryFn: api.fetchTransfers });
+}
+
 export function useMonthlyCategories() {
   return useQuery({ queryKey: ['monthly-categories'], queryFn: api.fetchMonthlyCategories });
 }
