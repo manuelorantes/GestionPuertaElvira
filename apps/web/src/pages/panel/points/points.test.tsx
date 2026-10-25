@@ -124,7 +124,7 @@ describe('Puntos', () => {
     expect(screen.getAllByRole('row')).toHaveLength(3);
   });
 
-  it('prints a blank attendance sheet of one Friday with every enrolled student', async () => {
+  it('prints the attendance sheet of one Friday choosing who to list, with those who came ticked', async () => {
     mockApi({
       'GET /api/auth/me': [200, { user: ADMIN }],
       [`GET /api/admin/points/students?month=${month}`]: [200, { month, items: [] }],
@@ -139,23 +139,66 @@ describe('Puntos', () => {
       screen.getByRole('button', { name: 'Imprimir la hoja del viernes 21/01' }),
     ).toBeEnabled();
 
-    // La hoja lleva a todos los alumnos de alta, aunque la tabla esté filtrada, y sin marcar a nadie.
+    // Al pulsar se elige a quién listar; por defecto, a todos, aunque la tabla esté filtrada.
     await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar alumno' }), 'Pablo');
     const print = vi.spyOn(window, 'print').mockImplementation(() => {});
     await userEvent.click(
       screen.getByRole('button', { name: 'Imprimir la hoja del viernes 07/01' }),
     );
+    const dialog = screen.getByRole('dialog', { name: 'Imprimir la hoja del viernes 07/01' });
+    expect(within(dialog).getByRole('radio', { name: 'Ambos' })).toBeChecked();
+    expect(print).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Imprimir' }));
     expect(print).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).toBeNull();
+
     const sheet = screen.getByRole('region', { name: 'Viernes 07/01/2000' });
     expect(sheet).toHaveTextContent('apuntar la asistencia');
     const list = within(sheet).getByRole('table', {
       name: 'Hoja de asistencia del viernes 07/01/2000',
     });
-    const names = within(list)
-      .getAllByRole('rowheader')
-      .map((cell) => cell.textContent);
-    expect(names).toEqual(['Natan Rodriguez Raposo', 'Pablo Gil Ruiz']);
+    const [natan, pablo] = within(list).getAllByRole('row').slice(1);
+    expect(natan).toHaveTextContent('Natan Rodriguez Raposo');
+    expect(pablo).toHaveTextContent('Pablo Gil Ruiz');
+    expect(natan).toHaveTextContent('Sí');
+    expect(pablo).not.toHaveTextContent('Sí');
     expect(within(list).queryByRole('checkbox')).toBeNull();
+
+    // Solo los que no asistieron: la hoja de los ausentes.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Imprimir la hoja del viernes 07/01' }),
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'No asistieron' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Imprimir' }),
+    );
+    expect(print).toHaveBeenCalledTimes(2);
+    const absent = screen.getByRole('table', { name: 'Hoja de asistencia del viernes 07/01/2000' });
+    expect(
+      within(absent)
+        .getAllByRole('rowheader')
+        .map((c) => c.textContent),
+    ).toEqual(['Pablo Gil Ruiz']);
+    expect(screen.getByRole('region', { name: 'Viernes 07/01/2000' })).toHaveTextContent(
+      'Solo los que no asistieron',
+    );
+
+    // Solo los que asistieron.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Imprimir la hoja del viernes 07/01' }),
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'Asistieron' }));
+    await userEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Imprimir' }),
+    );
+    const present = screen.getByRole('table', {
+      name: 'Hoja de asistencia del viernes 07/01/2000',
+    });
+    expect(
+      within(present)
+        .getAllByRole('rowheader')
+        .map((c) => c.textContent),
+    ).toEqual(['Natan Rodriguez Raposo']);
     print.mockRestore();
   });
 
