@@ -148,5 +148,34 @@ Deno.test('activities without confirmation from their manager should show up in 
       204,
     );
     assertEquals(await pending(), [['Encargado del club', 'Lucía Moreno Gil']]);
+
+    // Otra cuenta de administración la sigue viendo, con quién la dio por buena, hasta que la revisa ella.
+    await createUser('tesoreria@club.es');
+    await db()`UPDATE identity_user SET full_name = 'Junta Directiva' WHERE email = 'junta@club.es'`;
+    const treasurer = new ApiClient();
+    await treasurer.logIn('tesoreria@club.es');
+    const theirs = async () =>
+      body<{ items: { label: string; validation: { by: string | null; on: string } | null }[] }>(
+        await treasurer.get('/api/admin/attendance/pending'),
+      ).items.map((p) => [p.label, p.validation]);
+    assertEquals(await theirs(), [
+      ['Viernes', { by: 'Junta Directiva', on: '2026-10-12' }],
+      ['Encargado del club', null],
+    ]);
+    assertEquals(
+      (await treasurer.json(
+        'POST',
+        `/api/admin/attendance/pending/activities/${fx.fridays}/2026-10-09/confirm`,
+        {},
+      ))
+        .status,
+      204,
+    );
+    assertEquals(await theirs(), [['Encargado del club', null]]);
+    assertEquals(
+      (await db()`SELECT COUNT(*)::int AS n FROM attendance_activity_check`)[0]?.n,
+      1,
+      'revisarla no la vuelve a confirmar',
+    );
   });
 });

@@ -25,6 +25,7 @@ import {
   type GroupAttendanceQuery,
   GroupNotYours,
   type MissedRollCallQuery,
+  type MissedRollCallReviews,
   MissedRollCalls,
   NotYourComment,
   OpenRollCall,
@@ -192,33 +193,50 @@ const MISSED = {
   label: 'Martes y jueves 17:00 · Intermedio · Alfil',
   teacherName: 'Lucía Moreno Gil',
   locked: false,
+  validation: null,
 };
 
 Deno.test('MissedRollCalls should list the recorded classes without a roll call once the deadline is over', async () => {
   const asked: string[] = [];
   const query: MissedRollCallQuery = {
     since: () => Promise.resolve(LocalDate.fromString('2026-10-10')),
-    missed: (from, until) => {
-      asked.push(`${from.toString()}…${until.toString()}`);
+    missed: (from, until, userId) => {
+      asked.push(`${from.toString()}…${until.toString()} ${userId}`);
       return Promise.resolve([MISSED]);
     },
   };
   const clock = new FrozenClock('2026-10-16T09:00:00+02:00');
-  assertEquals(await new MissedRollCalls(query, clock).execute(), [MISSED]);
-  // El plazo del 14 acaba el 15 a medianoche: el 16 se avisa hasta el 14.
-  assertEquals(asked, ['2026-10-10…2026-10-14']);
+  assertEquals(await new MissedRollCalls(query, clock).execute('u1'), [MISSED]);
+  // El plazo del 14 acaba el 15 a medianoche: el 16 se avisa hasta el 14, a cada cuenta lo que no revisó.
+  assertEquals(asked, ['2026-10-10…2026-10-14 u1']);
 });
 
 Deno.test('ConfirmWithoutRollCall should keep a missed class only once its deadline is over and without a list', async () => {
   const rolls = new InMemoryRollCalls();
-  const confirm = (now: string, date = '2026-10-13') =>
-    new ConfirmWithoutRollCall(rolls, new FrozenClock(now)).execute('g1', date, 'u1');
+  const reviewed: string[] = [];
+  const reviews: MissedRollCallReviews = {
+    markReviewed: (user, subject, date) => {
+      reviewed.push(
+        `${user} ${'group' in subject ? subject.group : subject.duty} ${date.toString()}`,
+      );
+      return Promise.resolve();
+    },
+  };
+  const confirm = (now: string, user = 'u1') =>
+    new ConfirmWithoutRollCall(rolls, reviews, new FrozenClock(now)).execute(
+      'g1',
+      '2026-10-13',
+      user,
+    );
 
   await assertRejects(() => confirm('2026-10-14T20:00:00+02:00'), RollCallStillOpen);
   await confirm('2026-10-15T09:00:00+02:00');
-  assertEquals((await rolls.find('g1', LocalDate.fromString('2026-10-13')))?.kind(), 'confirmed');
-  await confirm('2026-10-15T10:00:00+02:00');
+  const roll = await rolls.find('g1', LocalDate.fromString('2026-10-13'));
+  assertEquals([roll?.kind(), roll?.takenBy().user], ['confirmed', 'u1']);
+  // Otra cuenta la ve ya dada por buena: solo la revisa, no la vuelve a confirmar.
+  await confirm('2026-10-15T10:00:00+02:00', 'u2');
   assertEquals(rolls.saved.size, 1, 'darla por buena dos veces no cambia nada');
+  assertEquals(reviewed, ['u1 g1 2026-10-13', 'u2 g1 2026-10-13']);
 });
 
 Deno.test('StudentAttendance should summarise the season so far', async () => {

@@ -119,6 +119,7 @@ export class AuditLabels {
     attendance_guest: 'Asistencia especial a clase',
     attendance_activity_check: 'Confirmación de actividad',
     attendance_roll_call: 'Lista de clase',
+    attendance_missed_review: 'Lista sin pasar revisada',
     points_movement: 'Movimiento de puntos',
     points_photo: 'Foto de torneo',
     billing_account: 'Datos de cobro del alumno',
