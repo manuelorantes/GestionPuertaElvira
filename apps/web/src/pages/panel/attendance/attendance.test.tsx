@@ -12,8 +12,9 @@ const MISSED = [
     label: 'Martes 19:00',
     teacherName: 'Carlos Ruiz Márquez',
     locked: false,
+    validation: null,
   },
-  // Una actividad del club que su encargado no confirmó.
+  // Una actividad del club que su encargado no confirmó y que otra cuenta ya dio por buena.
   {
     sessionId: 'p2',
     groupId: null,
@@ -22,11 +23,12 @@ const MISSED = [
     label: 'Viernes',
     teacherName: 'Ángel Castillo Rodriguez',
     locked: false,
+    validation: { by: 'Junta Directiva', on: '2026-10-18' },
   },
 ];
 
 describe('Listas sin pasar', () => {
-  it('counts them in the menu and lets administration remove a session or keep the class', async () => {
+  it('counts them in the menu and lets administration remove a session or review a class kept by someone else', async () => {
     const spy = mockApi({
       'GET /api/auth/me': [200, { user: ADMIN }],
       'GET /api/admin/attendance/pending': [
@@ -43,6 +45,8 @@ describe('Listas sin pasar', () => {
     expect(within(block).getByRole('heading')).toHaveTextContent('Listas sin pasar (2)');
     const nav = screen.getByRole('navigation', { name: 'Secciones' });
     expect(within(nav).getByLabelText('2 listas sin pasar')).toBeVisible();
+    expect(block).toHaveTextContent('Nadie la ha dado por buena todavía');
+    expect(block).toHaveTextContent('Dada por buena por Junta Directiva el 18/10/2026');
 
     await userEvent.click(
       within(block).getByRole('button', {
@@ -61,7 +65,7 @@ describe('Listas sin pasar', () => {
     expect(await within(nav).findByLabelText('1 lista sin pasar')).toBeVisible();
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Dar por buena la clase del 16/10/2026 de Viernes' }),
+      screen.getByRole('button', { name: 'Marcar como vista la clase del 16/10/2026 de Viernes' }),
     );
     await waitFor(() =>
       expect(screen.queryByRole('region', { name: 'Listas sin pasar' })).not.toBeInTheDocument(),
