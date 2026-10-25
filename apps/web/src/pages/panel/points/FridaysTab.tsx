@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { Printer } from 'lucide-react';
+import { useCallback, useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { monthLabel } from '@/features/billing/money';
@@ -10,6 +11,8 @@ import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
 import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
+
+import { FridayAttendanceSheet } from './FridayAttendanceSheet';
 
 const normalise = (text: string) =>
   text
@@ -26,6 +29,8 @@ export function FridaysTab({ month }: { month: string }) {
   const grid = useFridays(month);
   const [search, setSearch] = useState('');
   const [onlyPresent, setOnlyPresent] = useState(false);
+  const [printing, setPrinting] = useState<string | null>(null);
+  const printed = useCallback(() => setPrinting(null), []);
   const queryClient = useQueryClient();
   const refresh = useRefreshClubData();
   const key = ['points-fridays', month];
@@ -115,6 +120,17 @@ export function FridaysTab({ month }: { month: string }) {
                   <span className="block text-[11px] font-normal tracking-normal normal-case">
                     {f.holiday ? 'Festivo' : `${count(f.date)} vinieron`}
                   </span>
+                  {f.holiday === null && (
+                    <button
+                      type="button"
+                      aria-label={`Imprimir la hoja del viernes ${dayMonth(f.date)}`}
+                      title="Imprimir la hoja para apuntar la asistencia"
+                      onClick={() => setPrinting(f.date)}
+                      className="mt-1 inline-flex size-7 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted hover:text-ink"
+                    >
+                      <Printer aria-hidden size={14} />
+                    </button>
+                  )}
                 </th>
               ))}
             </tr>
@@ -152,6 +168,9 @@ export function FridaysTab({ month }: { month: string }) {
           </tbody>
         </table>
       </div>
+      {printing !== null && (
+        <FridayAttendanceSheet date={printing} students={grid.data.students} onPrinted={printed} />
+      )}
       <p className="px-5 py-3 text-[13px] text-ink-muted">
         Cada viernes que viene un alumno es 1 punto de ese mes. Es independiente de las clases: no
         tiene nada que ver con pasar lista. Los viernes que aún no han llegado y los festivos no se
