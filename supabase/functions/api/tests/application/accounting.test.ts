@@ -10,19 +10,24 @@ import {
   CloseSeason,
   DeleteEntry,
   DeleteInvoice,
+  DeleteTransfer,
   EditMovement,
   FiscalYearSummary,
   ListCategories,
+  ListTransfers,
   MonthLedger,
   PayInvoice,
   PreviousSeasonOpen,
   RecordEntry,
+  RecordTransfer,
   RegisterInvoice,
   RemoveCategory,
   RenameCategory,
   SeasonAlreadyClosed,
   SeasonNotFinished,
   SupplierInvoiceNotFound,
+  TransferNotFound,
+  TreasuryBalances,
   type UploadedDocument,
 } from '../../src/application/accounting/mod.ts';
 import { PeriodClosed } from '../../src/application/common/mod.ts';
@@ -75,8 +80,10 @@ function setUp() {
       category,
       amount,
     }, document);
-  const close = () => new CloseSeason(new FiscalYearSummary(fx, fx, fx.clock), fx, fx.clock);
-  return { fx, registerInvoice, close };
+  const treasury = () => new TreasuryBalances(fx, fx, fx, fx.clock);
+  const close = () =>
+    new CloseSeason(new FiscalYearSummary(fx, fx, fx.clock), fx, treasury(), fx.clock);
+  return { fx, registerInvoice, close, treasury };
 }
 
 Deno.test('MonthLedger should list the month with income, expenses and spending by category', async () => {
@@ -135,6 +142,7 @@ Deno.test('FiscalYearSummary should summarise the year month by month with the o
       new FiscalYear(2025),
       Money.euros(1000),
       Money.euros(400),
+      Money.euros(100),
       LocalDate.fromString('2026-09-01'),
     ),
   );
@@ -294,6 +302,7 @@ Deno.test('AmendInvoice should correct the whole invoice, its payment included, 
       new FiscalYear(2025),
       Money.euros(0),
       Money.euros(0),
+      Money.euros(0),
       LocalDate.fromString('2026-09-01'),
     ),
   );
@@ -397,4 +406,122 @@ Deno.test('EditMovement should edit entries and invoices, and correct payments o
       }),
     InvalidValue,
   );
+});
+
+Deno.test('TreasuryBalances should tell what the club has in the bank and in cash, as of today', async () => {
+  const { fx, treasury } = setUp();
+  // Arrastrado: 600 € de resultado, de los que 100 € quedaron en caja.
+  await fx.saveClosing(
+    SeasonClosing.close(
+      new FiscalYear(2025),
+      Money.euros(1000),
+      Money.euros(400),
+      Money.euros(100),
+      LocalDate.fromString('2026-09-01'),
+    ),
+  );
+  // Hoy es el 25 de octubre de 2026: lo de este mes cuenta (45 € en efectivo, 416 € por transferencia).
+  fx.clock.advanceSeconds(-315 * 24 * 3600);
+  await new RecordTransfer(fx, fx).execute({
+    date: '2026-10-20',
+    from: 'cash',
+    to: 'bank',
+    amount: '120',
+    note: 'Ingreso del efectivo',
+  });
+  // Un traspaso del mes que viene aún no cuenta.
+  await new RecordTransfer(fx, fx).execute({
+    date: '2026-11-01',
+    from: 'bank',
+    to: 'cash',
+    amount: '50',
+  });
+  const balances = await treasury().execute();
+  assertEquals(balances, {
+    clubCents: 60000 + 4500 - 41600,
+    bankCents: 50000 - 41600 + 12000,
+    cashCents: 10000 + 4500 - 12000,
+  });
+  const transfers = await new ListTransfers(fx).execute();
+  assertEquals(transfers.map((t) => [t.date, t.from, t.to, t.amountCents, t.note]), [
+    ['2026-11-01', 'bank', 'cash', 5000, ''],
+    ['2026-10-20', 'cash', 'bank', 12000, 'Ingreso del efectivo'],
+  ]);
+});
+
+Deno.test('transfers should respect closed seasons and reject the same account twice', async () => {
+  const { fx } = setUp();
+  await assertRejects(
+    () =>
+      new RecordTransfer(fx, fx).execute({
+        date: '2026-10-20',
+        from: 'bank',
+        to: 'bank',
+        amount: '10',
+      }),
+    InvalidValue,
+  );
+  await assertRejects(
+    () =>
+      new RecordTransfer(fx, fx).execute({
+        date: '2026-10-20',
+        from: 'safe',
+        to: 'bank',
+        amount: '10',
+      }),
+    InvalidValue,
+  );
+  const id = await new RecordTransfer(fx, fx).execute({
+    date: '2026-08-20',
+    from: 'bank',
+    to: 'cash',
+    amount: '10',
+  });
+  await fx.saveClosing(
+    SeasonClosing.close(
+      new FiscalYear(2025),
+      Money.euros(0),
+      Money.euros(0),
+      Money.euros(0),
+      LocalDate.fromString('2026-09-01'),
+    ),
+  );
+  await assertRejects(() => new DeleteTransfer(fx, fx).execute(id), PeriodClosed);
+  await assertRejects(
+    () =>
+      new RecordTransfer(fx, fx).execute({
+        date: '2026-08-21',
+        from: 'bank',
+        to: 'cash',
+        amount: '10',
+      }),
+    PeriodClosed,
+  );
+  await assertRejects(
+    () => new DeleteTransfer(fx, fx).execute('00000000-0000-7000-8000-000000000000'),
+    TransferNotFound,
+  );
+  const open = await new RecordTransfer(fx, fx).execute({
+    date: '2026-10-20',
+    from: 'bank',
+    to: 'cash',
+    amount: '10',
+  });
+  await new DeleteTransfer(fx, fx).execute(open);
+  assertEquals((await new ListTransfers(fx).execute()).length, 1);
+});
+
+Deno.test('CloseSeason should freeze what the season moved in cash', async () => {
+  const { fx, close } = setUp();
+  // 45 € en efectivo cobrados en octubre de 2026 y 120 € sacados del banco: 165 € más en caja.
+  await new RecordTransfer(fx, fx).execute({
+    date: '2027-03-01',
+    from: 'bank',
+    to: 'cash',
+    amount: '120',
+  });
+  await close().execute(2026);
+  const closing = await fx.closing(new FiscalYear(2026));
+  assertEquals(closing?.cash.cents, 16500);
+  assertEquals(closing?.bankResult().cents, -41600 - 12000);
 });

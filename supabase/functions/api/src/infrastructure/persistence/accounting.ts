@@ -1,5 +1,6 @@
 import { LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
 import {
+  accountFromName,
   Attachment,
   type Category,
   CategoryCatalog,
@@ -13,6 +14,8 @@ import {
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
+  Transfer,
+  TransferId,
 } from '../../domain/accounting/mod.ts';
 import type {
   AccountingCategoryRepository,
@@ -25,6 +28,7 @@ import type {
   ManualEntryRepository,
   SeasonClosingRepository,
   SupplierInvoiceRepository,
+  TransferRepository,
 } from '../../application/accounting/mod.ts';
 import { Row, type Sql } from './sql.ts';
 
@@ -203,9 +207,53 @@ export class SqlAccountingRepository
 
   async saveClosing(c: SeasonClosing): Promise<void> {
     await this
-      .sql`INSERT INTO accounting_closing (start_year, income_cents, expense_cents, closed_on)
-      VALUES (${c.year.startYear}, ${c.income.cents}, ${c.expenses.cents}, ${c.closedOn.toString()})`;
+      .sql`INSERT INTO accounting_closing (start_year, income_cents, expense_cents, cash_cents, closed_on)
+      VALUES (${c.year.startYear}, ${c.income.cents}, ${c.expenses.cents}, ${c.cash.cents}, ${c.closedOn.toString()})`;
   }
+}
+
+/** Traspasos entre caja y banco. */
+export class SqlTransferRepository implements TransferRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async transfer(id: TransferId): Promise<Transfer | null> {
+    const rows = await this.sql`SELECT * FROM accounting_transfer WHERE id = ${id.value}`;
+    return rows[0] ? toTransfer(new Row(rows[0])) : null;
+  }
+
+  async saveTransfer(t: Transfer): Promise<void> {
+    await this
+      .sql`INSERT INTO accounting_transfer (id, transfer_date, from_account, to_account, amount_cents, note)
+      VALUES (${t.id.value}, ${t.date.toString()}, ${t.from}, ${t.to}, ${t.amount.cents}, ${t.note})`;
+  }
+
+  async deleteTransfer(id: TransferId): Promise<void> {
+    await this.sql`DELETE FROM accounting_transfer WHERE id = ${id.value}`;
+  }
+
+  async transfers(): Promise<Transfer[]> {
+    const rows = await this
+      .sql`SELECT * FROM accounting_transfer ORDER BY transfer_date DESC, id DESC`;
+    return Row.all(rows).map(toTransfer);
+  }
+
+  async transfersBetween(from: LocalDate, to: LocalDate): Promise<Transfer[]> {
+    const rows = await this.sql`SELECT * FROM accounting_transfer
+      WHERE transfer_date BETWEEN ${from.toString()} AND ${to.toString()}
+      ORDER BY transfer_date DESC, id DESC`;
+    return Row.all(rows).map(toTransfer);
+  }
+}
+
+function toTransfer(r: Row): Transfer {
+  return Transfer.restore({
+    id: TransferId.fromString(r.string('id')),
+    date: LocalDate.fromString(r.string('transfer_date')),
+    from: accountFromName(r.string('from_account')),
+    to: accountFromName(r.string('to_account')),
+    amount: Money.cents(r.int('amount_cents')),
+    note: r.string('note'),
+  });
 }
 
 function periodOf(value: string | null): YearMonth | null {
@@ -217,6 +265,7 @@ function toClosing(r: Row): SeasonClosing {
     new FiscalYear(r.int('start_year')),
     Money.cents(r.int('income_cents')),
     Money.cents(r.int('expense_cents')),
+    Money.cents(r.int('cash_cents')),
     LocalDate.fromString(r.string('closed_on')),
   );
 }
