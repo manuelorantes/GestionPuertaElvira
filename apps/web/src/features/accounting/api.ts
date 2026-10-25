@@ -194,3 +194,46 @@ export function saveMonthlyCategories(categories: string[]): Promise<void> {
 export function closeSeason(startYear: number): Promise<void> {
   return apiSend('POST', `${BASE}/years/${startYear}/closing`);
 }
+
+/** Lo que tiene el club hoy, y dónde: banco (cuenta y tarjeta) y caja (efectivo). */
+export interface Balances {
+  clubCents: number;
+  bankCents: number;
+  cashCents: number;
+}
+
+export type Account = 'bank' | 'cash';
+
+/** Traspaso de dinero entre caja y banco: no cambia lo que tiene el club. */
+export interface Transfer {
+  id: string;
+  date: string;
+  from: Account;
+  to: Account;
+  fromLabel: string;
+  toLabel: string;
+  amountCents: number;
+  note: string;
+}
+
+export function fetchBalances(): Promise<Balances> {
+  return apiGet(`${BASE}/balances`);
+}
+
+export async function fetchTransfers(): Promise<Transfer[]> {
+  return (await apiGet<{ items: Transfer[] }>(`${BASE}/transfers`)).items;
+}
+
+export async function recordTransfer(input: {
+  date: string;
+  from: Account;
+  to: Account;
+  amount: string;
+  note: string;
+}): Promise<string> {
+  return (await apiSend<{ id: string }>('POST', `${BASE}/transfers`, input)).id;
+}
+
+export function deleteTransfer(id: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/transfers/${id}`);
+}

@@ -108,9 +108,36 @@ const BUILT_IN = [
   ['grants', 'income', 'Subvenciones'],
 ].map(([code, kind, label]) => ({ code, kind, label, custom: false }));
 
+const BALANCES = { clubCents: 1426496, bankCents: 1301496, cashCents: 125000 };
+
+const TRANSFERS = [
+  {
+    id: 't1',
+    date: '2026-10-20',
+    from: 'cash',
+    to: 'bank',
+    fromLabel: 'Caja',
+    toLabel: 'Banco',
+    amountCents: 50000,
+    note: 'Ingreso del efectivo de septiembre',
+  },
+  {
+    id: 't2',
+    date: '2026-10-05',
+    from: 'bank',
+    to: 'cash',
+    fromLabel: 'Banco',
+    toLabel: 'Caja',
+    amountCents: 10000,
+    note: '',
+  },
+];
+
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     'GET /api/auth/me': [200, { user: ADMIN }],
+    'GET /api/admin/accounting/balances': [200, BALANCES],
+    'GET /api/admin/accounting/transfers': [200, { items: TRANSFERS }],
     'GET /api/admin/accounting/categories': [200, { items: BUILT_IN }],
     'GET /api/admin/accounting/ledger?month=2026-10': [200, LEDGER],
     'GET /api/admin/accounting/invoices': [200, { items: INVOICES }],
@@ -679,6 +706,66 @@ describe('Contabilidad', () => {
     expect(numbers()).toEqual(['R-2026-10', 'TP-044']);
     await user.click(screen.getByRole('button', { name: 'Ordenar por número' }));
     expect(numbers()).toEqual(['TP-044', 'R-2026-10']);
+  });
+
+  it('shows what the club has in the bank and in cash, and moves money between them', async () => {
+    const fetch = api({
+      'POST /api/admin/accounting/transfers': [201, { id: 't3' }],
+      'DELETE /api/admin/accounting/transfers/t2': [204],
+    });
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    // Las tarjetas, bajo el título, en todas las pestañas.
+    expect((await screen.findByText('14.264,96 €')).parentElement).toHaveTextContent(
+      'Saldo del club',
+    );
+    expect(screen.getByText('13.014,96 €').parentElement).toHaveTextContent('Saldo en el banco');
+    expect(screen.getByText('1250 €').parentElement).toHaveTextContent('Saldo en caja');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Traspasos' }));
+    const table = await screen.findByRole('table', { name: 'Traspasos entre caja y banco' });
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent('20/10/2026');
+    expect(rows[0]).toHaveTextContent('Caja → Banco');
+    expect(rows[0]).toHaveTextContent('Ingreso del efectivo de septiembre');
+    expect(rows[0]).toHaveTextContent('500 €');
+    // Ordenable desde las cabeceras: por importe, de menor a mayor.
+    await userEvent.click(within(table).getByRole('button', { name: /Ordenar por importe/ }));
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('100 €');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Traspasar dinero' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Traspasar dinero' });
+    expect(within(dialog).getByRole('button', { name: 'Traspasar' })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Del banco a caja' }));
+    await userEvent.type(within(dialog).getByLabelText('Importe (€)'), '200');
+    await userEvent.type(within(dialog).getByLabelText('Nota'), 'Cambio para el torneo');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Traspasar' }));
+    expect(await screen.findByText('Traspaso guardado')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/admin/accounting/transfers' && init?.method === 'POST',
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual({
+      date: new Date().toISOString().slice(0, 10),
+      from: 'bank',
+      to: 'cash',
+      amount: '200',
+      note: 'Cambio para el torneo',
+    });
+
+    await userEvent.click(
+      within(within(table).getByRole('row', { name: /Banco → Caja/ })).getByRole('button', {
+        name: 'Quitar traspaso',
+      }),
+    );
+    await userEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Quitar' }),
+    );
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/admin/accounting/transfers/t2',
+        expect.objectContaining({ method: 'DELETE' }),
+      ),
+    );
   });
 
   it('shows the season month by month and closes it after confirming', async () => {
