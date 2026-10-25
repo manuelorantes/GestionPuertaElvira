@@ -24,6 +24,10 @@ temporada para elegir y estas pestañas:
   casilla es un punto de ese mes y desmarcarla lo quita. El encargado de la actividad de los viernes marca la misma
   asistencia desde su espacio (ver la spec de asistencia). Los viernes que aún no han llegado y los festivos no se pueden
   marcar. Se busca por nombre y se puede ver solo a los que vinieron.
+  Debajo de cada viernes que no sea festivo, «Imprimir» abre directamente la impresión del navegador
+  con la hoja de ese día para apuntar la asistencia a mano:
+  la cabecera con la fecha del viernes, la indicación de para qué es
+  y todos los alumnos de alta (no solo los filtrados) con su número de socio y una casilla vacía cada uno.
 - **Fotos de torneo**: la galería de las fotos del mes con la equipación oficial en los torneos (alumno, fecha y, si se
   indica, el torneo). «Añadir foto» busca al alumno por su nombre y le adjunta la foto (imagen JPEG, PNG o WebP de
   hasta 5 MB; el navegador la reduce antes de subirla); cada foto es 1 punto en el mes de la foto, que no puede ser
@@ -38,6 +42,11 @@ temporada para elegir y estas pestañas:
 #### Scenario: Asistencia de un viernes
 - **WHEN** administración marca que Natan vino el viernes 4 de septiembre
 - **THEN** Natan gana 1 punto de septiembre, que sale en sus movimientos como «Viernes 04/09»
+
+#### Scenario: La hoja de un viernes para apuntar a mano
+- **WHEN** administración pulsa «Imprimir» bajo el viernes 16 de octubre, con la tabla filtrada por «Pablo»
+- **THEN** se abre la impresión con una hoja encabezada «Viernes 16/10/2026», que indica que es para apuntar la
+  asistencia y lista a todos los alumnos de alta con una casilla vacía, sin nadie marcado
 
 #### Scenario: Una foto de torneo
 - **WHEN** administración busca a Alberto, le adjunta su foto del Open de Granada del 4 de octubre y la guarda
