@@ -117,6 +117,9 @@ con quién la dio por buena y qué día,
 hasta que cada una la marca como vista («Visto»).
 Las que nadie ha dado por buena lo indican.
 Si el profesor pasa la lista después, deja de salir para todos.
+El nombre de una clase del aviso lleva a su ficha en Clases,
+con la asistencia y los comentarios del mes de esa clase y sus alumnos;
+pulsarlo no da nada por bueno ni por visto.
 
 #### Scenario: Un profesor que no pasó lista
 - **WHEN** Carlos no pasa la lista de su clase del martes 13 y es viernes 16
