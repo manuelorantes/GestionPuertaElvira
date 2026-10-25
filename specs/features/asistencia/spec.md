@@ -105,10 +105,18 @@ bloque «Listas sin pasar» del resumen, con fecha, clase y profesor, y en un co
 Solo cuentan las clases de profesores que pueden pasar lista (con una cuenta activa vinculada a su ficha), desde
 el día en que se vinculó su cuenta y nunca antes del día en que se activó la asistencia. Para cada una, administración
 MUST poder:
-- **quitar la sesión** («No se dio»): deja de contar horas y de salir en el aviso; no se puede si la liquidación de
-  ese mes ya está pagada;
-- **darla por buena** («Se dio»): sigue contando y deja de salir en el aviso.
+- **quitar la sesión** («No se dio»): deja de contar horas y de salir en el aviso de todos;
+  no se puede si la liquidación de ese mes ya está pagada;
+- **darla por buena** («Se dio»): sigue contando para las horas
+  y deja de salir en el aviso de quien lo hace.
 No se puede dar por buena una clase cuyo plazo para pasar lista no ha acabado.
+
+El aviso es de cada cuenta de administración:
+una clase que alguien dio por buena sigue saliendo a las demás cuentas
+con quién la dio por buena y qué día,
+hasta que cada una la marca como vista («Visto»).
+Las que nadie ha dado por buena lo indican.
+Si el profesor pasa la lista después, deja de salir para todos.
 
 #### Scenario: Un profesor que no pasó lista
 - **WHEN** Carlos no pasa la lista de su clase del martes 13 y es viernes 16
@@ -117,6 +125,11 @@ No se puede dar por buena una clase cuyo plazo para pasar lista no ha acabado.
 #### Scenario: Un profesor sin cuenta
 - **WHEN** Ana no tiene cuenta de profesorado y su clase del martes no tiene lista
 - **THEN** no sale en «Listas sin pasar»: no podía pasarla
+
+#### Scenario: Otra cuenta ya la dio por buena
+- **WHEN** Junta da por buena la clase del martes 13 de Carlos
+- **THEN** cuenta para las horas de Carlos y deja de salir en el aviso de Junta
+- **AND** a Tesorería le sigue saliendo, con «Dada por buena por Junta el 15/10», hasta que pulsa «Visto»
 
 #### Scenario: No se dio
 - **WHEN** administración pulsa «No se dio» en esa clase y lo confirma
