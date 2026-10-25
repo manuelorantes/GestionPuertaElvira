@@ -113,6 +113,7 @@ export class AuditLabels {
     accounting_closing: 'Cierre de temporada',
     accounting_entry: 'Movimiento manual',
     accounting_invoice: 'Factura de proveedor',
+    accounting_transfer: 'Traspaso entre caja y banco',
     attendance_absence: 'Falta a clase',
     attendance_comment: 'Comentario de clase',
     attendance_guest: 'Asistencia especial a clase',

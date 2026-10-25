@@ -2,6 +2,7 @@ import { assert, assertEquals, assertFalse, assertThrows } from '@std/assert';
 
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
+  accountOf,
   Attachment,
   CategoryCatalog,
   categoryKind,
@@ -13,6 +14,9 @@ import {
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
+  Transfer,
+  TransferId,
+  Treasury,
 } from '../../src/domain/accounting/mod.ts';
 
 const cat = (code: string) => CategoryCatalog.of([]).require(code);
@@ -196,15 +200,82 @@ Deno.test('Attachment should only accept documents and photos up to ten megabyte
   assertEquals(new Attachment('invoices/a.jpg', 'foto.jpg', 'image/jpeg', 10).bytes, 10);
 });
 
-Deno.test('SeasonClosing should close a season with its result', () => {
+Deno.test('SeasonClosing should close a season with its result, split between bank and cash', () => {
   const closing = SeasonClosing.close(
     FiscalYear.of(LocalDate.fromString('2026-10-01')),
     Money.euros(52000),
     Money.euros(48000),
+    Money.euros(1500),
     LocalDate.fromString('2027-09-01'),
   );
   assertEquals(closing.result().cents, 400000);
+  assertEquals(closing.cash.cents, 150000);
+  assertEquals(closing.bankResult().cents, 250000);
   assert(closing.year.includes(LocalDate.fromString('2027-01-15')));
+});
+
+Deno.test('cash goes to the cash box and transfers and cards to the bank', () => {
+  assertEquals(accountOf('cash'), 'cash');
+  assertEquals(accountOf('transfer'), 'bank');
+  assertEquals(accountOf('card'), 'bank');
+});
+
+Deno.test('Transfer should move money between different accounts, more than zero', () => {
+  const transfer = Transfer.record(
+    TransferId.generate(),
+    LocalDate.fromString('2026-10-20'),
+    'cash',
+    'bank',
+    Money.euros(500),
+    '  Ingreso del efectivo de septiembre ',
+  );
+  assertEquals(transfer.note, 'Ingreso del efectivo de septiembre');
+  assertThrows(
+    () =>
+      Transfer.record(
+        TransferId.generate(),
+        LocalDate.fromString('2026-10-20'),
+        'bank',
+        'bank',
+        Money.euros(500),
+        '',
+      ),
+    InvalidValue,
+  );
+  assertThrows(
+    () =>
+      Transfer.record(
+        TransferId.generate(),
+        LocalDate.fromString('2026-10-20'),
+        'bank',
+        'cash',
+        Money.zero(),
+        '',
+      ),
+    InvalidValue,
+  );
+});
+
+Deno.test('Treasury should split the balance by where each movement was paid, moved by the transfers', () => {
+  const balances = Treasury.balances(
+    { bankCents: 100000, cashCents: 20000 },
+    [
+      { kind: 'income', method: 'cash', amountCents: 4500 },
+      { kind: 'income', method: 'card', amountCents: 4000 },
+      { kind: 'expense', method: 'transfer', amountCents: 95000 },
+    ],
+    [
+      Transfer.record(
+        TransferId.generate(),
+        LocalDate.fromString('2026-10-20'),
+        'cash',
+        'bank',
+        Money.euros(200),
+        '',
+      ),
+    ],
+  );
+  assertEquals(balances, { clubCents: 33500, bankCents: 29000, cashCents: 4500 });
 });
 
 Deno.test('the club expenses have their own categories: president, cleaning and each utility', () => {

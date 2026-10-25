@@ -117,6 +117,10 @@ export function monthLabel(month: string | null): string | null {
   return `${MONTHS[Number(m) - 1] ?? m} ${y}`;
 }
 
+const ACCOUNT_NAME: Record<string, string> = { bank: 'Banco', cash: 'Caja' };
+
+const accountName = (account: string | null) => ACCOUNT_NAME[account ?? ''] ?? '';
+
 const CHARGE_KIND: Record<string, string> = {
   monthly: 'Cuota',
   membership: 'Cuota de socio',
@@ -194,6 +198,11 @@ export function titleOf(
       return join(text(row, 'concept'), dateLabel(text(row, 'entry_date')));
     case 'accounting_invoice':
       return join(text(row, 'number'), text(row, 'supplier'));
+    case 'accounting_transfer':
+      return join(
+        `${accountName(text(row, 'from_account'))} → ${accountName(text(row, 'to_account'))}`,
+        dateLabel(text(row, 'transfer_date')),
+      );
     case 'accounting_closing': {
       const year = row.start_year;
       return typeof year === 'number'
