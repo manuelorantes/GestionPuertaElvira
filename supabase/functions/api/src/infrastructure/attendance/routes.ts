@@ -43,6 +43,7 @@ import {
   SqlFridayRoster,
   SqlGroupAttendanceQuery,
   SqlMissedRollCallQuery,
+  SqlMissedRollCallReviews,
   SqlStudentAttendanceQuery,
   SqlTeacherRosterQuery,
 } from '../persistence/attendance.ts';
@@ -360,9 +361,10 @@ export function registerAttendanceRoutes(api: ApiApp): void {
   api.defineRoute(
     { method: 'GET', path: '/api/admin/attendance/pending', access: 'admin' },
     async (c, scope) => {
+      if (scope.user === null) throw httpError(401);
       return c.json({
         items: await new MissedRollCalls(new SqlMissedRollCallQuery(scope.tx), api.deps.clock)
-          .execute(),
+          .execute(scope.user.id),
       });
     },
   );
@@ -375,7 +377,11 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     },
     async (c, scope) => {
       if (scope.user === null) throw httpError(401);
-      await new ConfirmWithoutRollCall(new SqlRollCallRepository(scope.tx), api.deps.clock).execute(
+      await new ConfirmWithoutRollCall(
+        new SqlRollCallRepository(scope.tx),
+        new SqlMissedRollCallReviews(scope.tx),
+        api.deps.clock,
+      ).execute(
         param(c, 'groupId'),
         param(c, 'date'),
         scope.user.id,
@@ -412,7 +418,11 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     },
     async (c, scope) => {
       if (scope.user === null) throw httpError(401);
-      await new ConfirmActivity(checks(scope), api.deps.clock).execute(
+      await new ConfirmActivity(
+        checks(scope),
+        new SqlMissedRollCallReviews(scope.tx),
+        api.deps.clock,
+      ).execute(
         param(c, 'dutyId'),
         param(c, 'date'),
         scope.user.id,

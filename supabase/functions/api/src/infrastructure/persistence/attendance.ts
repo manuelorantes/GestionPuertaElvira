@@ -7,6 +7,7 @@ import type {
   GroupAttendanceQuery,
   MissedRollCall,
   MissedRollCallQuery,
+  MissedRollCallReviews,
   RosterStudent,
   StudentAttendanceQuery,
   StudentAttendanceSummary,
@@ -122,12 +123,15 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
       : LocalDate.fromInstant(new Date());
   }
 
-  async missed(from: LocalDate, until: LocalDate): Promise<MissedRollCall[]> {
-    // Clases sin lista y actividades sin confirmar (un turno sin «Turno hecho»; los viernes, sin ninguna marca del
-    // encargado), de profesores con la cuenta activa vinculada y desde el día en que se vinculó.
+  async missed(from: LocalDate, until: LocalDate, userId: string): Promise<MissedRollCall[]> {
+    // Clases sin lista del profesor y actividades sin confirmar por su encargado (un turno sin «Turno hecho»; los
+    // viernes, sin ninguna marca suya), de profesores con la cuenta activa vinculada y desde el día en que se vinculó.
+    // Las que administración dio por buenas siguen saliendo, con quién lo hizo, a quien aún no las revisó.
     const rows = await this.sql`
       SELECT s.id, s.group_id, d.id AS duty_id, s.session_date::text AS date,
-             COALESCE(g.name, d.label, s.label) AS label, t.full_name, st.teacher_id IS NOT NULL AS locked
+             COALESCE(g.name, d.label, s.label) AS label, t.full_name, st.teacher_id IS NOT NULL AS locked,
+             (r.kind IS NOT NULL OR c.kind IS NOT NULL) AS validated, vu.full_name AS validated_by,
+             (COALESCE(r.taken_at, c.taken_at) AT TIME ZONE 'Europe/Madrid')::date::text AS validated_on
         FROM payroll_session s
         JOIN teachers_teacher t ON t.id = s.teacher_id
         JOIN identity_user u ON u.teacher_id = s.teacher_id AND u.status = 'active'
@@ -135,17 +139,21 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
         LEFT JOIN payroll_duty d ON s.group_id IS NULL AND s.source = 'duty:' || d.id
         LEFT JOIN payroll_settlement st
                ON st.teacher_id = s.teacher_id AND st.month = to_char(s.session_date, 'YYYY-MM')
+        LEFT JOIN attendance_roll_call r ON r.group_id = s.group_id AND r.roll_date = s.session_date
+        LEFT JOIN attendance_activity_check c ON c.duty_id = d.id AND c.check_date = s.session_date
+        LEFT JOIN identity_user vu ON vu.id = COALESCE(r.taken_by_user, c.taken_by_user)
        WHERE (s.group_id IS NOT NULL OR d.id IS NOT NULL)
          AND s.session_date BETWEEN ${from.toString()} AND ${until.toString()}
          AND s.session_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
-         AND NOT EXISTS (SELECT 1 FROM attendance_roll_call r
-                          WHERE r.group_id = s.group_id AND r.roll_date = s.session_date)
-         AND NOT EXISTS (SELECT 1 FROM attendance_activity_check c
-                          WHERE c.duty_id = d.id AND c.check_date = s.session_date)
+         AND COALESCE(r.kind, 'confirmed') = 'confirmed'
+         AND COALESCE(c.kind, 'confirmed') = 'confirmed'
          AND NOT (COALESCE(d.kind, '') = 'fridays' AND EXISTS (
                SELECT 1 FROM points_movement m JOIN identity_user mu ON mu.id = m.created_by
                 WHERE m.kind = 'friday' AND m.reference = s.session_date::text
                   AND mu.teacher_id = s.teacher_id))
+         AND NOT EXISTS (SELECT 1 FROM attendance_missed_review v
+                          WHERE v.user_id = ${userId} AND COALESCE(v.group_id, v.duty_id) = COALESCE(s.group_id, d.id)
+                            AND v.class_date = s.session_date)
        ORDER BY s.session_date, s.start_minutes NULLS LAST, label`;
     return Row.all(rows).map((r) => ({
       sessionId: r.string('id'),
@@ -155,7 +163,29 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
       label: r.string('label'),
       teacherName: r.string('full_name'),
       locked: r.bool('locked'),
+      validation: r.bool('validated')
+        ? { by: r.nullableString('validated_by'), on: r.string('validated_on') }
+        : null,
     }));
+  }
+}
+
+/** Lo revisado del aviso de listas sin pasar, por cuenta. */
+export class SqlMissedRollCallReviews implements MissedRollCallReviews {
+  constructor(private readonly sql: Sql) {}
+
+  async markReviewed(
+    userId: string,
+    subject: { group: string } | { duty: string },
+    date: LocalDate,
+    now: Date,
+  ): Promise<void> {
+    const group = 'group' in subject ? subject.group : null;
+    const duty = 'duty' in subject ? subject.duty : null;
+    await this.sql`
+      INSERT INTO attendance_missed_review (user_id, group_id, duty_id, class_date, reviewed_at)
+      VALUES (${userId}, ${group}, ${duty}, ${date.toString()}, ${now})
+      ON CONFLICT DO NOTHING`;
   }
 }
 
