@@ -12,13 +12,15 @@ export interface MissedRollCall {
   teacherName: string;
   /** Su liquidación ya está pagada: la sesión no se puede quitar. */
   locked: boolean;
+  /** Otra cuenta ya la dio por buena (y cuenta para las horas): quién y qué día; null si nadie. */
+  validation: { by: string | null; on: string } | null;
 }
 
 export async function fetchMissedRollCalls(): Promise<MissedRollCall[]> {
   return (await apiGet<{ items: MissedRollCall[] }>('/api/admin/attendance/pending')).items;
 }
 
-/** La clase o actividad se dio: cuenta y deja de salir en el aviso. */
+/** La clase o actividad se dio (o, si otra cuenta ya la dio por buena, vista): deja de salir en mi aviso. */
 export function confirmWithoutRollCall(item: MissedRollCall): Promise<void> {
   return item.dutyId !== null
     ? apiSend(
