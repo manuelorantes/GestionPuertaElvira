@@ -318,12 +318,27 @@ Table accounting_closing {
   start_year smallint [pk, note: 'ejercicio de septiembre de start_year a agosto siguiente']
   income_cents int [not null]
   expense_cents int [not null]
+  cash_cents int [not null, default: 0, note: 'lo que el ejercicio movió en caja (efectivo y traspasos)']
   closed_on date [not null]
-  Note: 'Bloquea todo lo fechado en el ejercicio; su resultado pasa como saldo inicial del siguiente'
+  Note: 'Bloquea todo lo fechado en el ejercicio; su resultado pasa como saldo inicial del siguiente, repartido entre banco y caja'
+}
+
+Table accounting_transfer {
+  id uuid [pk]
+  transfer_date date [not null]
+  from_account varchar(4) [not null, note: 'bank | cash']
+  to_account varchar(4) [not null, note: 'bank | cash, distinta de from_account']
+  amount_cents int [not null, note: '> 0']
+  note varchar(120) [not null, default: '']
+
+  indexes {
+    transfer_date [name: 'accounting_transfer_date_idx']
+  }
+  Note: 'Traspaso entre caja y banco: cambia dónde está el dinero, no cuánto tiene el club'
 }
 
 Note libro {
-  'El libro de movimientos no tiene tabla propia: se compone en lectura con billing_payment, payroll_settlement, accounting_invoice pagadas y accounting_entry.'
+  'El libro de movimientos no tiene tabla propia: se compone en lectura con billing_payment, payroll_settlement, accounting_invoice pagadas y accounting_entry. Los saldos de banco y caja se derivan de él por la forma de pago, más accounting_transfer.'
 }
 
 // --- Historial (Audit) ------------------------------------------------------
