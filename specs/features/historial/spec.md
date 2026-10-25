@@ -69,11 +69,21 @@ apunta a otro registro (alumno, profesor, grupo, cobro, cuota, producto, turno, 
 nombre con enlace a donde se ve, también si ese registro ya se borró. Los identificadores y las columnas internas
 no se muestran, y en altas y bajas tampoco los campos vacíos.
 
+La excepción son las acciones que registran o quitan un cobro:
+su detalle MUST resumirse en «Cobro registrado» (o «Cobro quitado») con solo el alumno (enlace a su ficha),
+el pago (importe y forma de pago) y el concepto,
+sin el número de recibo, la numeración de documentos ni el resto de campos;
+a la derecha MUST quedar un botón por cada sitio adonde ir (el cobro, las cuotas del mes…).
+
 #### Scenario: Registrar un cobro
 - **WHEN** superadministración abre el detalle de «Registrar cobro»
-- **THEN** ve «Alta · Cobro · R-2026-0401 · Martina López Herrera» con «Alumno: Martina López Herrera» (enlace a su
-  ficha), «Tipo: Cuotas», «Forma de pago: Efectivo», «Conceptos: 1,5 h semanales · 1 mes: 40 €» y «Meses: Octubre
-  2026», y en la cuota «Pagada con el cobro: — → R-2026-0401 · Martina López Herrera» (enlace al recibo)
+- **THEN** ve «Cobro registrado» con «Alumno: Martina López Herrera» (enlace a su ficha), «Pago: 40 € · Efectivo»
+  y «Concepto: Octubre 2026», y a la derecha «Ir al cobro» e «Ir a las cuotas de octubre 2026»; no ve el recibo
+  «R-2026-0401»
+
+#### Scenario: Cambiar los datos de un alumno
+- **WHEN** superadministración abre el detalle de «Editar alumno»
+- **THEN** ve el cambio campo a campo, con el valor anterior tachado y el nuevo
 
 ### Requirement: Ir al elemento cambiado
 En el detalle de una acción, cada cambio MUST ofrecer un botón para ir al sitio de la aplicación donde se ve lo
