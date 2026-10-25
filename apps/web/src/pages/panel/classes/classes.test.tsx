@@ -533,6 +533,26 @@ describe('Clases', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the attendance of a group in the month of its link', async () => {
+    const month = shiftMonth(MONTH, -1);
+    api({
+      'GET /api/admin/groups/g1': [200, { ...GROUP, students: [] }],
+      [`GET /api/admin/attendance/groups/g1?month=${month}`]: [
+        200,
+        { ...ATTENDANCE, month, days: [{ date: `${month}-06`, status: 'confirmed' }] },
+      ],
+    });
+    renderApp(`/panel/clases?grupo=g1&mes=${month}`);
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(
+      await within(sheet).findByRole('table', { name: /Asistencia de Iniciación A/ }),
+    ).toBeInTheDocument();
+    expect(
+      within(sheet).getByRole('columnheader', { name: new RegExp(`06/${month.slice(5)}`) }),
+    ).toBeInTheDocument();
+  });
+
   it('should be reachable from the panel navigation', async () => {
     api({ 'GET /api/health': [200, {}] });
     renderApp('/panel');
