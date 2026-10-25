@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from '@std/assert';
 
-import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
+import { ApiClient, assertError, atTime, createUser, resetDatabase } from '../support/http.ts';
 
 const PDF = new TextEncoder().encode('%PDF-1.4\n1 0 obj << >> endobj\ntrailer << >>\n%%EOF\n');
 
@@ -450,4 +450,66 @@ Deno.test('accounting edits a manual entry, but not one in a closed season', asy
     404,
     'not_found',
   );
+});
+
+Deno.test('accounting should tell the bank and cash balances and move money between them', async () => {
+  // Hoy es el 25 de octubre de 2025: el ejercicio en curso es el 2025/26.
+  await atTime('2025-10-25T10:00:00+02:00', async () => {
+    const client = await admin();
+    await client.json('POST', '/api/admin/accounting/entries', {
+      date: '2025-10-15',
+      kind: 'income',
+      concept: 'Subvención',
+      category: 'grants',
+      method: 'transfer',
+      amount: '600',
+    });
+    await client.json('POST', '/api/admin/accounting/entries', {
+      date: '2025-10-16',
+      kind: 'income',
+      concept: 'Venta de libros',
+      category: 'other_income',
+      method: 'cash',
+      amount: '80',
+    });
+    const recorded = await client.json('POST', '/api/admin/accounting/transfers', {
+      date: '2025-10-20',
+      from: 'cash',
+      to: 'bank',
+      amount: '50',
+      note: 'Ingreso del efectivo',
+    });
+    assertEquals(recorded.status, 201, JSON.stringify(recorded.body));
+    const id = body<{ id: string }>(recorded).id;
+
+    const balances = await client.get('/api/admin/accounting/balances');
+    assertEquals(balances.body, { clubCents: 68000, bankCents: 65000, cashCents: 3000 });
+
+    const transfers = body<{ items: Record<string, unknown>[] }>(
+      await client.get('/api/admin/accounting/transfers'),
+    );
+    assertEquals(transfers.items.length, 1);
+    assertEquals(transfers.items[0]?.fromLabel, 'Caja');
+    assertEquals(transfers.items[0]?.toLabel, 'Banco');
+    assertEquals(transfers.items[0]?.amountCents, 5000);
+
+    assertError(
+      await client.json('POST', '/api/admin/accounting/transfers', {
+        date: '2025-10-20',
+        from: 'bank',
+        to: 'bank',
+        amount: '50',
+      }),
+      422,
+      'unprocessable',
+    );
+    assertEquals(
+      (await client.json('DELETE', `/api/admin/accounting/transfers/${id}`)).status,
+      204,
+    );
+    assertEquals(
+      (await client.get('/api/admin/accounting/balances')).body,
+      { clubCents: 68000, bankCents: 60000, cashCents: 8000 },
+    );
+  });
 });

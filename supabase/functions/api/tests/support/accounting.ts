@@ -9,6 +9,8 @@ import {
   type SeasonClosing,
   type SupplierInvoice,
   type SupplierInvoiceId,
+  type Transfer,
+  type TransferId,
 } from '../../src/domain/accounting/mod.ts';
 import type {
   AccountingCategoryRepository,
@@ -20,6 +22,7 @@ import type {
   PaymentMethods,
   SeasonClosingRepository,
   SupplierInvoiceRepository,
+  TransferRepository,
 } from '../../src/application/accounting/mod.ts';
 import type { ClosedPeriods } from '../../src/application/common/mod.ts';
 import { FrozenClock } from './identity.ts';
@@ -35,8 +38,36 @@ export class AccountingFixture
     ClosedPeriods,
     AccountingCategoryRepository,
     LedgerCorrections,
-    PaymentMethods {
+    PaymentMethods,
+    TransferRepository {
   customCategories: Category[] = [];
+  transferList = new Map<string, Transfer>();
+
+  transfer(id: TransferId): Promise<Transfer | null> {
+    return Promise.resolve(this.transferList.get(id.value) ?? null);
+  }
+
+  saveTransfer(transfer: Transfer): Promise<void> {
+    this.transferList.set(transfer.id.value, transfer);
+    return Promise.resolve();
+  }
+
+  deleteTransfer(id: TransferId): Promise<void> {
+    this.transferList.delete(id.value);
+    return Promise.resolve();
+  }
+
+  transfers(): Promise<Transfer[]> {
+    return Promise.resolve(
+      [...this.transferList.values()].sort((a, b) =>
+        b.date.toString().localeCompare(a.date.toString())
+      ),
+    );
+  }
+
+  async transfersBetween(from: LocalDate, to: LocalDate): Promise<Transfer[]> {
+    return (await this.transfers()).filter((t) => !t.date.isBefore(from) && !to.isBefore(t.date));
+  }
   corrections = new Map<string, LedgerCorrection>();
   paymentMethodChanges: [string, string][] = [];
 

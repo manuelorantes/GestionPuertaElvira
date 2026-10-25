@@ -1,5 +1,10 @@
 import { InvalidValue } from '../../domain/common/mod.ts';
-import { methodFromName, methodLabel, SupplierInvoiceId } from '../../domain/accounting/mod.ts';
+import {
+  accountLabel,
+  methodFromName,
+  methodLabel,
+  SupplierInvoiceId,
+} from '../../domain/accounting/mod.ts';
 import {
   AddCategory,
   AmendInvoice,
@@ -7,21 +12,25 @@ import {
   CloseSeason,
   DeleteEntry,
   DeleteInvoice,
+  DeleteTransfer,
   DocumentNotFound,
   type DocumentStorage,
   EditMovement,
   FiscalYearSummary,
   GetMonthlyCategories,
   ListCategories,
+  ListTransfers,
   MonthLedger,
   PayInvoice,
   RecordEntry,
+  RecordTransfer,
   RegisterInvoice,
   RemoveCategory,
   RenameCategory,
   SetMonthlyCategories,
   ShowEntry,
   SupplierInvoiceNotFound,
+  TreasuryBalances,
   type UploadedDocument,
 } from '../../application/accounting/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
@@ -31,6 +40,7 @@ import {
   SqlAccountingRepository,
   SqlInvoiceQuery,
   SqlLedgerQuery,
+  SqlTransferRepository,
 } from '../persistence/accounting.ts';
 import { SqlClosedPeriods, SqlPaymentRepository } from '../persistence/billing.ts';
 import { ChangePaymentMethod } from '../../application/billing/mod.ts';
@@ -87,6 +97,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     InvoiceAlreadyPaidCannotBeDeleted: [409, 'invoice_paid'],
     CategoryInUse: [409, 'category_in_use'],
     MovementNotFound: [404, 'not_found'],
+    TransferNotFound: [404, 'not_found'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, upload = false) => ({
     method,
@@ -101,6 +112,13 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     summary: new FiscalYearSummary(
       new SqlLedgerQuery(scope.tx),
       new SqlAccountingRepository(scope.tx),
+      api.deps.clock,
+    ),
+    transfers: new SqlTransferRepository(scope.tx),
+    treasury: new TreasuryBalances(
+      new SqlLedgerQuery(scope.tx),
+      new SqlAccountingRepository(scope.tx),
+      new SqlTransferRepository(scope.tx),
       api.deps.clock,
     ),
   });
@@ -309,8 +327,45 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   });
 
   api.defineRoute(admin('POST', '/api/admin/accounting/years/:year/closing'), async (c, scope) => {
-    const { accounting, summary } = repos(scope);
-    await new CloseSeason(summary, accounting, api.deps.clock).execute(Number(param(c, 'year')));
+    const { accounting, summary, treasury } = repos(scope);
+    await new CloseSeason(summary, accounting, treasury, api.deps.clock).execute(
+      Number(param(c, 'year')),
+    );
+    return c.body(null, 204);
+  });
+
+  // Caja y banco: lo que hay en cada sitio y los traspasos entre ambos.
+  api.defineRoute(admin('GET', '/api/admin/accounting/balances'), async (c, scope) => {
+    return c.json(await repos(scope).treasury.execute());
+  });
+
+  api.defineRoute(admin('GET', '/api/admin/accounting/transfers'), async (c, scope) => {
+    const items = await new ListTransfers(repos(scope).transfers).execute();
+    return c.json({
+      items: items.map((t) => ({
+        ...t,
+        fromLabel: accountLabel(t.from),
+        toLabel: accountLabel(t.to),
+      })),
+    });
+  });
+
+  api.defineRoute(admin('POST', '/api/admin/accounting/transfers'), async (c, scope) => {
+    const b = await JsonBody.from(c.req.raw);
+    const { transfers, closed } = repos(scope);
+    const id = await new RecordTransfer(transfers, closed).execute({
+      date: b.requiredString('date'),
+      from: b.requiredString('from'),
+      to: b.requiredString('to'),
+      amount: b.requiredString('amount'),
+      note: b.optionalString('note') ?? null,
+    });
+    return c.json({ id }, 201);
+  });
+
+  api.defineRoute(admin('DELETE', '/api/admin/accounting/transfers/:id'), async (c, scope) => {
+    const { transfers, closed } = repos(scope);
+    await new DeleteTransfer(transfers, closed).execute(param(c, 'id'));
     return c.body(null, 204);
   });
 }

@@ -602,12 +602,17 @@ export class LedgerCorrection {
   }
 }
 
-/** Cierre de un ejercicio: congela ingresos, gastos y resultado, que pasa como saldo inicial del siguiente. */
+/**
+ * Cierre de un ejercicio: congela ingresos, gastos y resultado, que pasa como saldo inicial del siguiente. `cash` es
+ * lo que el ejercicio movió en caja (ingresos y gastos en efectivo y traspasos): así el saldo arrastrado se reparte
+ * entre banco y caja.
+ */
 export class SeasonClosing {
   private constructor(
     readonly year: FiscalYear,
     readonly income: Money,
     readonly expenses: Money,
+    readonly cash: Money,
     readonly closedOn: LocalDate,
   ) {}
 
@@ -615,12 +620,122 @@ export class SeasonClosing {
     year: FiscalYear,
     income: Money,
     expenses: Money,
+    cash: Money,
     closedOn: LocalDate,
   ): SeasonClosing {
-    return new SeasonClosing(year, income, expenses, closedOn);
+    return new SeasonClosing(year, income, expenses, cash, closedOn);
   }
 
   result(): Money {
     return this.income.minus(this.expenses);
+  }
+
+  /** Lo que el ejercicio movió en el banco: el resto del resultado. */
+  bankResult(): Money {
+    return this.result().minus(this.cash);
+  }
+}
+
+/** Dónde está el dinero del club: en el banco (transferencias y tarjeta) o en caja (efectivo). */
+export type Account = 'bank' | 'cash';
+
+export function accountFromName(name: string): Account {
+  if (name !== 'bank' && name !== 'cash') throw new InvalidValue('account', 'Indica banco o caja.');
+  return name;
+}
+
+/** La cuenta a la que va un movimiento según su forma de pago. */
+export function accountOf(method: string): Account {
+  return method === 'cash' ? 'cash' : 'bank';
+}
+
+export function accountLabel(account: Account): string {
+  return { bank: 'Banco', cash: 'Caja' }[account];
+}
+
+export class TransferId extends Uuid {}
+
+/**
+ * Traspaso de dinero entre caja y banco (ingresar el efectivo en el banco o sacar efectivo): cambia dónde está el
+ * dinero, no cuánto tiene el club.
+ */
+export class Transfer {
+  private static readonly NOTE_MAX = 120;
+
+  private constructor(
+    readonly id: TransferId,
+    readonly date: LocalDate,
+    readonly from: Account,
+    readonly to: Account,
+    readonly amount: Money,
+    readonly note: string,
+  ) {}
+
+  static record(
+    id: TransferId,
+    date: LocalDate,
+    from: Account,
+    to: Account,
+    amount: Money,
+    note: string,
+  ): Transfer {
+    if (from === to) {
+      throw new InvalidValue('to', 'El origen y el destino tienen que ser distintos.');
+    }
+    if (amount.cents <= 0) {
+      throw new InvalidValue('amount', 'El importe tiene que ser mayor que cero.');
+    }
+    const trimmed = note.trim();
+    if (trimmed.length > Transfer.NOTE_MAX) {
+      throw new InvalidValue('note', `La nota no puede pasar de ${Transfer.NOTE_MAX} caracteres.`);
+    }
+    return new Transfer(id, date, from, to, amount, trimmed);
+  }
+
+  static restore(fields: {
+    id: TransferId;
+    date: LocalDate;
+    from: Account;
+    to: Account;
+    amount: Money;
+    note: string;
+  }): Transfer {
+    return new Transfer(fields.id, fields.date, fields.from, fields.to, fields.amount, fields.note);
+  }
+}
+
+/** Un movimiento del libro tal como lo ve la tesorería: si entra o sale, por dónde y cuánto. */
+export interface TreasuryLine {
+  kind: string;
+  method: string;
+  amountCents: number;
+}
+
+export interface Balances {
+  clubCents: number;
+  bankCents: number;
+  cashCents: number;
+}
+
+/** Lo que hay en el banco y en caja: cada movimiento va a la cuenta de su forma de pago y los traspasos lo mueven. */
+export class Treasury {
+  static balances(
+    opening: { bankCents: number; cashCents: number },
+    lines: TreasuryLine[],
+    transfers: Transfer[],
+  ): Balances {
+    let bank = opening.bankCents;
+    let cash = opening.cashCents;
+    for (const line of lines) {
+      const signed = line.kind === 'income' ? line.amountCents : -line.amountCents;
+      if (accountOf(line.method) === 'cash') cash += signed;
+      else bank += signed;
+    }
+    for (const t of transfers) {
+      const toCash = t.to === 'cash' ? t.amount.cents : -t.amount.cents;
+      cash += toCash;
+      bank -= toCash;
+    }
+    return { clubCents: bank + cash, bankCents: bank, cashCents: cash };
   }
 }

@@ -7,6 +7,8 @@ import {
   YearMonth,
 } from '../../domain/common/mod.ts';
 import {
+  type Account,
+  accountFromName,
   Attachment,
   type Category,
   CategoryCatalog,
@@ -22,6 +24,9 @@ import {
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
+  Transfer,
+  TransferId,
+  Treasury,
 } from '../../domain/accounting/mod.ts';
 import { type ClosedPeriods, PeriodClosed } from '../common/mod.ts';
 
@@ -302,6 +307,23 @@ export interface SeasonClosingRepository {
   closing(year: FiscalYear): Promise<SeasonClosing | null>;
   closings(): Promise<SeasonClosing[]>;
   saveClosing(closing: SeasonClosing): Promise<void>;
+}
+
+export interface TransferRepository {
+  transfer(id: TransferId): Promise<Transfer | null>;
+  saveTransfer(transfer: Transfer): Promise<void>;
+  deleteTransfer(id: TransferId): Promise<void>;
+  /** Todos los traspasos, del más reciente al más antiguo. */
+  transfers(): Promise<Transfer[]>;
+  /** Los traspasos con fecha entre `from` y `to`, ambos incluidos. */
+  transfersBetween(from: LocalDate, to: LocalDate): Promise<Transfer[]>;
+}
+
+export class TransferNotFound extends Error {
+  constructor() {
+    super('Ese traspaso no existe.');
+    this.name = 'TransferNotFound';
+  }
 }
 
 // ---- Errores ---------------------------------------------------------------------------------
@@ -753,7 +775,7 @@ export class FiscalYearSummary {
   }
 }
 
-/** Cierra un ejercicio terminado (o en su último mes), en orden, congelando su resultado. */
+/** Cierra un ejercicio terminado (o en su último mes), en orden, congelando su resultado y su parte en caja. */
 export class CloseSeason {
   /** Temporadas anteriores que se revisan (el club no tiene datos de antes). */
   private static readonly YEARS_BACK = 10;
@@ -761,6 +783,7 @@ export class CloseSeason {
   constructor(
     private readonly summary: FiscalYearSummary,
     private readonly closings: SeasonClosingRepository,
+    private readonly treasury: TreasuryBalances,
     private readonly clock: Clock,
   ) {}
 
@@ -781,6 +804,7 @@ export class CloseSeason {
         year,
         Money.cents(view.incomeCents),
         Money.cents(view.expenseCents),
+        await this.treasury.yearCash(year),
         LocalDate.fromInstant(this.clock.now()),
       ),
     );
@@ -792,5 +816,129 @@ export class CloseSeason {
       if (income !== 0 || expenses !== 0) return true;
     }
     return false;
+  }
+}
+
+// ---- Caja y banco ----------------------------------------------------------------------------
+
+export interface TreasuryView {
+  clubCents: number;
+  bankCents: number;
+  cashCents: number;
+}
+
+/**
+ * Lo que tiene el club, y dónde: lo arrastrado de los cierres más los movimientos del ejercicio hasta el mes de hoy
+ * (el mismo saldo que el resumen), repartido entre banco y caja por la forma de pago y los traspasos.
+ */
+export class TreasuryBalances {
+  constructor(
+    private readonly ledger: LedgerQuery,
+    private readonly closings: SeasonClosingRepository,
+    private readonly transfers: TransferRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(): Promise<TreasuryView> {
+    const month = YearMonth.of(LocalDate.fromInstant(this.clock.now()));
+    const year = FiscalYear.ofMonth(month);
+    let bankCents = 0;
+    let cashCents = 0;
+    for (const closing of await this.closings.closings()) {
+      if (closing.year.startYear >= year.startYear) continue;
+      bankCents += closing.bankResult().cents;
+      cashCents += closing.cash.cents;
+    }
+    return this.between({ bankCents, cashCents }, year.firstMonth(), month);
+  }
+
+  /** Lo que un ejercicio entero movió en caja (lo que guarda su cierre). */
+  async yearCash(year: FiscalYear): Promise<Money> {
+    const balances = await this.between(
+      { bankCents: 0, cashCents: 0 },
+      year.firstMonth(),
+      year.lastMonth(),
+    );
+    return Money.cents(balances.cashCents);
+  }
+
+  private async between(
+    opening: { bankCents: number; cashCents: number },
+    from: YearMonth,
+    to: YearMonth,
+  ): Promise<TreasuryView> {
+    return Treasury.balances(
+      opening,
+      await this.ledger.linesBetween(from, to),
+      await this.transfers.transfersBetween(from.firstDay(), to.lastDay()),
+    );
+  }
+}
+
+export interface TransferInput {
+  date: string;
+  from: string;
+  to: string;
+  amount: string;
+  note?: string | null;
+}
+
+export class RecordTransfer {
+  constructor(
+    private readonly transfers: TransferRepository,
+    private readonly closed: ClosedPeriods,
+  ) {}
+
+  async execute(input: TransferInput): Promise<string> {
+    const date = LocalDate.fromString(input.date);
+    await PeriodClosed.guard(this.closed, date);
+    const transfer = Transfer.record(
+      TransferId.generate(),
+      date,
+      accountFromName(input.from),
+      accountFromName(input.to),
+      Money.fromDecimal(input.amount),
+      input.note ?? '',
+    );
+    await this.transfers.saveTransfer(transfer);
+    return transfer.id.value;
+  }
+}
+
+export class DeleteTransfer {
+  constructor(
+    private readonly transfers: TransferRepository,
+    private readonly closed: ClosedPeriods,
+  ) {}
+
+  async execute(id: string): Promise<void> {
+    const transfer = await this.transfers.transfer(TransferId.fromString(id));
+    if (transfer === null) throw new TransferNotFound();
+    await PeriodClosed.guard(this.closed, transfer.date);
+    await this.transfers.deleteTransfer(transfer.id);
+  }
+}
+
+export interface TransferView {
+  id: string;
+  date: string;
+  from: Account;
+  to: Account;
+  amountCents: number;
+  note: string;
+}
+
+export class ListTransfers {
+  constructor(private readonly transfers: TransferRepository) {}
+
+  async execute(): Promise<TransferView[]> {
+    return (await this.transfers.transfers()).map((t) => ({
+      id: t.id.value,
+      date: t.date.toString(),
+      from: t.from,
+      to: t.to,
+      amountCents: t.amount.cents,
+      note: t.note,
+    }));
   }
 }
