@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router';
 
 import type { MissedRollCall } from '@/features/attendance/api';
 import { useMissedRollCalls, useSettleMissedRollCall } from '@/features/attendance/hooks';
@@ -59,7 +60,18 @@ export function MissedRollCalls() {
             >
               <div className="min-w-0 flex-1 text-sm">
                 <p className="font-medium">
-                  {formatDate(item.date)} · {item.label}
+                  {formatDate(item.date)} ·{' '}
+                  {item.groupId !== null ? (
+                    <Link
+                      to={`/panel/clases?grupo=${item.groupId}&mes=${item.date.slice(0, 7)}`}
+                      className="decoration-1 underline-offset-2 hover:underline"
+                      title="Ver la clase: asistencia, comentarios y alumnos"
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    item.label
+                  )}
                 </p>
                 <p className="text-ink-muted">{item.teacherName}</p>
                 <p className={item.validation ? 'text-success-fg' : 'text-warning-fg'}>

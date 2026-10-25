@@ -47,6 +47,12 @@ describe('Listas sin pasar', () => {
     expect(within(nav).getByLabelText('2 listas sin pasar')).toBeVisible();
     expect(block).toHaveTextContent('Nadie la ha dado por buena todavía');
     expect(block).toHaveTextContent('Dada por buena por Junta Directiva el 18/10/2026');
+    // La clase lleva a su ficha en el mes de la clase, sin dar nada por bueno; una actividad no es una clase.
+    expect(within(block).getByRole('link', { name: 'Martes 19:00' })).toHaveAttribute(
+      'href',
+      '/panel/clases?grupo=g2&mes=2026-10',
+    );
+    expect(within(block).queryByRole('link', { name: 'Viernes' })).not.toBeInTheDocument();
 
     await userEvent.click(
       within(block).getByRole('button', {
