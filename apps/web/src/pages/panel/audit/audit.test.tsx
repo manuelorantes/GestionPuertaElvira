@@ -48,6 +48,7 @@ const DETAIL = {
         { field: 'student_id', before: null, after: 's1' },
         { field: 'kind', before: null, after: 'monthly' },
         { field: 'method', before: null, after: 'cash' },
+        { field: 'concept', before: null, after: 'Octubre 2026' },
         {
           field: 'lines',
           before: null,
@@ -58,6 +59,15 @@ const DETAIL = {
         { field: 'total_cents', before: null, after: 4500 },
       ],
       target: { kind: 'payment', id: 'p1' },
+    },
+    {
+      table: 'billing_document_sequence',
+      tableLabel: 'Numeración de documentos',
+      title: 'R · 2026',
+      key: { prefix: 'R', season_year: 2026 },
+      operation: 'U',
+      fields: [{ field: 'last_number', before: 26, after: 27 }],
+      target: null,
     },
     {
       table: 'billing_charge',
@@ -104,33 +114,59 @@ describe('Historial', () => {
     await userEvent.click(
       within(payment).getByRole('button', { name: 'Ver detalle de Registrar cobro' }),
     );
-    expect(await screen.findByText('R-2026-0027')).toBeInTheDocument();
-    expect(screen.getByText('Recibo')).toBeInTheDocument();
-    expect(screen.getByText('45 €')).toBeInTheDocument();
-    expect(screen.getByText('Alta · Cobro')).toBeInTheDocument();
-    expect(screen.getByText('Cambio · Cuota')).toBeInTheDocument();
-    // Nombres y cantidades, no identificadores ni claves: el alumno con enlace, los valores traducidos.
-    expect(screen.getByText('· R-2026-0027 · Martina López Herrera')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
+    // Un cobro se resume: alumno, pago y concepto, con los enlaces a la derecha; sin recibo ni numeración.
+    const summary = await screen.findByRole('region', { name: 'Cobro registrado' });
+    const value = (term: string) => within(summary).getByText(term).nextElementSibling;
+    expect(value('Alumno')).toHaveTextContent('Martina López Herrera');
+    expect(within(summary).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
       'href',
       '/panel/alumnos/s1',
     );
-    expect(screen.getByText('Cuotas')).toBeInTheDocument();
-    expect(screen.getByText('Efectivo')).toBeInTheDocument();
-    expect(screen.getByText('1,5 h semanales · 1 mes: 45 €')).toBeInTheDocument();
-    expect(screen.getByText('Octubre 2026')).toBeInTheDocument();
-    expect(screen.queryByText('Datos de la factura')).not.toBeInTheDocument();
-    expect(screen.queryByText('p1')).not.toBeInTheDocument();
-    expect(
-      screen.getByRole('link', { name: 'R-2026-0027 · Martina López Herrera' }),
-    ).toHaveAttribute('href', '/panel/cobros?pestana=registro&recibo=p1');
-    expect(screen.getByRole('link', { name: 'Ir al cobro' })).toHaveAttribute(
+    expect(value('Pago')).toHaveTextContent('45 € · Efectivo');
+    expect(value('Concepto')).toHaveTextContent('Octubre 2026');
+    expect(screen.queryByText(/R-2026-0027/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Recibo')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Numeración de documentos ·|Último número/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Alta · Cobro')).not.toBeInTheDocument();
+    expect(within(summary).getByRole('link', { name: 'Ir al cobro' })).toHaveAttribute(
       'href',
       '/panel/cobros?pestana=registro&recibo=p1',
     );
-    expect(screen.getByRole('link', { name: 'Ir a las cuotas de octubre 2026' })).toHaveAttribute(
+    expect(
+      within(summary).getByRole('link', { name: 'Ir a las cuotas de octubre 2026' }),
+    ).toHaveAttribute('href', '/panel/cobros?mes=2026-10');
+  });
+
+  it('keeps the field by field detail for actions that are not a payment', async () => {
+    api({
+      'GET /api/admin/audit/actions/a1': [
+        200,
+        {
+          ...DETAIL,
+          changes: [
+            {
+              table: 'students_student',
+              tableLabel: 'Alumno',
+              title: 'Martina López Herrera',
+              key: { id: 's1' },
+              operation: 'U',
+              fields: [{ field: 'phone', before: '600 000 000', after: '611 111 111' }],
+              target: { kind: 'student', id: 's1' },
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/historial');
+    const table = await screen.findByRole('table', { name: 'Historial de acciones' });
+    await userEvent.click(
+      within(table).getByRole('button', { name: 'Ver detalle de Registrar cobro' }),
+    );
+    expect(await screen.findByText('Cambio · Alumno')).toBeInTheDocument();
+    expect(screen.getByText('611 111 111')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Ir al alumno' })).toHaveAttribute(
       'href',
-      '/panel/cobros?mes=2026-10',
+      '/panel/alumnos/s1',
     );
   });
 

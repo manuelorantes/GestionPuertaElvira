@@ -6,7 +6,7 @@ import { Link } from 'react-router';
 import { fieldLabel, fieldValue, isEmptyValue, type ValuePart } from '@/features/audit/fields';
 import { targetLink } from '@/features/audit/targets';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { fetchAction } from '@/features/audit/api';
+import { type AuditDetail, fetchAction } from '@/features/audit/api';
 import { Alert } from '@/shared/ui/Alert';
 
 const OPERATION = { I: 'Alta', U: 'Cambio', D: 'Baja' } as const;
@@ -30,14 +30,98 @@ function Value({ parts, muted = false }: { parts: ValuePart[]; muted?: boolean }
   );
 }
 
-/** El detalle campo a campo de una acción. */
+type Change = AuditDetail['changes'][number];
+
+/** El botón «Ir a…» de un cambio, a la derecha. */
+function TargetLink({ target }: { target: NonNullable<Change['target']> }) {
+  const link = targetLink(target);
+  return (
+    <Link
+      to={link.to}
+      className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-line-strong bg-surface px-3 text-[13px] font-semibold text-ink no-underline hover:bg-surface-muted"
+    >
+      {link.label}
+      <ArrowRight aria-hidden size={14} />
+    </Link>
+  );
+}
+
+/** El cobro que una acción registró (o quitó, al deshacer), si lo hay. */
+function paymentOf(changes: Change[]): Change | undefined {
+  return changes.find((c) => c.table === 'billing_payment' && c.operation !== 'U');
+}
+
+/**
+ * Un cobro se resume en lo que interesa (alumno, pago y concepto) en vez de campo a campo: el recibo, la numeración
+ * y las cuotas que cubre se quedan en los enlaces de la derecha.
+ */
+function PaymentSummary({
+  payment,
+  changes,
+  references,
+}: {
+  payment: Change;
+  changes: Change[];
+  references: AuditDetail['references'];
+}) {
+  const value = (field: string) =>
+    payment.fields.find((f) => f.field === field)?.[payment.operation === 'D' ? 'before' : 'after'];
+  const parts = (field: string) => fieldValue(field, value(field), payment.table, references);
+  const total = fieldValue('total_cents', value('total_cents'))[0]?.text ?? '—';
+  const method = fieldValue('method', value('method'), payment.table)[0]?.text ?? '—';
+  const targets = changes
+    .map((c) => c.target)
+    .filter((t): t is NonNullable<Change['target']> => t !== null)
+    .filter((t, i, all) => all.findIndex((o) => targetLink(o).to === targetLink(t).to) === i);
+  const title = payment.operation === 'D' ? 'Cobro quitado' : 'Cobro registrado';
+  const titleId = `payment-summary-${payment.key.id as string}`;
+
+  return (
+    <section
+      aria-labelledby={titleId}
+      className="flex flex-wrap items-start justify-between gap-3 rounded-sm border border-line-soft bg-surface p-3"
+    >
+      <div className="flex flex-col gap-1.5">
+        <p id={titleId} className="text-[13px] font-semibold">
+          {title}
+        </p>
+        <dl className="grid grid-cols-[minmax(80px,auto)_1fr] gap-x-3 gap-y-1 text-[13px]">
+          <dt className="text-ink-muted">Alumno</dt>
+          <dd>
+            <Value parts={parts('student_id')} />
+          </dd>
+          <dt className="text-ink-muted">Pago</dt>
+          <dd>
+            {total} · {method}
+          </dd>
+          <dt className="text-ink-muted">Concepto</dt>
+          <dd className="break-words">
+            <Value parts={parts('concept')} />
+          </dd>
+        </dl>
+      </div>
+      {targets.length > 0 && (
+        <div className="flex flex-col items-end gap-2">
+          {targets.map((t) => (
+            <TargetLink key={targetLink(t).to} target={t} />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** El detalle de una acción: el resumen de un cobro o, para lo demás, campo a campo. */
 export function ActionDetail({ id }: { id: string }) {
   const detail = useQuery({ queryKey: ['audit-action', id], queryFn: () => fetchAction(id) });
   if (detail.isPending) return <p className="text-sm text-ink-muted">Cargando detalle…</p>;
   if (detail.isError) return <Alert>{apiErrorMessage(detail.error)}</Alert>;
   if (detail.data.changes.length === 0)
     return <p className="text-sm text-ink-muted">Esta acción no cambió datos.</p>;
-  const { references } = detail.data;
+  const { references, changes } = detail.data;
+  const payment = paymentOf(changes);
+  if (payment)
+    return <PaymentSummary payment={payment} changes={changes} references={references} />;
 
   return (
     <div className="flex flex-col gap-3">
@@ -53,15 +137,7 @@ export function ActionDetail({ id }: { id: string }) {
               </span>
               {change.title && <span className="text-ink-soft"> · {change.title}</span>}
             </p>
-            {change.target && (
-              <Link
-                to={targetLink(change.target).to}
-                className="inline-flex h-8 items-center gap-1.5 rounded-sm border border-line-strong bg-surface px-3 text-[13px] font-semibold text-ink no-underline hover:bg-surface-muted"
-              >
-                {targetLink(change.target).label}
-                <ArrowRight aria-hidden size={14} />
-              </Link>
-            )}
+            {change.target && <TargetLink target={change.target} />}
           </div>
           <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-3 gap-y-1 text-[13px]">
             {change.fields
