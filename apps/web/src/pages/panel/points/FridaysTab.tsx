@@ -13,6 +13,7 @@ import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 
 import { FridayAttendanceSheet } from './FridayAttendanceSheet';
+import { PrintFridayDialog, type SheetScope } from './PrintFridayDialog';
 
 const normalise = (text: string) =>
   text
@@ -29,7 +30,8 @@ export function FridaysTab({ month }: { month: string }) {
   const grid = useFridays(month);
   const [search, setSearch] = useState('');
   const [onlyPresent, setOnlyPresent] = useState(false);
-  const [printing, setPrinting] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState<string | null>(null);
+  const [printing, setPrinting] = useState<{ date: string; scope: SheetScope } | null>(null);
   const printed = useCallback(() => setPrinting(null), []);
   const queryClient = useQueryClient();
   const refresh = useRefreshClubData();
@@ -125,7 +127,7 @@ export function FridaysTab({ month }: { month: string }) {
                       type="button"
                       aria-label={`Imprimir la hoja del viernes ${dayMonth(f.date)}`}
                       title="Imprimir la hoja para apuntar la asistencia"
-                      onClick={() => setPrinting(f.date)}
+                      onClick={() => setChoosing(f.date)}
                       className="mt-1 inline-flex size-7 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted hover:text-ink"
                     >
                       <Printer aria-hidden size={14} />
@@ -168,8 +170,23 @@ export function FridaysTab({ month }: { month: string }) {
           </tbody>
         </table>
       </div>
+      {choosing !== null && (
+        <PrintFridayDialog
+          dayLabel={dayMonth(choosing)}
+          onClose={() => setChoosing(null)}
+          onPrint={(scope) => {
+            setPrinting({ date: choosing, scope });
+            setChoosing(null);
+          }}
+        />
+      )}
       {printing !== null && (
-        <FridayAttendanceSheet date={printing} students={grid.data.students} onPrinted={printed} />
+        <FridayAttendanceSheet
+          date={printing.date}
+          scope={printing.scope}
+          students={grid.data.students}
+          onPrinted={printed}
+        />
       )}
       <p className="px-5 py-3 text-[13px] text-ink-muted">
         Cada viernes que viene un alumno es 1 punto de ese mes. Es independiente de las clases: no
