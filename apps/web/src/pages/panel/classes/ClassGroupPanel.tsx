@@ -30,11 +30,13 @@ interface ClassGroupPanelProps {
   onClose: () => void;
   /** Sin él (profesorado), el grupo no se edita ni se inscribe a nadie. */
   onEdit?: ((group: ClassGroup) => void) | undefined;
+  /** Mes en que se abre la asistencia («AAAA-MM»); sin él, el actual. */
+  month?: string | null | undefined;
 }
 
-export function ClassGroupPanel({ groupId, onClose, onEdit }: ClassGroupPanelProps) {
+export function ClassGroupPanel({ groupId, onClose, onEdit, month }: ClassGroupPanelProps) {
   const group = useGroup(groupId);
-  const [attendanceMonth, setAttendanceMonth] = useState(currentMonth());
+  const [attendanceMonth, setAttendanceMonth] = useState(month ?? currentMonth());
   const candidates = useStudents('active', '');
   const navigate = useNavigate();
   const toast = useToast();

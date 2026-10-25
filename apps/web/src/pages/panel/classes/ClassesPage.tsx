@@ -29,8 +29,12 @@ export function ClassesPage() {
     ? (searchParams.get('pestana') as string)
     : 'horario';
   const [dialog, setDialog] = useState<DialogState>(null);
-  // ?grupo=<id> abre ese grupo (p. ej. desde el historial).
+  // ?grupo=<id> abre ese grupo (p. ej. desde el historial) y ?mes=AAAA-MM, su asistencia en ese mes.
   const [openGroupId, setOpenGroupId] = useState<string | null>(() => searchParams.get('grupo'));
+  const [openMonth] = useState(() => {
+    const month = searchParams.get('mes');
+    return month !== null && /^\d{4}-\d{2}$/.test(month) ? month : null;
+  });
   const groups = useGroups();
   const canManage = useCanManageClub();
   // La lista de profesores (con sus tarifas) solo hace falta para crear o editar grupos.
@@ -82,6 +86,7 @@ export function ClassesPage() {
       {openGroupId && (
         <ClassGroupPanel
           groupId={openGroupId}
+          month={openGroupId === searchParams.get('grupo') ? openMonth : null}
           onClose={() => setOpenGroupId(null)}
           onEdit={
             canManage
