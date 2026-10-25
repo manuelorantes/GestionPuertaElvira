@@ -7,6 +7,37 @@ Decisión de diseño: [facturas con adjunto en almacenamiento de documentos](../
 ### Requirement: Ejercicio contable
 El ejercicio MUST ir de septiembre a agosto. Su acumulado MUST empezar en el saldo arrastrado de los ejercicios anteriores cerrados.
 
+### Requirement: Saldos del club, del banco y de caja
+Debajo del título de Contabilidad, en todas sus pestañas, el sistema MUST mostrar tres cifras:
+el saldo del club (el mismo del resumen: lo arrastrado más lo acumulado del ejercicio hasta el mes en curso),
+el saldo en el banco y el saldo en caja.
+Cada movimiento del libro MUST contar en el banco si su forma de pago es transferencia o tarjeta,
+y en caja si es efectivo.
+El saldo arrastrado de un ejercicio cerrado MUST repartirse igual:
+el cierre guarda lo que el ejercicio movió en caja y el resto es del banco.
+El saldo del club MUST ser siempre la suma del banco y la caja.
+
+#### Scenario: Dónde está el dinero
+- **WHEN** en el ejercicio han entrado 600 € por transferencia y 80 € en efectivo
+- **THEN** el saldo del club es «680 €», el del banco «600 €» y el de caja «80 €»
+
+### Requirement: Traspasos entre caja y banco
+Administración MUST poder anotar traspasos de dinero de caja al banco o del banco a caja,
+con fecha, importe mayor que cero y una nota opcional, y quitarlos.
+Un traspaso MUST mover el importe de un saldo al otro sin cambiar el saldo del club,
+y no MUST salir entre los movimientos del mes ni en los totales de ingresos y gastos.
+Los traspasos MUST verse en la pestaña «Traspasos», ordenables desde las cabeceras por fecha
+(por defecto, del más reciente al más antiguo), traspaso, nota o importe, en ambos sentidos.
+No se pueden anotar ni quitar traspasos con fecha de una temporada cerrada.
+
+#### Scenario: Ingresar el efectivo en el banco
+- **WHEN** con 600 € en el banco y 80 € en caja, administración traspasa 50 € de caja al banco
+- **THEN** el banco pasa a «650 €», la caja a «30 €» y el saldo del club sigue en «680 €»
+
+#### Scenario: Quitar un traspaso
+- **WHEN** administración quita ese traspaso y confirma
+- **THEN** el dinero vuelve a donde estaba: «600 €» en el banco y «80 €» en caja
+
 ### Requirement: Movimientos del mes
 El sistema MUST mostrar los movimientos del mes, del más reciente al más antiguo, con fecha, concepto, categoría, forma de pago e importe,
 y los totales de ingresos, gastos y resultado. Los movimientos MUST salir de:
@@ -135,7 +166,7 @@ Un ejercicio MUST poder cerrarse a partir de su último mes (agosto), en orden y
 
 #### Scenario: Cerrar la temporada
 - **WHEN** administración confirma el cierre
-- **THEN** se guardan ingresos, gastos y resultado; nada con fecha del ejercicio se puede crear, cambiar ni borrar (apuntes, facturas, cobros, liquidaciones), y el resultado pasa como saldo inicial del siguiente
+- **THEN** se guardan ingresos, gastos, resultado y lo movido en caja; nada con fecha del ejercicio se puede crear, cambiar ni borrar (apuntes, facturas, cobros, liquidaciones, traspasos), y el resultado pasa como saldo inicial del siguiente, repartido entre banco y caja
 
 ### Requirement: Diagnóstico de datos
 Contabilidad MUST tener una pestaña «Diagnóstico» con lo que no cuadra en los datos del club, explicado y con su
