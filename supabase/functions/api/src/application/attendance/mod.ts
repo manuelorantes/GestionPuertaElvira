@@ -297,29 +297,47 @@ export interface MissedRollCall {
   teacherName: string;
   /** Su liquidación ya está pagada: la sesión no se puede quitar. */
   locked: boolean;
+  /** Otra cuenta ya la dio por buena (cuenta para las horas): quién y qué día; null si nadie. */
+  validation: { by: string | null; on: string } | null;
 }
 
 export interface MissedRollCallQuery {
   /** Primer día que cuenta (el día en que se activó la asistencia). */
   since(): Promise<LocalDate>;
-  /** Sesiones de grupo entre esas fechas sin lista ni confirmación, de la más antigua a la más reciente. */
-  missed(from: LocalDate, until: LocalDate): Promise<MissedRollCall[]>;
+  /**
+   * Sesiones entre esas fechas sin lista ni confirmación del encargado (dadas por buenas o no) que esa cuenta aún no
+   * revisó, de la más antigua a la más reciente.
+   */
+  missed(from: LocalDate, until: LocalDate, userId: string): Promise<MissedRollCall[]>;
+}
+
+/** Lo que cada cuenta de administración ya revisó del aviso (una clase o actividad, un día). */
+export interface MissedRollCallReviews {
+  markReviewed(
+    userId: string,
+    subject: { group: string } | { duty: string },
+    date: LocalDate,
+    now: Date,
+  ): Promise<void>;
 }
 
 /** Último día cuyo plazo ya acabó: anteayer (el de ayer se puede pasar hasta el final de hoy). */
 const lastClosedDay = (now: Date) => LocalDate.fromInstant(now).plusDays(-2);
 
-/** Listas sin pasar: clases apuntadas cuyo plazo acabó sin lista (para quitarlas o darlas por buenas). */
+/**
+ * Listas sin pasar: clases apuntadas cuyo plazo acabó sin lista (para quitarlas o darlas por buenas). Cada cuenta las
+ * ve hasta que las revisa ella misma, aunque otra ya las diera por buenas.
+ */
 export class MissedRollCalls {
   constructor(
     private readonly query: MissedRollCallQuery,
     private readonly clock: Clock,
   ) {}
 
-  async execute(): Promise<MissedRollCall[]> {
+  async execute(userId: string): Promise<MissedRollCall[]> {
     const until = lastClosedDay(this.clock.now());
     const since = await this.query.since();
-    return until.isBefore(since) ? [] : await this.query.missed(since, until);
+    return until.isBefore(since) ? [] : await this.query.missed(since, until, userId);
   }
 }
 
@@ -333,10 +351,14 @@ export class RollCallStillOpen extends Error {
   }
 }
 
-/** Administración da por buena una clase sin lista (se dio y cuenta): deja de salir en el aviso. */
+/**
+ * Administración da por buena una clase sin lista (se dio y cuenta) o, si otra cuenta ya lo hizo, la da por vista: deja
+ * de salir en el aviso de quien lo hace.
+ */
 export class ConfirmWithoutRollCall {
   constructor(
     private readonly rollCalls: RollCallRepository,
+    private readonly reviews: MissedRollCallReviews,
     private readonly clock: Clock,
   ) {}
 
@@ -344,8 +366,10 @@ export class ConfirmWithoutRollCall {
     const day = LocalDate.fromString(date);
     const now = this.clock.now();
     if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
-    if ((await this.rollCalls.find(groupId, day)) !== null) return;
-    await this.rollCalls.save(RollCall.confirm(groupId, day, userId, now));
+    if ((await this.rollCalls.find(groupId, day)) === null) {
+      await this.rollCalls.save(RollCall.confirm(groupId, day, userId, now));
+    }
+    await this.reviews.markReviewed(userId, { group: groupId }, day, now);
   }
 }
 
@@ -520,6 +544,7 @@ export class MarkFridayAsManager {
 export class ConfirmActivity {
   constructor(
     private readonly checks: ActivityCheckRepository,
+    private readonly reviews: MissedRollCallReviews,
     private readonly clock: Clock,
   ) {}
 
@@ -527,8 +552,10 @@ export class ConfirmActivity {
     const day = LocalDate.fromString(date);
     const now = this.clock.now();
     if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
-    if ((await this.checks.find(dutyId, day)) !== null) return;
-    await this.checks.save(ActivityCheck.confirm(dutyId, day, userId, now));
+    if ((await this.checks.find(dutyId, day)) === null) {
+      await this.checks.save(ActivityCheck.confirm(dutyId, day, userId, now));
+    }
+    await this.reviews.markReviewed(userId, { duty: dutyId }, day, now);
   }
 }
 
