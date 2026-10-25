@@ -14,7 +14,8 @@ const ACTION =
 
 /**
  * Listas sin pasar: clases apuntadas cuyo plazo acabó sin lista. Se quita la sesión (no se dio, deja de contar
- * horas) o se da por buena (se dio). Solo aparece si hay alguna.
+ * horas) o se da por buena (se dio). Cada cuenta las ve hasta que las revisa ella: si otra ya la dio por buena, se
+ * dice quién y basta con darla por vista. Solo aparece si hay alguna.
  */
 export function MissedRollCalls() {
   const missed = useMissedRollCalls();
@@ -25,7 +26,10 @@ export function MissedRollCalls() {
   if (items.length === 0) return null;
 
   function keep(item: MissedRollCall) {
-    settle.mutate({ item, given: true }, { onSuccess: () => toast('Clase dada por buena') });
+    settle.mutate(
+      { item, given: true },
+      { onSuccess: () => toast(item.validation ? 'Marcada como vista' : 'Clase dada por buena') },
+    );
   }
 
   return (
@@ -38,7 +42,8 @@ export function MissedRollCalls() {
           <p className="mt-0.5 text-sm text-ink-muted">
             Clases sin lista y actividades del club que su encargado no confirmó (en la de los
             viernes, sin marcar a nadie), con el plazo acabado. Si no se dio, quita la sesión; si se
-            dio, dala por buena.
+            dio, dala por buena. Si otra persona de administración ya la dio por buena, cuenta para
+            las horas y aquí se indica quién: márcala como vista cuando lo hayas comprobado.
           </p>
         </div>
         {settle.isError && !removing && (
@@ -57,6 +62,11 @@ export function MissedRollCalls() {
                   {formatDate(item.date)} · {item.label}
                 </p>
                 <p className="text-ink-muted">{item.teacherName}</p>
+                <p className={item.validation ? 'text-success-fg' : 'text-warning-fg'}>
+                  {item.validation
+                    ? `Dada por buena por ${item.validation.by ?? 'otra cuenta'} el ${formatDate(item.validation.on)}`
+                    : 'Nadie la ha dado por buena todavía'}
+                </p>
               </div>
               <div className="flex gap-2">
                 <button
@@ -74,9 +84,13 @@ export function MissedRollCalls() {
                   className={ACTION}
                   disabled={settle.isPending}
                   onClick={() => keep(item)}
-                  aria-label={`Dar por buena la clase del ${formatDate(item.date)} de ${item.label}`}
+                  aria-label={
+                    item.validation
+                      ? `Marcar como vista la clase del ${formatDate(item.date)} de ${item.label}`
+                      : `Dar por buena la clase del ${formatDate(item.date)} de ${item.label}`
+                  }
                 >
-                  Se dio
+                  {item.validation ? 'Visto' : 'Se dio'}
                 </button>
               </div>
             </li>
