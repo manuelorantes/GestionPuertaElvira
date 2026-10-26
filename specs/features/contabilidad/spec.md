@@ -89,7 +89,7 @@ e importe mayor que cero, y quitarlos.
 
 ### Requirement: Editar movimientos
 Cada movimiento del libro MUST tener un botón de editar (lápiz) junto a los demás, para cambiar su concepto, categoría
-(de su mismo tipo), forma de pago, importe y mes al que corresponde. Antes de guardar MUST pedirse confirmación con la
+(de su mismo tipo), forma de pago, importe y meses a los que corresponde. Antes de guardar MUST pedirse confirmación con la
 lista de lo que cambia («Importe: 45 € → 40 €»). No se pueden editar los de una temporada cerrada.
 
 - En apuntes manuales y facturas se cambia el apunte o la factura.
@@ -103,16 +103,32 @@ lista de lo que cambia («Importe: 45 € → 40 €»). No se pueden editar los
 - **THEN** el libro muestra 40 € por transferencia y «Corregido en contabilidad»; el recibo sigue siendo de 45 €, ahora
   por transferencia, y las cuotas del alumno no cambian
 
-### Requirement: Mes al que corresponde
-Cada apunte y cada factura MUST tener un mes al que corresponde (la luz de septiembre pagada en octubre corresponde a
-septiembre). Al anotarlos se puede elegir; por defecto es el mes de su fecha (la de la factura, en las facturas). En los
-movimientos, el mes al que corresponde MUST ser el de la liquidación o el anticipo para el profesorado y el del cobro en
-los cobros. Los movimientos de otro mes MUST indicarlo («Corresponde a septiembre 2026»).
+### Requirement: Meses a los que corresponde
+Una cosa es cuándo se paga un movimiento (su fecha) y otra a qué meses corresponde.
+Cada apunte y cada factura MUST corresponder a uno o varios meses (la luz de septiembre pagada en octubre corresponde a
+septiembre; el IVA de octubre a diciembre, pagado en enero, a esos tres meses).
+Al anotarlos se puede elegir en «Mes al que corresponde»: por defecto, el mes de su fecha (la de la factura, en las
+facturas); otro mes; o «Varios meses…», que reparte el importe a partes iguales entre los meses elegidos (los
+céntimos que sobran, a los primeros) y deja escribir a mano lo que va a cada mes.
+Un reparto MUST sumar el importe, sin meses repetidos y con más de 0 € en cada mes; si no, no se guarda y se explica
+(«El reparto suma 250 € y el importe es 300 €.»).
+Los meses MUST estar a menos de un año de la fecha del movimiento y no MAY ser de una temporada cerrada.
+En los demás movimientos, lo que corresponde a cada mes MUST ser: en las liquidaciones y anticipos, su mes; en los
+cobros de cuotas, el importe a partes iguales entre los meses que pagan; en los demás cobros, el mes del cobro.
+Editar un movimiento MUST permitir cambiar también su reparto.
+Los movimientos que no corresponden solo al mes de su fecha MUST indicarlo («Corresponde a septiembre 2026»,
+«Corresponde a octubre, noviembre y diciembre 2026»).
 
 #### Scenario: Luz pagada al mes siguiente
 - **WHEN** administración anota el 3 de octubre la luz y elige «Septiembre 2026» como mes al que corresponde
 - **THEN** el movimiento sale en octubre con «Corresponde a septiembre 2026», y en el resumen cuenta como gasto de
   septiembre en «Cuotas vs gastos fijos»
+
+#### Scenario: IVA trimestral
+- **WHEN** administración anota el 20 de enero de 2027 el IVA, 300 €, y elige «Varios meses…» con octubre, noviembre
+  y diciembre de 2026
+- **THEN** el movimiento sale en enero con «Corresponde a octubre, noviembre y diciembre 2026» y en «Mes a mes» suma
+  100 € a los gastos de cada uno de esos meses; el saldo de enero baja 300 €
 
 ### Requirement: Categorías del club
 En «Ajustes», administración MUST poder añadir categorías propias de ingresos o de gastos, renombrarlas y quitarlas
@@ -134,7 +150,7 @@ El sistema MUST mostrar los gastos del mes agrupados por categoría (Profesores,
 Otros gastos), de mayor a menor, con su total.
 
 ### Requirement: Facturas de proveedores
-Una factura MUST tener fecha, número, proveedor, concepto, categoría de gasto, importe y mes al que corresponde, y MAY llevar un documento (PDF, JPG, PNG o WEBP de hasta 10 MB),
+Una factura MUST tener fecha, número, proveedor, concepto, categoría de gasto, importe y meses a los que corresponde, y MAY llevar un documento (PDF, JPG, PNG o WEBP de hasta 10 MB),
 que se puede abrir o sustituir. Se marca como pagada con fecha y forma de pago; solo una factura pendiente se puede quitar.
 La lista MUST poder ordenarse desde las cabeceras por fecha
 (por defecto, de la más reciente a la más antigua), número, proveedor,
@@ -147,7 +163,7 @@ concepto, categoría, importe o estado, en ambos sentidos.
 ### Requirement: Editar una factura
 Solo superadministración MUST poder editar una factura desde «Facturas», también si ya está pagada,
 con un botón de editar (lápiz) a la derecha del todo de su fila que administración no ve.
-Se cambian la fecha, el número, el proveedor, el concepto, la categoría, el importe y el mes al que corresponde
+Se cambian la fecha, el número, el proveedor, el concepto, la categoría, el importe y los meses a los que corresponde
 y, en una factura pagada, la fecha y la forma de pago; el documento no cambia.
 Antes de guardar MUST pedirse confirmación con la lista de lo que cambia («Importe: 950 € → 900 €»).
 No se puede editar una factura de una temporada cerrada ni moverla a una.
@@ -161,12 +177,17 @@ No se puede editar una factura de una temporada cerrada ni moverla a una.
 - **THEN** no ve el botón de editar en ninguna fila
 
 ### Requirement: Mes a mes y cierre
-El sistema MUST mostrar los 12 meses del ejercicio con ingresos, gastos, resultado y acumulado, y el total.
+El sistema MUST mostrar los 12 meses del ejercicio con ingresos, gastos y resultado, contando cada movimiento en los
+[meses a los que corresponde](#requirement-meses-a-los-que-corresponde), y el saldo del club al acabar cada mes, que
+va por la fecha de los movimientos (cuando se movió el dinero), y el total.
 Un ejercicio MUST poder cerrarse a partir de su último mes (agosto), en orden y una sola vez.
+El cierre MUST arrastrar lo movido de verdad en el ejercicio (por fecha), no el resultado por meses: así el saldo del
+club sigue siendo la suma del banco y la caja. Si no coinciden, la tarjeta de cierre MUST mostrar los dos
+(«Movido en caja y banco»).
 
 #### Scenario: Cerrar la temporada
 - **WHEN** administración confirma el cierre
-- **THEN** se guardan ingresos, gastos, resultado y lo movido en caja; nada con fecha del ejercicio se puede crear, cambiar ni borrar (apuntes, facturas, cobros, liquidaciones, traspasos), y el resultado pasa como saldo inicial del siguiente, repartido entre banco y caja
+- **THEN** se guardan los ingresos, los gastos y el resultado movidos en el ejercicio, y lo movido en caja; nada con fecha del ejercicio se puede crear, cambiar ni borrar (apuntes, facturas, cobros, liquidaciones, traspasos), ni hacer que corresponda a sus meses, y ese resultado pasa como saldo inicial del siguiente, repartido entre banco y caja
 
 ### Requirement: Diagnóstico de datos
 Contabilidad MUST tener una pestaña «Diagnóstico» con lo que no cuadra en los datos del club, explicado y con su
