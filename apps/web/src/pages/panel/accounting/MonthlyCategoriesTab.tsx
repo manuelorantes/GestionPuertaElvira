@@ -23,9 +23,14 @@ import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
+import { ExpectedExpensesSection } from './ExpectedExpensesSection';
+
 const SECTION_TITLE = 'text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase';
 
-/** Ajustes de contabilidad: las categorías del club y cuáles cuentan como ingresos y gastos «del mes». */
+/**
+ * Ajustes de contabilidad: las categorías del club, los gastos esperados y qué categorías cuentan como ingresos y
+ * gastos «del mes».
+ */
 export function MonthlyCategoriesTab() {
   const categories = useCategories();
   const saved = useMonthlyCategories();
@@ -39,6 +44,7 @@ export function MonthlyCategoriesTab() {
   return (
     <div className="flex flex-col gap-6">
       <ClubCategories categories={categories.data} />
+      <ExpectedExpensesSection />
       <MonthlyCategoriesForm
         // Al añadir una categoría se vuelve a montar con su casilla.
         key={categories.data.map((c) => c.code).join()}

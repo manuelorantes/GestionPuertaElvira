@@ -9,10 +9,10 @@ export interface ChartMonth {
 
 export type BarKind = 'income' | 'expected' | 'expense' | 'expectedExpense';
 
-/** Las cuotas previstas, en el verde claro de los grupos de iniciación; el profesorado previsto, en gris. */
+/** Las cuotas previstas, en el verde claro de los grupos de iniciación; los gastos previstos, en gris. */
 export const BAR_STYLE: Record<BarKind, { label: string; color: string }> = {
   income: { label: 'Ingresos', color: 'bg-brand' },
   expected: { label: 'Cuotas previstas', color: 'border border-brand-tint bg-brand-soft' },
   expense: { label: 'Gastos', color: 'bg-ink-strong' },
-  expectedExpense: { label: 'Profesorado previsto', color: 'bg-ink-muted' },
+  expectedExpense: { label: 'Gastos previstos', color: 'bg-ink-muted' },
 };
