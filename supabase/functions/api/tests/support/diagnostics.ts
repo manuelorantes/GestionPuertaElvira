@@ -42,6 +42,7 @@ export function factsWith(overrides: Partial<Facts> = {}): Facts {
     ledger: [],
     entries: [],
     invoices: [],
+    expectedPending: [],
     categories: [
       { code: 'fees', label: 'Cuotas', kind: 'income' },
       { code: 'teachers', label: 'Profesores', kind: 'expense' },

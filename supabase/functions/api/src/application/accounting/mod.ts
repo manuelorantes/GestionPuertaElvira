@@ -13,6 +13,8 @@ import {
   type Category,
   CategoryCatalog,
   type EntryKind,
+  ExpectedExpense,
+  ExpectedExpenseId,
   FiscalYear,
   type InvoiceAmendment,
   LedgerCorrection,
@@ -937,6 +939,295 @@ export class CloseSeason {
       if (income !== 0 || expenses !== 0) return true;
     }
     return false;
+  }
+}
+
+// ---- Gastos esperados ------------------------------------------------------------------------
+
+/** Cómo quedó un mes de un gasto esperado: pagado con un apunte (su importe y fecha) o saltado (`entryId` null). */
+export interface ExpectedSettlement {
+  expenseId: string;
+  period: string;
+  entryId: string | null;
+  amountCents: number | null;
+  date: string | null;
+}
+
+export interface ExpectedExpenseRepository {
+  /** En el orden en que se crearon. */
+  expectedExpenses(): Promise<ExpectedExpense[]>;
+  expectedExpense(id: ExpectedExpenseId): Promise<ExpectedExpense | null>;
+  saveExpectedExpense(expense: ExpectedExpense): Promise<void>;
+  /** Quita el gasto esperado y cómo quedó cada mes; los apuntes con que se pagó se quedan. */
+  deleteExpectedExpense(id: ExpectedExpenseId): Promise<void>;
+  /** Los meses pagados o saltados entre `first` y `last`. Quitar el apunte de un mes pagado lo deja pendiente. */
+  settlements(first: YearMonth, last: YearMonth): Promise<ExpectedSettlement[]>;
+  /** El mes queda pagado con ese apunte o, con null, saltado («No hay este mes»). */
+  settleExpected(
+    id: ExpectedExpenseId,
+    period: YearMonth,
+    entry: ManualEntryId | null,
+  ): Promise<void>;
+  unsettleExpected(id: ExpectedExpenseId, period: YearMonth): Promise<void>;
+}
+
+export class ExpectedExpenseNotFound extends Error {
+  constructor() {
+    super('No se ha encontrado ese gasto esperado.');
+    this.name = 'ExpectedExpenseNotFound';
+  }
+}
+
+export class ExpectedMonthSettled extends Error {
+  constructor(paid: boolean) {
+    super(
+      paid
+        ? 'Ese gasto ya está pagado ese mes: para cambiarlo, edita o quita su apunte.'
+        : 'Ese gasto ya está marcado como «No hay este mes».',
+    );
+    this.name = 'ExpectedMonthSettled';
+  }
+}
+
+export interface ExpectedExpenseView {
+  id: string;
+  concept: string;
+  category: string;
+  amountCents: number;
+  /** Meses del año (1 a 12) en que se espera, de septiembre a agosto. */
+  months: number[];
+  /** Mes («AAAA-MM») desde el que se espera. */
+  since: string;
+}
+
+/** Un gasto esperado en un mes: pendiente, pagado (con lo que costó de verdad y su apunte) o saltado. */
+export interface ExpectedMonthView {
+  expenseId: string;
+  concept: string;
+  category: string;
+  period: string;
+  expectedCents: number;
+  status: 'pending' | 'paid' | 'skipped';
+  paidCents: number | null;
+  entryId: string | null;
+  paidOn: string | null;
+}
+
+function expectedView(expense: ExpectedExpense): ExpectedExpenseView {
+  return {
+    id: expense.id.value,
+    concept: expense.concept,
+    category: expense.category,
+    amountCents: expense.amount.cents,
+    months: expense.months,
+    since: expense.since.toString(),
+  };
+}
+
+/** Los gastos esperados de cada mes entre `first` y `last`, con cómo quedaron. */
+export async function expectedMonths(
+  repository: ExpectedExpenseRepository,
+  first: YearMonth,
+  last: YearMonth,
+): Promise<ExpectedMonthView[]> {
+  const settled = new Map(
+    (await repository.settlements(first, last)).map((s) => [`${s.expenseId}/${s.period}`, s]),
+  );
+  const views: ExpectedMonthView[] = [];
+  const expenses = await repository.expectedExpenses();
+  for (let month = first; !last.isBefore(month); month = month.next()) {
+    for (const expense of expenses.filter((e) => e.expectedIn(month))) {
+      const s = settled.get(`${expense.id.value}/${month.toString()}`);
+      views.push({
+        expenseId: expense.id.value,
+        concept: expense.concept,
+        category: expense.category,
+        period: month.toString(),
+        expectedCents: expense.amount.cents,
+        status: s === undefined ? 'pending' : s.entryId === null ? 'skipped' : 'paid',
+        paidCents: s?.amountCents ?? null,
+        entryId: s?.entryId ?? null,
+        paidOn: s?.date ?? null,
+      });
+    }
+  }
+  return views;
+}
+
+export interface ExpectedExpenseInput {
+  concept: string;
+  category: string;
+  amount: string;
+  /** Meses del año (1 a 12); sin ellos, de septiembre a junio. */
+  months: number[] | null;
+  /** Desde qué mes («AAAA-MM»); sin él, el actual. */
+  since?: string | null;
+}
+
+export class ListExpectedExpenses {
+  constructor(private readonly expected: ExpectedExpenseRepository) {}
+
+  async execute(): Promise<ExpectedExpenseView[]> {
+    return (await this.expected.expectedExpenses()).map(expectedView);
+  }
+}
+
+export class DefineExpectedExpense {
+  constructor(
+    private readonly expected: ExpectedExpenseRepository,
+    private readonly categories: AccountingCategoryRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(input: ExpectedExpenseInput): Promise<string> {
+    const expense = ExpectedExpense.define(
+      ExpectedExpenseId.generate(),
+      input.concept,
+      (await this.categories.catalog()).require(input.category),
+      Money.fromDecimal(input.amount),
+      input.months,
+      input.since
+        ? YearMonth.fromString(input.since)
+        : YearMonth.of(LocalDate.fromInstant(this.clock.now())),
+    );
+    await this.expected.saveExpectedExpense(expense);
+    return expense.id.value;
+  }
+}
+
+export class ReviseExpectedExpense {
+  constructor(
+    private readonly expected: ExpectedExpenseRepository,
+    private readonly categories: AccountingCategoryRepository,
+  ) {}
+
+  async execute(id: string, input: ExpectedExpenseInput): Promise<void> {
+    const expense = await findExpected(this.expected, id);
+    expense.revise(
+      input.concept,
+      (await this.categories.catalog()).require(input.category),
+      Money.fromDecimal(input.amount),
+      input.months,
+      input.since ? YearMonth.fromString(input.since) : expense.since,
+    );
+    await this.expected.saveExpectedExpense(expense);
+  }
+}
+
+export class RemoveExpectedExpense {
+  constructor(private readonly expected: ExpectedExpenseRepository) {}
+
+  async execute(id: string): Promise<void> {
+    await this.expected.deleteExpectedExpense((await findExpected(this.expected, id)).id);
+  }
+}
+
+export class ExpectedExpensesOfMonth {
+  constructor(private readonly expected: ExpectedExpenseRepository) {}
+
+  execute(month: string): Promise<ExpectedMonthView[]> {
+    const period = YearMonth.fromString(month);
+    return expectedMonths(this.expected, period, period);
+  }
+}
+
+async function findExpected(
+  repository: ExpectedExpenseRepository,
+  id: string,
+): Promise<ExpectedExpense> {
+  const expense = await repository.expectedExpense(ExpectedExpenseId.fromString(id));
+  if (expense === null) throw new ExpectedExpenseNotFound();
+  return expense;
+}
+
+/** El mes de un gasto esperado, que debe esperarse ese mes y no ser de una temporada cerrada, y cómo quedó. */
+async function expectedMonth(
+  repository: ExpectedExpenseRepository,
+  closed: ClosedPeriods,
+  id: string,
+  month: string,
+): Promise<{ expense: ExpectedExpense; period: YearMonth; view: ExpectedMonthView }> {
+  const expense = await findExpected(repository, id);
+  const period = YearMonth.fromString(month);
+  if (!expense.expectedIn(period)) {
+    throw new InvalidValue('month', 'Ese gasto no se espera ese mes.');
+  }
+  await PeriodClosed.guard(closed, period.firstDay());
+  const view = (await expectedMonths(repository, period, period)).find((v) =>
+    v.expenseId === expense.id.value
+  ) as ExpectedMonthView;
+  return { expense, period, view };
+}
+
+export interface ExpectedPaymentInput {
+  date: string;
+  method: string;
+  /** Lo que ha costado de verdad. */
+  amount: string;
+  /** Mes al que corresponde; sin él, el del gasto esperado. */
+  period?: string | null;
+  shares?: ShareInput[] | null;
+}
+
+/** Paga un gasto esperado de un mes por lo que ha costado de verdad: anota el apunte y deja el mes pagado. */
+export class PayExpectedExpense {
+  constructor(
+    private readonly expected: ExpectedExpenseRepository,
+    private readonly entries: ManualEntryRepository,
+    private readonly closed: ClosedPeriods,
+    private readonly categories: AccountingCategoryRepository,
+  ) {}
+
+  async execute(id: string, month: string, input: ExpectedPaymentInput): Promise<string> {
+    const { expense, period, view } = await expectedMonth(this.expected, this.closed, id, month);
+    if (view.status === 'paid') throw new ExpectedMonthSettled(true);
+    const date = LocalDate.fromString(input.date);
+    await PeriodClosed.guard(this.closed, date);
+    const amount = Money.fromDecimal(input.amount);
+    const shares = sharesFrom(amount, input.period, input.shares) ??
+      PeriodShares.single(period, amount);
+    await guardShares(this.closed, shares);
+    const entry = ManualEntry.record(
+      ManualEntryId.generate(),
+      date,
+      'expense',
+      expense.concept,
+      (await this.categories.catalog()).require(expense.category, 'expense'),
+      methodFromName(input.method),
+      amount,
+      shares,
+    );
+    await this.entries.saveEntry(entry);
+    await this.expected.settleExpected(expense.id, period, entry.id);
+    return entry.id.value;
+  }
+}
+
+/** «No hay este mes»: el gasto esperado no se da ese mes (la limpieza en agosto, por ejemplo). */
+export class SkipExpectedMonth {
+  constructor(
+    private readonly expected: ExpectedExpenseRepository,
+    private readonly closed: ClosedPeriods,
+  ) {}
+
+  async execute(id: string, month: string): Promise<void> {
+    const { expense, period, view } = await expectedMonth(this.expected, this.closed, id, month);
+    if (view.status !== 'pending') throw new ExpectedMonthSettled(view.status === 'paid');
+    await this.expected.settleExpected(expense.id, period, null);
+  }
+}
+
+/** Vuelve a esperar un mes saltado. Uno pagado vuelve a esperarse quitando su apunte. */
+export class RestoreExpectedMonth {
+  constructor(
+    private readonly expected: ExpectedExpenseRepository,
+    private readonly closed: ClosedPeriods,
+  ) {}
+
+  async execute(id: string, month: string): Promise<void> {
+    const { expense, period, view } = await expectedMonth(this.expected, this.closed, id, month);
+    if (view.status === 'paid') throw new ExpectedMonthSettled(true);
+    await this.expected.unsettleExpected(expense.id, period);
   }
 }
 

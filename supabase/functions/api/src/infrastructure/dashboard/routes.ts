@@ -40,6 +40,7 @@ export function registerDashboardRoutes(api: ApiApp): void {
           new SqlAccountingRepository(scope.tx),
           api.deps.clock,
         ),
+        new SqlAccountingRepository(scope.tx),
       );
       return c.json(await summary.execute());
     },

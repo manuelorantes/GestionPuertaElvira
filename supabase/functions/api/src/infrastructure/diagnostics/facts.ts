@@ -3,6 +3,7 @@
 import { type Clock, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import { FeeCalculator, StudentRef } from '../../domain/billing/mod.ts';
 import { feeProfileOf, GenerateMonthlyCharges } from '../../application/billing/mod.ts';
+import { expectedMonths } from '../../application/accounting/mod.ts';
 import type {
   FactCharge,
   FactChargeStatus,
@@ -71,6 +72,7 @@ export class SqlDiagnosticsFacts implements FactsSource {
     const ledger = await this.ledger(season.firstMonth(), currentMonth);
     const entries = await this.entries();
     const invoices = await new SqlInvoiceQuery(this.sql).all();
+    const expectedPending = await this.expectedPending(season.firstMonth(), currentMonth);
     const categories = await this.categories();
     const teachers = await this.teachers();
     const teacherMonths = await this.teacherMonths(pastAndCurrent, today);
@@ -100,11 +102,31 @@ export class SqlDiagnosticsFacts implements FactsSource {
         period: i.period,
         paidOn: i.paidOn,
       })),
+      expectedPending,
       categories,
       teachers,
       teacherMonths,
       points,
     };
+  }
+
+  /** Los meses de la temporada anteriores al actual con gastos esperados pendientes. */
+  private async expectedPending(
+    first: YearMonth,
+    current: YearMonth,
+  ): Promise<Facts['expectedPending']> {
+    if (!first.isBefore(current)) return [];
+    const months = await expectedMonths(
+      new SqlAccountingRepository(this.sql),
+      first,
+      current.previous(),
+    );
+    return months.filter((m) => m.status === 'pending').map((m) => ({
+      expenseId: m.expenseId,
+      concept: m.concept,
+      period: m.period,
+      expectedCents: m.expectedCents,
+    }));
   }
 
   private monthsOf(season: Season): YearMonth[] {

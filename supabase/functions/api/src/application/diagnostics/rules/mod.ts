@@ -34,6 +34,7 @@ const BY_CODE: Record<RuleCode, Rule> = {
   generic_category: accountingRules[0] as Rule,
   invoice_duplicates_entry: accountingRules[1] as Rule,
   teacher_expense_as_entry: accountingRules[2] as Rule,
+  expected_unpaid: accountingRules[3] as Rule,
   income_without_hours: payrollRules[0] as Rule,
   settlement_sessions_mismatch: payrollRules[1] as Rule,
   ledger_payments_mismatch: integrityRules[0] as Rule,

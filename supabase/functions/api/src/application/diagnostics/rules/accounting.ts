@@ -1,4 +1,4 @@
-// Reglas de contabilidad (specs/features/diagnostico/spec.md, reglas 11 a 13).
+// Reglas de contabilidad (specs/features/diagnostico/spec.md, reglas 2 a 4 y 22).
 import type { EntityRef } from '../../../domain/diagnostics/mod.ts';
 import type { Candidate, FactEntry, FactInvoice, Facts, FactTeacher, Rule } from '../facts.ts';
 import { euros, monthLabel, normalise } from './support.ts';
@@ -32,7 +32,7 @@ function targetCategory(concept: string): string | null {
   return KEYWORDS.find(([pattern]) => pattern.test(text))?.[1] ?? null;
 }
 
-/** Regla 11: gasto en «Otros gastos» o «Suministros» cuyo concepto habla de una categoría que existe. */
+/** Regla 2: gasto en «Otros gastos» o «Suministros» cuyo concepto habla de una categoría que existe. */
 export const genericCategory: Rule = (facts) => {
   const labels = new Map(facts.categories.map((c) => [c.code, c.label]));
   const candidate = (
@@ -74,7 +74,7 @@ const monthDistance = (a: string, b: string): number => {
   return Math.abs((ay ?? 0) * 12 + (am ?? 0) - ((by ?? 0) * 12 + (bm ?? 0)));
 };
 
-/** Regla 12: factura con un apunte manual de gasto por el mismo importe (o un tercio) en un mes cercano. */
+/** Regla 3: factura con un apunte manual de gasto por el mismo importe (o un tercio) en un mes cercano. */
 export const invoiceDuplicatesEntry: Rule = (facts) =>
   facts.invoices.flatMap((invoice) =>
     facts.entries.filter((e) =>
@@ -124,7 +124,7 @@ function teacherNamedIn(concept: string, teachers: FactTeacher[]): FactTeacher |
   return byFirst.length === 1 ? byFirst[0] ?? null : null;
 }
 
-/** Regla 13: apunte manual de gasto en «Profesores» que nombra a un profesor. */
+/** Regla 4: apunte manual de gasto en «Profesores» que nombra a un profesor. */
 export const teacherExpenseAsEntry: Rule = (facts: Facts) =>
   facts.entries.filter((e) => e.kind === 'expense' && e.category === 'teachers').flatMap(
     (entry): Candidate[] => {
@@ -144,8 +144,27 @@ export const teacherExpenseAsEntry: Rule = (facts: Facts) =>
     },
   );
 
+/** Regla 22: gasto esperado de un mes pasado de la temporada que no se ha pagado ni marcado «No hay este mes». */
+export const expectedUnpaid: Rule = (facts) =>
+  facts.expectedPending.map((pending): Candidate => ({
+    rule: 'expected_unpaid',
+    entity: {
+      kind: 'club',
+      id: `${pending.expenseId}/${pending.period}`,
+      label: `${pending.concept} · ${monthLabel(pending.period)}`,
+    },
+    data: { expenseId: pending.expenseId, period: pending.period },
+    explanation: `«${pending.concept}» se esperaba en ${monthLabel(pending.period)} (${
+      euros(pending.expectedCents)
+    }) y no consta pagado: sigue contando como previsto en el resumen.`,
+    proposal:
+      'Pagarlo desde Movimientos de ese mes con lo que costó, o marcar «No hay este mes» si no lo hubo.',
+    fix: null,
+  }));
+
 export const accountingRules: readonly Rule[] = [
   genericCategory,
   invoiceDuplicatesEntry,
   teacherExpenseAsEntry,
+  expectedUnpaid,
 ];

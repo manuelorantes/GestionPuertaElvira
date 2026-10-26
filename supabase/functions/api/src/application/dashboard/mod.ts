@@ -1,10 +1,12 @@
 import { type Clock, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import { PeriodShares } from '../../domain/accounting/mod.ts';
-import type {
-  AccountingSettingsRepository,
-  FiscalYearSummary,
-  LedgerLine,
-  MonthLedger,
+import {
+  type AccountingSettingsRepository,
+  type ExpectedExpenseRepository,
+  expectedMonths,
+  type FiscalYearSummary,
+  type LedgerLine,
+  type MonthLedger,
 } from '../accounting/mod.ts';
 import type { BillingQuery, ChargeView, ListMonthlyCharges } from '../billing/mod.ts';
 import type { ClassQuery, GroupSummary } from '../classes/mod.ts';
@@ -96,6 +98,7 @@ export class ClubSummary {
     private readonly settings: AccountingSettingsRepository,
     private readonly expectedPayroll: ExpectedPayroll,
     private readonly fiscalYear: FiscalYearSummary,
+    private readonly expected: ExpectedExpenseRepository,
   ) {}
 
   /**
@@ -195,7 +198,8 @@ export class ClubSummary {
    * Las categorías «del mes», cada movimiento en los meses a los que corresponde. Las cuotas mensuales, repartidas entre los
    * meses que paga cada cobro; y lo que falta por cobrar de las cuotas de cada mes: las emitidas y pendientes (lo
    * cancelado no se debe) y, en los meses que vienen, las previstas de los alumnos matriculados hoy. Del mes en curso
-   * en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes.
+   * en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes; y, en
+   * cualquier mes, lo esperado de los gastos esperados de esas categorías que aún no se han pagado ni saltado.
    */
   private async monthChart(
     months: string[],
@@ -212,6 +216,14 @@ export class ClubSummary {
     const payroll = categories.includes('teachers') && !last.isBefore(current)
       ? await this.expectedPayroll.between(current.isBefore(first) ? first : current, last)
       : new Map<string, number>();
+    const pendingExpected = new Map<string, number>();
+    for (const view of await expectedMonths(this.expected, first, last)) {
+      if (view.status !== 'pending' || !categories.includes(view.category)) continue;
+      pendingExpected.set(
+        view.period,
+        (pendingExpected.get(view.period) ?? 0) + view.expectedCents,
+      );
+    }
     const bars = new Map(
       months.map((m) => [m, {
         income: earned.get(m) ?? 0,
@@ -219,6 +231,7 @@ export class ClubSummary {
         expense: 0,
         teachers: 0,
         expectedExpense: payroll.get(m) ?? 0,
+        expectedOther: pendingExpected.get(m) ?? 0,
       }]),
     );
     if (withFees) {
@@ -247,7 +260,8 @@ export class ClubSummary {
         incomeCents: bar?.income ?? 0,
         expenseCents: bar?.expense ?? 0,
         expectedCents: bar?.expected ?? 0,
-        expectedExpenseCents: Math.max(0, (bar?.expectedExpense ?? 0) - (bar?.teachers ?? 0)),
+        expectedExpenseCents: Math.max(0, (bar?.expectedExpense ?? 0) - (bar?.teachers ?? 0)) +
+          (bar?.expectedOther ?? 0),
       };
     });
   }

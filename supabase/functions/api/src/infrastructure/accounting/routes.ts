@@ -10,26 +10,35 @@ import {
   AmendInvoice,
   AttachDocument,
   CloseSeason,
+  DefineExpectedExpense,
   DeleteEntry,
   DeleteInvoice,
   DeleteTransfer,
   DocumentNotFound,
   type DocumentStorage,
   EditMovement,
+  type ExpectedExpenseInput,
+  ExpectedExpensesOfMonth,
   FiscalYearSummary,
   GetMonthlyCategories,
   ListCategories,
+  ListExpectedExpenses,
   ListTransfers,
   MonthLedger,
+  PayExpectedExpense,
   PayInvoice,
   RecordEntry,
   RecordTransfer,
   RegisterInvoice,
   RemoveCategory,
+  RemoveExpectedExpense,
   RenameCategory,
+  RestoreExpectedMonth,
+  ReviseExpectedExpense,
   SetMonthlyCategories,
   type ShareInput,
   ShowEntry,
+  SkipExpectedMonth,
   SupplierInvoiceNotFound,
   TreasuryBalances,
   type UploadedDocument,
@@ -121,6 +130,8 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     CategoryInUse: [409, 'category_in_use'],
     MovementNotFound: [404, 'not_found'],
     TransferNotFound: [404, 'not_found'],
+    ExpectedExpenseNotFound: [404, 'not_found'],
+    ExpectedMonthSettled: [409, 'expected_month_settled'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, upload = false) => ({
     method,
@@ -395,4 +406,99 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     await new DeleteTransfer(transfers, closed).execute(param(c, 'id'));
     return c.body(null, 204);
   });
+
+  // Gastos esperados: lo que el club espera pagar cada mes y cómo quedó cada mes.
+  const expectedInput = (b: JsonBody): ExpectedExpenseInput => ({
+    concept: b.requiredString('concept'),
+    category: b.requiredString('category'),
+    amount: b.requiredString('amount'),
+    months: b.optionalIntList('months'),
+    since: b.optionalString('since'),
+  });
+
+  api.defineRoute(admin('GET', '/api/admin/accounting/expected'), async (c, scope) => {
+    const { accounting } = repos(scope);
+    const [items, catalog] = await Promise.all([
+      new ListExpectedExpenses(accounting).execute(),
+      accounting.catalog(),
+    ]);
+    return c.json({
+      items: items.map((e) => ({ ...e, categoryLabel: catalog.label(e.category) })),
+    });
+  });
+
+  api.defineRoute(admin('POST', '/api/admin/accounting/expected'), async (c, scope) => {
+    const b = await JsonBody.from(c.req.raw);
+    const { accounting } = repos(scope);
+    const id = await new DefineExpectedExpense(accounting, accounting, api.deps.clock).execute(
+      expectedInput(b),
+    );
+    return c.json({ id }, 201);
+  });
+
+  api.defineRoute(admin('PUT', '/api/admin/accounting/expected/:id'), async (c, scope) => {
+    const b = await JsonBody.from(c.req.raw);
+    const { accounting } = repos(scope);
+    await new ReviseExpectedExpense(accounting, accounting).execute(
+      param(c, 'id'),
+      expectedInput(b),
+    );
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('DELETE', '/api/admin/accounting/expected/:id'), async (c, scope) => {
+    await new RemoveExpectedExpense(repos(scope).accounting).execute(param(c, 'id'));
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('GET', '/api/admin/accounting/expected/month'), async (c, scope) => {
+    const month = c.req.query('month');
+    if (!month) throw new InvalidValue('month', 'Indica el mes (AAAA-MM).');
+    const { accounting } = repos(scope);
+    const [items, catalog] = await Promise.all([
+      new ExpectedExpensesOfMonth(accounting).execute(month),
+      accounting.catalog(),
+    ]);
+    return c.json({
+      items: items.map((m) => ({ ...m, categoryLabel: catalog.label(m.category) })),
+    });
+  });
+
+  api.defineRoute(
+    admin('POST', '/api/admin/accounting/expected/:id/months/:month/payment'),
+    async (c, scope) => {
+      const b = await JsonBody.from(c.req.raw);
+      const { accounting, closed } = repos(scope);
+      const id = await new PayExpectedExpense(accounting, accounting, closed, accounting).execute(
+        param(c, 'id'),
+        param(c, 'month'),
+        {
+          date: b.requiredString('date'),
+          method: b.requiredString('method'),
+          amount: b.requiredString('amount'),
+          period: b.optionalString('period'),
+          shares: sharesIn(b),
+        },
+      );
+      return c.json({ id }, 201);
+    },
+  );
+
+  api.defineRoute(
+    admin('POST', '/api/admin/accounting/expected/:id/months/:month/skip'),
+    async (c, scope) => {
+      const { accounting, closed } = repos(scope);
+      await new SkipExpectedMonth(accounting, closed).execute(param(c, 'id'), param(c, 'month'));
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    admin('DELETE', '/api/admin/accounting/expected/:id/months/:month/skip'),
+    async (c, scope) => {
+      const { accounting, closed } = repos(scope);
+      await new RestoreExpectedMonth(accounting, closed).execute(param(c, 'id'), param(c, 'month'));
+      return c.body(null, 204);
+    },
+  );
 }

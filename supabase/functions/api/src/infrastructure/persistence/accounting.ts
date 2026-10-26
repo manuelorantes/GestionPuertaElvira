@@ -5,6 +5,8 @@ import {
   type Category,
   CategoryCatalog,
   type EntryKind,
+  ExpectedExpense,
+  ExpectedExpenseId,
   FiscalYear,
   type LedgerCorrection,
   ManualEntry,
@@ -21,6 +23,8 @@ import {
 import type {
   AccountingCategoryRepository,
   AccountingSettingsRepository,
+  ExpectedExpenseRepository,
+  ExpectedSettlement,
   InvoiceQuery,
   InvoiceView,
   LedgerCorrections,
@@ -42,8 +46,63 @@ export class SqlAccountingRepository
     SeasonClosingRepository,
     AccountingSettingsRepository,
     AccountingCategoryRepository,
-    LedgerCorrections {
+    LedgerCorrections,
+    ExpectedExpenseRepository {
   constructor(private readonly sql: Sql) {}
+
+  async expectedExpenses(): Promise<ExpectedExpense[]> {
+    const rows = await this.sql`SELECT * FROM accounting_expected_expense ORDER BY id`;
+    return Row.all(rows).map(toExpectedExpense);
+  }
+
+  async expectedExpense(id: ExpectedExpenseId): Promise<ExpectedExpense | null> {
+    const rows = await this.sql`SELECT * FROM accounting_expected_expense WHERE id = ${id.value}`;
+    return rows[0] ? toExpectedExpense(new Row(rows[0])) : null;
+  }
+
+  async saveExpectedExpense(e: ExpectedExpense): Promise<void> {
+    await this
+      .sql`INSERT INTO accounting_expected_expense (id, concept, category, amount_cents, months, since)
+      VALUES (${e.id.value}, ${e.concept}, ${e.category}, ${e.amount.cents}, ${
+      this.sql.json(e.months)
+    },
+              ${e.since.toString()})
+      ON CONFLICT (id) DO UPDATE SET concept = EXCLUDED.concept, category = EXCLUDED.category,
+        amount_cents = EXCLUDED.amount_cents, months = EXCLUDED.months, since = EXCLUDED.since`;
+  }
+
+  async deleteExpectedExpense(id: ExpectedExpenseId): Promise<void> {
+    await this.sql`DELETE FROM accounting_expected_expense WHERE id = ${id.value}`;
+  }
+
+  async settlements(first: YearMonth, last: YearMonth): Promise<ExpectedSettlement[]> {
+    const rows = await this.sql`SELECT m.expected_expense_id::text AS expense_id, m.period,
+             m.entry_id::text AS entry_id, e.amount_cents, e.entry_date::text AS entry_date
+        FROM accounting_expected_month m LEFT JOIN accounting_entry e ON e.id = m.entry_id
+       WHERE m.period BETWEEN ${first.toString()} AND ${last.toString()}`;
+    return Row.all(rows).map((r) => ({
+      expenseId: r.string('expense_id'),
+      period: r.string('period'),
+      entryId: r.nullableString('entry_id'),
+      amountCents: r.nullableInt('amount_cents'),
+      date: r.nullableString('entry_date'),
+    }));
+  }
+
+  async settleExpected(
+    id: ExpectedExpenseId,
+    period: YearMonth,
+    entry: ManualEntryId | null,
+  ): Promise<void> {
+    await this.sql`INSERT INTO accounting_expected_month (expected_expense_id, period, entry_id)
+      VALUES (${id.value}, ${period.toString()}, ${entry?.value ?? null})
+      ON CONFLICT (expected_expense_id, period) DO UPDATE SET entry_id = EXCLUDED.entry_id`;
+  }
+
+  async unsettleExpected(id: ExpectedExpenseId, period: YearMonth): Promise<void> {
+    await this.sql`DELETE FROM accounting_expected_month
+      WHERE expected_expense_id = ${id.value} AND period = ${period.toString()}`;
+  }
 
   async catalog(): Promise<CategoryCatalog> {
     const rows = await this.sql`SELECT code, kind, label FROM accounting_category ORDER BY label`;
@@ -313,6 +372,17 @@ function lineShares(r: Row, amountCents: number): ShareView[] {
     period: s.period.toString(),
     amountCents: s.amount.cents,
   }));
+}
+
+function toExpectedExpense(r: Row): ExpectedExpense {
+  return ExpectedExpense.restore({
+    id: ExpectedExpenseId.fromString(r.string('id')),
+    concept: r.string('concept'),
+    category: r.string('category'),
+    amount: Money.cents(r.int('amount_cents')),
+    months: r.intList('months'),
+    since: YearMonth.fromString(r.string('since')),
+  });
 }
 
 function toClosing(r: Row): SeasonClosing {
