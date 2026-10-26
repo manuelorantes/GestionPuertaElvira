@@ -9,6 +9,10 @@ que solo usaba la gráfica «Cuotas vs gastos fijos» del resumen.
 Además, el saldo del club que enseña el resumen sale del acumulado de «Mes a mes»
 y tiene que ser siempre la suma del banco y la caja
 ([saldos derivados del libro](specs/decisions/saldos-de-caja-y-banco-derivados-del-libro.md)).
+Por otro lado, el club tiene gastos que se repiten cada mes (alquiler, limpieza, presidencia)
+y el resumen solo preveía el profesorado:
+hasta que se anotaban, esos gastos no contaban en el margen previsto,
+y su importe real cambia de un mes a otro (la limpieza depende de las horas).
 
 ## Decision
 - Cada movimiento lleva un **reparto por meses** (`PeriodShares`):
@@ -31,6 +35,17 @@ y tiene que ser siempre la suma del banco y la caja
   como ningún movimiento puede corresponder a meses de una temporada cerrada, se puede recalcular siempre.
 - El resumen y «Mes a mes» buscan movimientos hasta un año antes y después de los meses que enseñan,
   porque un movimiento puede pagarse así de lejos de los meses a los que corresponde.
+- Un **gasto esperado** (`ExpectedExpense`) es una plantilla: concepto, categoría de gasto (no Profesores),
+  importe esperado, meses del año en que se espera y el mes desde el que se espera.
+  No se generan apuntes por adelantado: cada mes está pendiente
+  hasta que se paga con un apunte manual (por lo que costó de verdad)
+  o se marca «No hay este mes».
+  Cómo quedó cada mes se guarda en `accounting_expected_month` (sin fila, pendiente);
+  la fila de un mes pagado apunta a su apunte con `ON DELETE CASCADE`,
+  así que quitar el apunte deja el mes pendiente sin más lógica.
+- Lo pendiente de los gastos esperados de categorías del mes se suma en gris a los **gastos previstos**
+  de «Cuotas vs gastos fijos» y al margen previsto, también en los meses pasados
+  (para que lo olvidado se vea; el diagnóstico lo señala).
 
 ## Consequences
 - El saldo del club, el del banco y el de la caja no cambian:
@@ -40,3 +55,7 @@ y tiene que ser siempre la suma del banco y la caja
 - Un cobro de varios meses ya no cuenta entero en el mes en que se cobró, sino repartido entre los meses que paga.
 - Corregir en contabilidad un cobro de varios meses guarda su reparto en la corrección.
   Las correcciones anteriores a esta decisión cuentan todo en su mes.
+- Lo que cuesta de verdad cada mes es siempre un apunte normal del libro:
+  saldos, «Mes a mes» y cierre no cambian por tener gastos esperados.
+- Cambiar el importe de un gasto esperado no toca los meses ya pagados.
+- Pagar un gasto esperado con una factura queda fuera por ahora: se paga con un apunte.

@@ -132,6 +132,9 @@ Dinero:
    los extras por error en el cálculo de varios descuentos, que son saldo a favor a propósito. Un hallazgo por
    alumno, con cuánto pagó de más. Sin arreglo: se corrige el importe del recibo si fue un error al teclear, o se
    descarta si pagó de más y queda como saldo a favor.
+22. **Gasto esperado sin pagar de un mes pasado**: [gasto esperado](../contabilidad/spec.md#requirement-gastos-esperados)
+    de un mes de la temporada anterior al actual que no se ha pagado ni marcado «No hay este mes» (sigue contando
+    como previsto). Un hallazgo por gasto y mes. Sin arreglo: se paga o se salta desde Movimientos de ese mes.
 
 Datos del club:
 9. **Paga cuota sin estar en ningún grupo**: alumno activo sin grupos con cuotas mensuales del mes en curso o futuras.
