@@ -533,6 +533,16 @@ export class Charge {
     return this.amount.minus(this.base);
   }
 
+  /**
+   * Un cobro dirigido a esta cuota pagó `paid` de lo que se le subió a mano: eso deja de cubrirse lo último, para que
+   * ese dinero se quede en este mes y no pase a cubrir los siguientes.
+   */
+  settleRaisedByHand(paid: Money): void {
+    if (this.base === null) return;
+    const base = this.base.plus(paid);
+    this.base = base.cents >= this.value.cents ? null : base;
+  }
+
   /** El importe más bajo que tuvo antes de fijarla a mano (para guardarlo), o null. */
   amountBeforeHand(): Money | null {
     return this.base;

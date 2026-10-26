@@ -839,6 +839,7 @@ export class RegisterPayment {
         charge.applyPrepayment(quote.prepaymentPercent, quote.familyPercent);
         const left = charge.amount.minus(already);
         if (!left.isNegative()) credit = credit.plus(left);
+        charge.settleRaisedByHand(left);
         covered.push(charge);
       }
       const payment = Payment.register({
@@ -956,15 +957,37 @@ export class ReschedulePayment {
   }
 }
 
-/** Corrige el importe de un cobro ya registrado, con el motivo como línea del recibo. */
+/**
+ * Corrige el importe de un cobro ya registrado, con el motivo como línea del recibo. Lo que se le sube paga primero
+ * lo que se subió a mano a los meses de ese recibo, para que se quede en ellos.
+ */
 export class CorrectPaymentAmount {
-  constructor(private readonly payments: PaymentRepository) {}
+  constructor(
+    private readonly payments: PaymentRepository,
+    private readonly charges: ChargeRepository,
+  ) {}
 
   async execute(paymentId: string, amountCents: number, reason: string): Promise<void> {
     const payment = await this.payments.payment(PaymentId.fromString(paymentId));
     if (payment === null) throw new PaymentNotFound();
+    const before = payment.total;
     payment.correctTotal(Money.cents(amountCents), reason);
     await this.payments.savePayment(payment);
+    await this.settleRaises(payment, payment.total.minus(before));
+  }
+
+  private async settleRaises(payment: Payment, increase: Money): Promise<void> {
+    let left = increase;
+    for (const period of payment.periods) {
+      if (left.cents <= 0) return;
+      const charge = await this.charges.chargeFor(payment.student, payment.kind, period);
+      const raised = charge?.raisedByHand() ?? Money.zero();
+      if (charge === null || raised.cents === 0) continue;
+      const paid = raised.cents > left.cents ? left : raised;
+      charge.settleRaisedByHand(paid);
+      await this.charges.saveCharge(charge);
+      left = left.minus(paid);
+    }
   }
 }
 
@@ -1316,8 +1339,8 @@ export class RecalculateCharges {
  * (creando las cuotas que falten). Los cobros no cambian; el reparto se rehace solo.
  */
 /**
- * Qué hacer al bajar una cuota por debajo de lo que ya tenía cubierto: corregir el cobro que la cubrió (el recibo
- * baja la diferencia) o dejar la diferencia como saldo a favor del alumno.
+ * Qué hacer al cambiar una cuota ya cubierta: corregir el cobro que la cubrió (el recibo baja o sube la diferencia) o
+ * dejar los cobros como están (al bajarla, la diferencia queda como saldo a favor; al subirla, pendiente).
  */
 export type PaidChargePolicy = 'correct_payment' | 'keep_credit';
 
@@ -1356,34 +1379,47 @@ export class AdjustCharge {
       const before = existing === null ? Money.zero() : existing.amount;
       const covered = existing === null ? Money.zero() : await coveredOf(this.charges, existing);
       charge.adjust(amount, reason);
-      await this.charges.saveCharge(charge);
+      const paid = existing !== null && covered.cents > 0 && covered.equals(before);
       if (onPaid === 'correct_payment' && covered.cents > amount.cents) {
-        await this.takeBack(ref, period, covered.minus(amount), before, amount, reason);
+        await this.correctPayment(ref, period, amount.minus(covered), before, amount, reason);
+      } else if (onPaid === 'correct_payment' && paid && amount.cents > before.cents) {
+        const corrected = await this.correctPayment(
+          ref,
+          period,
+          amount.minus(before),
+          before,
+          amount,
+          reason,
+        );
+        if (corrected) charge.settleRaisedByHand(amount.minus(before));
       }
+      await this.charges.saveCharge(charge);
     }
   }
 
   /**
-   * Quita de un cobro lo que la cuota ya no necesita: del recibo que pagó ese mes o, si no lo hay, del más reciente.
-   * Sin cobros que corregir, la diferencia queda como saldo a favor.
+   * Cambia lo pagado en `difference` (negativa al bajar, sin pasar de lo que tiene el recibo) en el recibo que pagó ese
+   * mes o, si no lo hay, en el más reciente. Sin cobros que corregir no hace nada: al bajar, la diferencia queda como
+   * saldo a favor; al subir, como pendiente.
    */
-  private async takeBack(
+  private async correctPayment(
     student: StudentRef,
     period: YearMonth,
-    surplus: Money,
+    difference: Money,
     before: Money,
     after: Money,
     reason: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const payments = await this.payments.paymentsFor(student, 'monthly');
     const payment = payments.find((p) => p.periods.some((m) => m.equals(period))) ?? payments[0];
-    if (payment === undefined) return;
-    const refund = surplus.cents > payment.total.cents ? payment.total : surplus;
+    if (payment === undefined) return false;
+    const total = payment.total.plus(difference);
     payment.correctTotal(
-      payment.total.minus(refund),
+      total.isNegative() ? Money.zero() : total,
       `cuota de ${period.label()} de ${before.format()} a ${after.format()} (${reason.trim()})`,
     );
     await this.payments.savePayment(payment);
+    return true;
   }
 }
 
