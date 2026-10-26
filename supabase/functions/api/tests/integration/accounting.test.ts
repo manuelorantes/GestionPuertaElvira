@@ -405,6 +405,7 @@ Deno.test('accounting shows a manual entry by id, to open the ledger where it is
     method: 'card',
     amountCents: 8000,
     period: '2025-09',
+    shares: [{ period: '2025-09', amountCents: 8000 }],
   });
   assertError(
     await client.get('/api/admin/accounting/entries/00000000-0000-7000-8000-000000000000'),
@@ -512,4 +513,80 @@ Deno.test('accounting should tell the bank and cash balances and move money betw
       { clubCents: 68000, bankCents: 60000, cashCents: 8000 },
     );
   });
+});
+
+Deno.test('accounting splits a movement between the months it applies to, for the year month by month', async () => {
+  const client = await admin();
+  const shares = [
+    { period: '2025-10', amountCents: 10000 },
+    { period: '2025-11', amountCents: 10000 },
+    { period: '2025-12', amountCents: 10000 },
+  ];
+  const created = await client.json('POST', '/api/admin/accounting/entries', {
+    date: '2026-01-20',
+    kind: 'expense',
+    concept: 'IVA cuarto trimestre',
+    category: 'other_expenses',
+    method: 'transfer',
+    amount: '300',
+    shares,
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const id = body<{ id: string }>(created).id;
+  assertEquals(
+    body<{ shares: unknown }>(await client.get(`/api/admin/accounting/entries/${id}`)).shares,
+    shares,
+  );
+
+  // Una factura con documento lleva el reparto como JSON.
+  const invoice = await client.request('POST', '/api/admin/accounting/invoices', {
+    body: invoiceForm(null, {
+      date: '2026-01-10',
+      amount: '90',
+      shares: JSON.stringify([
+        { period: '2025-12', amountCents: 3000 },
+        { period: '2026-01', amountCents: 6000 },
+      ]),
+    }),
+    headers: { 'X-Requested-With': 'fetch' },
+  });
+  assertEquals(invoice.status, 201, JSON.stringify(invoice.body));
+  const invoiceId = body<{ id: string }>(invoice).id;
+  await client.json('POST', `/api/admin/accounting/invoices/${invoiceId}/payment`, {
+    date: '2026-01-12',
+    method: 'transfer',
+  });
+
+  const ledger = body<{ items: { sourceId: string; period: string; shares: unknown }[] }>(
+    await client.get('/api/admin/accounting/ledger?month=2026-01'),
+  );
+  const entry = ledger.items.find((i) => i.sourceId === id);
+  assertEquals([entry?.period, entry?.shares], ['2025-10', shares]);
+
+  const year = body<{
+    months: { month: string; expenseCents: number; accumulatedCents: number }[];
+    resultCents: number;
+    cashResultCents: number;
+  }>(await client.get('/api/admin/accounting/years/2025'));
+  const month = (m: string) => year.months.find((r) => r.month === m);
+  assertEquals(
+    ['2025-10', '2025-11', '2025-12', '2026-01'].map((m) => month(m)?.expenseCents),
+    [10000, 10000, 13000, 6000],
+  );
+  assertEquals(month('2026-01')?.accumulatedCents, -39000, 'el saldo, por cuando se pagó');
+  assertEquals([year.resultCents, year.cashResultCents], [-39000, -39000]);
+
+  assertError(
+    await client.json('POST', '/api/admin/accounting/entries', {
+      date: '2026-01-20',
+      kind: 'expense',
+      concept: 'IVA',
+      category: 'other_expenses',
+      method: 'transfer',
+      amount: '300',
+      shares: [{ period: '2025-10', amountCents: 100 }],
+    }),
+    422,
+    'unprocessable',
+  );
 });

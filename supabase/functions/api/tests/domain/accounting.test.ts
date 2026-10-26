@@ -11,6 +11,7 @@ import {
   InvoiceAlreadyPaid,
   ManualEntry,
   ManualEntryId,
+  PeriodShares,
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
@@ -155,7 +156,7 @@ Deno.test('SupplierInvoice should let its header be amended, and its payment onl
     concept: 'Tablero mural grande',
     category: cat('rent'),
     amount: Money.cents(9000),
-    period: YearMonth.fromString('2026-09'),
+    shares: PeriodShares.single(YearMonth.fromString('2026-09'), Money.cents(9000)),
     paidOn: LocalDate.fromString('2026-10-09'),
     method: 'cash' as const,
   };
@@ -305,7 +306,7 @@ Deno.test('entries and invoices belong to the month of their date unless another
       cat('electricity'),
       'transfer',
       Money.euros(80),
-      period ?? null,
+      period ? PeriodShares.single(period, Money.euros(80)) : null,
     );
   assertEquals(entry().period.toString(), '2026-10');
   assertEquals(entry(YearMonth.fromString('2026-09')).period.toString(), '2026-09');
@@ -317,7 +318,7 @@ Deno.test('entries and invoices belong to the month of their date unless another
     'Alquiler de septiembre',
     cat('rent'),
     Money.euros(950),
-    YearMonth.fromString('2026-09'),
+    PeriodShares.single(YearMonth.fromString('2026-09'), Money.euros(950)),
   );
   assertEquals(invoice.period.toString(), '2026-09');
 });
@@ -341,4 +342,86 @@ Deno.test('CategoryCatalog should add and rename the club own categories, never 
   assertEquals(catalog.rename('c_seguro', 'Seguro del local').label, 'Seguro del local');
   assertEquals(catalog.label('c_seguro'), 'Seguro del local');
   assertThrows(() => catalog.rename('rent', 'Local'), InvalidValue);
+});
+
+Deno.test('PeriodShares should split an amount equally between months, the first ones taking the spare cents', () => {
+  const months = ['2026-10', '2026-11', '2026-12'].map((m) => YearMonth.fromString(m));
+  const shares = PeriodShares.equal(Money.euros(100), months);
+  assertEquals(
+    shares.list().map((s) => [s.period.toString(), s.amount.cents]),
+    [['2026-10', 3334], ['2026-11', 3333], ['2026-12', 3333]],
+  );
+  assertEquals(shares.first.toString(), '2026-10');
+  assertFalse(shares.isSingle());
+  assert(PeriodShares.single(YearMonth.fromString('2026-09'), Money.euros(80)).isSingle());
+});
+
+Deno.test('PeriodShares should take amounts by hand that add up to the total, in month order', () => {
+  const share = (period: string, euros: number) => ({
+    period: YearMonth.fromString(period),
+    amount: Money.euros(euros),
+  });
+  const shares = PeriodShares.of(Money.euros(300), [share('2026-12', 50), share('2026-10', 250)]);
+  assertEquals(shares.list().map((s) => s.period.toString()), ['2026-10', '2026-12']);
+  assertThrows(
+    () => PeriodShares.of(Money.euros(300), [share('2026-10', 100), share('2026-11', 100)]),
+    InvalidValue,
+    'sumar el importe',
+  );
+  assertThrows(
+    () => PeriodShares.of(Money.euros(200), [share('2026-10', 100), share('2026-10', 100)]),
+    InvalidValue,
+  );
+  assertThrows(
+    () => PeriodShares.of(Money.euros(100), [share('2026-10', 100), share('2026-11', 0)]),
+    InvalidValue,
+  );
+  assertThrows(() => PeriodShares.of(Money.euros(100), []), InvalidValue);
+});
+
+Deno.test('entries and invoices can apply to several months, no further than a year from their date', () => {
+  const date = LocalDate.fromString('2027-01-20');
+  const months = ['2026-10', '2026-11', '2026-12'].map((m) => YearMonth.fromString(m));
+  const entry = ManualEntry.record(
+    ManualEntryId.generate(),
+    date,
+    'expense',
+    'IVA del cuarto trimestre',
+    cat('other_expenses'),
+    'transfer',
+    Money.euros(300),
+    PeriodShares.equal(Money.euros(300), months),
+  );
+  assertEquals(entry.shares.months().map((m) => m.toString()), ['2026-10', '2026-11', '2026-12']);
+  assertEquals(entry.period.toString(), '2026-10', 'el primero, para mostrarlo');
+  assertThrows(
+    () =>
+      ManualEntry.record(
+        ManualEntryId.generate(),
+        date,
+        'expense',
+        'IVA',
+        cat('other_expenses'),
+        'transfer',
+        Money.euros(200),
+        PeriodShares.equal(Money.euros(300), months),
+      ),
+    InvalidValue,
+    'sumar el importe',
+  );
+  assertThrows(
+    () =>
+      SupplierInvoice.register(
+        SupplierInvoiceId.generate(),
+        date,
+        'A-1',
+        'Hacienda',
+        'IVA',
+        cat('other_expenses'),
+        Money.euros(10),
+        PeriodShares.single(YearMonth.fromString('2025-12'), Money.euros(10)),
+      ),
+    InvalidValue,
+    'un año',
+  );
 });

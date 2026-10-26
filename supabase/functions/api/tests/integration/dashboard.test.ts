@@ -45,8 +45,10 @@ Deno.test({
       })).status,
       201,
     );
-    // La luz del mes anterior, pagada hoy: gasto de hoy en caja, del mes anterior en lo que corresponde a cada mes.
+    // La luz pagada hoy, repartida entre el mes anterior (10 €) y el siguiente (20 €): gasto de hoy en caja y de esos
+    // meses en lo que corresponde a cada mes.
     const previousMonth = YearMonth.fromString(today.slice(0, 7)).previous().toString();
+    const followingMonth = YearMonth.fromString(today.slice(0, 7)).next().toString();
     assertEquals(
       (await client.json('POST', '/api/admin/accounting/entries', {
         date: today,
@@ -55,7 +57,10 @@ Deno.test({
         category: 'electricity',
         method: 'transfer',
         amount: '30',
-        period: previousMonth,
+        shares: [
+          { period: previousMonth, amountCents: 1000 },
+          { period: followingMonth, amountCents: 2000 },
+        ],
       })).status,
       201,
     );
@@ -126,7 +131,7 @@ Deno.test({
       expectedExpenseCents: currentPayroll,
     });
     if (season.includes(YearMonth.fromString(previousMonth))) {
-      assertEquals(at(ofMonth, previousMonth)?.expenseCents, 3000);
+      assertEquals(at(ofMonth, previousMonth)?.expenseCents, 1000);
       assertEquals(
         at(ofMonth, previousMonth)?.expectedExpenseCents,
         0,
@@ -142,7 +147,7 @@ Deno.test({
       assertEquals(at(ofMonth, nextMonth.toString()), {
         month: nextMonth.toString(),
         incomeCents: 0,
-        expenseCents: 0,
+        expenseCents: 2000,
         expectedCents: 4500,
         expectedExpenseCents: nextPayroll,
       });

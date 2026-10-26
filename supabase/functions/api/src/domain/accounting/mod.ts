@@ -1,4 +1,4 @@
-import { InvalidValue, LocalDate, type Money, Uuid, YearMonth } from '../common/mod.ts';
+import { InvalidValue, LocalDate, Money, Uuid, YearMonth } from '../common/mod.ts';
 
 export class ManualEntryId extends Uuid {}
 export class SupplierInvoiceId extends Uuid {}
@@ -198,6 +198,100 @@ export class MonthlyCategories {
   }
 }
 
+/** Una parte de un movimiento: el mes al que corresponde y cuánto le toca. */
+export interface PeriodShare {
+  period: YearMonth;
+  amount: Money;
+}
+
+/**
+ * Reparto de un movimiento entre los meses a los que corresponde (el IVA pagado en enero, entre octubre, noviembre y
+ * diciembre): de más antiguo a más reciente, sin meses repetidos, cada parte mayor que cero y sumando el importe.
+ */
+export class PeriodShares {
+  /** Lo más lejos de su fecha que puede estar un mes al que corresponde un movimiento. */
+  static readonly MAX_DISTANCE_MONTHS = 12;
+
+  private constructor(private readonly parts: readonly PeriodShare[]) {}
+
+  static single(period: YearMonth, amount: Money): PeriodShares {
+    return new PeriodShares([{ period, amount }]);
+  }
+
+  /** A partes iguales: cada mes, el cociente; los primeros, un céntimo más hasta agotar el resto. */
+  static equal(amount: Money, periods: readonly YearMonth[]): PeriodShares {
+    if (periods.length === 0) throw PeriodShares.noMonths();
+    const sorted = PeriodShares.sorted(periods.map((period) => ({ period, amount })));
+    const quotient = Math.trunc(amount.cents / sorted.length);
+    const rest = amount.cents - quotient * sorted.length;
+    return PeriodShares.of(
+      amount,
+      sorted.map((s, i) => ({
+        period: s.period,
+        amount: Money.cents(quotient + (i < rest ? 1 : 0)),
+      })),
+    );
+  }
+
+  /** Con lo que va a cada mes, que debe sumar `amount`. */
+  static of(amount: Money, parts: readonly PeriodShare[]): PeriodShares {
+    if (parts.length === 0) throw PeriodShares.noMonths();
+    const sorted = PeriodShares.sorted(parts);
+    if (sorted.some((p, i) => i > 0 && sorted[i - 1]?.period.equals(p.period))) {
+      throw new InvalidValue('shares', 'No se puede repetir un mes en el reparto.');
+    }
+    if (sorted.some((p) => p.amount.cents <= 0)) {
+      throw new InvalidValue('shares', 'Cada mes del reparto tiene que llevar más de 0 €.');
+    }
+    const total = sorted.reduce((sum, p) => sum.plus(p.amount), Money.zero());
+    if (!total.equals(amount)) {
+      throw new InvalidValue(
+        'shares',
+        `El reparto por meses tiene que sumar el importe (${amount.format()}).`,
+      );
+    }
+    return new PeriodShares(sorted);
+  }
+
+  private static sorted(parts: readonly PeriodShare[]): PeriodShare[] {
+    return [...parts].sort((a, b) => a.period.toString().localeCompare(b.period.toString()));
+  }
+
+  private static noMonths(): InvalidValue {
+    return new InvalidValue('shares', 'Elige al menos un mes al que corresponde.');
+  }
+
+  /** El primer mes (el que se muestra cuando hace falta uno solo). */
+  get first(): YearMonth {
+    return (this.parts[0] as PeriodShare).period;
+  }
+
+  isSingle(): boolean {
+    return this.parts.length === 1;
+  }
+
+  months(): YearMonth[] {
+    return this.parts.map((p) => p.period);
+  }
+
+  list(): PeriodShare[] {
+    return [...this.parts];
+  }
+
+  /** Comprueba que cuadra con el movimiento: suma su importe y no se aleja más de un año de su fecha. */
+  checkFor(amount: Money, date: LocalDate): void {
+    PeriodShares.of(amount, this.parts);
+    const month = YearMonth.of(date);
+    const distance = (m: YearMonth) => Math.abs((m.year - month.year) * 12 + m.month - month.month);
+    if (this.parts.some((p) => distance(p.period) > PeriodShares.MAX_DISTANCE_MONTHS)) {
+      throw new InvalidValue(
+        'shares',
+        'Los meses a los que corresponde no pueden estar a más de un año de su fecha.',
+      );
+    }
+  }
+}
+
 /** Ejercicio contable del club: de septiembre a agosto. */
 export class FiscalYear {
   constructor(readonly startYear: number) {}
@@ -244,8 +338,8 @@ export class FiscalYear {
 }
 
 /**
- * Ingreso o gasto anotado a mano (subvención, venta de material, comisión del banco…). `period` es el mes al que
- * corresponde (la luz de septiembre pagada en octubre); por defecto, el de su fecha.
+ * Ingreso o gasto anotado a mano (subvención, venta de material, comisión del banco…). `shares` son los meses a los que
+ * corresponde (la luz de septiembre pagada en octubre, el IVA de un trimestre); por defecto, el de su fecha.
  */
 export class ManualEntry {
   private constructor(
@@ -256,7 +350,7 @@ export class ManualEntry {
     readonly category: string,
     readonly method: Method,
     readonly amount: Money,
-    readonly period: YearMonth,
+    readonly shares: PeriodShares,
   ) {}
 
   static record(
@@ -267,7 +361,7 @@ export class ManualEntry {
     category: Category,
     method: Method,
     amount: Money,
-    period: YearMonth | null = null,
+    shares: PeriodShares | null = null,
   ): ManualEntry {
     if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
     if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
@@ -277,16 +371,14 @@ export class ManualEntry {
         `La categoría no corresponde a un ${kind === 'income' ? 'ingreso' : 'gasto'}.`,
       );
     }
-    return new ManualEntry(
-      id,
-      date,
-      kind,
-      concept.trim(),
-      category.code,
-      method,
-      amount,
-      period ?? YearMonth.of(date),
-    );
+    const split = shares ?? PeriodShares.single(YearMonth.of(date), amount);
+    split.checkFor(amount, date);
+    return new ManualEntry(id, date, kind, concept.trim(), category.code, method, amount, split);
+  }
+
+  /** El primer mes al que corresponde. */
+  get period(): YearMonth {
+    return this.shares.first;
   }
 
   /** El mismo apunte con otros datos (la fecha y el tipo no cambian). */
@@ -295,7 +387,7 @@ export class ManualEntry {
     category: Category,
     method: Method,
     amount: Money,
-    period: YearMonth,
+    shares: PeriodShares,
   ): ManualEntry {
     return ManualEntry.record(
       this.id,
@@ -305,7 +397,7 @@ export class ManualEntry {
       category,
       method,
       amount,
-      period,
+      shares,
     );
   }
 
@@ -317,7 +409,7 @@ export class ManualEntry {
     category: string;
     method: Method;
     amount: Money;
-    period: YearMonth | null;
+    shares: PeriodShares | null;
   }): ManualEntry {
     return new ManualEntry(
       fields.id,
@@ -327,7 +419,7 @@ export class ManualEntry {
       fields.category,
       fields.method,
       fields.amount,
-      fields.period ?? YearMonth.of(fields.date),
+      fields.shares ?? PeriodShares.single(YearMonth.of(fields.date), fields.amount),
     );
   }
 }
@@ -364,10 +456,6 @@ export class Attachment {
   }
 }
 
-/**
- * Factura de un proveedor del club, pendiente o pagada, con su documento. `period` es el mes al que corresponde; por
- * defecto, el de la factura.
- */
 /** Lo que superadministración puede corregir de una factura: también la cabecera y, si está pagada, el pago. */
 export interface InvoiceAmendment {
   date: LocalDate;
@@ -376,11 +464,15 @@ export interface InvoiceAmendment {
   concept: string;
   category: Category;
   amount: Money;
-  period: YearMonth;
+  shares: PeriodShares;
   paidOn: LocalDate | null;
   method: Method | null;
 }
 
+/**
+ * Factura de un proveedor del club, pendiente o pagada, con su documento. `shares` son los meses a los que corresponde;
+ * por defecto, el de la factura.
+ */
 export class SupplierInvoice {
   private constructor(
     readonly id: SupplierInvoiceId,
@@ -390,7 +482,7 @@ export class SupplierInvoice {
     private currentConcept: string,
     private currentCategory: string,
     private currentAmount: Money,
-    private currentPeriod: YearMonth,
+    private currentShares: PeriodShares,
     private paid: LocalDate | null,
     private paymentMethod: Method | null,
     private document: Attachment | null,
@@ -404,10 +496,12 @@ export class SupplierInvoice {
     concept: string,
     category: Category,
     amount: Money,
-    period: YearMonth | null = null,
+    shares: PeriodShares | null = null,
   ): SupplierInvoice {
     SupplierInvoice.checkSupplier(supplier);
     SupplierInvoice.checkDetails(concept, category, amount);
+    const split = shares ?? PeriodShares.single(YearMonth.of(date), amount);
+    split.checkFor(amount, date);
     return new SupplierInvoice(
       id,
       date,
@@ -416,7 +510,7 @@ export class SupplierInvoice {
       concept.trim(),
       category.code,
       amount,
-      period ?? YearMonth.of(date),
+      split,
       null,
       null,
       null,
@@ -431,7 +525,7 @@ export class SupplierInvoice {
     concept: string;
     category: string;
     amount: Money;
-    period: YearMonth | null;
+    shares: PeriodShares | null;
     paidOn: LocalDate | null;
     method: Method | null;
     attachment: Attachment | null;
@@ -444,7 +538,7 @@ export class SupplierInvoice {
       fields.concept,
       fields.category,
       fields.amount,
-      fields.period ?? YearMonth.of(fields.date),
+      fields.shares ?? PeriodShares.single(YearMonth.of(fields.date), fields.amount),
       fields.paidOn,
       fields.method,
       fields.attachment,
@@ -475,8 +569,13 @@ export class SupplierInvoice {
     return this.currentAmount;
   }
 
+  get shares(): PeriodShares {
+    return this.currentShares;
+  }
+
+  /** El primer mes al que corresponde. */
   get period(): YearMonth {
-    return this.currentPeriod;
+    return this.currentShares.first;
   }
 
   /** Corrige sus datos desde el libro; la forma de pago, solo si ya está pagada. */
@@ -484,14 +583,15 @@ export class SupplierInvoice {
     concept: string,
     category: Category,
     amount: Money,
-    period: YearMonth,
+    shares: PeriodShares,
     method: Method | null,
   ): void {
     SupplierInvoice.checkDetails(concept, category, amount);
+    shares.checkFor(amount, this.currentDate);
     this.currentConcept = concept.trim();
     this.currentCategory = category.code;
     this.currentAmount = amount;
-    this.currentPeriod = period;
+    this.currentShares = shares;
     if (this.paid !== null && method !== null) this.paymentMethod = method;
   }
 
@@ -499,6 +599,7 @@ export class SupplierInvoice {
   amend(amendment: InvoiceAmendment): void {
     SupplierInvoice.checkSupplier(amendment.supplier);
     SupplierInvoice.checkDetails(amendment.concept, amendment.category, amendment.amount);
+    amendment.shares.checkFor(amendment.amount, amendment.date);
     if (this.paid !== null && (amendment.paidOn === null || amendment.method === null)) {
       throw new InvalidValue('paidOn', 'Indica la fecha y la forma de pago.');
     }
@@ -508,7 +609,7 @@ export class SupplierInvoice {
     this.currentConcept = amendment.concept.trim();
     this.currentCategory = amendment.category.code;
     this.currentAmount = amendment.amount;
-    this.currentPeriod = amendment.period;
+    this.currentShares = amendment.shares;
     if (this.paid !== null) {
       this.paid = amendment.paidOn;
       this.paymentMethod = amendment.method;
@@ -569,8 +670,13 @@ export class LedgerCorrection {
     readonly category: string,
     readonly method: Method | null,
     readonly amount: Money,
-    readonly period: YearMonth,
+    readonly shares: PeriodShares,
   ) {}
+
+  /** El primer mes al que corresponde. */
+  get period(): YearMonth {
+    return this.shares.first;
+  }
 
   static of(
     source: string,
@@ -580,7 +686,8 @@ export class LedgerCorrection {
     category: Category,
     method: Method | null,
     amount: Money,
-    period: YearMonth,
+    shares: PeriodShares,
+    date: LocalDate,
   ): LedgerCorrection {
     if (concept.trim() === '') throw new InvalidValue('concept', 'Indica el concepto.');
     if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
@@ -590,6 +697,7 @@ export class LedgerCorrection {
         `La categoría no corresponde a un ${kind === 'income' ? 'ingreso' : 'gasto'}.`,
       );
     }
+    shares.checkFor(amount, date);
     return new LedgerCorrection(
       source,
       sourceId,
@@ -597,13 +705,14 @@ export class LedgerCorrection {
       category.code,
       method,
       amount,
-      period,
+      shares,
     );
   }
 }
 
 /**
- * Cierre de un ejercicio: congela ingresos, gastos y resultado, que pasa como saldo inicial del siguiente. `cash` es
+ * Cierre de un ejercicio: congela lo que entró y salió de verdad (por fecha, no por el mes al que corresponde) y su
+ * resultado, que pasa como saldo inicial del siguiente. `cash` es
  * lo que el ejercicio movió en caja (ingresos y gastos en efectivo y traspasos): así el saldo arrastrado se reparte
  * entre banco y caja.
  */

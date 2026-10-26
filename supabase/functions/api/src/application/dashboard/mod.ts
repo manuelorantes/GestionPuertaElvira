@@ -1,4 +1,5 @@
 import { type Clock, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
+import { PeriodShares } from '../../domain/accounting/mod.ts';
 import type {
   AccountingSettingsRepository,
   FiscalYearSummary,
@@ -97,8 +98,11 @@ export class ClubSummary {
     private readonly fiscalYear: FiscalYearSummary,
   ) {}
 
-  /** Meses de margen alrededor de la temporada: un gasto puede pagarse antes o después del mes al que corresponde. */
-  private static readonly MARGIN_MONTHS = 3;
+  /**
+   * Meses de margen alrededor de la temporada: un gasto puede pagarse antes o después de los meses a los que corresponde
+   * (como mucho, un año).
+   */
+  private static readonly MARGIN_MONTHS = PeriodShares.MAX_DISTANCE_MONTHS;
 
   async execute(): Promise<ClubSummaryView> {
     const today = LocalDate.fromInstant(this.clock.now());
@@ -188,7 +192,7 @@ export class ClubSummary {
     };
   }
   /**
-   * Las categorías «del mes», cada movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas entre los
+   * Las categorías «del mes», cada movimiento en los meses a los que corresponde. Las cuotas mensuales, repartidas entre los
    * meses que paga cada cobro; y lo que falta por cobrar de las cuotas de cada mes: las emitidas y pendientes (lo
    * cancelado no se debe) y, en los meses que vienen, las previstas de los alumnos matriculados hoy. Del mes en curso
    * en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes.
@@ -226,12 +230,14 @@ export class ClubSummary {
     }
     for (const line of lines) {
       if (line.category === 'fees' || !categories.includes(line.category)) continue;
-      const bar = bars.get(line.period);
-      if (!bar) continue;
-      if (line.kind === 'income') bar.income += line.amountCents;
-      else {
-        bar.expense += line.amountCents;
-        if (line.category === 'teachers') bar.teachers += line.amountCents;
+      for (const share of line.shares) {
+        const bar = bars.get(share.period);
+        if (!bar) continue;
+        if (line.kind === 'income') bar.income += share.amountCents;
+        else {
+          bar.expense += share.amountCents;
+          if (line.category === 'teachers') bar.teachers += share.amountCents;
+        }
       }
     }
     return months.map((m) => {
