@@ -12,7 +12,7 @@ El resumen MUST mostrar:
   el plazo del día 5 y, aparte en la misma línea, lo que falta por cobrar de cuotas de socio de la temporada (p. ej.
   «Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio»);
 - el margen previsto del mes: las cuotas del mes en curso (cobradas y previstas) menos sus gastos fijos (anotados y
-  profesorado previsto), las mismas cifras que el mes en curso de «Cuotas vs gastos fijos», con el detalle debajo
+  previstos), las mismas cifras que el mes en curso de «Cuotas vs gastos fijos», con el detalle debajo
   (p. ej. «3920 € de cuotas · 2100 € de gastos fijos»);
 - los socios activos (de alta hoy) y, debajo, cuántos se han dado de alta este mes (p. ej. «107» y «+6 este mes»);
 - los socios en clases (de alta hoy y en al menos una clase) y, debajo, cuántos han empezado este mes a tener
@@ -37,12 +37,14 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
   lo pendiente de las cuotas emitidas (una cuota cancelada ya no se debe y desaparece de ahí); en los meses que
   vienen, además, las que se emitirán a los alumnos matriculados hoy que aún no tengan la de ese mes (las
   [previstas](../cobros/spec.md) de Cobros, con la tarifa de hoy). Julio y agosto no tienen cuotas. Sobre los gastos,
-  en gris, el **profesorado previsto**: lo que costará el
+  en gris, los **gastos previstos**: lo que costará el
   profesorado ese mes según el horario (las [horas esperadas](../profesorado/spec.md) de Rentabilidad: clases y
   actividades de los días del mes salvo festivos, a la tarifa de hoy), menos lo del profesorado que ya esté en el
-  libro ese mes. Del mes en curso en adelante; los meses pasados, julio y agosto no tienen.
+  libro ese mes, del mes en curso en adelante (los meses pasados, julio y agosto no tienen); y lo esperado de los
+  [gastos esperados](../contabilidad/spec.md#requirement-gastos-esperados) de categorías del mes que siguen
+  pendientes, también en los meses pasados, hasta que se pagan o se marcan «No hay este mes».
 Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cuánto dinero equivale, p. ej. «Ingresos de
-octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «Profesorado previsto de noviembre 2026:
+octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «Gastos previstos de noviembre 2026:
 1200 €».
 
 #### Scenario: Un pago trimestral

@@ -140,6 +140,37 @@ se pueden marcar como «del mes».
 - **WHEN** administración intenta quitar la categoría «Seguro», que ya usa un apunte
 - **THEN** no se quita y se explica que tiene movimientos
 
+### Requirement: Gastos esperados
+En «Ajustes», administración MUST poder definir los **gastos esperados** del club:
+lo que paga cada mes (alquiler, limpieza, presidencia…) con su concepto, una categoría de gasto, lo que suele costar
+y en qué meses del año se espera (por defecto, de septiembre a junio).
+Se espera desde el mes en que se añade.
+No MAY ser de la categoría Profesores: lo del profesorado ya se prevé con su horario.
+La tabla se ordena desde sus cabeceras (Concepto, Categoría, Importe, Meses),
+y cada gasto esperado se edita o se quita; quitarlo no quita los apuntes con que se pagó.
+
+En Movimientos, junto a «Gastos de <mes>», la tarjeta **«Gastos esperados de <mes>»** MUST mostrar los del mes,
+cada uno en uno de tres estados, y abajo lo que falta por pagar:
+- **pendiente**, con «Pagar» y «No hay este mes»;
+- **pagado**, con lo que costó, la fecha y, si no coincide, lo que se esperaba;
+- **«No hay este mes»**, con «Volver a esperarlo».
+
+«Pagar» abre un diálogo con el importe pagado (por defecto, lo esperado), la fecha (hoy), la forma de pago
+y los [meses a los que corresponde](#requirement-meses-a-los-que-corresponde) (por defecto, el del gasto esperado,
+aunque se pague otro mes).
+Al pagar se anota un apunte manual de gasto con su concepto y su categoría, y ese mes queda pagado.
+Para cambiar lo pagado se edita el apunte; si se quita, el mes vuelve a estar pendiente.
+No MAY pagarse ni saltarse un mes de una temporada cerrada.
+
+#### Scenario: La limpieza costó más
+- **WHEN** la limpieza se espera a 120 € al mes y en noviembre se pagan 135,50 € el 2 de diciembre
+- **THEN** en Movimientos de diciembre sale «Limpieza» por −135,50 €, que corresponde a noviembre;
+  en noviembre la limpieza sale pagada («se esperaban 120 €») y ya no cuenta como prevista en el resumen
+
+#### Scenario: Un mes sin limpieza
+- **WHEN** en agosto no hay limpieza y administración pulsa «No hay este mes»
+- **THEN** deja de contar como prevista; con «Volver a esperarlo» vuelve a estar pendiente
+
 ### Requirement: Categorías del mes
 En la pestaña «Ajustes», administración MUST poder marcar qué categorías de ingresos y gastos cuentan como «del mes»
 (las que salen en la gráfica «Cuotas vs gastos fijos» del resumen). Por defecto: en ingresos, Cuotas; en gastos,
