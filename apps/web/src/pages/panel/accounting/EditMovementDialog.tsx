@@ -8,7 +8,13 @@ import {
   useCategories,
   useCategoryOptions,
 } from '@/features/accounting/hooks';
-import { centsFromText, centsToText, formatCents, monthLabel } from '@/features/billing/money';
+import {
+  initialChoice,
+  resolveChoice,
+  sharesDetail,
+  type PeriodChoice,
+} from '@/features/accounting/periodShares';
+import { centsFromText, centsToText, formatCents } from '@/features/billing/money';
 import { Button } from '@/shared/ui/Button';
 import { ConfirmChangesDialog } from '@/shared/ui/ConfirmChangesDialog';
 import { changedFields } from '@/shared/ui/fieldChanges';
@@ -17,7 +23,7 @@ import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
-import { PeriodSelect } from './PeriodSelect';
+import { PeriodSharesField } from './PeriodSharesField';
 
 /** Lo que no cambia fuera de contabilidad al corregir un movimiento que viene de otra sección. */
 const ELSEWHERE: Record<string, string> = {
@@ -46,23 +52,29 @@ export function EditMovementDialog({
   const [category, setCategory] = useState(item.category);
   const [method, setMethod] = useState(item.method);
   const [amount, setAmount] = useState(centsToText(item.amountCents));
-  const [period, setPeriod] = useState(item.period && item.period !== dateMonth ? item.period : '');
+  const before = item.shares?.length
+    ? item.shares
+    : [{ period: item.period || dateMonth, amountCents: item.amountCents }];
+  const [period, setPeriod] = useState<PeriodChoice>(() =>
+    initialChoice(before, dateMonth, item.amountCents),
+  );
   const [confirming, setConfirming] = useState(false);
   const categories = useCategories().data ?? [];
   const categoryOptions = useCategoryOptions(item.kind === 'income' ? 'income' : 'expense');
   const save = useAccountingMutation(editMovement);
   const toast = useToast();
   const cents = centsFromText(amount);
-  const invalid = !concept.trim() || !category || cents === null || cents <= 0;
+  const resolved = resolveChoice(period, dateMonth, cents ?? 0);
+  const invalid =
+    !concept.trim() || !category || cents === null || cents <= 0 || resolved.problem !== null;
 
   const label = (code: string) => categories.find((c) => c.code === code)?.label ?? code;
-  const newPeriod = period || dateMonth;
   const changes = changedFields([
     ['Concepto', item.concept, concept.trim()],
     ['Categoría', label(item.category), label(category)],
     ['Forma de pago', methodLabel(item.method), methodLabel(method)],
     ['Importe', formatCents(item.amountCents), formatCents(cents ?? 0)],
-    ['Mes al que corresponde', monthLabel(item.period || dateMonth), monthLabel(newPeriod)],
+    ['Mes al que corresponde', sharesDetail(before), sharesDetail(resolved.effective)],
   ]);
 
   function review(event: FormEvent) {
@@ -82,7 +94,8 @@ export function EditMovementDialog({
         category,
         method,
         amount: amount.trim(),
-        period: newPeriod,
+        period: resolved.period ?? dateMonth,
+        ...(resolved.shares && { shares: resolved.shares }),
       })
       .then(
         () => {
@@ -131,8 +144,9 @@ export function EditMovementDialog({
             onChange={(e) => setAmount(e.target.value)}
           />
         </div>
-        <PeriodSelect
+        <PeriodSharesField
           date={item.date}
+          totalCents={cents ?? 0}
           value={period}
           onChange={setPeriod}
           defaultLabel="El de la fecha"

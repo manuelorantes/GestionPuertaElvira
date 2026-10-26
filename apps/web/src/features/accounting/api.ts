@@ -1,6 +1,7 @@
 import { apiGet, apiSend, apiUpload } from '@/shared/api/client';
 
 import type { EntryKind } from './categories';
+import type { Share } from './periodShares';
 
 export interface LedgerItem {
   source: 'payment' | 'settlement' | 'advance' | 'invoice' | 'manual';
@@ -13,8 +14,10 @@ export interface LedgerItem {
   amountCents: number;
   /** El alumno de un cobro; el resto de movimientos no tiene. */
   studentId: string | null;
-  /** Mes al que corresponde («AAAA-MM»). */
+  /** Primer mes al que corresponde («AAAA-MM»). */
   period: string;
+  /** Lo que corresponde a cada mes. */
+  shares: Share[];
   /** Un cobro, liquidación o anticipo corregido en contabilidad (su recibo o nómina siguen igual). */
   corrected: boolean;
   categoryLabel: string;
@@ -42,12 +45,14 @@ export interface Invoice {
   method: string | null;
   attachmentName: string | null;
   period: string;
+  shares: Share[];
 }
 
 export interface FiscalYear {
   startYear: number;
   label: string;
   openingCents: number;
+  /** Ingresos, gastos y resultado por los meses a los que corresponde; `accumulatedCents`, el saldo al acabar el mes. */
   months: {
     month: string;
     incomeCents: number;
@@ -58,6 +63,8 @@ export interface FiscalYear {
   incomeCents: number;
   expenseCents: number;
   resultCents: number;
+  /** Lo que entró y salió de verdad: lo que el cierre pasa a la siguiente temporada. */
+  cashResultCents: number;
   canClose: boolean;
   closedOn: string | null;
 }
@@ -71,6 +78,8 @@ export interface EntryPayload {
   amount: string;
   /** Mes al que corresponde; sin él, el de la fecha. */
   period: string | null;
+  /** Lo que corresponde a cada mes, si son varios. */
+  shares?: Share[];
 }
 
 const BASE = '/api/admin/accounting';
@@ -89,6 +98,7 @@ export interface ManualEntry {
   method: string;
   amountCents: number;
   period: string;
+  shares: Share[];
 }
 
 export function fetchEntry(id: string): Promise<ManualEntry> {
@@ -117,6 +127,7 @@ export function editMovement(input: {
   method: string;
   amount: string;
   period: string;
+  shares?: Share[];
 }): Promise<void> {
   return apiSend('PUT', `${BASE}/movements`, input);
 }
@@ -142,6 +153,7 @@ export interface InvoiceAmendment {
   category: string;
   amount: string;
   period: string;
+  shares?: Share[];
   paidOn: string | null;
   method: string | null;
 }

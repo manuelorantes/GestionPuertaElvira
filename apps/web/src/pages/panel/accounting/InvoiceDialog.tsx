@@ -5,6 +5,8 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { payInvoice, registerInvoice } from '@/features/accounting/api';
 import { documentProblem } from '@/features/accounting/categories';
 import { useAccountingMutation, useCategoryOptions } from '@/features/accounting/hooks';
+import { resolveChoice, type PeriodChoice } from '@/features/accounting/periodShares';
+import { centsFromText } from '@/features/billing/money';
 import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -15,7 +17,7 @@ import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
-import { PeriodSelect } from './PeriodSelect';
+import { PeriodSharesField } from './PeriodSharesField';
 
 /** «Añadir factura»: datos del proveedor y, si se tiene, el PDF o la foto. */
 export function InvoiceDialog({ onClose }: { onClose: () => void }) {
@@ -28,9 +30,14 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
     amount: '',
     category: '',
     date: todayIso(),
-    // Mes al que corresponde; vacío, el de la factura.
-    period: '',
   });
+  // Mes al que corresponde; por defecto, el de la factura.
+  const [period, setPeriod] = useState<PeriodChoice>({ kind: 'one', period: '' });
+  const resolved = resolveChoice(
+    period,
+    values.date.slice(0, 7),
+    centsFromText(values.amount) ?? 0,
+  );
   const [paid, setPaid] = useState(true);
   // Si la factura ya se registró pero falló el pago, reintentar no debe registrarla otra vez.
   const [createdId, setCreatedId] = useState<string | null>(null);
@@ -43,6 +50,8 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
     if (!id) {
       const form = new FormData();
       Object.entries(values).forEach(([key, value]) => form.append(key, value.trim()));
+      form.append('period', resolved.period ?? '');
+      if (resolved.shares) form.append('shares', JSON.stringify(resolved.shares));
       if (file) form.append('file', file);
       id = await registerInvoice(form);
       setCreatedId(id);
@@ -51,7 +60,11 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
   });
   const year = new Date().getFullYear();
   const invalid =
-    !values.supplier.trim() || !values.concept.trim() || !values.amount.trim() || !values.category;
+    !values.supplier.trim() ||
+    !values.concept.trim() ||
+    !values.amount.trim() ||
+    !values.category ||
+    resolved.problem !== null;
   const set = (key: keyof typeof values) => (value: string) =>
     setValues((current) => ({ ...current, [key]: value }));
 
@@ -160,10 +173,11 @@ export function InvoiceDialog({ onClose }: { onClose: () => void }) {
             fromYear={year - 2}
             toYear={year + 1}
           />
-          <PeriodSelect
+          <PeriodSharesField
             date={values.date}
-            value={values.period}
-            onChange={set('period')}
+            totalCents={centsFromText(values.amount) ?? 0}
+            value={period}
+            onChange={setPeriod}
             defaultLabel="El de la factura"
           />
           <Switch
