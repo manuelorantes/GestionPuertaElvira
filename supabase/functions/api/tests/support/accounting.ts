@@ -12,17 +12,18 @@ import {
   type Transfer,
   type TransferId,
 } from '../../src/domain/accounting/mod.ts';
-import type {
-  AccountingCategoryRepository,
-  DocumentStorage,
-  LedgerCorrections,
-  LedgerLine,
-  LedgerQuery,
-  ManualEntryRepository,
-  PaymentMethods,
-  SeasonClosingRepository,
-  SupplierInvoiceRepository,
-  TransferRepository,
+import {
+  type AccountingCategoryRepository,
+  type DocumentStorage,
+  type LedgerCorrections,
+  type LedgerLine,
+  type LedgerQuery,
+  type ManualEntryRepository,
+  type PaymentMethods,
+  type SeasonClosingRepository,
+  shareViews,
+  type SupplierInvoiceRepository,
+  type TransferRepository,
 } from '../../src/application/accounting/mod.ts';
 import type { ClosedPeriods } from '../../src/application/common/mod.ts';
 import { FrozenClock } from './identity.ts';
@@ -197,6 +198,7 @@ export class AccountingFixture
             method: c.method ?? l.method,
             amountCents: c.amount.cents,
             period: c.period.toString(),
+            shares: shareViews(c.shares),
             corrected: true,
           }
           : l;
@@ -214,6 +216,7 @@ export class AccountingFixture
           amountCents: e.amount.cents,
           studentId: null,
           period: e.period.toString(),
+          shares: shareViews(e.shares),
           corrected: false,
         });
       }
@@ -232,6 +235,7 @@ export class AccountingFixture
           amountCents: i.amount.cents,
           studentId: null,
           period: i.period.toString(),
+          shares: shareViews(i.shares),
           corrected: false,
         });
       }

@@ -21,6 +21,7 @@ import {
   type Method,
   methodFromName,
   MonthlyCategories,
+  PeriodShares,
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
@@ -52,10 +53,15 @@ export interface LedgerLine {
   /** El alumno de un cobro; el resto de movimientos no tiene. */
   studentId: string | null;
   /**
-   * Mes al que corresponde («AAAA-MM»): el de la liquidación o anticipo para el profesorado, el elegido en apuntes y
-   * facturas y, en los cobros, el del cobro.
+   * Primer mes al que corresponde («AAAA-MM»): el de la liquidación o anticipo para el profesorado, el elegido en
+   * apuntes y facturas y, en los cobros, el del cobro (o el primero que paga).
    */
   period: string;
+  /**
+   * Cuánto corresponde a cada mes: en apuntes, facturas y correcciones, lo elegido; en los cobros de cuotas, a partes
+   * iguales entre los meses que pagan; en lo demás, todo a `period`.
+   */
+  shares: ShareView[];
   /** Un cobro, liquidación o anticipo corregido en contabilidad (su recibo o nómina siguen igual). */
   corrected: boolean;
 }
@@ -67,20 +73,97 @@ export interface LedgerQuery {
   linesBetween(from: YearMonth, to: YearMonth): Promise<LedgerLine[]>;
 }
 
-/** Ingresos y gastos de cada mes («AAAA-MM») a partir de sus movimientos. */
+/** Lo que corresponde a un mes («AAAA-MM») de un movimiento. */
+export interface ShareView {
+  period: string;
+  amountCents: number;
+}
+
+export function shareViews(shares: PeriodShares): ShareView[] {
+  return shares.list().map((s) => ({ period: s.period.toString(), amountCents: s.amount.cents }));
+}
+
+/** Ingresos y gastos de cada mes («AAAA-MM») a partir de sus movimientos, por su fecha (cuando se movió el dinero). */
 function totalsByMonth(lines: LedgerLine[]): Map<string, [number, number]> {
+  return addUp(
+    lines.map((l) => ({ month: l.date.slice(0, 7), kind: l.kind, cents: l.amountCents })),
+  );
+}
+
+/** Ingresos y gastos de cada mes («AAAA-MM») por los meses a los que corresponde cada movimiento. */
+function attributedByMonth(lines: LedgerLine[]): Map<string, [number, number]> {
+  return addUp(
+    lines.flatMap((l) =>
+      l.shares.map((s) => ({ month: s.period, kind: l.kind, cents: s.amountCents }))
+    ),
+  );
+}
+
+function addUp(
+  parts: { month: string; kind: string; cents: number }[],
+): Map<string, [number, number]> {
   const totals = new Map<string, [number, number]>();
-  for (const line of lines) {
-    const month = line.date.slice(0, 7);
-    const [income, expenses] = totals.get(month) ?? [0, 0];
+  for (const part of parts) {
+    const [income, expenses] = totals.get(part.month) ?? [0, 0];
     totals.set(
-      month,
-      line.kind === 'income'
-        ? [income + line.amountCents, expenses]
-        : [income, expenses + line.amountCents],
+      part.month,
+      part.kind === 'income' ? [income + part.cents, expenses] : [income, expenses + part.cents],
     );
   }
   return totals;
+}
+
+/**
+ * Los movimientos que corresponden (en parte o del todo) a algún mes entre `first` y `last`: se pagan como mucho un año
+ * antes o después (ver `PeriodShares.MAX_DISTANCE_MONTHS`).
+ */
+export async function linesAttributedTo(
+  ledger: LedgerQuery,
+  first: YearMonth,
+  last: YearMonth,
+): Promise<LedgerLine[]> {
+  let from = first;
+  let to = last;
+  for (let i = 0; i < PeriodShares.MAX_DISTANCE_MONTHS; i++) {
+    from = from.previous();
+    to = to.next();
+  }
+  const [low, high] = [first.toString(), last.toString()];
+  return (await ledger.linesBetween(from, to)).filter((l) =>
+    l.shares.some((s) => s.period >= low && s.period <= high)
+  );
+}
+
+/** Lo que se envía como reparto por meses: cada mes con sus céntimos. */
+export interface ShareInput {
+  period: string;
+  amountCents: number;
+}
+
+/**
+ * El reparto pedido: el de `shares` si viene; si no, todo al mes `period` (o, sin él, null: el de la fecha del
+ * movimiento).
+ */
+function sharesFrom(
+  amount: Money,
+  period: string | null | undefined,
+  shares: readonly ShareInput[] | null | undefined,
+): PeriodShares | null {
+  if (shares && shares.length > 0) {
+    return PeriodShares.of(
+      amount,
+      shares.map((s) => ({
+        period: YearMonth.fromString(s.period),
+        amount: Money.cents(s.amountCents),
+      })),
+    );
+  }
+  return period ? PeriodShares.single(YearMonth.fromString(period), amount) : null;
+}
+
+/** Ningún mes al que corresponde puede ser de una temporada cerrada. */
+async function guardShares(closed: ClosedPeriods, shares: PeriodShares | null): Promise<void> {
+  for (const month of shares?.months() ?? []) await PeriodClosed.guard(closed, month.firstDay());
 }
 
 export interface InvoiceView {
@@ -95,6 +178,7 @@ export interface InvoiceView {
   method: string | null;
   attachmentName: string | null;
   period: string;
+  shares: ShareView[];
 }
 
 export interface InvoiceQuery {
@@ -150,6 +234,8 @@ export interface MovementEdit {
   method: string;
   amount: string;
   period: string;
+  /** Lo que corresponde a cada mes; sin él, todo a `period`. */
+  shares?: ShareInput[] | null;
 }
 
 /**
@@ -173,12 +259,13 @@ export class EditMovement {
     const category = catalog.require(edit.category);
     const method = methodFromName(edit.method);
     const amount = Money.fromDecimal(edit.amount);
-    const period = YearMonth.fromString(edit.period);
+    const shares = sharesFrom(amount, edit.period, edit.shares) as PeriodShares;
+    await guardShares(this.closed, shares);
     if (edit.source === 'manual') {
       const entry = await this.entries.entry(ManualEntryId.fromString(edit.sourceId));
       if (entry === null) throw new EntryNotFound();
       await PeriodClosed.guard(this.closed, entry.date);
-      await this.entries.saveEntry(entry.revise(edit.concept, category, method, amount, period));
+      await this.entries.saveEntry(entry.revise(edit.concept, category, method, amount, shares));
       return;
     }
     if (edit.source === 'invoice') {
@@ -190,7 +277,7 @@ export class EditMovement {
       const concept = edit.concept.startsWith(prefix)
         ? edit.concept.slice(prefix.length)
         : edit.concept;
-      invoice.revise(concept, category, amount, period, method);
+      invoice.revise(concept, category, amount, shares, method);
       await this.invoices.saveInvoice(invoice);
       return;
     }
@@ -213,7 +300,8 @@ export class EditMovement {
         // La de un cobro va en el cobro; la de lo demás, en la corrección.
         isPayment ? null : method,
         amount,
-        period,
+        shares,
+        LocalDate.fromString(line.date),
       ),
     );
   }
@@ -414,11 +502,8 @@ export interface EntryInput {
   amount: string;
   /** Mes al que corresponde («AAAA-MM»); sin él, el de la fecha. */
   period?: string | null;
-}
-
-/** Mes opcional de un formulario. */
-function periodOf(value: string | null | undefined): YearMonth | null {
-  return value ? YearMonth.fromString(value) : null;
+  /** Lo que corresponde a cada mes, si son varios. */
+  shares?: ShareInput[] | null;
 }
 
 export class RecordEntry {
@@ -434,6 +519,9 @@ export class RecordEntry {
     if (input.kind !== 'income' && input.kind !== 'expense') {
       throw new InvalidValue('kind', 'Indica si es un ingreso o un gasto.');
     }
+    const amount = Money.fromDecimal(input.amount);
+    const shares = sharesFrom(amount, input.period, input.shares);
+    await guardShares(this.closed, shares);
     const entry = ManualEntry.record(
       ManualEntryId.generate(),
       date,
@@ -441,8 +529,8 @@ export class RecordEntry {
       input.concept,
       (await this.categories.catalog()).require(input.category),
       methodFromName(input.method),
-      Money.fromDecimal(input.amount),
-      periodOf(input.period),
+      amount,
+      shares,
     );
     await this.entries.saveEntry(entry);
     return entry.id.value;
@@ -459,6 +547,7 @@ export interface ManualEntryView {
   method: Method;
   amountCents: number;
   period: string;
+  shares: ShareView[];
 }
 
 export class ShowEntry {
@@ -476,6 +565,7 @@ export class ShowEntry {
       method: entry.method,
       amountCents: entry.amount.cents,
       period: entry.period.toString(),
+      shares: shareViews(entry.shares),
     };
   }
 }
@@ -503,6 +593,8 @@ export interface InvoiceInput {
   amount: string;
   /** Mes al que corresponde («AAAA-MM»); sin él, el de la factura. */
   period?: string | null;
+  /** Lo que corresponde a cada mes, si son varios. */
+  shares?: ShareInput[] | null;
 }
 
 export class RegisterInvoice {
@@ -516,6 +608,9 @@ export class RegisterInvoice {
   async execute(input: InvoiceInput, document: UploadedDocument | null): Promise<string> {
     const date = LocalDate.fromString(input.date);
     await PeriodClosed.guard(this.closed, date);
+    const amount = Money.fromDecimal(input.amount);
+    const shares = sharesFrom(amount, input.period, input.shares);
+    await guardShares(this.closed, shares);
     const invoice = SupplierInvoice.register(
       SupplierInvoiceId.generate(),
       date,
@@ -523,8 +618,8 @@ export class RegisterInvoice {
       input.supplier,
       input.concept,
       (await this.categories.catalog()).require(input.category),
-      Money.fromDecimal(input.amount),
-      periodOf(input.period),
+      amount,
+      shares,
     );
     if (document !== null) {
       invoice.attach(await storeDocument(this.storage, invoice.id.value, document));
@@ -558,6 +653,8 @@ export interface InvoiceAmendmentInput {
   category: string;
   amount: string;
   period: string;
+  /** Lo que corresponde a cada mes; sin él, todo a `period`. */
+  shares?: ShareInput[] | null;
   paidOn: string | null;
   method: string | null;
 }
@@ -580,6 +677,7 @@ export class AmendInvoice {
     for (const date of [invoice.paidOn() ?? invoice.date, amendment.date, amendment.paidOn]) {
       if (date !== null) await PeriodClosed.guard(this.closed, date);
     }
+    await guardShares(this.closed, amendment.shares);
     invoice.amend(amendment);
     await this.invoices.saveInvoice(invoice);
   }
@@ -589,14 +687,15 @@ export class AmendInvoice {
     paid: boolean,
   ): Promise<InvoiceAmendment> {
     const catalog = await this.categories.catalog();
+    const amount = Money.fromDecimal(input.amount);
     return {
       date: LocalDate.fromString(input.date),
       number: input.number,
       supplier: input.supplier,
       concept: input.concept,
       category: catalog.require(input.category),
-      amount: Money.fromDecimal(input.amount),
-      period: YearMonth.fromString(input.period),
+      amount,
+      shares: sharesFrom(amount, input.period, input.shares) as PeriodShares,
       // El pago solo cuenta en una factura pagada; en una pendiente se ignora.
       paidOn: paid && input.paidOn !== null ? LocalDate.fromString(input.paidOn) : null,
       method: paid && input.method !== null ? methodFromName(input.method) : null,
@@ -701,6 +800,10 @@ export interface FiscalYearView {
   startYear: number;
   label: string;
   openingCents: number;
+  /**
+   * Ingresos, gastos y resultado de cada mes por los meses a los que corresponde cada movimiento; `accumulatedCents` es
+   * el saldo del club al acabar el mes (lo arrastrado más lo que se ha movido de verdad hasta entonces).
+   */
   months: {
     month: string;
     incomeCents: number;
@@ -711,11 +814,18 @@ export interface FiscalYearView {
   incomeCents: number;
   expenseCents: number;
   resultCents: number;
+  /** Lo que entró y salió de verdad en el ejercicio (por fecha): es lo que el cierre arrastra al siguiente. */
+  cashIncomeCents: number;
+  cashExpenseCents: number;
+  cashResultCents: number;
   canClose: boolean;
   closedOn: string | null;
 }
 
-/** El ejercicio mes a mes: ingresos, gastos, resultado y acumulado desde el saldo arrastrado. */
+/**
+ * El ejercicio mes a mes: ingresos, gastos y resultado de lo que corresponde a cada mes, y el saldo desde lo arrastrado
+ * por lo que se movió de verdad.
+ */
 export class FiscalYearSummary {
   constructor(
     private readonly ledger: LedgerQuery,
@@ -733,14 +843,22 @@ export class FiscalYearSummary {
     let accumulated = opening;
     let income = 0;
     let expenses = 0;
-    const byMonth = totalsByMonth(
+    let cashIncome = 0;
+    let cashExpenses = 0;
+    const paid = totalsByMonth(
       await this.ledger.linesBetween(year.firstMonth(), year.lastMonth()),
+    );
+    const byMonth = attributedByMonth(
+      await linesAttributedTo(this.ledger, year.firstMonth(), year.lastMonth()),
     );
     for (const month of year.months()) {
       const [monthIncome, monthExpenses] = byMonth.get(month.toString()) ?? [0, 0];
-      accumulated += monthIncome - monthExpenses;
+      const [paidIn, paidOut] = paid.get(month.toString()) ?? [0, 0];
+      accumulated += paidIn - paidOut;
       income += monthIncome;
       expenses += monthExpenses;
+      cashIncome += paidIn;
+      cashExpenses += paidOut;
       months.push({
         month: month.toString(),
         incomeCents: monthIncome,
@@ -759,6 +877,9 @@ export class FiscalYearSummary {
       incomeCents: income,
       expenseCents: expenses,
       resultCents: income - expenses,
+      cashIncomeCents: cashIncome,
+      cashExpenseCents: cashExpenses,
+      cashResultCents: cashIncome - cashExpenses,
       canClose: closing === null && !current.isBefore(year.lastMonth()),
       closedOn: closing?.closedOn.toString() ?? null,
     };
@@ -802,8 +923,8 @@ export class CloseSeason {
     await this.closings.saveClosing(
       SeasonClosing.close(
         year,
-        Money.cents(view.incomeCents),
-        Money.cents(view.expenseCents),
+        Money.cents(view.cashIncomeCents),
+        Money.cents(view.cashExpenseCents),
         await this.treasury.yearCash(year),
         LocalDate.fromInstant(this.clock.now()),
       ),

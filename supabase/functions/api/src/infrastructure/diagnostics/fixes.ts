@@ -184,13 +184,13 @@ export class UseCaseFixExecutor implements FixExecutor {
       const entry = await accounting.entry(ManualEntryId.fromString(id));
       if (entry === null) throw new EntryNotFound();
       await accounting.saveEntry(
-        entry.revise(entry.concept, target, entry.method, entry.amount, entry.period),
+        entry.revise(entry.concept, target, entry.method, entry.amount, entry.shares),
       );
       return;
     }
     const invoice = await accounting.invoice(SupplierInvoiceId.fromString(id));
     if (invoice === null) throw new SupplierInvoiceNotFound();
-    invoice.revise(invoice.concept, target, invoice.amount, invoice.period, invoice.method());
+    invoice.revise(invoice.concept, target, invoice.amount, invoice.shares, invoice.method());
     await accounting.saveInvoice(invoice);
   }
 

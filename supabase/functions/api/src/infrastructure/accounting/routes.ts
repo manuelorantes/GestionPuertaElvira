@@ -28,6 +28,7 @@ import {
   RemoveCategory,
   RenameCategory,
   SetMonthlyCategories,
+  type ShareInput,
   ShowEntry,
   SupplierInvoiceNotFound,
   TreasuryBalances,
@@ -83,6 +84,28 @@ const field = (form: FormData, name: string): string => {
   const value = form.get(name);
   return typeof value === 'string' ? value : '';
 };
+
+/** El reparto por meses de un cuerpo JSON («shares»: [{ period, amountCents }]); sin él, null. */
+function sharesIn(body: JsonBody): ShareInput[] | null {
+  const shares = body.objectList('shares').map((s) => ({
+    period: s.requiredString('period'),
+    amountCents: s.requiredInt('amountCents'),
+  }));
+  return shares.length > 0 ? shares : null;
+}
+
+/** El mismo reparto en un formulario con documento: el campo «shares» lleva el JSON. */
+function sharesInForm(form: FormData): ShareInput[] | null {
+  const raw = field(form, 'shares');
+  if (raw === '') return null;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new InvalidValue('shares', 'El reparto por meses no es válido.');
+  }
+  return sharesIn(JsonBody.fromUnknown({ shares: parsed }));
+}
 
 /** Rutas de contabilidad: /api/admin/accounting */
 export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage): void {
@@ -153,6 +176,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
       method: b.requiredString('method'),
       amount: b.requiredString('amount'),
       period: b.optionalString('period'),
+      shares: sharesIn(b),
     });
     return c.json({ id }, 201);
   });
@@ -173,6 +197,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
       method: b.requiredString('method'),
       amount: b.requiredString('amount'),
       period: b.requiredString('period'),
+      shares: sharesIn(b),
     });
     return c.body(null, 204);
   });
@@ -248,6 +273,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
         category: field(form, 'category'),
         amount: field(form, 'amount'),
         period: field(form, 'period') || null,
+        shares: sharesInForm(form),
       },
       await document(form, false),
     );
@@ -268,6 +294,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
         category: b.requiredString('category'),
         amount: b.requiredString('amount'),
         period: b.requiredString('period'),
+        shares: sharesIn(b),
         paidOn: b.optionalString('paidOn') ?? null,
         method: b.optionalString('method') ?? null,
       });
