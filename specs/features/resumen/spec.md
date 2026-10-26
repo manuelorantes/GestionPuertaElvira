@@ -30,9 +30,9 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
 - **Ingresos y gastos de cada mes**: todo lo que entra y sale en cada mes, por fecha (cuadra con los totales de
   Contabilidad de ese mes).
 - **Cuotas vs gastos fijos**: lo que corresponde a cada mes, solo las [categorías del mes](../contabilidad/spec.md)
-  de Contabilidad, cada movimiento en el mes al que corresponde. Las cuotas mensuales, repartidas a partes iguales
-  entre los meses que paga cada cobro; lo del profesorado, en el mes de la liquidación; apuntes y facturas, en su mes
-  al que corresponde. Sobre los ingresos de cada mes, apiladas en el verde claro de los grupos de iniciación, las
+  de Contabilidad, cada movimiento en los meses a los que corresponde (repartido si son varios). Las cuotas
+  mensuales, repartidas a partes iguales entre los meses que paga cada cobro; lo del profesorado, en el mes de la
+  liquidación; apuntes y facturas, en los meses a los que corresponden. Sobre los ingresos de cada mes, apiladas en el verde claro de los grupos de iniciación, las
   **cuotas previstas**: lo que falta por cobrar de las cuotas mensuales de ese mes. En el mes en curso y los pasados,
   lo pendiente de las cuotas emitidas (una cuota cancelada ya no se debe y desaparece de ahí); en los meses que
   vienen, además, las que se emitirán a los alumnos matriculados hoy que aún no tengan la de ese mes (las
