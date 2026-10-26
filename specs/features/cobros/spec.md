@@ -130,8 +130,11 @@ Al bajar una cuota por debajo de lo que ya tiene cubierto, administración MUST 
 diferencia: cambiar la cantidad pagada (marcado por defecto), con lo que el recibo que pagó ese mes (o, si no lo
 hay, el cobro mensual más reciente del alumno) baja esa diferencia con una línea de corrección que lleva el motivo,
 o dejarla como saldo a favor del alumno. Con «este y los siguientes» se corrige así cada mes que tuviera algo
-cubierto. Subir una cuota pagada no toca ningún cobro: queda pagada en parte. Sin ningún cobro que corregir, la
-diferencia queda como saldo a favor.
+cubierto. Sin ningún cobro que corregir, la diferencia queda como saldo a favor.
+Al subir una cuota cobrada, administración MUST confirmar antes si se pagó el importe nuevo (marcado por defecto: se
+registró mal), con lo que el recibo que pagó ese mes (o, si no lo hay, el cobro mensual más reciente) sube la
+diferencia con una línea de corrección y la cuota sigue cobrada, o si falta por pagar, con lo que no se toca ningún
+cobro y queda pagada en parte. Con «este y los siguientes» se corrige así cada mes que estuviera cobrado.
 
 #### Scenario: Bajar una cuota ya cobrada
 - **WHEN** la cuota de octubre de Alvaro es de 55 € y está cobrada con el recibo R-2026-0412, y administración la
@@ -141,10 +144,20 @@ diferencia queda como saldo a favor.
 Lo que se sube a mano a una cuota MUST cubrirse lo último: si el alumno ya la tenía cubierta, esa cuota queda
 «Pagada en parte» con la diferencia y los meses siguientes no cambian de estado. Al devolverla al importe calculado
 (o fijar su descuento) vuelve a cubrirse como las demás.
+Lo que paga un cobro de ese mes, o lo que se sube al corregir el importe de un recibo que lo cubre, MUST quedarse en
+esa cuota aunque se subiera a mano, sin repartirse a otras cuotas pendientes.
 
 #### Scenario: Subir a mano un mes ya pagado
 - **WHEN** un alumno pagó el curso entero (octubre a 32 € y el resto a 44 €) y administración fija octubre en 35 €
-- **THEN** octubre queda «Pagada en parte» con 3 € pendientes y junio sigue «Cobrada»
+  desmarcando «Se pagó el importe nuevo»
+- **THEN** octubre queda «Pagada en parte» con 3 € pendientes y junio sigue «Cobrada»; si lo deja marcado, el recibo
+  que pagó octubre sube 3 € con la línea «Corrección: cuota de octubre 2026 de 32 € a 35 € (motivo)» y octubre sigue
+  «Cobrada»
+
+#### Scenario: Pagar el euro que falta de una cuota subida a mano
+- **WHEN** a un alumno le falta 1 € de septiembre (subida a mano) y 20 € de octubre, y administración corrige el recibo
+  de septiembre sumándole 1 € (o cobra un mes)
+- **THEN** septiembre queda «Cobrada» y a octubre le siguen faltando 20 €
 
 #### Scenario: Un mes cobrado de más y el siguiente de menos
 - **WHEN** un alumno pagó 50 € por septiembre (debían ser 25 €) y 25 € por octubre, y administración fija septiembre en 25 € y octubre en 50 €
