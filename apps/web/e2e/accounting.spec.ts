@@ -76,3 +76,39 @@ test('should split an invoice between the months it applies to', async ({ page }
   await expect(row).toContainText('−90 €');
   await expect(row).toContainText('Corresponde a');
 });
+
+test('should pay an expected expense for another amount than expected', async ({ page }) => {
+  const concept = `Limpieza de prueba ${Date.now()}`;
+  await openAccounting(page, '?pestana=ajustes');
+  await page.getByRole('button', { name: 'Añadir gasto esperado' }).click();
+  const define = page.getByRole('dialog', { name: 'Añadir gasto esperado' });
+  await define.getByLabel('Concepto').fill(concept);
+  await define.getByLabel('Categoría').selectOption('cleaning');
+  await define.getByLabel('Importe esperado (€)').fill('120');
+  // Todo el año, para que se espere también si el test corre en verano.
+  await define.getByRole('button', { name: 'julio' }).click();
+  await define.getByRole('button', { name: 'agosto' }).click();
+  await define.getByRole('button', { name: 'Guardar' }).click();
+  await expect(page.getByText('Gasto esperado añadido')).toBeVisible();
+  await expect(
+    page
+      .getByRole('table', { name: 'Gastos esperados' })
+      .getByRole('row', { name: new RegExp(concept) }),
+  ).toContainText('120 €');
+
+  await page.getByRole('tab', { name: 'Movimientos' }).click();
+  const card = page.getByRole('region', { name: /Gastos esperados de/ });
+  await card.getByRole('button', { name: `Pagar ${concept}` }).click();
+  const pay = page.getByRole('dialog', { name: `Pagar ${concept}` });
+  await expect(pay.getByLabel('Importe pagado (€)')).toHaveValue('120');
+  await pay.getByLabel('Importe pagado (€)').fill('135,50');
+  await pay.getByRole('button', { name: 'Pagar' }).click();
+  await expect(page.getByText(new RegExp(`${concept} de .* pagado`))).toBeVisible();
+
+  await expect(card.getByText('se esperaban 120 €')).toBeVisible();
+  const row = page.getByRole('table', { name: /Movimientos de/ }).getByRole('row', {
+    name: new RegExp(concept),
+  });
+  await expect(row).toContainText('−135,50 €');
+  await expect(row).toContainText('Limpieza');
+});

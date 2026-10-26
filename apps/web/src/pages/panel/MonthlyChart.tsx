@@ -32,7 +32,7 @@ function describe(m: ChartMonth): string {
   const extras = [
     (m.expectedCents ?? 0) > 0 ? `cuotas previstas ${formatCents(m.expectedCents ?? 0)}` : null,
     (m.expectedExpenseCents ?? 0) > 0
-      ? `profesorado previsto ${formatCents(m.expectedExpenseCents ?? 0)}`
+      ? `gastos previstos ${formatCents(m.expectedExpenseCents ?? 0)}`
       : null,
   ].filter((part) => part !== null);
   return [
@@ -44,7 +44,7 @@ function describe(m: ChartMonth): string {
 
 /**
  * Barras de ingresos y gastos por mes (sin dependencias de gráficos); lo previsto, apilado sobre lo real: las cuotas
- * sobre los ingresos y el profesorado sobre los gastos.
+ * sobre los ingresos y los gastos previstos (profesorado y gastos esperados sin pagar) sobre los gastos.
  */
 export function MonthlyChart({ months, current, label, id: chartId }: MonthlyChartProps) {
   // La barra señalada (al pasar el ratón o al tocarla) muestra su importe.

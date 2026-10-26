@@ -27,6 +27,7 @@ import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
 import { EditMovementDialog } from './EditMovementDialog';
 import { EntryDialog } from './EntryDialog';
+import { ExpectedMonthCard } from './ExpectedMonthCard';
 
 import { MovementConcept } from './MovementConcept';
 
@@ -343,34 +344,37 @@ export function LedgerTab({
       </div>
       <div className="flex flex-wrap items-start gap-6">
         <Card className="min-w-0 flex-[2_1_560px]">{renderTable()}</Card>
-        <Card className="flex min-w-0 flex-[1_1_280px] flex-col gap-3.5 p-6">
-          <section aria-label={`Gastos de ${label}`} className="flex flex-col gap-3.5">
-            <h2 className="font-display text-xl font-semibold tracking-[0.04em] uppercase">
-              Gastos de {label}
-            </h2>
-            {(data?.expensesByCategory ?? []).length === 0 && (
-              <p className="text-sm text-ink-muted">Sin gastos este mes.</p>
-            )}
-            {(data?.expensesByCategory ?? []).map((c) => (
-              <div key={c.category} className="flex flex-col gap-1.5">
-                <div className="flex justify-between text-sm">
-                  <span>{c.label}</span>
-                  <span className="font-semibold">{formatCents(c.amountCents)}</span>
+        <div className="flex min-w-0 flex-[1_1_280px] flex-col gap-6">
+          <ExpectedMonthCard month={month} />
+          <Card className="flex min-w-0 flex-col gap-3.5 p-6">
+            <section aria-label={`Gastos de ${label}`} className="flex flex-col gap-3.5">
+              <h2 className="font-display text-xl font-semibold tracking-[0.04em] uppercase">
+                Gastos de {label}
+              </h2>
+              {(data?.expensesByCategory ?? []).length === 0 && (
+                <p className="text-sm text-ink-muted">Sin gastos este mes.</p>
+              )}
+              {(data?.expensesByCategory ?? []).map((c) => (
+                <div key={c.category} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between text-sm">
+                    <span>{c.label}</span>
+                    <span className="font-semibold">{formatCents(c.amountCents)}</span>
+                  </div>
+                  <div aria-hidden className="h-2 overflow-hidden rounded-full bg-line-soft">
+                    <div
+                      className="h-full rounded-full bg-ink-strong"
+                      style={{ width: `${(c.amountCents / maxCategory) * 100}%` }}
+                    />
+                  </div>
                 </div>
-                <div aria-hidden className="h-2 overflow-hidden rounded-full bg-line-soft">
-                  <div
-                    className="h-full rounded-full bg-ink-strong"
-                    style={{ width: `${(c.amountCents / maxCategory) * 100}%` }}
-                  />
-                </div>
+              ))}
+              <div className="flex justify-between border-t border-line-strong pt-3 font-semibold">
+                <span>Total</span>
+                <span>{formatCents(data?.expenseCents ?? 0)}</span>
               </div>
-            ))}
-            <div className="flex justify-between border-t border-line-strong pt-3 font-semibold">
-              <span>Total</span>
-              <span>{formatCents(data?.expenseCents ?? 0)}</span>
-            </div>
-          </section>
-        </Card>
+            </section>
+          </Card>
+        </div>
       </div>
       {adding && <EntryDialog onClose={() => setAdding(false)} />}
       {editing && (

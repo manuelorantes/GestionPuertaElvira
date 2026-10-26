@@ -55,6 +55,19 @@ export function useTransfers() {
   return useQuery({ queryKey: ['accounting-transfers'], queryFn: api.fetchTransfers });
 }
 
+export function useExpectedExpenses() {
+  return useQuery({ queryKey: ['expected-expenses'], queryFn: api.fetchExpectedExpenses });
+}
+
+/** Los gastos esperados de un mes y cómo quedó cada uno. */
+export function useExpectedMonth(month: string) {
+  return useQuery({
+    queryKey: ['expected-month', month],
+    queryFn: () => api.fetchExpectedMonth(month),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useMonthlyCategories() {
   return useQuery({ queryKey: ['monthly-categories'], queryFn: api.fetchMonthlyCategories });
 }

@@ -249,3 +249,85 @@ export async function recordTransfer(input: {
 export function deleteTransfer(id: string): Promise<void> {
   return apiSend('DELETE', `${BASE}/transfers/${id}`);
 }
+
+/** Gasto que el club espera cada mes (alquiler, limpieza…), con lo que suele costar. */
+export interface ExpectedExpense {
+  id: string;
+  concept: string;
+  category: string;
+  categoryLabel: string;
+  amountCents: number;
+  /** Meses del año (1 a 12) en que se espera, de septiembre a agosto. */
+  months: number[];
+  /** Mes («AAAA-MM») desde el que se espera. */
+  since: string;
+}
+
+export interface ExpectedExpenseInput {
+  concept: string;
+  category: string;
+  amount: string;
+  months: number[];
+}
+
+/** Un gasto esperado en un mes: pendiente, pagado (con lo que costó) o «No hay este mes». */
+export interface ExpectedMonth {
+  expenseId: string;
+  concept: string;
+  category: string;
+  categoryLabel: string;
+  period: string;
+  expectedCents: number;
+  status: 'pending' | 'paid' | 'skipped';
+  paidCents: number | null;
+  entryId: string | null;
+  paidOn: string | null;
+}
+
+export async function fetchExpectedExpenses(): Promise<ExpectedExpense[]> {
+  return (await apiGet<{ items: ExpectedExpense[] }>(`${BASE}/expected`)).items;
+}
+
+export async function defineExpectedExpense(input: ExpectedExpenseInput): Promise<string> {
+  return (await apiSend<{ id: string }>('POST', `${BASE}/expected`, input)).id;
+}
+
+export function reviseExpectedExpense(input: { id: string } & ExpectedExpenseInput): Promise<void> {
+  const { id, ...body } = input;
+  return apiSend('PUT', `${BASE}/expected/${id}`, body);
+}
+
+export function removeExpectedExpense(id: string): Promise<void> {
+  return apiSend('DELETE', `${BASE}/expected/${id}`);
+}
+
+export async function fetchExpectedMonth(month: string): Promise<ExpectedMonth[]> {
+  return (
+    await apiGet<{ items: ExpectedMonth[] }>(
+      `${BASE}/expected/month?month=${encodeURIComponent(month)}`,
+    )
+  ).items;
+}
+
+export async function payExpected(input: {
+  id: string;
+  month: string;
+  date: string;
+  method: string;
+  amount: string;
+  period: string;
+  shares?: Share[];
+}): Promise<string> {
+  const { id, month, ...body } = input;
+  return (
+    await apiSend<{ id: string }>('POST', `${BASE}/expected/${id}/months/${month}/payment`, body)
+  ).id;
+}
+
+export function skipExpected(input: { id: string; month: string }): Promise<void> {
+  return apiSend('POST', `${BASE}/expected/${input.id}/months/${input.month}/skip`);
+}
+
+export function restoreExpected(input: { id: string; month: string }): Promise<void> {
+  return apiSend('DELETE', `${BASE}/expected/${input.id}/months/${input.month}/skip`);
+}
