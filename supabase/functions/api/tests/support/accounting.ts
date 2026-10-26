@@ -2,6 +2,8 @@ import { type LocalDate, YearMonth } from '../../src/domain/common/mod.ts';
 import {
   type Category,
   CategoryCatalog,
+  type ExpectedExpense,
+  type ExpectedExpenseId,
   FiscalYear,
   type LedgerCorrection,
   type ManualEntry,
@@ -15,6 +17,8 @@ import {
 import {
   type AccountingCategoryRepository,
   type DocumentStorage,
+  type ExpectedExpenseRepository,
+  type ExpectedSettlement,
   type LedgerCorrections,
   type LedgerLine,
   type LedgerQuery,
@@ -40,7 +44,64 @@ export class AccountingFixture
     AccountingCategoryRepository,
     LedgerCorrections,
     PaymentMethods,
-    TransferRepository {
+    TransferRepository,
+    ExpectedExpenseRepository {
+  expectedList = new Map<string, ExpectedExpense>();
+  /** «gasto/mes» → id del apunte con que se pagó, o null si se saltó. */
+  expectedMonths = new Map<string, string | null>();
+
+  expectedExpenses(): Promise<ExpectedExpense[]> {
+    return Promise.resolve([...this.expectedList.values()]);
+  }
+
+  expectedExpense(id: ExpectedExpenseId): Promise<ExpectedExpense | null> {
+    return Promise.resolve(this.expectedList.get(id.value) ?? null);
+  }
+
+  saveExpectedExpense(expense: ExpectedExpense): Promise<void> {
+    this.expectedList.set(expense.id.value, expense);
+    return Promise.resolve();
+  }
+
+  deleteExpectedExpense(id: ExpectedExpenseId): Promise<void> {
+    this.expectedList.delete(id.value);
+    for (const key of [...this.expectedMonths.keys()]) {
+      if (key.startsWith(`${id.value}/`)) this.expectedMonths.delete(key);
+    }
+    return Promise.resolve();
+  }
+
+  settlements(first: YearMonth, last: YearMonth): Promise<ExpectedSettlement[]> {
+    const list: ExpectedSettlement[] = [];
+    for (const [key, entryId] of this.expectedMonths) {
+      const [expenseId = '', period = ''] = key.split('/');
+      if (period < first.toString() || period > last.toString()) continue;
+      const entry = entryId === null ? null : this.entries.get(entryId) ?? null;
+      list.push({
+        expenseId,
+        period,
+        entryId,
+        amountCents: entry?.amount.cents ?? null,
+        date: entry?.date.toString() ?? null,
+      });
+    }
+    return Promise.resolve(list);
+  }
+
+  settleExpected(
+    id: ExpectedExpenseId,
+    period: YearMonth,
+    entry: ManualEntryId | null,
+  ): Promise<void> {
+    this.expectedMonths.set(`${id.value}/${period.toString()}`, entry?.value ?? null);
+    return Promise.resolve();
+  }
+
+  unsettleExpected(id: ExpectedExpenseId, period: YearMonth): Promise<void> {
+    this.expectedMonths.delete(`${id.value}/${period.toString()}`);
+    return Promise.resolve();
+  }
+
   customCategories: Category[] = [];
   transferList = new Map<string, Transfer>();
 
@@ -131,6 +192,10 @@ export class AccountingFixture
 
   deleteEntry(id: ManualEntryId): Promise<void> {
     this.entries.delete(id.value);
+    // Como en la base: el mes que pagaba vuelve a estar pendiente.
+    for (const [key, entryId] of this.expectedMonths) {
+      if (entryId === id.value) this.expectedMonths.delete(key);
+    }
     return Promise.resolve();
   }
 

@@ -10,6 +10,7 @@ export type RuleCode =
   | 'generic_category'
   | 'invoice_duplicates_entry'
   | 'teacher_expense_as_entry'
+  | 'expected_unpaid'
   | 'ledger_payments_mismatch'
   | 'student_overpaid'
   | 'charge_cover_inconsistent'
@@ -62,6 +63,12 @@ export const RULE_CATALOGUE: readonly RuleDefinition[] = [
     title: 'Gasto de «Profesores» que nombra a un profesor',
     severity: 'money',
     hasFix: true,
+  },
+  {
+    code: 'expected_unpaid',
+    title: 'Gasto esperado sin pagar de un mes pasado',
+    severity: 'money',
+    hasFix: false,
   },
   {
     code: 'ledger_payments_mismatch',

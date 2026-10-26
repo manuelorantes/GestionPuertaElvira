@@ -73,6 +73,16 @@ export class JsonBody {
     return value as string[];
   }
 
+  /** Lista de enteros, o null si no viene. */
+  optionalIntList(field: string): number[] | null {
+    const value = this.data[field];
+    if (value === null || value === undefined) return null;
+    if (!Array.isArray(value) || !value.every((item) => Number.isInteger(item))) {
+      throw new InvalidValue(field, `El campo «${field}» debe ser una lista de números enteros.`);
+    }
+    return value as number[];
+  }
+
   objectList(field: string): JsonBody[] {
     const value = this.data[field] ?? [];
     if (

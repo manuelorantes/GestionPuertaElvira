@@ -292,6 +292,119 @@ export class PeriodShares {
   }
 }
 
+export class ExpectedExpenseId extends Uuid {}
+
+/**
+ * Gasto que el club espera cada mes (alquiler, limpieza, presidencia…), con lo que suele costar. Se espera en sus meses
+ * del año (`months`, de 1 a 12; por defecto, de septiembre a junio) desde el mes `since`. Lo que cuesta de verdad cada
+ * mes es el apunte con que se paga.
+ */
+export class ExpectedExpense {
+  static readonly SEASON_MONTHS: readonly number[] = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6];
+  private static readonly CONCEPT_MAX = 120;
+
+  private constructor(
+    readonly id: ExpectedExpenseId,
+    private currentConcept: string,
+    private currentCategory: string,
+    private currentAmount: Money,
+    private currentMonths: number[],
+    private currentSince: YearMonth,
+  ) {}
+
+  static define(
+    id: ExpectedExpenseId,
+    concept: string,
+    category: Category,
+    amount: Money,
+    months: readonly number[] | null,
+    since: YearMonth,
+  ): ExpectedExpense {
+    const expense = new ExpectedExpense(id, '', '', amount, [], since);
+    expense.revise(concept, category, amount, months, since);
+    return expense;
+  }
+
+  static restore(fields: {
+    id: ExpectedExpenseId;
+    concept: string;
+    category: string;
+    amount: Money;
+    months: number[];
+    since: YearMonth;
+  }): ExpectedExpense {
+    return new ExpectedExpense(
+      fields.id,
+      fields.concept,
+      fields.category,
+      fields.amount,
+      fields.months,
+      fields.since,
+    );
+  }
+
+  revise(
+    concept: string,
+    category: Category,
+    amount: Money,
+    months: readonly number[] | null,
+    since: YearMonth,
+  ): void {
+    const clean = concept.trim();
+    if (clean === '' || clean.length > ExpectedExpense.CONCEPT_MAX) {
+      throw new InvalidValue('concept', 'Indica el concepto (hasta 120 caracteres).');
+    }
+    if (category.kind !== 'expense') {
+      throw new InvalidValue(
+        'category',
+        'Un gasto esperado tiene que ser de una categoría de gasto.',
+      );
+    }
+    if (category.code === 'teachers') {
+      throw new InvalidValue(
+        'category',
+        'Lo del profesorado ya se prevé con su horario: no hace falta como gasto esperado.',
+      );
+    }
+    if (amount.cents <= 0) throw new InvalidValue('amount', 'El importe debe ser mayor que cero.');
+    const chosen = [...new Set(months ?? ExpectedExpense.SEASON_MONTHS)];
+    if (chosen.length === 0 || chosen.some((m) => !Number.isInteger(m) || m < 1 || m > 12)) {
+      throw new InvalidValue('months', 'Elige en qué meses del año se espera.');
+    }
+    this.currentConcept = clean;
+    this.currentCategory = category.code;
+    this.currentAmount = amount;
+    this.currentMonths = chosen.sort((a, b) => (a + 3) % 12 - (b + 3) % 12);
+    this.currentSince = since;
+  }
+
+  get concept(): string {
+    return this.currentConcept;
+  }
+
+  get category(): string {
+    return this.currentCategory;
+  }
+
+  /** Lo que suele costar cada mes. */
+  get amount(): Money {
+    return this.currentAmount;
+  }
+
+  /** Meses del año en que se espera (1 a 12), de septiembre a agosto. */
+  get months(): number[] {
+    return [...this.currentMonths];
+  }
+
+  get since(): YearMonth {
+    return this.currentSince;
+  }
+
+  expectedIn(month: YearMonth): boolean {
+    return !month.isBefore(this.currentSince) && this.currentMonths.includes(month.month);
+  }
+}
+
 /** Ejercicio contable del club: de septiembre a agosto. */
 export class FiscalYear {
   constructor(readonly startYear: number) {}
