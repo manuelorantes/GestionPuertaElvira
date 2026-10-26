@@ -4,6 +4,8 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { recordEntry } from '@/features/accounting/api';
 import { METHODS, type EntryKind } from '@/features/accounting/categories';
 import { useAccountingMutation, useCategoryOptions } from '@/features/accounting/hooks';
+import { resolveChoice, type PeriodChoice } from '@/features/accounting/periodShares';
+import { centsFromText } from '@/features/billing/money';
 import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -14,7 +16,7 @@ import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 
-import { PeriodSelect } from './PeriodSelect';
+import { PeriodSharesField } from './PeriodSharesField';
 
 /** «Añadir movimiento»: ingreso o gasto anotado a mano. */
 export function EntryDialog({ onClose }: { onClose: () => void }) {
@@ -24,12 +26,13 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
   const [category, setCategory] = useState('');
   const [method, setMethod] = useState('transfer');
   const [amount, setAmount] = useState('');
-  const [period, setPeriod] = useState('');
+  const [period, setPeriod] = useState<PeriodChoice>({ kind: 'one', period: '' });
   const save = useAccountingMutation(recordEntry);
   const categories = useCategoryOptions(kind);
   const toast = useToast();
   const year = new Date().getFullYear();
-  const invalid = !concept.trim() || !category || !amount.trim();
+  const resolved = resolveChoice(period, date.slice(0, 7), centsFromText(amount) ?? 0);
+  const invalid = !concept.trim() || !category || !amount.trim() || resolved.problem !== null;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -42,7 +45,8 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
         category,
         method,
         amount: amount.trim(),
-        period: period || null,
+        period: resolved.period,
+        ...(resolved.shares && { shares: resolved.shares }),
       })
       .then(
         () => {
@@ -85,12 +89,6 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
           fromYear={year - 2}
           toYear={year + 1}
         />
-        <PeriodSelect
-          date={date}
-          value={period}
-          onChange={setPeriod}
-          defaultLabel="El de la fecha"
-        />
         <TextField label="Concepto" value={concept} onChange={(e) => setConcept(e.target.value)} />
         <Select
           label="Categoría"
@@ -108,6 +106,13 @@ export function EntryDialog({ onClose }: { onClose: () => void }) {
             onChange={(e) => setAmount(e.target.value)}
           />
         </div>
+        <PeriodSharesField
+          date={date}
+          totalCents={centsFromText(amount) ?? 0}
+          value={period}
+          onChange={setPeriod}
+          defaultLabel="El de la fecha"
+        />
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
             Cancelar

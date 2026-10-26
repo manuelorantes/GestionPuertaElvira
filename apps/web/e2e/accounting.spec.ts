@@ -49,3 +49,30 @@ test('should show the season month by month', async ({ page }) => {
   await expect(page.getByRole('table', { name: /mes a mes/ })).toBeVisible();
   await expect(page.getByRole('region', { name: /Cierre de temporada/ })).toContainText('Abierta');
 });
+
+test('should split an invoice between the months it applies to', async ({ page }) => {
+  // Con una factura: un apunte manual se cruzaría con el test del historial, que mira el último.
+  await openAccounting(page, '?pestana=facturas');
+  await page.getByRole('button', { name: 'Añadir factura' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Añadir factura' });
+  await dialog.getByLabel('Proveedor').fill('Agencia Tributaria');
+  await dialog.getByLabel('Concepto').fill('IVA de prueba repartido');
+  await dialog.getByLabel('Importe (€)').fill('90');
+  await dialog.getByLabel('Categoría').selectOption('other_expenses');
+  await dialog.getByLabel('Mes al que corresponde').selectOption('many');
+  // Ya lleva el mes de la factura; se añade otro.
+  const months = dialog.getByRole('group', { name: 'Meses a los que corresponde' });
+  await months.getByRole('button', { pressed: false }).last().click();
+  await expect(dialog.getByText('Repartido a partes iguales.')).toBeVisible();
+  await expect(dialog.getByLabel(/^[A-Z][a-z]+ \d{4} \(€\)$/)).toHaveCount(2);
+  await dialog.getByRole('button', { name: 'Guardar factura' }).click();
+  await expect(page.getByText('Factura registrada')).toBeVisible();
+
+  await page.getByRole('tab', { name: 'Movimientos' }).click();
+  const row = page.getByRole('table', { name: /Movimientos de/ }).getByRole('row', {
+    name: /IVA de prueba repartido/,
+  });
+  await expect(row).toContainText('−90 €');
+  await expect(row).toContainText('Corresponde a');
+});

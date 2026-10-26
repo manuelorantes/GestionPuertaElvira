@@ -8,7 +8,13 @@ import {
   useCategories,
   useCategoryOptions,
 } from '@/features/accounting/hooks';
-import { centsFromText, centsToText, formatCents, monthLabel } from '@/features/billing/money';
+import {
+  initialChoice,
+  resolveChoice,
+  sharesDetail,
+  type PeriodChoice,
+} from '@/features/accounting/periodShares';
+import { centsFromText, centsToText, formatCents } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -20,7 +26,7 @@ import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
-import { PeriodSelect } from './PeriodSelect';
+import { PeriodSharesField } from './PeriodSharesField';
 
 const monthOf = (date: string) => date.slice(0, 7);
 
@@ -36,11 +42,13 @@ export function EditInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onCl
     category: invoice.category,
     amount: centsToText(invoice.amountCents),
     date: invoice.date,
-    // Mes al que corresponde; vacío, el de la fecha de la factura.
-    period: invoice.period !== monthOf(invoice.date) ? invoice.period : '',
     paidOn: invoice.paidOn ?? '',
     method: invoice.method ?? 'transfer',
   });
+  // Mes al que corresponde; vacío, el de la fecha de la factura.
+  const [period, setPeriod] = useState<PeriodChoice>(() =>
+    initialChoice(invoice.shares, monthOf(invoice.date), invoice.amountCents),
+  );
   const [confirming, setConfirming] = useState(false);
   const categories = useCategories().data ?? [];
   // Lo del profesorado sale de sus liquidaciones, no de facturas.
@@ -50,7 +58,10 @@ export function EditInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onCl
   const year = new Date().getFullYear();
   const paid = invoice.paidOn !== null;
   const cents = centsFromText(values.amount);
+  const date = values.date || invoice.date;
+  const resolved = resolveChoice(period, monthOf(date), cents ?? 0);
   const invalid =
+    resolved.problem !== null ||
     !values.supplier.trim() ||
     !values.concept.trim() ||
     !values.category ||
@@ -62,8 +73,6 @@ export function EditInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onCl
     setValues((current) => ({ ...current, [key]: value }));
 
   const label = (code: string) => categories.find((c) => c.code === code)?.label ?? code;
-  const date = values.date || invoice.date;
-  const period = values.period || monthOf(date);
   const paymentChanges: FieldChange[] = paid
     ? [
         ['Fecha de pago', formatDate(invoice.paidOn ?? ''), formatDate(values.paidOn)],
@@ -77,7 +86,13 @@ export function EditInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onCl
     ['Categoría', label(invoice.category), label(values.category)],
     ['Importe', formatCents(invoice.amountCents), formatCents(cents ?? 0)],
     ['Fecha de la factura', formatDate(invoice.date), formatDate(date)],
-    ['Mes al que corresponde', monthLabel(invoice.period), monthLabel(period)],
+    [
+      'Mes al que corresponde',
+      sharesDetail(
+        invoice.shares ?? [{ period: invoice.period, amountCents: invoice.amountCents }],
+      ),
+      sharesDetail(resolved.effective),
+    ],
     ...paymentChanges,
   ]);
 
@@ -99,7 +114,8 @@ export function EditInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onCl
           concept: values.concept.trim(),
           category: values.category,
           amount: values.amount.trim(),
-          period,
+          period: resolved.period ?? monthOf(date),
+          ...(resolved.shares && { shares: resolved.shares }),
           paidOn: paid ? values.paidOn : null,
           method: paid ? values.method : null,
         },
@@ -174,10 +190,11 @@ export function EditInvoiceDialog({ invoice, onClose }: { invoice: Invoice; onCl
             fromYear={year - 2}
             toYear={year + 1}
           />
-          <PeriodSelect
+          <PeriodSharesField
             date={date}
-            value={values.period}
-            onChange={set('period')}
+            totalCents={cents ?? 0}
+            value={period}
+            onChange={setPeriod}
             defaultLabel="El de la factura"
           />
           {paid && (

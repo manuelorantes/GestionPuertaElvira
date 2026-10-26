@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 
 import { deleteEntry, type LedgerItem } from '@/features/accounting/api';
 import { useAccountingMutation, useLedger } from '@/features/accounting/hooks';
+import { sharesDetail, sharesLabel } from '@/features/accounting/periodShares';
 import {
   applyLedgerFilter,
   emptyFilterMessage,
@@ -209,11 +210,7 @@ function LedgerTable({
               <td className="px-3 py-3 text-ink-muted">{formatDate(item.date)}</td>
               <td className="px-3 py-3 font-medium">
                 <MovementConcept concept={item.concept} studentId={item.studentId} />
-                {item.period && item.period !== item.date.slice(0, 7) && (
-                  <span className="block text-[12px] font-normal text-ink-muted">
-                    Corresponde a {monthLabel(item.period).toLowerCase()}
-                  </span>
-                )}
+                <AppliesTo item={item} />
                 {item.corrected && (
                   <span
                     className="block text-[12px] font-normal text-warning-fg"
@@ -402,5 +399,19 @@ export function LedgerTab({
         />
       )}
     </div>
+  );
+}
+
+/** «Corresponde a septiembre 2026» o «a octubre, noviembre y diciembre 2026» cuando no es el mes de su fecha. */
+function AppliesTo({ item }: { item: LedgerItem }) {
+  const shares = item.shares?.length
+    ? item.shares
+    : [{ period: item.period, amountCents: item.amountCents }];
+  const own = shares.length === 1 && shares[0]?.period === item.date.slice(0, 7);
+  if (own || !shares[0]?.period) return null;
+  return (
+    <span className="block text-[12px] font-normal text-ink-muted" title={sharesDetail(shares)}>
+      Corresponde a {sharesLabel(shares)}
+    </span>
   );
 }
