@@ -24,7 +24,9 @@ obligaba a tocar recibos o descuentos. El club quiere reorganizar las cuotas sin
   fijarla a mano): el reparto cubre primero lo que cada cuota debía por sí misma, de la más antigua a la más reciente,
   y después lo que se subió a mano, en el mismo orden. Así, subir a mano un mes ya cubierto lo deja «pagado en parte»
   en vez de mover la falta al mes más reciente (que es lo que se quiere cuando cambia la tarifa, no cuando se corrige
-  un mes). Al volver al importe calculado se olvida.
+  un mes). Al volver al importe calculado se olvida. Lo que paga un cobro de ese mes, o lo que se sube al corregir
+  un recibo que lo cubre (también al subir la cuota indicando que se pagó el importe nuevo), deja de contar como
+  subido a mano: ese dinero se queda en ese mes en vez de pasar a cubrir otra cuota pendiente.
 - **Recálculo automático**: al cambiar lo que determina la cuota de un alumno (grupos, horario especial, familia
   directa, precio de particulares o tarifa de un grupo), las cuotas no fijadas a mano se recalculan desde el mes
   siguiente, o desde el actual si es del día 1 al 10, hasta junio, estén cobradas o no. La diferencia aparece como
