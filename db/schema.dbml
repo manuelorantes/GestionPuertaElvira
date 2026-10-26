@@ -288,6 +288,8 @@ Table accounting_entry {
   category varchar(20) [not null, note: 'categoría fija coherente con el tipo']
   method varchar(10) [not null, note: 'cash | transfer | card']
   amount_cents int [not null, note: '> 0']
+  period varchar(7) [note: 'AAAA-MM: (primer) mes al que corresponde; nulo = el de entry_date']
+  period_shares jsonb [note: 'reparto por meses [{period, amount_cents}] que suma amount_cents; nulo = todo a period']
 
   indexes {
     entry_date [name: 'accounting_entry_date_idx']
@@ -302,6 +304,8 @@ Table accounting_invoice {
   concept varchar(120) [not null]
   category varchar(20) [not null, note: 'categoría de gasto']
   amount_cents int [not null]
+  period varchar(7) [note: 'AAAA-MM: (primer) mes al que corresponde; nulo = el de invoice_date']
+  period_shares jsonb [note: 'reparto por meses [{period, amount_cents}] que suma amount_cents; nulo = todo a period']
   paid_on date [note: 'nulo = pendiente; cuenta como gasto en esta fecha']
   method varchar(10)
   attachment_key varchar(200) [note: 'clave en el almacenamiento de documentos']
@@ -314,10 +318,26 @@ Table accounting_invoice {
   }
 }
 
+Table accounting_correction {
+  source varchar(20) [not null, note: 'payment | settlement | advance']
+  source_id varchar(80) [not null]
+  concept varchar(200) [not null]
+  category varchar(20) [not null]
+  method varchar(10) [note: 'nulo = la del movimiento (la de un cobro cambia en el cobro)']
+  amount_cents int [not null, note: '> 0']
+  period varchar(7) [not null, note: 'AAAA-MM: (primer) mes al que corresponde']
+  period_shares jsonb [note: 'reparto por meses [{period, amount_cents}]; nulo = todo a period']
+
+  indexes {
+    (source, source_id) [pk]
+  }
+  Note: 'Cómo sale en el libro un movimiento de Cobros o Profesorado; el cobro o la nómina no cambian'
+}
+
 Table accounting_closing {
   start_year smallint [pk, note: 'ejercicio de septiembre de start_year a agosto siguiente']
-  income_cents int [not null]
-  expense_cents int [not null]
+  income_cents int [not null, note: 'lo que entró en el ejercicio, por fecha (no por mes al que corresponde)']
+  expense_cents int [not null, note: 'lo que salió en el ejercicio, por fecha']
   cash_cents int [not null, default: 0, note: 'lo que el ejercicio movió en caja (efectivo y traspasos)']
   closed_on date [not null]
   Note: 'Bloquea todo lo fechado en el ejercicio; su resultado pasa como saldo inicial del siguiente, repartido entre banco y caja'

@@ -49,6 +49,7 @@ function setUp() {
       amountCents: 4500,
       studentId: 'martina',
       period: '2026-10',
+      shares: [{ period: '2026-10', amountCents: 4500 }],
       corrected: false,
     },
     {
@@ -62,6 +63,7 @@ function setUp() {
       amountCents: 41600,
       studentId: null,
       period: '2026-09',
+      shares: [{ period: '2026-09', amountCents: 41600 }],
       corrected: false,
     },
   ];
@@ -159,13 +161,18 @@ Deno.test('FiscalYearSummary should summarise the year month by month with the o
   assertEquals(summary.openingCents, 60000);
   assertEquals(summary.months.length, 12);
   const october = summary.months[1];
-  assertEquals([
-    october?.month,
-    october?.incomeCents,
-    october?.expenseCents,
-    october?.resultCents,
-    october?.accumulatedCents,
-  ], ['2026-10', 4500, 41600, -37100, 60000 - 37100]);
+  assertEquals(
+    [
+      october?.month,
+      october?.incomeCents,
+      october?.expenseCents,
+      october?.resultCents,
+      october?.accumulatedCents,
+    ],
+    ['2026-10', 4500, 0, 4500, 60000 - 37100],
+    'la liquidación de septiembre cuenta en septiembre',
+  );
+  assertEquals(summary.months[0]?.expenseCents, 41600);
   assertEquals(summary.resultCents, -38100);
   assertEquals(summary.canClose, true);
   assertEquals(summary.closedOn, null);
@@ -203,6 +210,7 @@ Deno.test('CloseSeason should refuse while an older season with movements is ope
     amountCents: 4500,
     studentId: 'martina',
     period: '2024-10',
+    shares: [{ period: '2024-10', amountCents: 4500 }],
     corrected: false,
   }];
   await assertRejects(() => close().execute(2026), PreviousSeasonOpen);
@@ -351,6 +359,7 @@ Deno.test('EditMovement should edit entries and invoices, and correct payments o
     amountCents: 8500,
     studentId: null,
     period: '2026-09',
+    shares: [{ period: '2026-09', amountCents: 8500 }],
     corrected: false,
   });
 
@@ -524,4 +533,156 @@ Deno.test('CloseSeason should freeze what the season moved in cash', async () =>
   const closing = await fx.closing(new FiscalYear(2026));
   assertEquals(closing?.cash.cents, 16500);
   assertEquals(closing?.bankResult().cents, -41600 - 12000);
+});
+
+Deno.test('FiscalYearSummary should count each movement in the months it applies to, keeping the balance by payment date', async () => {
+  const { fx } = setUp();
+  // El IVA del cuarto trimestre se paga el 20 de enero y corresponde a octubre, noviembre y diciembre.
+  await new RecordEntry(fx, fx, fx).execute({
+    date: '2027-01-20',
+    kind: 'expense',
+    concept: 'IVA cuarto trimestre',
+    category: 'other_expenses',
+    method: 'transfer',
+    amount: '300',
+    shares: [
+      { period: '2026-10', amountCents: 10000 },
+      { period: '2026-11', amountCents: 10000 },
+      { period: '2026-12', amountCents: 10000 },
+    ],
+  });
+  // Un cobro de tres meses cuenta un tercio en cada uno.
+  fx.external.push({
+    source: 'payment',
+    sourceId: 'p3',
+    date: '2026-11-03',
+    kind: 'income',
+    concept: '3 meses · Hugo Ruiz',
+    category: 'fees',
+    method: 'transfer',
+    amountCents: 12150,
+    studentId: 'hugo',
+    period: '2026-11',
+    shares: [
+      { period: '2026-11', amountCents: 4050 },
+      { period: '2026-12', amountCents: 4050 },
+      { period: '2027-01', amountCents: 4050 },
+    ],
+    corrected: false,
+  });
+  const summary = await new FiscalYearSummary(fx, fx, fx.clock).execute(2026);
+  const month = (m: string) => summary.months.find((row) => row.month === m);
+  assertEquals(
+    ['2026-10', '2026-11', '2026-12', '2027-01'].map((m) => [
+      month(m)?.incomeCents,
+      month(m)?.expenseCents,
+    ]),
+    [[4500, 10000], [4050, 10000], [4050, 10000], [4050, 0]],
+  );
+  // El saldo sigue al dinero: el IVA sale en enero y el cobro entra entero en noviembre.
+  assertEquals(
+    ['2026-10', '2026-11', '2026-12', '2027-01'].map((m) => month(m)?.accumulatedCents),
+    [-37100, -37100 + 12150, -37100 + 12150, -37100 + 12150 - 30000],
+  );
+  assertEquals(summary.resultCents, 4500 + 12150 - 41600 - 30000);
+  assertEquals(summary.cashResultCents, 4500 + 12150 - 41600 - 30000);
+});
+
+Deno.test('a movement cannot apply to the months of a closed season, and the closing keeps what was paid', async () => {
+  const { fx, close } = setUp();
+  // Pagado en septiembre de 2027, corresponde a junio de 2027.
+  await new RecordEntry(fx, fx, fx).execute({
+    date: '2027-08-20',
+    kind: 'expense',
+    concept: 'IVA segundo trimestre',
+    category: 'other_expenses',
+    method: 'transfer',
+    amount: '90',
+  });
+  await close().execute(2026);
+  assertEquals((await fx.closing(new FiscalYear(2026)))?.result().cents, -37100 - 9000);
+  const fresh = new AccountingFixture('2027-10-05T10:00:00+02:00');
+  await fresh.saveClosing(
+    SeasonClosing.close(
+      new FiscalYear(2026),
+      Money.zero(),
+      Money.zero(),
+      Money.zero(),
+      LocalDate.fromString('2027-09-01'),
+    ),
+  );
+  await assertRejects(
+    () =>
+      new RecordEntry(fresh, fresh, fresh).execute({
+        date: '2027-10-01',
+        kind: 'expense',
+        concept: 'IVA tercer trimestre',
+        category: 'other_expenses',
+        method: 'transfer',
+        amount: '90',
+        shares: [
+          { period: '2027-08', amountCents: 3000 },
+          { period: '2027-09', amountCents: 6000 },
+        ],
+      }),
+    PeriodClosed,
+  );
+});
+
+Deno.test('entries, invoices and corrections keep the months they apply to', async () => {
+  const { fx, registerInvoice } = setUp();
+  const invoice = await new RegisterInvoice(fx, fx, fx, fx).execute({
+    date: '2027-01-15',
+    number: 'H-1',
+    supplier: 'Hacienda',
+    concept: 'IVA',
+    category: 'other_expenses',
+    amount: '300',
+    shares: [
+      { period: '2026-10', amountCents: 5000 },
+      { period: '2026-11', amountCents: 25000 },
+    ],
+  }, null);
+  await new PayInvoice(fx, fx).execute(invoice, '2027-01-20', 'transfer');
+  const line = (await new MonthLedger(fx, fx).execute('2027-01')).lines[0];
+  assertEquals(line?.shares, [
+    { period: '2026-10', amountCents: 5000 },
+    { period: '2026-11', amountCents: 25000 },
+  ]);
+  void registerInvoice;
+
+  // Corregir en contabilidad un cobro de octubre para que cuente en septiembre y octubre.
+  await new EditMovement(fx, fx, fx, fx, fx, fx, fx).execute({
+    source: 'payment',
+    sourceId: 'p1',
+    month: '2026-10',
+    concept: 'Octubre 2026 · Martina López',
+    category: 'fees',
+    method: 'cash',
+    amount: '45',
+    period: '2026-10',
+    shares: [
+      { period: '2026-09', amountCents: 2000 },
+      { period: '2026-10', amountCents: 2500 },
+    ],
+  });
+  const payment = (await new MonthLedger(fx, fx).execute('2026-10')).lines.find((l) =>
+    l.sourceId === 'p1'
+  );
+  assertEquals(payment?.shares.map((s) => s.period), ['2026-09', '2026-10']);
+  await assertRejects(
+    () =>
+      new EditMovement(fx, fx, fx, fx, fx, fx, fx).execute({
+        source: 'payment',
+        sourceId: 'p1',
+        month: '2026-10',
+        concept: 'Octubre',
+        category: 'fees',
+        method: 'cash',
+        amount: '45',
+        period: '2026-10',
+        shares: [{ period: '2026-10', amountCents: 4000 }],
+      }),
+    InvalidValue,
+  );
 });

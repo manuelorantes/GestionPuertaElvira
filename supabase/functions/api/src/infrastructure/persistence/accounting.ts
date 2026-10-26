@@ -11,6 +11,7 @@ import {
   ManualEntryId,
   methodFromName,
   MonthlyCategories,
+  PeriodShares,
   SeasonClosing,
   SupplierInvoice,
   SupplierInvoiceId,
@@ -27,6 +28,7 @@ import type {
   LedgerQuery,
   ManualEntryRepository,
   SeasonClosingRepository,
+  ShareView,
   SupplierInvoiceRepository,
   TransferRepository,
 } from '../../application/accounting/mod.ts';
@@ -63,12 +65,20 @@ export class SqlAccountingRepository
 
   async saveCorrection(c: LedgerCorrection): Promise<void> {
     await this.sql`INSERT INTO accounting_correction
-      (source, source_id, concept, category, method, amount_cents, period)
+      (source, source_id, concept, category, method, amount_cents, period, period_shares)
       VALUES (${c.source}, ${c.sourceId}, ${c.concept}, ${c.category}, ${c.method},
-              ${c.amount.cents}, ${c.period.toString()})
+              ${c.amount.cents}, ${c.period.toString()}, ${this.sharesColumn(c.shares)})
       ON CONFLICT (source, source_id) DO UPDATE SET concept = EXCLUDED.concept,
         category = EXCLUDED.category, method = EXCLUDED.method,
-        amount_cents = EXCLUDED.amount_cents, period = EXCLUDED.period`;
+        amount_cents = EXCLUDED.amount_cents, period = EXCLUDED.period,
+        period_shares = EXCLUDED.period_shares`;
+  }
+
+  /** Nulo si todo corresponde a un solo mes (el de `period`). */
+  private sharesColumn(shares: PeriodShares) {
+    return shares.isSingle() ? null : this.sql.json(
+      shares.list().map((s) => ({ period: s.period.toString(), amount_cents: s.amount.cents })),
+    );
   }
 
   async categoryInUse(code: string): Promise<boolean> {
@@ -99,6 +109,7 @@ export class SqlAccountingRepository
     const rows = await this.sql`SELECT * FROM accounting_entry WHERE id = ${id.value}`;
     if (!rows[0]) return null;
     const r = new Row(rows[0]);
+    const amount = Money.cents(r.int('amount_cents'));
     return ManualEntry.restore({
       id: ManualEntryId.fromString(r.string('id')),
       date: LocalDate.fromString(r.string('entry_date')),
@@ -106,17 +117,20 @@ export class SqlAccountingRepository
       concept: r.string('concept'),
       category: r.string('category'),
       method: methodFromName(r.string('method')),
-      amount: Money.cents(r.int('amount_cents')),
-      period: periodOf(r.nullableString('period')),
+      amount,
+      shares: storedShares(r, amount),
     });
   }
 
   async saveEntry(e: ManualEntry): Promise<void> {
     await this
-      .sql`INSERT INTO accounting_entry (id, entry_date, kind, concept, category, method, amount_cents, period)
-      VALUES (${e.id.value}, ${e.date.toString()}, ${e.kind}, ${e.concept}, ${e.category}, ${e.method}, ${e.amount.cents}, ${e.period.toString()})
+      .sql`INSERT INTO accounting_entry (id, entry_date, kind, concept, category, method, amount_cents, period, period_shares)
+      VALUES (${e.id.value}, ${e.date.toString()}, ${e.kind}, ${e.concept}, ${e.category}, ${e.method}, ${e.amount.cents}, ${e.period.toString()}, ${
+      this.sharesColumn(e.shares)
+    })
       ON CONFLICT (id) DO UPDATE SET concept = EXCLUDED.concept, category = EXCLUDED.category,
-        method = EXCLUDED.method, amount_cents = EXCLUDED.amount_cents, period = EXCLUDED.period`;
+        method = EXCLUDED.method, amount_cents = EXCLUDED.amount_cents, period = EXCLUDED.period,
+        period_shares = EXCLUDED.period_shares`;
   }
 
   async deleteEntry(id: ManualEntryId): Promise<void> {
@@ -130,6 +144,7 @@ export class SqlAccountingRepository
     const key = r.nullableString('attachment_key');
     const paidOn = r.nullableString('paid_on');
     const method = r.nullableString('method');
+    const amount = Money.cents(r.int('amount_cents'));
     return SupplierInvoice.restore({
       id: SupplierInvoiceId.fromString(r.string('id')),
       date: LocalDate.fromString(r.string('invoice_date')),
@@ -137,8 +152,8 @@ export class SqlAccountingRepository
       supplier: r.string('supplier'),
       concept: r.string('concept'),
       category: r.string('category'),
-      amount: Money.cents(r.int('amount_cents')),
-      period: periodOf(r.nullableString('period')),
+      amount,
+      shares: storedShares(r, amount),
       paidOn: paidOn === null ? null : LocalDate.fromString(paidOn),
       method: method === null ? null : methodFromName(method),
       attachment: key === null ? null : new Attachment(
@@ -161,6 +176,7 @@ export class SqlAccountingRepository
       category: i.category,
       amount_cents: i.amount.cents,
       period: i.period.toString(),
+      period_shares: this.sharesColumn(i.shares),
       paid_on: i.paidOn()?.toString() ?? null,
       method: i.method() ?? null,
       attachment_key: a?.key ?? null,
@@ -179,6 +195,7 @@ export class SqlAccountingRepository
         'category',
         'amount_cents',
         'period',
+        'period_shares',
         'paid_on',
         'method',
         'attachment_key',
@@ -256,8 +273,46 @@ function toTransfer(r: Row): Transfer {
   });
 }
 
-function periodOf(value: string | null): YearMonth | null {
-  return value === null ? null : YearMonth.fromString(value);
+/** El reparto guardado; sin él, todo al mes de `period` (o, en filas antiguas sin mes, null: el de su fecha). */
+function storedShares(r: Row, amount: Money): PeriodShares | null {
+  const stored = shareList(r.json('period_shares'));
+  if (stored !== null) {
+    return PeriodShares.of(
+      amount,
+      stored.map((s) => ({
+        period: YearMonth.fromString(s.period),
+        amount: Money.cents(s.amountCents),
+      })),
+    );
+  }
+  const period = r.nullableString('period');
+  return period === null ? null : PeriodShares.single(YearMonth.fromString(period), amount);
+}
+
+function shareList(value: unknown): ShareView[] | null {
+  if (!Array.isArray(value)) return null;
+  return value.map((item: { period: string; amount_cents: number }) => ({
+    period: item.period,
+    amountCents: item.amount_cents,
+  }));
+}
+
+/**
+ * Lo que corresponde a cada mes de una línea del libro: el reparto de su corrección o el suyo y, si no tiene, en los
+ * cobros de cuotas, a partes iguales entre los meses que pagan (como el resumen); si no, todo a su mes.
+ */
+function lineShares(r: Row, amountCents: number): ShareView[] {
+  const amount = Money.cents(amountCents);
+  const stored = shareList(r.json('shares'));
+  if (stored !== null) return stored;
+  const paid = r.json('paid_periods');
+  const periods = !r.bool('corrected') && Array.isArray(paid) && paid.length > 0
+    ? (paid as string[]).map((p) => YearMonth.fromString(p))
+    : [YearMonth.fromString(r.string('period'))];
+  return PeriodShares.equal(amount, periods).list().map((s) => ({
+    period: s.period.toString(),
+    amountCents: s.amount.cents,
+  }));
 }
 
 function toClosing(r: Row): SeasonClosing {
@@ -288,6 +343,10 @@ export class SqlInvoiceQuery implements InvoiceQuery {
       method: r.nullableString('method'),
       attachmentName: r.nullableString('attachment_name'),
       period: r.nullableString('period') ?? r.string('invoice_date').slice(0, 7),
+      shares: shareList(r.json('period_shares')) ?? [{
+        period: r.nullableString('period') ?? r.string('invoice_date').slice(0, 7),
+        amountCents: r.int('amount_cents'),
+      }],
     }));
   }
 }
@@ -308,12 +367,14 @@ export class SqlLedgerQuery implements LedgerQuery {
       SELECT u.source, u.source_id, u.date, u.kind,
              COALESCE(c.concept, u.concept) AS concept, COALESCE(c.category, u.category) AS category,
              COALESCE(c.method, u.method) AS method, COALESCE(c.amount_cents, u.amount) AS amount,
-             u.student_id, COALESCE(c.period, u.period) AS period, c.source IS NOT NULL AS corrected
+             u.student_id, COALESCE(c.period, u.period) AS period, c.source IS NOT NULL AS corrected,
+             CASE WHEN c.source IS NOT NULL THEN c.period_shares ELSE u.shares END AS shares, u.paid_periods
         FROM (
       SELECT 'payment' AS source, p.id::text AS source_id, p.paid_on::text AS date, 'income' AS kind,
              p.concept || ' · ' || s.full_name AS concept,
              CASE p.kind WHEN 'membership' THEN 'membership' WHEN 'material' THEN 'material_sales' ELSE 'fees' END AS category, p.method, p.total_cents AS amount,
-             p.student_id::text AS student_id, to_char(p.paid_on, 'YYYY-MM') AS period
+             p.student_id::text AS student_id, to_char(p.paid_on, 'YYYY-MM') AS period,
+             NULL::jsonb AS shares, CASE WHEN p.kind = 'monthly' THEN p.periods::jsonb END AS paid_periods
         FROM billing_payment p JOIN students_student s ON s.id = p.student_id
        WHERE p.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
@@ -321,39 +382,43 @@ export class SqlLedgerQuery implements LedgerQuery {
              'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', 'transfer',
              -- Lo adelantado a cuenta de ese mes ya salió como anticipo.
              st.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM payroll_advance a
-                WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0), NULL, st.month
+                WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0), NULL, st.month, NULL, NULL
         FROM payroll_settlement st JOIN teachers_teacher t ON t.id = st.teacher_id
        WHERE st.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
       SELECT 'advance', a.teacher_id::text || '/' || a.id::text, a.paid_on::text, 'expense',
              'Anticipo a cuenta de ' || a.month || ' · ' || t.full_name || COALESCE(' · ' || a.note, ''),
-             'teachers', 'transfer', a.amount_cents, NULL, a.month
+             'teachers', 'transfer', a.amount_cents, NULL, a.month, NULL, NULL
         FROM payroll_advance a JOIN teachers_teacher t ON t.id = a.teacher_id
        WHERE a.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
       SELECT 'invoice', i.id::text, i.paid_on::text, 'expense', i.supplier || ' · ' || i.concept, i.category, i.method, i.amount_cents, NULL,
-             COALESCE(i.period, to_char(i.invoice_date, 'YYYY-MM'))
+             COALESCE(i.period, to_char(i.invoice_date, 'YYYY-MM')), i.period_shares, NULL
         FROM accounting_invoice i
        WHERE i.paid_on BETWEEN ${from} AND ${to}
       UNION ALL
       SELECT 'manual', e.id::text, e.entry_date::text, e.kind, e.concept, e.category, e.method, e.amount_cents, NULL,
-             COALESCE(e.period, to_char(e.entry_date, 'YYYY-MM'))
+             COALESCE(e.period, to_char(e.entry_date, 'YYYY-MM')), e.period_shares, NULL
         FROM accounting_entry e
        WHERE e.entry_date BETWEEN ${from} AND ${to}
         ) u
         LEFT JOIN accounting_correction c ON c.source = u.source AND c.source_id = u.source_id`;
-    return Row.all(rows).map((r) => ({
-      source: r.string('source'),
-      sourceId: r.string('source_id'),
-      date: r.string('date'),
-      kind: r.string('kind'),
-      concept: r.string('concept'),
-      category: r.string('category'),
-      method: r.string('method'),
-      amountCents: r.int('amount'),
-      studentId: r.nullableString('student_id'),
-      period: r.string('period'),
-      corrected: r.bool('corrected'),
-    }));
+    return Row.all(rows).map((r) => {
+      const shares = lineShares(r, r.int('amount'));
+      return {
+        source: r.string('source'),
+        sourceId: r.string('source_id'),
+        date: r.string('date'),
+        kind: r.string('kind'),
+        concept: r.string('concept'),
+        category: r.string('category'),
+        method: r.string('method'),
+        amountCents: r.int('amount'),
+        studentId: r.nullableString('student_id'),
+        period: shares[0]?.period ?? r.string('period'),
+        shares,
+        corrected: r.bool('corrected'),
+      };
+    });
   }
 }
