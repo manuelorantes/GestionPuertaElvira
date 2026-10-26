@@ -161,3 +161,18 @@ Deno.test('teacher_expense_as_entry should flag a «Profesores» entry naming a 
   assertStringIncludes(found[0]?.proposal ?? '', 'anticipo');
   assertStringIncludes(found[0]?.proposal ?? '', 'Jorge Rivas Pérez');
 });
+
+Deno.test('expected_unpaid should tell the expected expenses of past months still pending', () => {
+  const facts = factsWith({
+    expectedPending: [
+      { expenseId: 'x1', concept: 'Limpieza', period: '2026-09', expectedCents: 12000 },
+    ],
+  });
+  const found = ofRule(facts, 'expected_unpaid');
+  assertEquals(found.map((c) => [c.entity.kind, c.entity.id, c.entity.label, c.fix]), [
+    ['club', 'x1/2026-09', 'Limpieza · septiembre 2026', null],
+  ]);
+  assertEquals(found[0]?.data, { expenseId: 'x1', period: '2026-09' });
+  assertStringIncludes(found[0]?.explanation ?? '', '120 €');
+  assertStringIncludes(found[0]?.proposal ?? '', 'No hay este mes');
+});

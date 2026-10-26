@@ -196,6 +196,10 @@ export function titleOf(
       return monthLabel(text(row, 'month'));
     case 'accounting_entry':
       return join(text(row, 'concept'), dateLabel(text(row, 'entry_date')));
+    case 'accounting_expected_expense':
+      return text(row, 'concept');
+    case 'accounting_expected_month':
+      return monthLabel(text(row, 'period'));
     case 'accounting_invoice':
       return join(text(row, 'number'), text(row, 'supplier'));
     case 'accounting_transfer':

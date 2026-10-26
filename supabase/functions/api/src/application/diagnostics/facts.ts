@@ -68,6 +68,13 @@ export interface FactLedgerLine {
   amountCents: number;
 }
 
+export interface FactExpectedPending {
+  expenseId: string;
+  concept: string;
+  period: string;
+  expectedCents: number;
+}
+
 export interface FactEntry {
   id: string;
   date: string;
@@ -139,6 +146,8 @@ export interface Facts {
   ledger: FactLedgerLine[];
   entries: FactEntry[];
   invoices: FactInvoice[];
+  /** Gastos esperados de los meses pasados de la temporada que siguen sin pagar ni saltar. */
+  expectedPending: FactExpectedPending[];
   categories: FactCategory[];
   teachers: FactTeacher[];
   teacherMonths: FactTeacherMonth[];

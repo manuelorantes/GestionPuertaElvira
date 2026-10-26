@@ -7,6 +7,8 @@ import {
   CategoryCatalog,
   categoryKind,
   categoryLabel,
+  ExpectedExpense,
+  ExpectedExpenseId,
   FiscalYear,
   InvoiceAlreadyPaid,
   ManualEntry,
@@ -423,5 +425,65 @@ Deno.test('entries and invoices can apply to several months, no further than a y
       ),
     InvalidValue,
     'un año',
+  );
+});
+
+Deno.test('ExpectedExpense should be expected in its months of the year from the month it starts', () => {
+  const cleaning = ExpectedExpense.define(
+    ExpectedExpenseId.generate(),
+    'Limpieza',
+    cat('cleaning'),
+    Money.euros(120),
+    null,
+    YearMonth.fromString('2026-10'),
+  );
+  const month = (m: string) => YearMonth.fromString(m);
+  assertEquals(
+    cleaning.months,
+    [9, 10, 11, 12, 1, 2, 3, 4, 5, 6],
+    'por defecto, de septiembre a junio',
+  );
+  assert(cleaning.expectedIn(month('2026-11')));
+  assertFalse(cleaning.expectedIn(month('2026-09')), 'antes de empezar');
+  assertFalse(cleaning.expectedIn(month('2027-07')), 'en julio no hay');
+
+  cleaning.revise('Limpieza del local', cat('cleaning'), Money.euros(130), [
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+  ], month('2026-09'));
+  assert(cleaning.expectedIn(month('2027-07')));
+  assertEquals([cleaning.concept, cleaning.amount.cents], ['Limpieza del local', 13000]);
+});
+
+Deno.test('ExpectedExpense should need a concept, an expense category other than teachers, an amount and months', () => {
+  const define = (category: string, euros: number, months: number[] | null, concept = 'Alquiler') =>
+    ExpectedExpense.define(
+      ExpectedExpenseId.generate(),
+      concept,
+      cat(category),
+      Money.euros(euros),
+      months,
+      YearMonth.fromString('2026-10'),
+    );
+  assertThrows(() => define('rent', 950, null, ' '), InvalidValue);
+  assertThrows(() => define('grants', 950, null), InvalidValue);
+  assertThrows(() => define('teachers', 950, null), InvalidValue, 'horario');
+  assertThrows(() => define('rent', 0, null), InvalidValue);
+  assertThrows(() => define('rent', 950, []), InvalidValue);
+  assertThrows(() => define('rent', 950, [13]), InvalidValue);
+  assertEquals(
+    define('rent', 950, [10, 9, 10]).months,
+    [9, 10],
+    'sin repetir, en el orden de la temporada',
   );
 });

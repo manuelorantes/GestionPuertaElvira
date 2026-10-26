@@ -590,3 +590,87 @@ Deno.test('accounting splits a movement between the months it applies to, for th
     'unprocessable',
   );
 });
+
+Deno.test('accounting expects the club monthly expenses, pays them for what they cost and counts the rest as expected', async () => {
+  await atTime('2026-11-05T10:00:00+01:00', async () => {
+    const client = await admin();
+    const define = async (concept: string, category: string, amount: string) => {
+      const created = await client.json('POST', '/api/admin/accounting/expected', {
+        concept,
+        category,
+        amount,
+      });
+      assertEquals(created.status, 201, JSON.stringify(created.body));
+      return body<{ id: string }>(created).id;
+    };
+    const rent = await define('Alquiler', 'rent', '950');
+    const cleaning = await define('Limpieza', 'cleaning', '120');
+    const list = body<
+      { items: { concept: string; categoryLabel: string; months: number[]; since: string }[] }
+    >(
+      await client.get('/api/admin/accounting/expected'),
+    ).items;
+    assertEquals(
+      list.map((e) => [e.concept, e.since, e.months.length]),
+      [
+        ['Alquiler', '2026-11', 10],
+        ['Limpieza', '2026-11', 10],
+      ].sort(),
+    );
+
+    const expectedOf = async (month: string) =>
+      body<{ monthChart: { month: string; expenseCents: number; expectedExpenseCents: number }[] }>(
+        await client.get('/api/admin/dashboard'),
+      ).monthChart.find((m) => m.month === month);
+    assertEquals((await expectedOf('2026-11'))?.expectedExpenseCents, 107000);
+    assertEquals((await expectedOf('2026-10'))?.expectedExpenseCents, 0, 'antes de esperarlos');
+
+    const paid = await client.json(
+      'POST',
+      `/api/admin/accounting/expected/${cleaning}/months/2026-11/payment`,
+      { date: '2026-11-04', method: 'cash', amount: '135,50' },
+    );
+    assertEquals(paid.status, 201, JSON.stringify(paid.body));
+    assertEquals(
+      (await client.json('POST', `/api/admin/accounting/expected/${rent}/months/2026-11/skip`))
+        .status,
+      204,
+    );
+    const month = body<{ items: { concept: string; status: string; paidCents: number | null }[] }>(
+      await client.get('/api/admin/accounting/expected/month?month=2026-11'),
+    ).items;
+    assertEquals(
+      month.map((m) => [m.concept, m.status, m.paidCents]).sort(),
+      [['Alquiler', 'skipped', null], ['Limpieza', 'paid', 13550]],
+    );
+    assertEquals(
+      [
+        (await expectedOf('2026-11'))?.expenseCents,
+        (await expectedOf('2026-11'))?.expectedExpenseCents,
+      ],
+      [13550, 0],
+    );
+    assertError(
+      await client.json('POST', `/api/admin/accounting/expected/${rent}/months/2026-11/skip`),
+      409,
+      'expected_month_settled',
+    );
+
+    // Quitar el apunte deja la limpieza pendiente otra vez.
+    const entryId = body<{ id: string }>(paid).id;
+    assertEquals(
+      (await client.json('DELETE', `/api/admin/accounting/entries/${entryId}`)).status,
+      204,
+    );
+    assertEquals((await expectedOf('2026-11'))?.expectedExpenseCents, 12000);
+
+    assertEquals(
+      (await client.json('DELETE', `/api/admin/accounting/expected/${rent}`)).status,
+      204,
+    );
+    assertEquals(
+      body<{ items: unknown[] }>(await client.get('/api/admin/accounting/expected')).items.length,
+      1,
+    );
+  });
+});

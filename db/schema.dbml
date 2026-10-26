@@ -357,6 +357,27 @@ Table accounting_transfer {
   Note: 'Traspaso entre caja y banco: cambia dónde está el dinero, no cuánto tiene el club'
 }
 
+Table accounting_expected_expense {
+  id uuid [pk]
+  concept varchar(120) [not null]
+  category varchar(20) [not null, note: 'categoría de gasto (de serie o del club), no teachers']
+  amount_cents int [not null, note: 'lo que suele costar cada mes, > 0']
+  months jsonb [not null, note: 'meses del año (1 a 12) en que se espera']
+  since varchar(7) [not null, note: 'AAAA-MM desde el que se espera']
+  Note: 'Gasto esperado: lo que el club espera pagar cada mes (alquiler, limpieza, presidencia…)'
+}
+
+Table accounting_expected_month {
+  expected_expense_id uuid [not null, ref: > accounting_expected_expense.id, note: 'ON DELETE CASCADE']
+  period varchar(7) [not null, note: 'AAAA-MM']
+  entry_id uuid [unique, ref: - accounting_entry.id, note: 'apunte con que se pagó (ON DELETE CASCADE); nulo = «No hay este mes»']
+
+  indexes {
+    (expected_expense_id, period) [pk]
+  }
+  Note: 'Cómo quedó un mes de un gasto esperado; sin fila, pendiente'
+}
+
 Note libro {
   'El libro de movimientos no tiene tabla propia: se compone en lectura con billing_payment, payroll_settlement, accounting_invoice pagadas y accounting_entry. Los saldos de banco y caja se derivan de él por la forma de pago, más accounting_transfer.'
 }
