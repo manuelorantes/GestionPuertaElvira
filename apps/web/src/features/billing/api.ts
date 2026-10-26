@@ -260,7 +260,7 @@ export function updateSettings(settings: BillingSettings): Promise<void> {
 export type ChargeScope = 'one' | 'rest';
 
 /** Fija a mano el importe de una cuota: solo ese mes o ese y los siguientes de la temporada. */
-/** Al bajar una cuota por debajo de lo cubierto: corregir el cobro que la pagó o dejar la diferencia a favor. */
+/** Al cambiar una cuota cubierta: corregir el cobro que la pagó o dejar los cobros como están. */
 export type PaidChargePolicy = 'correct_payment' | 'keep_credit';
 
 export function adjustCharge(
