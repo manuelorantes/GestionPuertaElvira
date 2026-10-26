@@ -235,6 +235,22 @@ Deno.test('Charge should tell how much of it was raised by hand over what it had
   assertEquals(charge.raisedByHand().cents, 0, 'fijar el descuento también lo deja calculado');
 });
 
+Deno.test('Charge should stop covering last what was raised by hand once it is paid', () => {
+  const charge = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-10'),
+    Money.euros(32),
+  );
+  charge.adjust(Money.euros(37), 'Empieza dos días tarde');
+  charge.settleRaisedByHand(Money.euros(2));
+  assertEquals(charge.raisedByHand().cents, 300, 'lo pagado deja de ser subido a mano');
+  charge.settleRaisedByHand(Money.euros(10));
+  assertEquals(charge.raisedByHand().cents, 0);
+  assertEquals(charge.amount.cents, 3700, 'el importe no cambia');
+});
+
 Deno.test('Charge should keep its prepayment discount when it is repriced', () => {
   const charge = Charge.create(
     ChargeId.generate(),

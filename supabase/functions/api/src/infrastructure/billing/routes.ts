@@ -241,11 +241,12 @@ export function registerBillingRoutes(api: ApiApp): void {
 
   api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/amount'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
-    await new CorrectPaymentAmount(new SqlPaymentRepository(scope.tx)).execute(
-      param(c, 'id'),
-      body.requiredInt('amountCents'),
-      body.requiredString('reason'),
-    );
+    await new CorrectPaymentAmount(new SqlPaymentRepository(scope.tx), billing(api, scope).charges)
+      .execute(
+        param(c, 'id'),
+        body.requiredInt('amountCents'),
+        body.requiredString('reason'),
+      );
     return c.body(null, 204);
   });
 
