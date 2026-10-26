@@ -32,7 +32,7 @@ function formatSigned(cents: number): string {
   return `${cents > 0 ? '+' : ''}${formatCents(cents)}`;
 }
 
-/** Cuotas (cobradas y previstas) menos gastos fijos (anotados y profesorado previsto) del mes en curso. */
+/** Cuotas (cobradas y previstas) menos gastos fijos (anotados y previstos) del mes en curso. */
 function monthMargin(data: Dashboard): { fees: number; fixed: number } {
   const bar = data.monthChart.find((m) => m.month === data.month);
   return {
@@ -91,7 +91,7 @@ function Summary({ data }: { data: Dashboard }) {
           />
           <ChartCard
             title={`Cuotas vs gastos fijos · ${seasonLabel(data.month)}`}
-            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan; las que faltan por cobrar de cada mes, previstas; el profesorado previsto según el horario, de este mes en adelante; y los gastos del mes en el suyo"
+            label="Cuotas vs gastos fijos, de septiembre a agosto: las cuotas, repartidas entre los meses que pagan; las que faltan por cobrar de cada mes, previstas; los gastos previstos: el profesorado según el horario, de este mes en adelante, y los gastos esperados sin pagar; y los gastos del mes en el suyo"
             id="mes"
             months={data.monthChart}
             current={data.month}

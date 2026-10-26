@@ -502,6 +502,133 @@ describe('Contabilidad', () => {
     ).toBeInTheDocument();
   });
 
+  it('pays an expected expense of the month for what it cost, or skips it', async () => {
+    const month = (status: 'pending' | 'paid' | 'skipped', extra = {}) => ({
+      expenseId: 'x1',
+      concept: 'Limpieza',
+      category: 'cleaning',
+      categoryLabel: 'Limpieza',
+      period: '2026-10',
+      expectedCents: 12000,
+      status,
+      paidCents: null,
+      entryId: null,
+      paidOn: null,
+      ...extra,
+    });
+    const rent = {
+      ...month('pending'),
+      expenseId: 'x2',
+      concept: 'Alquiler',
+      expectedCents: 95000,
+    };
+    const fetch = api({
+      'GET /api/admin/accounting/expected/month?month=2026-10': [
+        [200, { items: [month('pending'), rent] }],
+        [
+          200,
+          {
+            items: [month('paid', { paidCents: 13550, entryId: 'e9', paidOn: '2026-10-30' }), rent],
+          },
+        ],
+        [
+          200,
+          {
+            items: [
+              month('paid', { paidCents: 13550, entryId: 'e9', paidOn: '2026-10-30' }),
+              { ...rent, status: 'skipped' },
+            ],
+          },
+        ],
+      ],
+      'POST /api/admin/accounting/expected/x1/months/2026-10/payment': [201, { id: 'e9' }],
+      'POST /api/admin/accounting/expected/x2/months/2026-10/skip': [204],
+    });
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    const card = await screen.findByRole('region', { name: 'Gastos esperados de octubre 2026' });
+    expect(within(card).getByText('Falta por pagar').nextSibling).toHaveTextContent('1070 €');
+    await userEvent.click(within(card).getByRole('button', { name: 'Pagar Limpieza' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Pagar Limpieza' });
+    const amount = within(dialog).getByLabelText('Importe pagado (€)');
+    expect(amount).toHaveValue('120');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '135,50');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pagar' }));
+    expect(await screen.findByText('Limpieza de octubre 2026 pagado')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(
+      ([url]) => url === '/api/admin/accounting/expected/x1/months/2026-10/payment',
+    );
+    // Corresponde a octubre aunque se pague otro mes.
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({
+      amount: '135,50',
+      method: 'transfer',
+      period: '2026-10',
+    });
+
+    await userEvent.click(within(card).getByRole('button', { name: 'No hay Alquiler este mes' }));
+    expect(await within(card).findByText(/se esperaban 120 €/)).toBeInTheDocument();
+    expect(within(card).getByRole('button', { name: 'Volver a esperar Alquiler' })).toBeVisible();
+  });
+
+  it('defines the expected expenses of the club in the settings', async () => {
+    const fetch = api({
+      'GET /api/admin/accounting/monthly-categories': [200, { categories: ['rent'] }],
+      'GET /api/admin/accounting/expected': [
+        [200, { items: [] }],
+        [
+          200,
+          {
+            items: [
+              {
+                id: 'x1',
+                concept: 'Alquiler',
+                category: 'rent',
+                categoryLabel: 'Alquiler',
+                amountCents: 95000,
+                months: [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8],
+                since: '2026-10',
+              },
+            ],
+          },
+        ],
+      ],
+      'POST /api/admin/accounting/expected': [201, { id: 'x1' }],
+    });
+    renderApp('/panel/contabilidad?pestana=ajustes');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir gasto esperado' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Añadir gasto esperado' });
+    await userEvent.type(within(dialog).getByLabelText('Concepto'), 'Alquiler');
+    // El profesorado ya se prevé con su horario.
+    expect(
+      within(within(dialog).getByLabelText('Categoría')).queryByRole('option', {
+        name: 'Profesores',
+      }),
+    ).not.toBeInTheDocument();
+    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'rent');
+    await userEvent.type(within(dialog).getByLabelText('Importe esperado (€)'), '950');
+    expect(within(dialog).getByText('De septiembre a junio')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'julio' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'agosto' }));
+    expect(within(dialog).getByText('Todo el año')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    expect(await screen.findByText('Gasto esperado añadido')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(
+      ([url, init]) => url === '/api/admin/accounting/expected' && init?.method === 'POST',
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toEqual({
+      concept: 'Alquiler',
+      category: 'rent',
+      amount: '950',
+      months: [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8],
+    });
+    const table = await screen.findByRole('table', { name: 'Gastos esperados' });
+    expect(within(table).getByRole('row', { name: /Alquiler/ })).toHaveTextContent('Todo el año');
+    expect(within(table).getByRole('button', { name: 'Ordenar por importe' })).toBeVisible();
+  });
+
   it('adds the club own categories, renames them and removes the unused ones', async () => {
     const seguro = { code: 'c_seguro', kind: 'expense', label: 'Seguro', custom: true };
     const fetch = api({

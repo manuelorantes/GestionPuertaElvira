@@ -111,7 +111,7 @@ describe('Resumen', () => {
     expect(screen.getByText('15.340 €')).toBeInTheDocument();
     expect(screen.getByText('+1240 € esta temporada')).toBeInTheDocument();
     expect(screen.getByText('2460 €')).toBeInTheDocument();
-    // El margen previsto del mes: cuotas (3920 €) menos gastos fijos anotados (900 €) y profesorado previsto (1200 €).
+    // El margen previsto del mes: cuotas (3920 €) menos gastos fijos anotados (900 €) y gastos previstos (1200 €).
     expect(screen.getByText('Margen previsto de octubre')).toBeInTheDocument();
     expect(screen.getByText('+1820 €')).toBeInTheDocument();
     expect(screen.getByText('3920 € de cuotas · 2100 € de gastos fijos')).toBeInTheDocument();
@@ -143,16 +143,16 @@ describe('Resumen', () => {
     expect(screen.queryByTestId('caja-2026-09-expected')).not.toBeInTheDocument();
     await userEvent.hover(screen.getByTestId('mes-2026-09-expected'));
     expect(screen.getByText('Cuotas previstas de septiembre 2026: 1340 €')).toBeVisible();
-    // El profesorado previsto según el horario, en gris sobre los gastos.
+    // Los gastos previstos (aquí, el profesorado según el horario), en gris sobre los gastos.
     expect(screen.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining(
-        'septiembre 2026: ingresos 4800 €, gastos 900 €, cuotas previstas 1340 €, profesorado previsto 1200 €',
+        'septiembre 2026: ingresos 4800 €, gastos 900 €, cuotas previstas 1340 €, gastos previstos 1200 €',
       ),
     );
-    expect(screen.getByText('Profesorado previsto')).toBeInTheDocument();
+    expect(screen.getByText('Gastos previstos')).toBeInTheDocument();
     expect(screen.queryByTestId('caja-2026-10-expectedExpense')).not.toBeInTheDocument();
     await userEvent.hover(screen.getByTestId('mes-2026-10-expectedExpense'));
-    expect(screen.getByText('Profesorado previsto de octubre 2026: 1200 €')).toBeVisible();
+    expect(screen.getByText('Gastos previstos de octubre 2026: 1200 €')).toBeVisible();
     await userEvent.hover(screen.getByTestId('caja-2026-10-income'));
     expect(screen.getByText('Ingresos de octubre 2026: 4120 €')).toBeVisible();
     await userEvent.hover(screen.getByTestId('caja-2026-10-expense'));
