@@ -26,8 +26,9 @@ const SCOPES: { id: ChargeScope; label: string }[] = [
 
 /**
  * Fija a mano el importe de una cuota con un motivo (solo ese mes o también los siguientes de la temporada), o la
- * devuelve al importe calculado. Al bajarla por debajo de lo que ya tiene cubierto se confirma antes qué pasa con la
- * diferencia: corregir el cobro que la pagó (por defecto) o dejarla como saldo a favor.
+ * devuelve al importe calculado. Al bajarla por debajo de lo que ya tiene cubierto, o al subir una cuota cobrada, se
+ * confirma antes qué pasa con la diferencia: corregir el cobro que la pagó (por defecto) o dejar los cobros como están
+ * (al bajarla queda como saldo a favor; al subirla, pendiente).
  */
 export function ChargeDialog({
   studentId,
@@ -43,7 +44,7 @@ export function ChargeDialog({
   const [amount, setAmount] = useState(String(charge.amountCents / 100).replace('.', ','));
   const [reason, setReason] = useState(charge.note ?? '');
   const [scope, setScope] = useState<ChargeScope>('one');
-  /** Segundo paso, al bajar una cuota con algo cubierto: si se corrige el cobro que la pagó. */
+  /** Segundo paso, al bajar una cuota con algo cubierto o subir una cobrada: si se corrige el cobro que la pagó. */
   const [confirming, setConfirming] = useState(false);
   const [correctPayment, setCorrectPayment] = useState(true);
   const save = useBillingMutation(
@@ -61,6 +62,8 @@ export function ChargeDialog({
   const error = save.error ?? reset.error ?? applyDiscount.error;
 
   const surplusCents = cents === null ? 0 : charge.coveredCents - cents;
+  const paid = charge.coveredCents > 0 && charge.pendingCents === 0;
+  const raiseCents = cents === null || !paid ? 0 : cents - charge.amountCents;
 
   function store(onPaid?: PaidChargePolicy) {
     if (cents === null || !ready) return;
@@ -74,7 +77,7 @@ export function ChargeDialog({
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (surplusCents > 0) setConfirming(true);
+    if (surplusCents > 0 || raiseCents > 0) setConfirming(true);
     else store();
   }
 
@@ -101,14 +104,25 @@ export function ChargeDialog({
             onChange={(e) => setCorrectPayment(e.target.checked)}
             className="mt-0.5"
           />
-          <span>
-            <span className="font-medium">Cambiar la cantidad pagada</span>
-            <span className="block text-[13px] text-ink-muted">
-              {correctPayment
-                ? `El recibo que cubrió la cuota pasa a tener ${formatCents(surplusCents)} menos, con una línea de corrección.`
-                : `La diferencia (${formatCents(surplusCents)}) se quedará como saldo a favor del alumno.`}
+          {raiseCents > 0 ? (
+            <span>
+              <span className="font-medium">Se pagó el importe nuevo</span>
+              <span className="block text-[13px] text-ink-muted">
+                {correctPayment
+                  ? `Se registró mal: el recibo que cubrió la cuota pasa a tener ${formatCents(raiseCents)} más, con una línea de corrección.`
+                  : `Faltarán ${formatCents(raiseCents)} por pagar de esta cuota.`}
+              </span>
             </span>
-          </span>
+          ) : (
+            <span>
+              <span className="font-medium">Cambiar la cantidad pagada</span>
+              <span className="block text-[13px] text-ink-muted">
+                {correctPayment
+                  ? `El recibo que cubrió la cuota pasa a tener ${formatCents(surplusCents)} menos, con una línea de corrección.`
+                  : `La diferencia (${formatCents(surplusCents)}) se quedará como saldo a favor del alumno.`}
+              </span>
+            </span>
+          )}
         </label>
       </ConfirmChangesDialog>
     );
@@ -128,8 +142,8 @@ export function ChargeDialog({
           Ahora: {formatCents(charge.amountCents)}
           {charge.coveredCents > 0 && ` · cubiertos ${formatCents(charge.coveredCents)}`}
           {charge.manual && ' · fijada a mano'}. Lo cubierto se reparte solo entre las cuotas, de la
-          más antigua a la más reciente; si bajas una cuota ya cubierta, antes de guardar se elige
-          qué pasa con la diferencia.
+          más antigua a la más reciente; si bajas una cuota ya cubierta o subes una cobrada, antes
+          de guardar se elige qué pasa con la diferencia.
         </p>
         <TextField
           label="Importe (€)"

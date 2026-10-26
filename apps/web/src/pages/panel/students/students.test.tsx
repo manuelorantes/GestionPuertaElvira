@@ -704,6 +704,79 @@ describe('Alumnos', () => {
     expect(await screen.findByText('Cuota cambiada')).toBeInTheDocument();
   });
 
+  it('asks whether the new amount was paid when a paid charge is raised, raising the receipt by default', async () => {
+    const user = userEvent.setup();
+    const account = {
+      preferredPlan: 'monthly',
+      member: false,
+      privateRate: null,
+      points: 0,
+      suggestedMonths: 1,
+      remainingMonths: 9,
+      weeklyHours: 3,
+      monthlyFeeCents: 5500,
+      familyDiscount: false,
+      familyPercent: 0,
+      hasPrivateLessons: false,
+      membershipPaid: true,
+      membershipFeeCents: 5000,
+      membershipCharge: { id: 'c-socio', pendingCents: 0 },
+      charges: [
+        {
+          id: 'c10',
+          period: '2026-10',
+          amountCents: 5500,
+          coveredCents: 5500,
+          pendingCents: 0,
+          status: 'paid',
+          manual: false,
+          note: null,
+          discountPercent: 0,
+        },
+      ],
+      balanceCents: 0,
+      materialCharges: [],
+      totals: [],
+    };
+    const spy = api({
+      'GET /api/admin/billing/accounts/s1': [200, account],
+      'PUT /api/admin/billing/accounts/s1/charges/2026-10': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
+    await user.click(
+      within(season).getByRole('button', { name: 'Editar la cuota de octubre 2026' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Cuota de octubre 2026' });
+    const amount = within(dialog).getByLabelText('Importe (€)');
+    await user.clear(amount);
+    await user.type(amount, '60');
+    await user.type(within(dialog).getByLabelText('Motivo'), 'Estaba mal la cuota');
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    // Segundo paso: se pagó el importe nuevo y el recibo sube, salvo que se desmarque.
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
+    expect(confirm).toHaveTextContent('Importe: 55 € → 60 €');
+    const box = within(confirm).getByRole('checkbox', { name: /Se pagó el importe nuevo/ });
+    expect(box).toBeChecked();
+    expect(confirm).toHaveTextContent('pasa a tener 5 € más');
+    await user.click(box);
+    expect(confirm).toHaveTextContent('Faltarán 5 € por pagar de esta cuota.');
+    await user.click(box);
+    await user.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() =>
+      expect(postBodyFor(spy, 'PUT', '/api/admin/billing/accounts/s1/charges/2026-10')).toEqual({
+        amountCents: 6000,
+        reason: 'Estaba mal la cuota',
+        scope: 'one',
+        onPaid: 'correct_payment',
+      }),
+    );
+    expect(await screen.findByText('Cuota cambiada')).toBeInTheDocument();
+  });
+
   it('should keep «Alumnos» highlighted while a student card is open', async () => {
     api();
     renderApp('/panel/alumnos/s1');
