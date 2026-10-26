@@ -151,6 +151,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
         incomeCents: 64500,
         expenseCents: 136600,
         resultCents: -72100,
+        cashResultCents: -70000,
         canClose: true,
         closedOn: null,
       },
@@ -411,6 +412,94 @@ describe('Contabilidad', () => {
       amount: '6',
       period: shiftMonth(currentMonth(), -1),
     });
+  });
+
+  it('adds an expense that applies to several months, split equally or by hand', async () => {
+    const fetch = api({ 'POST /api/admin/accounting/entries': [201, { id: 'e9' }] });
+    renderApp('/panel/contabilidad?mes=2026-10');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir movimiento' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Añadir movimiento' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Gasto' }));
+    await userEvent.type(within(dialog).getByLabelText('Concepto'), 'IVA del trimestre');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Categoría'), 'other_expenses');
+    await userEvent.type(within(dialog).getByLabelText('Importe (€)'), '300');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Mes al que corresponde'), 'many');
+    const months = within(dialog).getByRole('group', { name: 'Meses a los que corresponde' });
+    const [first, second, third] = [-3, -2, -1].map((delta) =>
+      monthLabel(shiftMonth(currentMonth(), delta)),
+    );
+    // Empieza con el mes de la fecha: se quita y se eligen los tres anteriores.
+    await userEvent.click(within(months).getByRole('button', { name: monthLabel(currentMonth()) }));
+    for (const label of [first, second, third]) {
+      await userEvent.click(within(months).getByRole('button', { name: label ?? '' }));
+    }
+    expect(within(dialog).getByLabelText(`${first} (€)`)).toHaveValue('100');
+    expect(within(dialog).getByText('Repartido a partes iguales.')).toBeInTheDocument();
+
+    // A mano: si no suma el importe, no se puede guardar.
+    const firstAmount = within(dialog).getByLabelText(`${first} (€)`);
+    await userEvent.clear(firstAmount);
+    await userEvent.type(firstAmount, '50');
+    expect(
+      within(dialog).getByText('El reparto suma 250 € y el importe es 300 €.'),
+    ).toBeInTheDocument();
+    const save = within(dialog).getByRole('button', { name: 'Guardar movimiento' });
+    expect(save).toBeDisabled();
+    const secondAmount = within(dialog).getByLabelText(`${second} (€)`);
+    await userEvent.clear(secondAmount);
+    await userEvent.type(secondAmount, '150');
+    await userEvent.click(save);
+
+    expect(await screen.findByText('Movimiento añadido')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(([url]) => url === '/api/admin/accounting/entries');
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({
+      amount: '300',
+      period: shiftMonth(currentMonth(), -3),
+      shares: [
+        { period: shiftMonth(currentMonth(), -3), amountCents: 5000 },
+        { period: shiftMonth(currentMonth(), -2), amountCents: 15000 },
+        { period: shiftMonth(currentMonth(), -1), amountCents: 10000 },
+      ],
+    });
+  });
+
+  it('tells the months a movement applies to', async () => {
+    api({
+      'GET /api/admin/accounting/ledger?month=2027-01': [
+        200,
+        {
+          ...LEDGER,
+          month: '2027-01',
+          items: [
+            {
+              source: 'manual',
+              sourceId: 'e7',
+              date: '2027-01-20',
+              kind: 'expense',
+              concept: 'IVA cuarto trimestre',
+              category: 'other_expenses',
+              method: 'transfer',
+              amountCents: 30000,
+              studentId: null,
+              period: '2026-10',
+              shares: ['2026-10', '2026-11', '2026-12'].map((period) => ({
+                period,
+                amountCents: 10000,
+              })),
+              corrected: false,
+              categoryLabel: 'Otros gastos',
+              methodLabel: 'Transferencia',
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad?mes=2027-01');
+
+    expect(
+      await screen.findByText('Corresponde a octubre, noviembre y diciembre 2026'),
+    ).toBeInTheDocument();
   });
 
   it('adds the club own categories, renames them and removes the unused ones', async () => {
@@ -775,6 +864,10 @@ describe('Contabilidad', () => {
     const table = await screen.findByRole('table', { name: 'Temporada 2026/27 mes a mes' });
     expect(within(table).getByRole('row', { name: /Saldo inicial/ })).toHaveTextContent('1200 €');
     expect(within(table).getByRole('row', { name: /Octubre/ })).toHaveTextContent('−721 €');
+    expect(within(table).getByRole('columnheader', { name: 'Saldo' })).toBeInTheDocument();
+    // Lo que pasa a la siguiente es lo movido de verdad, aunque el resultado por meses sea otro.
+    const closing = screen.getByRole('region', { name: 'Cierre de temporada 2026/27' });
+    expect(closing).toHaveTextContent('Movido en caja y banco−700 €');
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar temporada' }));
     await userEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cerrar temporada' }),

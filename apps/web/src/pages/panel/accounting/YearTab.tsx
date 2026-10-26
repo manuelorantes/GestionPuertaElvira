@@ -76,7 +76,7 @@ export function YearTab({
                   <th scope="col" className="px-5 py-3 font-semibold">
                     Mes
                   </th>
-                  {['Ingresos', 'Gastos', 'Resultado', 'Acumulado'].map((h) => (
+                  {['Ingresos', 'Gastos', 'Resultado', 'Saldo'].map((h) => (
                     <th key={h} scope="col" className="px-5 py-3 text-right font-semibold">
                       {h}
                     </th>
@@ -153,10 +153,19 @@ export function YearTab({
                 <span>Resultado</span>
                 <span>{formatCents(y.resultCents)}</span>
               </div>
+              {y.cashResultCents !== y.resultCents && (
+                <div className="flex justify-between">
+                  <span className="text-line-strong">Movido en caja y banco</span>
+                  <span>{formatCents(y.cashResultCents)}</span>
+                </div>
+              )}
             </div>
             <p className="text-[13px] text-line-strong">
-              Al cerrar, los movimientos de septiembre {startYear} a agosto {startYear + 1} quedan
-              bloqueados y el resultado pasa como saldo inicial a {fiscalYearLabel(startYear + 1)}.
+              Ingresos, gastos y resultado cuentan cada movimiento en los meses a los que
+              corresponde; el saldo, cuando se movió el dinero. Al cerrar, los movimientos de
+              septiembre {startYear} a agosto {startYear + 1} quedan bloqueados y lo movido en caja
+              y banco ({formatCents(y.cashResultCents)}) pasa como saldo inicial a{' '}
+              {fiscalYearLabel(startYear + 1)}.
             </p>
             {y.canClose && (
               <button
@@ -179,7 +188,7 @@ export function YearTab({
       {confirming && (
         <ConfirmDialog
           title={`¿Cerrar la temporada ${label}?`}
-          message={`Los movimientos de septiembre ${startYear} a agosto ${startYear + 1} quedarán bloqueados. El resultado de ${formatCents(y?.resultCents ?? 0)} pasará como saldo inicial de ${fiscalYearLabel(startYear + 1)}.`}
+          message={`Los movimientos de septiembre ${startYear} a agosto ${startYear + 1} quedarán bloqueados. Lo movido en caja y banco, ${formatCents(y?.cashResultCents ?? 0)}, pasará como saldo inicial de ${fiscalYearLabel(startYear + 1)}.`}
           confirmLabel="Cerrar temporada"
           busy={close.isPending}
           onCancel={() => setConfirming(false)}
