@@ -51,6 +51,8 @@ This file is intentionally local to the project. Aircury AI Framework installs i
 | Pendiente / pagado / vencido / baja | `Pending` / `Paid` / `Overdue` / `Withdrawn` |
 | Factura de proveedor | `SupplierInvoice` |
 | Movimiento contable | `LedgerEntry` |
+| Meses a los que corresponde / reparto por meses | `PeriodShares` |
+| Gasto esperado | `ExpectedExpense` |
 | Cierre de temporada | `SeasonClosing` |
 | Temporada (sep–jun) | `Season` |
 | Licencia federativa | `FederationLicence` |
