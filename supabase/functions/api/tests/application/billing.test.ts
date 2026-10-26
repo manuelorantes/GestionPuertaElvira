@@ -13,6 +13,7 @@ import {
   AdjustCharge,
   CancelCharge,
   ChargeNotFound,
+  CorrectPaymentAmount,
   GenerateMonthlyCharges,
   GetStudentAccount,
   ImportPayment,
@@ -621,17 +622,68 @@ Deno.test('AdjustCharge should take the difference off the payment that covered 
     0,
   ]]);
 
-  // Subir una cuota pagada no toca el cobro: queda pagada en parte.
+  // Subir una cuota pagada sin cambiar lo pagado no toca el cobro: queda pagada en parte.
+  await new AdjustCharge(fx, fx).execute(id, '2026-10', 4500, 'Mes completo', 'one');
+  assertEquals((await fx.payment(PaymentId.fromString(paymentId)))?.total.cents, 4000);
+  assertEquals((await account(fx, id)).charges.map((c) => c.pendingCents), [500]);
+});
+
+Deno.test('AdjustCharge should raise the payment that covered a paid charge when it was really paid', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-09');
+  await generate(fx, '2026-10');
+  const paymentId = await register(fx, id, 1);
+  await new AdjustCharge(fx, fx).execute(id, '2026-10', 2000, 'Media', 'one');
+
+  // Septiembre se apuntó a 45 € pero se pagaron 50 €: el recibo sube y la cuota sigue cobrada.
   await new AdjustCharge(fx, fx).execute(
     id,
-    '2026-10',
-    4500,
-    'Mes completo',
+    '2026-09',
+    5000,
+    'Se cobró la matrícula',
     'one',
     'correct_payment',
   );
-  assertEquals((await fx.payment(PaymentId.fromString(paymentId)))?.total.cents, 4000);
-  assertEquals((await account(fx, id)).charges.map((c) => c.pendingCents), [500]);
+  const payment = await fx.payment(PaymentId.fromString(paymentId));
+  assertEquals([payment?.total.cents, payment?.credit.cents], [5000, 5000]);
+  assertEquals(
+    payment?.lines.at(-1)?.label,
+    'Corrección: cuota de septiembre 2026 de 45 € a 50 € (Se cobró la matrícula)',
+  );
+  assertEquals(payment?.lines.at(-1)?.amount.cents, 500);
+  assertEquals(
+    (await account(fx, id)).charges.map((c) => [c.period, c.pendingCents]),
+    [['2026-09', 0], ['2026-10', 2000]],
+  );
+
+  // Una cuota sin cobrar se sube sin tocar ningún recibo.
+  await new AdjustCharge(fx, fx).execute(id, '2026-10', 2500, 'Más', 'one', 'correct_payment');
+  assertEquals((await fx.payment(PaymentId.fromString(paymentId)))?.total.cents, 5000);
+  assertEquals((await account(fx, id)).charges.map((c) => c.pendingCents), [0, 2500]);
+});
+
+Deno.test('Paying what was raised by hand should cover that charge, not the next one', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-09');
+  await generate(fx, '2026-10');
+  const september = await register(fx, id, 1);
+  // A septiembre le falta 1 € (subido a mano) y a octubre 20 €.
+  await new AdjustCharge(fx, fx).execute(id, '2026-09', 4600, 'Un euro más', 'one');
+  await new AdjustCharge(fx, fx).execute(id, '2026-10', 2000, 'Media', 'one');
+  const pending = async () => (await account(fx, id)).charges.map((c) => c.pendingCents);
+  assertEquals(await pending(), [100, 2000]);
+
+  // Corregir el recibo de septiembre con el euro que faltaba lo deja cobrado.
+  await new CorrectPaymentAmount(fx, fx).execute(september, 4600, 'Faltaba un euro');
+  assertEquals(await pending(), [0, 2000]);
+
+  // Lo mismo al cobrar un mes: paga lo que le faltaba a ese mes.
+  await new AdjustCharge(fx, fx).execute(id, '2026-09', 4700, 'Otro euro', 'one');
+  assertEquals(await pending(), [100, 2000]);
+  await register(fx, id, 1);
+  assertEquals(await pending(), [0, 2000]);
 });
 
 Deno.test('AdjustCharge should correct each covered month of «this and the following» and leave credit when no payment covers it', async () => {
