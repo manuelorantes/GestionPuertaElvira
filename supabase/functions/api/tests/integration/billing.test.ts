@@ -631,6 +631,50 @@ Deno.test({
 });
 
 Deno.test({
+  name: 'a month fixed by hand and paid in advance keeps the discount the receipt gave it',
+  // Tres meses no caben en mayo ni en junio.
+  ignore: outsideSeason || ['05', '06'].includes(today.slice(5, 7)),
+  async fn() {
+    const fx = await fixture();
+    const month = today.slice(0, 7);
+    await fx.client.get('/api/admin/billing/charges');
+    await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}/charges/${month}`, {
+      amountCents: 5000,
+      reason: 'Precio acordado',
+      scope: 'one',
+    });
+    const paid = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'monthly',
+      months: 3,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(paid.status, 201, JSON.stringify(paid.body));
+
+    // El recibo: (50 + 45 + 45) € − 10 % = 126 €. Las cuotas tienen que sumar lo mismo: 45 + 40,50 + 40,50.
+    const account = body<{
+      balanceCents: number;
+      charges: {
+        amountCents: number;
+        pendingCents: number;
+        manual: boolean;
+        discountPercent: number;
+      }[];
+    }>(await fx.client.get(`/api/admin/billing/accounts/${fx.student}`));
+    const payments = body<{ items: { totalCents: number }[] }>(
+      await fx.client.get(`/api/admin/billing/payments?studentId=${fx.student}`),
+    );
+    assertEquals(payments.items.map((p) => p.totalCents), [12600]);
+    assertEquals(
+      account.charges.map((c) => [c.amountCents, c.pendingCents, c.manual, c.discountPercent]),
+      [[4500, 0, true, 10], [4050, 0, false, 10], [4050, 0, false, 10]],
+    );
+    assertEquals(account.balanceCents, 0, 'sin saldo a favor');
+  },
+});
+
+Deno.test({
   name: 'a payment corrected in accounting keeps its receipt, except the payment method',
   ignore: outsideSeason,
   async fn() {

@@ -452,11 +452,19 @@ export class Charge {
     if (!this.manual) this.value = Charge.discounted(fee, this.prepaid, family);
   }
 
-  /** Mes pagado por adelantado con descuento: se fija el porcentaje (si aún no tenía) y se descuenta del importe. */
+  /**
+   * Mes pagado por adelantado con descuento: se fija el porcentaje (si aún no tenía) y se descuenta del importe. A una
+   * fijada a mano se le descuenta de su importe, como hace el recibo, y sigue fijada a mano.
+   */
   applyPrepayment(percent: number, family = 0): void {
-    if (this.prepaid > 0 || percent <= 0 || this.manual) return;
+    if (this.prepaid > 0 || percent <= 0) return;
     this.prepaid = percent;
-    this.value = Charge.discounted(this.value, percent, family);
+    if (!this.manual) {
+      this.value = Charge.discounted(this.value, percent, family);
+      return;
+    }
+    this.value = this.value.minus(this.value.percent(percent));
+    if (this.base !== null) this.base = this.base.minus(this.base.percent(percent));
   }
 
   /** Fija a mano el descuento por pago adelantado de este mes y recalcula con la cuota de un mes indicada. */
