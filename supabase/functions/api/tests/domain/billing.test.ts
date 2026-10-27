@@ -270,6 +270,23 @@ Deno.test('Charge should keep its prepayment discount when it is repriced', () =
   assertThrows(() => charge.setDiscount(120, Money.euros(55)), InvalidValue);
 });
 
+Deno.test('Charge should take the prepayment discount off an amount set by hand, like the receipt does', () => {
+  const charge = Charge.create(
+    ChargeId.generate(),
+    StudentRef.generate(),
+    'monthly',
+    YearMonth.fromString('2026-10'),
+    Money.cents(4950),
+  );
+  charge.adjust(Money.euros(55), 'Su hermana no viene este año');
+  charge.applyPrepayment(15);
+  assertEquals([charge.amount.cents, charge.discountPercent()], [4675, 15], '55 € − 15 %');
+  assertEquals([charge.isManual(), charge.note()], [true, 'Su hermana no viene este año']);
+  assertEquals(charge.raisedByHand().cents, 468, 'lo subido a mano también lleva el descuento');
+  charge.applyPrepayment(15);
+  assertEquals(charge.amount.cents, 4675, 'el descuento ya fijado no se aplica dos veces');
+});
+
 Deno.test('allocateCredit should cover the oldest charges first and keep what is left as balance', () => {
   const charge = (period: string, euros: number) =>
     Charge.create(
