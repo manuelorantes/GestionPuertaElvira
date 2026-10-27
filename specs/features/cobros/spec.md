@@ -146,6 +146,13 @@ Lo que se sube a mano a una cuota MUST cubrirse lo último: si el alumno ya la t
 (o fijar su descuento) vuelve a cubrirse como las demás.
 Lo que paga un cobro de ese mes, o lo que se sube al corregir el importe de un recibo que lo cubre, MUST quedarse en
 esa cuota aunque se subiera a mano, sin repartirse a otras cuotas pendientes.
+Una cuota fijada a mano que se cobra con descuento por pago adelantado MUST quedarse con el descuento que le aplicó
+el recibo (su importe menos el porcentaje) y apuntado ese porcentaje; sigue fijada a mano con su motivo.
+
+#### Scenario: Cobrar por adelantado un mes fijado a mano
+- **WHEN** octubre está fijado a mano en 55 € y administración cobra 6 meses de 55 € con el 15 % (280,50 €)
+- **THEN** octubre queda en 46,75 € con el 15 % apuntado, como los otros cinco meses, y las cuotas suman lo mismo que
+  el recibo, sin saldo a favor
 
 #### Scenario: Subir a mano un mes ya pagado
 - **WHEN** un alumno pagó el curso entero (octubre a 32 € y el resto a 44 €) y administración fija octubre en 35 €
