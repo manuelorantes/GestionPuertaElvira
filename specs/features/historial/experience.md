@@ -29,3 +29,5 @@ tiene web.
 - Error de la API: `Alert` con el mensaje.
 - Vacío: mensaje según sección y periodo (ver layout).
 - Ordenación: desde las cabeceras, sobre lo cargado; por defecto lo más reciente primero.
+- Filtro por acción: desde el menú de la cabecera «Acción», en el servidor (todo el historial); mientras llega la
+  respuesta sigue la tabla anterior con el menú abierto.
