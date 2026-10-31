@@ -11,6 +11,8 @@ import {
   auditPeriodFrom,
   type AuditReverter,
   auditSectionFrom,
+  type EnrolmentSnapshot,
+  groupsAroundAction,
   NothingToUndo,
   periodStart,
   RestoreToPoint,
@@ -64,7 +66,7 @@ class FakeAudit implements AuditLog, AuditReverter {
   }
 
   changes(): Promise<AuditDetail> {
-    return Promise.resolve({ changes: [], references: {} });
+    return Promise.resolve({ changes: [], references: {}, studentGroups: [] });
   }
 
   people(): Promise<{ id: string; name: string }[]> {
@@ -164,4 +166,81 @@ Deno.test('periodStart should start today, the week and the month at Madrid midn
   assertThrows(() => auditPeriodFrom('ayer'), InvalidValue);
   assertEquals(auditSectionFrom('payments'), 'payments');
   assertThrows(() => auditSectionFrom('profesores'), InvalidValue);
+});
+
+const enrolment = (
+  id: string,
+  groupId: string,
+  enrolledOn: string,
+  endsOn: string | null = null,
+  studentId = 'ana',
+): EnrolmentSnapshot => ({ id, studentId, groupId, enrolledOn, endsOn });
+
+Deno.test('groupsAroundAction should list every group before and after removing a student from one', () => {
+  const tuesday = enrolment('e1', 'tuesday', '2026-09-01');
+  const wednesday = enrolment('e2', 'wednesday', '2026-09-01');
+  const removed = { ...tuesday, endsOn: '2026-10-26' };
+  const around = groupsAroundAction({
+    day: '2026-10-26',
+    current: [removed, wednesday],
+    later: [],
+    own: [{ before: tuesday, after: removed }],
+  });
+  assertEquals(around, [{
+    studentId: 'ana',
+    before: [
+      { groupId: 'tuesday', startsOn: null, endsOn: null },
+      { groupId: 'wednesday', startsOn: null, endsOn: null },
+    ],
+    after: [{ groupId: 'wednesday', startsOn: null, endsOn: null }],
+  }]);
+});
+
+Deno.test('groupsAroundAction should show the groups of that moment even after the action was undone', () => {
+  const tuesday = enrolment('e1', 'tuesday', '2026-09-01');
+  const removed = { ...tuesday, endsOn: '2026-10-26' };
+  // Hoy vuelve a estar en el grupo: el deshacer posterior devolvió la inscripción a como estaba.
+  const around = groupsAroundAction({
+    day: '2026-10-26',
+    current: [tuesday],
+    later: [{ before: removed, after: tuesday }],
+    own: [{ before: tuesday, after: removed }],
+  });
+  assertEquals(around[0]?.before, [{ groupId: 'tuesday', startsOn: null, endsOn: null }]);
+  assertEquals(around[0]?.after, []);
+});
+
+Deno.test('groupsAroundAction should follow new and deleted enrolments, with their start and end dates', () => {
+  const old = enrolment('e1', 'monday', '2026-09-01', '2026-10-15');
+  const moved = enrolment('e2', 'friday', '2026-11-01', '2026-12-20');
+  const later = enrolment('e3', 'thursday', '2026-10-20');
+  const around = groupsAroundAction({
+    day: '2026-10-15',
+    // Luego se le inscribió en otro grupo y se borró la inscripción del de los viernes.
+    current: [old, later],
+    later: [{ before: null, after: later }, { before: moved, after: null }],
+    own: [{ before: { ...old, endsOn: null }, after: old }, { before: null, after: moved }],
+  });
+  assertEquals(around, [{
+    studentId: 'ana',
+    before: [{ groupId: 'monday', startsOn: null, endsOn: null }],
+    after: [{ groupId: 'friday', startsOn: '2026-11-01', endsOn: '2026-12-20' }],
+  }]);
+});
+
+Deno.test('groupsAroundAction should answer for each student the action touched, and only them', () => {
+  const ana = enrolment('e1', 'tuesday', '2026-09-01');
+  const leo = enrolment('e2', 'tuesday', '2026-10-15', null, 'leo');
+  const other = enrolment('e3', 'tuesday', '2026-09-01', null, 'eva');
+  const around = groupsAroundAction({
+    day: '2026-10-15',
+    current: [ana, leo, other],
+    later: [],
+    own: [{ before: null, after: leo }],
+  });
+  assertEquals(around, [{
+    studentId: 'leo',
+    before: [],
+    after: [{ groupId: 'tuesday', startsOn: null, endsOn: null }],
+  }]);
 });

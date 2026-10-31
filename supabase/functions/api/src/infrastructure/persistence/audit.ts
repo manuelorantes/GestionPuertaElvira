@@ -14,7 +14,13 @@ import {
   type AuditReference,
   type AuditReferenceKind,
   type AuditReverter,
+  type AuditStudentGroups,
   type AuditTarget,
+  type EnrolmentChange,
+  type EnrolmentSnapshot,
+  groupsAroundAction,
+  type GroupStay,
+  type StudentGroupsAround,
 } from '../../application/audit/mod.ts';
 import {
   type AuditRow,
@@ -229,9 +235,10 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
 
   async changes(actionId: string): Promise<AuditDetail> {
     const rows = await this
-      .sql`SELECT table_name, row_key, operation, before, after FROM audit_change
+      .sql`SELECT id, table_name, row_key, operation, before, after FROM audit_change
       WHERE action_id = ${actionId}::uuid ORDER BY id`;
     const raw = Row.all(rows).map((row) => ({
+      id: row.int('id'),
       table: row.string('table_name'),
       key: (row.json('row_key') ?? {}) as AuditRow,
       operation: row.string('operation'),
@@ -244,6 +251,11 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
       for (const snapshot of [change.before, change.after]) {
         for (const ref of referencesOf(snapshot ?? {})) names.want(ref.kind, ref.id);
       }
+    }
+    const groupsAround = await this.groupsAround(actionId, raw);
+    for (const student of groupsAround) {
+      names.want('student', student.studentId);
+      for (const stay of [...student.before, ...student.after]) names.want('group', stay.groupId);
     }
     await names.resolve();
     const name = (kind: AuditReferenceKind, id: string) => names.label(kind, id);
@@ -267,7 +279,64 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
         target: auditTarget(table, operation, before, after),
       };
     });
-    return { changes, references: names.references() };
+    const named = (stays: GroupStay[]) =>
+      stays
+        .map((stay) => ({ ...stay, groupName: name('group', stay.groupId) ?? 'Grupo borrado' }))
+        .sort((a, b) => a.groupName.localeCompare(b.groupName, 'es'));
+    const studentGroups = groupsAround.map((s): AuditStudentGroups => ({
+      studentId: s.studentId,
+      studentName: name('student', s.studentId) ?? 'Alumno borrado',
+      before: named(s.before),
+      after: named(s.after),
+    }));
+    return { changes, references: names.references(), studentGroups };
+  }
+
+  /**
+   * Los grupos de cada alumno cuyas inscripciones tocó la acción, antes y después de ella: las inscripciones de hoy y
+   * los cambios registrados después de los de la acción, para deshacerlos sobre el papel (ver `groupsAroundAction`).
+   */
+  private async groupsAround(
+    actionId: string,
+    changes: { id: number; table: string; before: AuditRow | null; after: AuditRow | null }[],
+  ): Promise<StudentGroupsAround[]> {
+    const own = changes.filter((c) => c.table === 'classes_enrolment');
+    if (own.length === 0) return [];
+    const students = [
+      ...new Set(own.map((c) => String((c.after ?? c.before)?.student_id))),
+    ];
+    const lastOwn = Math.max(...own.map((c) => c.id));
+    const [action] = Row.all(
+      await this.sql`SELECT (occurred_at AT TIME ZONE 'Europe/Madrid')::date::text AS day
+        FROM audit_action WHERE id = ${actionId}::uuid`,
+    );
+    const current = Row.all(
+      await this.sql`SELECT id::text, student_id::text, class_group_id::text,
+          enrolled_on::text, ends_on::text
+        FROM classes_enrolment WHERE student_id::text = ANY(${students})`,
+    );
+    const later = Row.all(
+      await this.sql`SELECT before, after FROM audit_change
+        WHERE table_name = 'classes_enrolment' AND id > ${lastOwn}
+          AND COALESCE(after, before)->>'student_id' = ANY(${students})
+        ORDER BY id`,
+    );
+    return groupsAroundAction({
+      day: action?.string('day') ?? '',
+      current: current.map((r) =>
+        enrolmentSnapshot({
+          id: r.string('id'),
+          student_id: r.string('student_id'),
+          class_group_id: r.string('class_group_id'),
+          enrolled_on: r.string('enrolled_on'),
+          ends_on: r.nullableString('ends_on'),
+        })
+      ),
+      later: later.map((r) =>
+        enrolmentChange(r.json('before') as AuditRow | null, r.json('after') as AuditRow | null)
+      ),
+      own: own.map((c) => enrolmentChange(c.before, c.after)),
+    });
   }
 
   async classes(filter: AuditFilter): Promise<AuditClassView[]> {
@@ -384,6 +453,26 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
   async revert(changeId: number): Promise<void> {
     await this.sql`SELECT audit_revert_change(${changeId})`;
   }
+}
+
+/** Una inscripción tal como la guarda el historial (o la tabla), con solo lo que dice en qué grupo está quién. */
+function enrolmentSnapshot(row: AuditRow): EnrolmentSnapshot {
+  const date = (field: string) =>
+    typeof row[field] === 'string' ? (row[field] as string).slice(0, 10) : null;
+  return {
+    id: String(row.id),
+    studentId: String(row.student_id),
+    groupId: String(row.class_group_id),
+    enrolledOn: date('enrolled_on') ?? '',
+    endsOn: date('ends_on'),
+  };
+}
+
+function enrolmentChange(before: AuditRow | null, after: AuditRow | null): EnrolmentChange {
+  return {
+    before: before === null ? null : enrolmentSnapshot(before),
+    after: after === null ? null : enrolmentSnapshot(after),
+  };
 }
 
 /**

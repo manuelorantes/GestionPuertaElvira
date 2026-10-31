@@ -85,10 +85,107 @@ export interface AuditReference {
   target: AuditTarget | null;
 }
 
+/** Un grupo en el que estaba un alumno, con su nombre. */
+export interface AuditGroupStay extends GroupStay {
+  groupName: string;
+}
+
+/** Todos los grupos de un alumno justo antes y justo después de una acción que tocó sus inscripciones. */
+export interface AuditStudentGroups {
+  studentId: string;
+  studentName: string;
+  before: AuditGroupStay[];
+  after: AuditGroupStay[];
+}
+
 /** El detalle de una acción: sus cambios y, por identificador, los registros que mencionan. */
 export interface AuditDetail {
   changes: AuditChangeView[];
   references: Record<string, AuditReference>;
+  /** Por cada alumno cuyas inscripciones tocó la acción, sus grupos antes y después. */
+  studentGroups: AuditStudentGroups[];
+}
+
+/** Una inscripción tal como la guarda el historial, con lo que hace falta para saber en qué grupos está alguien. */
+export interface EnrolmentSnapshot {
+  id: string;
+  studentId: string;
+  groupId: string;
+  /** Fechas «AAAA-MM-DD». */
+  enrolledOn: string;
+  endsOn: string | null;
+}
+
+/** Un cambio registrado de una inscripción: null antes si se creó, null después si se borró. */
+export interface EnrolmentChange {
+  before: EnrolmentSnapshot | null;
+  after: EnrolmentSnapshot | null;
+}
+
+/** Un grupo en el que estaba un alumno un día: «desde» si aún no había empezado, «hasta» si ya tenía fin. */
+export interface GroupStay {
+  groupId: string;
+  startsOn: string | null;
+  endsOn: string | null;
+}
+
+/** Los grupos de un alumno antes y después de una acción, sin nombres. */
+export interface StudentGroupsAround {
+  studentId: string;
+  before: GroupStay[];
+  after: GroupStay[];
+}
+
+/**
+ * En qué grupos estaba cada alumno que tocó una acción, justo antes y justo después de ella. Se parte de las
+ * inscripciones de hoy y se deshacen sobre el papel, del más reciente al más antiguo, los cambios posteriores (queda
+ * el estado tras la acción) y luego los de la propia acción (queda el de antes). Así lo que pasó después, incluido
+ * deshacerla, no cambia la respuesta. Cuenta la inscripción que seguía en vigor el día de la acción (`day`).
+ */
+export function groupsAroundAction(input: {
+  day: string;
+  current: readonly EnrolmentSnapshot[];
+  /** Cambios de las acciones posteriores, en el orden en que pasaron. */
+  later: readonly EnrolmentChange[];
+  /** Cambios de la propia acción, en el orden en que pasaron. */
+  own: readonly EnrolmentChange[];
+}): StudentGroupsAround[] {
+  const state = new Map(input.current.map((e) => [e.id, e]));
+  const rollBack = (changes: readonly EnrolmentChange[]) => {
+    for (const change of [...changes].reverse()) {
+      const id = (change.before ?? change.after)?.id;
+      if (id === undefined) continue;
+      if (change.before === null) state.delete(id);
+      else state.set(id, change.before);
+    }
+  };
+  const groupsOf = (studentId: string): GroupStay[] =>
+    [...state.values()]
+      .filter((e) => e.studentId === studentId && (e.endsOn === null || e.endsOn > input.day))
+      .sort((a, b) =>
+        a.enrolledOn.localeCompare(b.enrolledOn) || a.groupId.localeCompare(b.groupId)
+      )
+      .map((e) => ({
+        groupId: e.groupId,
+        startsOn: e.enrolledOn > input.day ? e.enrolledOn : null,
+        endsOn: e.endsOn,
+      }));
+
+  const students = [
+    ...new Set(
+      input.own.flatMap((c) => [c.before?.studentId, c.after?.studentId]).filter(
+        (id): id is string => id !== undefined,
+      ),
+    ),
+  ];
+  rollBack(input.later);
+  const after = new Map(students.map((id) => [id, groupsOf(id)]));
+  rollBack(input.own);
+  return students.map((studentId) => ({
+    studentId,
+    before: groupsOf(studentId),
+    after: after.get(studentId) ?? [],
+  }));
 }
 
 /** Una sección del historial: las acciones que tocaron alguna de sus tablas. */
