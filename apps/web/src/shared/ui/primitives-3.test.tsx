@@ -1,10 +1,11 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 
 import { useDebouncedValue } from '@/shared/useDebouncedValue';
 
 import { Avatar } from './Avatar';
+import { ColumnMenu } from './ColumnMenu';
 import { ConfirmDialog } from './ConfirmDialog';
 import { DateField } from './DateField';
 import { SidePanel } from './SidePanel';
@@ -107,6 +108,33 @@ describe('SidePanel escape', () => {
     await user.keyboard('{Escape}');
 
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe('ColumnMenu', () => {
+  it('should let its long list scroll and close only when the page scrolls', async () => {
+    render(
+      <ColumnMenu
+        label="Acción"
+        name="acción"
+        sorted={null}
+        sorts={[]}
+        filter={{
+          options: Array.from({ length: 40 }, (_, i) => ({ value: `a${i}`, label: `Acción ${i}` })),
+          selected: [],
+          onChange: () => undefined,
+        }}
+      />,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Acción/ }));
+    const menu = screen.getByRole('dialog', { name: 'Ordenar y filtrar por acción' });
+    const list = within(menu).getByRole('checkbox', { name: 'Acción 0' }).closest('div');
+    fireEvent.scroll(list as HTMLElement);
+    expect(
+      screen.getByRole('dialog', { name: 'Ordenar y filtrar por acción' }),
+    ).toBeInTheDocument();
+    fireEvent.scroll(window);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 

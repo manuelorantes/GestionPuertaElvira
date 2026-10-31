@@ -42,16 +42,21 @@ export function ColumnMenu({
   const [open, setOpen] = useState(false);
   const radioName = useId();
   const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   // El panel se pinta fuera de la tabla, fijo bajo el botón: la tabla se desplaza en horizontal y recortaría el panel
-  // cuando hay pocas filas. Si la página se mueve o cambia de tamaño, se cierra en vez de quedarse descolocado.
+  // cuando hay pocas filas. Si la página se mueve o cambia de tamaño, se cierra en vez de quedarse descolocado; al
+  // desplazar su propia lista de valores, no.
   const [position, setPosition] = useState({ top: 0, left: 0 });
   useEffect(() => {
     if (!open) return;
     const close = () => setOpen(false);
-    window.addEventListener('scroll', close, true);
+    const closeUnlessInside = (event: Event) => {
+      if (!(event.target instanceof Node && panel.current?.contains(event.target))) close();
+    };
+    window.addEventListener('scroll', closeUnlessInside, true);
     window.addEventListener('resize', close);
     return () => {
-      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('scroll', closeUnlessInside, true);
       window.removeEventListener('resize', close);
     };
   }, [open]);
@@ -97,6 +102,7 @@ export function ColumnMenu({
               className="fixed inset-0 z-10 cursor-default"
             />
             <div
+              ref={panel}
               role="dialog"
               aria-label={`Ordenar y filtrar por ${name}`}
               onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
