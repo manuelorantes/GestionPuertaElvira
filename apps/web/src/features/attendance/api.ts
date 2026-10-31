@@ -1,3 +1,4 @@
+import type { RollCall } from '@/features/teacher-space/api';
 import { apiGet, apiSend } from '@/shared/api/client';
 
 /** Clase apuntada en las horas cuyo plazo para pasar lista acabó sin lista. */
@@ -28,6 +29,26 @@ export function confirmWithoutRollCall(item: MissedRollCall): Promise<void> {
         `/api/admin/attendance/pending/activities/${item.dutyId}/${item.date}/confirm`,
       )
     : apiSend('POST', `/api/admin/attendance/pending/${item.groupId}/${item.date}/confirm`);
+}
+
+/** La lista de una clase tal y como la ve superadministración: la de quien la da ese día. */
+export interface StaffRollCall extends RollCall {
+  groupId: string;
+  teacher: { id: string; name: string };
+}
+
+/** Superadministración: la lista de la clase de cualquier grupo un día en que la hay. */
+export function fetchStaffRollCall(groupId: string, date: string): Promise<StaffRollCall> {
+  return apiGet<StaffRollCall>(`/api/admin/roll-calls/${groupId}/${date}`);
+}
+
+/** Superadministración guarda la lista (sin plazo); apunta la clase en las horas del profesor si no lo estaba. */
+export function saveStaffRollCall(
+  groupId: string,
+  date: string,
+  marks: { absent: string[]; guests: string[] },
+): Promise<void> {
+  return apiSend('PUT', `/api/admin/roll-calls/${groupId}/${date}`, marks);
 }
 
 /** Asistencia de un alumno en la temporada: clases con lista en las que estaba, a cuántas vino y sus faltas. */
