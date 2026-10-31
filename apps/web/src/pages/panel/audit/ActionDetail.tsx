@@ -9,6 +9,8 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { type AuditDetail, fetchAction } from '@/features/audit/api';
 import { Alert } from '@/shared/ui/Alert';
 
+import { StudentGroups } from './StudentGroups';
+
 const OPERATION = { I: 'Alta', U: 'Cambio', D: 'Baja' } as const;
 /** Un valor del detalle: sus trozos, con enlace los que son un registro de la aplicación. */
 function Value({ parts, muted = false }: { parts: ValuePart[]; muted?: boolean }) {
@@ -111,7 +113,10 @@ function PaymentSummary({
   );
 }
 
-/** El detalle de una acción: el resumen de un cobro o, para lo demás, campo a campo. */
+/**
+ * El detalle de una acción: el resumen de un cobro o, para lo demás, campo a campo; si tocó inscripciones, antes van
+ * todos los grupos de cada alumno antes y después.
+ */
 export function ActionDetail({ id }: { id: string }) {
   const detail = useQuery({ queryKey: ['audit-action', id], queryFn: () => fetchAction(id) });
   if (detail.isPending) return <p className="text-sm text-ink-muted">Cargando detalle…</p>;
@@ -125,6 +130,7 @@ export function ActionDetail({ id }: { id: string }) {
 
   return (
     <div className="flex flex-col gap-3">
+      <StudentGroups students={detail.data.studentGroups} />
       {detail.data.changes.map((change, index) => (
         <div
           key={`${change.table}-${index}`}

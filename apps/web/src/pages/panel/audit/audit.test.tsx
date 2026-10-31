@@ -95,6 +95,7 @@ const DETAIL = {
       target: { kind: 'payment', id: 'p1' },
     },
   },
+  studentGroups: [],
 };
 
 function api(extra: Parameters<typeof mockApi>[0] = {}) {
@@ -178,6 +179,76 @@ describe('Historial', () => {
       'href',
       '/panel/alumnos/s1',
     );
+  });
+
+  it('shows every group of the student before and after an enrolment change', async () => {
+    const group = (groupId: string, groupName: string, extra = {}) => ({
+      groupId,
+      groupName,
+      startsOn: null,
+      endsOn: null,
+      ...extra,
+    });
+    api({
+      'GET /api/admin/audit/actions/a1': [
+        200,
+        {
+          ...DETAIL,
+          changes: [
+            {
+              table: 'classes_enrolment',
+              tableLabel: 'Inscripción',
+              title: 'Miguel Ángel Cabezas · Martes 17:00 · Iniciación · Peón',
+              key: { id: 'e1' },
+              operation: 'U',
+              fields: [{ field: 'ends_on', before: null, after: '2026-10-26' }],
+              target: { kind: 'student', id: 's2' },
+            },
+          ],
+          studentGroups: [
+            {
+              studentId: 's2',
+              studentName: 'Miguel Ángel Cabezas',
+              before: [
+                group('g1', 'Martes 17:00 · Iniciación · Peón'),
+                group('g2', 'Miércoles 17:00 · Iniciación · Peón', { endsOn: '2026-12-20' }),
+              ],
+              after: [group('g2', 'Miércoles 17:00 · Iniciación · Peón', { endsOn: '2026-12-20' })],
+            },
+            {
+              studentId: 's3',
+              studentName: 'Leo Ruiz',
+              before: [],
+              after: [group('g3', 'Jueves 18:30 · Avanzado', { startsOn: '2026-11-02' })],
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/historial');
+    const table = await screen.findByRole('table', { name: 'Historial de acciones' });
+    await userEvent.click(
+      within(table).getByRole('button', { name: 'Ver detalle de Registrar cobro' }),
+    );
+
+    const miguel = await screen.findByRole('region', { name: 'Grupos de Miguel Ángel Cabezas' });
+    const before = within(miguel).getByRole('definition', { name: 'Antes' });
+    const after = within(miguel).getByRole('definition', { name: 'Después' });
+    expect(before).toHaveTextContent(
+      'Martes 17:00 · Iniciación · Peón, Miércoles 17:00 · Iniciación · Peón (hasta 20/12/2026)',
+    );
+    expect(after).toHaveTextContent('Miércoles 17:00 · Iniciación · Peón (hasta 20/12/2026)');
+    expect(
+      within(before).getByRole('link', { name: 'Martes 17:00 · Iniciación · Peón' }),
+    ).toHaveAttribute('href', '/panel/clases?grupo=g1');
+
+    const leo = screen.getByRole('region', { name: 'Grupos de Leo Ruiz' });
+    expect(within(leo).getByRole('definition', { name: 'Antes' })).toHaveTextContent('Sin grupos');
+    expect(within(leo).getByRole('definition', { name: 'Después' })).toHaveTextContent(
+      'Jueves 18:30 · Avanzado (desde 02/11/2026)',
+    );
+    // Debajo sigue el detalle campo a campo.
+    expect(screen.getByText('Cambio · Inscripción')).toBeInTheDocument();
   });
 
   it('sorts the actions from the headers, most recent first unless another column is chosen', async () => {
