@@ -32,6 +32,17 @@ const substitutionNote = (s: TeacherSubstitution) =>
     ? `Sustituiste a ${s.otherName} en ${s.label}`
     : `Te sustituyó ${s.otherName} en ${s.label}`;
 
+/** Lo que cuentan las sesiones del mes (como en la liquidación): de sus clases y de sustitución. */
+function monthTotal(sessions: TeacherSession[]): { own: number; substitution: number } {
+  return sessions.reduce(
+    (sum, s) => ({
+      own: sum.own + (s.substitution ? 0 : s.countedMinutes),
+      substitution: sum.substitution + (s.substitution ? s.countedMinutes : 0),
+    }),
+    { own: 0, substitution: 0 },
+  );
+}
+
 /**
  * Mis horas: las clases que he dado en un mes, en el mismo calendario que ve administración en mi ficha (mis clases en
  * verde, las sustituciones en negro), los días en que sustituí a alguien o me sustituyeron, y la lista de sesiones.
@@ -41,7 +52,7 @@ export function TeacherHoursPage() {
   const hours = useTeacherHours(month);
   const sessions = hours.data?.sessions ?? [];
   const substitutions = hours.data?.substitutions ?? [];
-  const total = sessions.reduce((sum, s) => sum + s.minutes, 0);
+  const total = monthTotal(sessions);
   // De lo más reciente a lo más antiguo, salvo que se elija otra columna.
   const { header, apply } = useTableSort(SESSION_COLUMNS, { key: 'date', descending: true });
   return (
@@ -49,20 +60,30 @@ export function TeacherHoursPage() {
       <h1 className="font-display text-[28px] font-bold tracking-[0.04em] text-ink-strong uppercase">
         Mis horas
       </h1>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <SeasonMonths month={month} selected={month} label="Mes" onChange={setMonth} />
-        {hours.data && (
-          <span className="text-sm text-ink-muted">
-            {sessions.length} sesiones · {hoursLabel(total)}
-          </span>
-        )}
-      </div>
+      <SeasonMonths month={month} selected={month} label="Mes" onChange={setMonth} />
       {hours.isPending ? (
         <p className="text-ink-muted">Cargando…</p>
       ) : hours.isError ? (
         <Alert>{apiErrorMessage(hours.error)}</Alert>
       ) : (
         <>
+          <section aria-label="Total del mes" className="grid grid-cols-3 gap-3">
+            {[
+              [`Horas de ${monthLabel(month).toLowerCase()}`, total.own + total.substitution],
+              ['De mis clases', total.own],
+              ['De sustitución', total.substitution],
+            ].map(([label, minutes], index) => (
+              <Card key={label} className="px-4 py-3">
+                <p className="text-[13px] text-ink-muted">{label}</p>
+                <p className="font-display text-2xl font-bold">{hoursLabel(Number(minutes))}</p>
+                {index === 0 && (
+                  <p className="text-[13px] text-ink-muted">
+                    {sessions.length} {sessions.length === 1 ? 'sesión' : 'sesiones'}
+                  </p>
+                )}
+              </Card>
+            ))}
+          </section>
           <Card className="overflow-x-auto pb-4">
             <SessionsCalendar month={month} sessions={sessions} viewer="teacher" />
             {substitutions.length > 0 && (
