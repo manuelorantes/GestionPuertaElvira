@@ -185,6 +185,12 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
   curso), ingresos atribuidos y margen;
 - clases dadas en el mes que se elija (fecha, clase o actividad, horas y coste); las que dio sustituyendo a otro
   profesor llevan delante «(Sustitución)»;
+  antes de la lista, un calendario de ese mes (de lunes a viernes, o la semana entera si dio algo en fin de semana)
+  marca cada día las horas que dio:
+  las de sus clases en el verde de intermedio y las de sustitución en el negro de avanzado,
+  por separado si ese día dio de las dos;
+  cada sesión cuenta lo que cuenta en su liquidación (sin contar dos veces lo que se pisa);
+  el día en que le sustituyeron no lleva nada de esa clase;
 - sus clases asignadas con días, horario, aula, alumnos y ocupación, y la ocupación total de sus clases; cuando hay
   alumnos que no vienen todos los días de la clase, un asterisco junto a los alumnos abre los alumnos de cada día
   frente a las plazas;
@@ -193,6 +199,10 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
 Las clases dadas, las clases asignadas, los alumnos y los pagos recibidos MUST poder ordenarse desde las cabeceras por
 cualquiera de sus columnas, en ambos sentidos; por defecto, las clases dadas y los pagos de lo más reciente a lo más
 antiguo, las clases asignadas por horario y los alumnos por nombre.
+
+#### Scenario: Calendario de clases dadas
+- **WHEN** un miércoles un profesor da 2 h de sus clases y 1,5 h sustituyendo a otro, y el jueves le sustituyen
+- **THEN** el miércoles sale con 2 h en verde y 1,5 h en negro, y el jueves sin horas
 
 ### Requirement: Anticipos y fecha de pago
 Administración MUST poder apuntar un anticipo a un profesor (importe, mes del que se descuenta, día en que se pagó y
