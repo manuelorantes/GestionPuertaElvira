@@ -60,6 +60,14 @@ export function currentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
+/**
+ * El mes que muestra un selector de meses (`SeasonMonths`) que guarda el mes en la URL (`?mes=AAAA-MM`): el pedido o, si
+ * no hay o no es un mes, el mes en curso. Todos los selectores de meses empiezan en el mes en curso.
+ */
+export function selectedMonth(requested: string | null): string {
+  return requested !== null && /^\d{4}-\d{2}$/.test(requested) ? requested : currentMonth();
+}
+
 export function reminderText(charge: {
   guardianName: string;
   studentName: string;

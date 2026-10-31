@@ -2,7 +2,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import { currentMonth, shiftMonth } from '@/features/billing/money';
+import { selectedMonth } from '@/features/billing/money';
 import { SeasonMonths } from '@/features/billing/SeasonMonths';
 import { useTeachers } from '@/features/classes/hooks';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
@@ -33,13 +33,7 @@ export function TeachersPayPage() {
   const tab = TABS.some((t) => t.id === searchParams.get('pestana'))
     ? (searchParams.get('pestana') as string)
     : 'rentabilidad';
-  const requested = searchParams.get('mes') ?? '';
-  // La liquidación se paga a mes vencido: por defecto, el mes anterior.
-  const month = /^\d{4}-\d{2}$/.test(requested)
-    ? requested
-    : tab === 'liquidacion'
-      ? shiftMonth(currentMonth(), -1)
-      : currentMonth();
+  const month = selectedMonth(searchParams.get('mes'));
   const teachers = useTeachers();
   const active = (teachers.data ?? []).filter((t) => t.active);
   const [recording, setRecording] = useState(false);

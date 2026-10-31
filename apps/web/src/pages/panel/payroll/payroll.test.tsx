@@ -802,6 +802,29 @@ describe('Profesorado', () => {
     ).toBeInTheDocument();
   });
 
+  it('opens the settlements of the current month by default, like every month selector', async () => {
+    const month = currentMonth();
+    const spy = mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/teachers': [200, { items: [] }],
+      [`GET /api/admin/payroll/settlements?month=${month}`]: [200, { month, items: [] }],
+    });
+    renderApp('/panel/profesores?pestana=liquidacion');
+
+    expect(await screen.findByText('No hay liquidaciones este mes.')).toBeInTheDocument();
+    const months = screen.getByRole('group', { name: 'Mes' });
+    expect(within(months).getByRole('button', { name: monthLabel(month) })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(spy.mock.calls.some(([u]) => String(u).includes('settlements?month='))).toBe(true);
+    expect(
+      spy.mock.calls.every(
+        ([u]) => !String(u).includes('settlements?month=') || String(u).endsWith(month),
+      ),
+    ).toBe(true);
+  });
+
   it('explains why a settlement cannot be paid', async () => {
     api({
       'POST /api/admin/payroll/settlements/t1/2026-09/payment': [
