@@ -164,6 +164,9 @@ Cada bloque es un botón coloreado por nivel; el ancho mínimo es de 980px, con 
 - Prohibido usar colores hexadecimales en componentes: solo tokens de `index.css`.
 - Antes de crear un primitivo, busca en `apps/web/src/shared/ui/`.
 - Un token nuevo se añade a la vez en `index.css` y en esta guía.
+- Para elegir un mes de la temporada, siempre `SeasonMonths` (un botón por mes, de septiembre a junio).
+  Empieza siempre en el mes en curso; si guarda el mes en la URL (`?mes=AAAA-MM`), lo lee con `selectedMonth`,
+  que da el mes en curso cuando no hay mes o no es válido. Ninguna pantalla elige otro mes por defecto.
 
 ## Hoja imprimible (recibos y facturas)
 
