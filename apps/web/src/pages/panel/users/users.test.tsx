@@ -347,6 +347,12 @@ describe('emails adicionales', () => {
     await userEvent.click(
       within(list).getByRole('button', { name: 'Quitar club.personal@gmail.com' }),
     );
+    const confirm = screen.getByRole('dialog', { name: 'Quitar email' });
+    expect(confirm).toHaveTextContent(
+      'Ya no se podrá entrar en la cuenta de Club Ajedrez con club.personal@gmail.com.',
+    );
+    expect(spy.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Quitar' }));
     await waitFor(() =>
       expect(
         spy.mock.calls.some(

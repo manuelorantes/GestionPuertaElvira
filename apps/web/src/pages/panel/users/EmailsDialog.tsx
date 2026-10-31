@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -6,6 +6,7 @@ import { addUserEmail, type ClubUser, removeUserEmail } from '@/features/users/a
 import { useUserMutation } from '@/features/users/hooks';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
+import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { Dialog } from '@/shared/ui/Dialog';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
@@ -16,10 +17,11 @@ import { useToast } from '@/shared/ui/Toast';
  */
 export function EmailsDialog({ user, onClose }: { user: ClubUser; onClose: () => void }) {
   const [email, setEmail] = useState('');
+  const [removing, setRemoving] = useState<string | null>(null);
   const toast = useToast();
   const add = useUserMutation((address: string) => addUserEmail(user.id, address));
   const remove = useUserMutation((address: string) => removeUserEmail(user.id, address));
-  const failure = add.error ?? remove.error;
+  const failure = add.error;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -55,16 +57,14 @@ export function EmailsDialog({ user, onClose }: { user: ClubUser; onClose: () =>
                 <button
                   type="button"
                   aria-label={`Quitar ${other}`}
-                  disabled={remove.isPending}
-                  onClick={() =>
-                    void remove.mutateAsync(other).then(
-                      () => toast('Email quitado'),
-                      () => undefined,
-                    )
-                  }
-                  className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted disabled:opacity-60"
+                  title="Quitar email"
+                  onClick={() => {
+                    remove.reset();
+                    setRemoving(other);
+                  }}
+                  className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
                 >
-                  <X aria-hidden size={16} />
+                  <Trash2 aria-hidden size={16} />
                 </button>
               </li>
             ))}
@@ -88,6 +88,28 @@ export function EmailsDialog({ user, onClose }: { user: ClubUser; onClose: () =>
           <Button onClick={onClose}>Hecho</Button>
         </div>
       </form>
+      {removing && (
+        <ConfirmDialog
+          title="Quitar email"
+          message={`Ya no se podrá entrar en la cuenta de ${user.fullName} con ${removing}.`}
+          confirmLabel="Quitar"
+          busy={remove.isPending}
+          error={remove.isError ? apiErrorMessage(remove.error) : null}
+          onCancel={() => {
+            remove.reset();
+            setRemoving(null);
+          }}
+          onConfirm={() =>
+            void remove.mutateAsync(removing).then(
+              () => {
+                setRemoving(null);
+                toast('Email quitado');
+              },
+              () => undefined,
+            )
+          }
+        />
+      )}
     </Dialog>
   );
 }

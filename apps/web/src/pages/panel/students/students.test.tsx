@@ -1096,6 +1096,12 @@ describe('Alumnos', () => {
     renderApp('/panel/alumnos/s1');
 
     await user.click(await screen.findByRole('button', { name: 'Quitar de Iniciación A' }));
+    const confirm = screen.getByRole('dialog', { name: 'Quitar del grupo' });
+    expect(confirm).toHaveTextContent(
+      'Martina López Herrera dejará de estar en Iniciación A; sigue de alta en el club.',
+    );
+    expect(spy.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
+    await user.click(within(confirm).getByRole('button', { name: 'Quitar' }));
 
     expect(await screen.findByText('Quitado de Iniciación A')).toBeVisible();
     const card = screen.getByRole('dialog', { name: 'Martina López Herrera' });
@@ -1104,6 +1110,48 @@ describe('Alumnos', () => {
     expect(
       spy.mock.calls.some(
         ([u, init]) => u === '/api/admin/students/s1/enrolments/g1' && init?.method === 'DELETE',
+      ),
+    ).toBe(true);
+  });
+
+  it('should ask before removing a member of the direct family', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'GET /api/admin/students/s1': [
+        [200, DETAIL],
+        [200, { ...DETAIL, siblings: [] }],
+      ],
+      'DELETE /api/admin/students/s1/siblings/s3': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    await user.click(
+      await screen.findByRole('button', {
+        name: 'Quitar de la familia directa a Pablo López Herrera',
+      }),
+    );
+    const confirm = screen.getByRole('dialog', { name: 'Quitar de la familia directa' });
+    expect(confirm).toHaveTextContent(
+      'Pablo López Herrera dejará de ser familia directa de Martina López Herrera y del resto de su familia.',
+    );
+    await user.click(within(confirm).getByRole('button', { name: 'Cancelar' }));
+    expect(screen.queryByRole('dialog', { name: 'Quitar de la familia directa' })).toBeNull();
+    expect(spy.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(false);
+
+    await user.click(
+      screen.getByRole('button', { name: 'Quitar de la familia directa a Pablo López Herrera' }),
+    );
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Quitar de la familia directa' })).getByRole(
+        'button',
+        { name: 'Quitar' },
+      ),
+    );
+
+    expect(await screen.findByText('Familiar desvinculado')).toBeVisible();
+    expect(
+      spy.mock.calls.some(
+        ([u, init]) => u === '/api/admin/students/s1/siblings/s3' && init?.method === 'DELETE',
       ),
     ).toBe(true);
   });
