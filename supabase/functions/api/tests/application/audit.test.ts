@@ -68,6 +68,10 @@ class FakeAudit implements AuditLog, AuditReverter {
     return Promise.resolve([]);
   }
 
+  labels(): Promise<{ label: string; count: number }[]> {
+    return Promise.resolve([]);
+  }
+
   begin(label: string, kind: string, reverts: string): Promise<void> {
     this.begun.push({ label, kind, reverts });
     return Promise.resolve();
