@@ -481,6 +481,87 @@ describe('Mis pagos', () => {
   });
 });
 
+describe('Mis horas', () => {
+  it('shows the hours of the month on a calendar, the substitutions of the month and the sessions', async () => {
+    const month = currentMonth();
+    const day = (n: number) => `${month}-${String(n).padStart(2, '0')}`;
+    mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      [`GET /api/teacher/hours?month=${month}`]: [
+        200,
+        {
+          month,
+          sessions: [
+            {
+              id: 'p2',
+              date: day(14),
+              label: 'Adultos I',
+              minutes: 90,
+              countedMinutes: 90,
+              substitution: true,
+            },
+            {
+              id: 'p1',
+              date: day(14),
+              label: 'Iniciación A',
+              minutes: 120,
+              countedMinutes: 120,
+              substitution: false,
+            },
+          ],
+          substitutions: [
+            {
+              date: day(14),
+              label: 'Adultos I',
+              role: 'gave',
+              otherName: 'Carlos Ruiz Márquez',
+              reason: null,
+            },
+            {
+              date: day(15),
+              label: 'Iniciación A',
+              role: 'received',
+              otherName: 'Ana Belén Torres',
+              reason: 'Médico',
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/mis-horas');
+
+    expect(await screen.findByRole('heading', { name: 'Mis horas', level: 1 })).toBeVisible();
+    // En el menú, entre Alumnos y Mis pagos.
+    const nav = screen.getByRole('navigation', { name: 'Secciones' });
+    const labels = within(nav)
+      .getAllByRole('link')
+      .map((l) => l.textContent);
+    expect(labels.indexOf('Mis horas')).toBe(labels.indexOf('Alumnos') + 1);
+    expect(labels.indexOf('Mis pagos')).toBe(labels.indexOf('Mis horas') + 1);
+
+    const calendar = await screen.findByRole('table', { name: /Calendario de clases dadas/ });
+    const cell = within(calendar).getByText('14', { exact: false }).closest('td');
+    expect(cell).toHaveTextContent('2 h de mis clases');
+    expect(cell).toHaveTextContent('1,5 h de sustitución');
+    expect(screen.getByRole('list', { name: 'Leyenda del calendario' })).toHaveTextContent(
+      'Mis clases',
+    );
+
+    const notes = screen.getByRole('list', { name: 'Sustituciones del mes' });
+    const [gave, received] = within(notes).getAllByRole('listitem');
+    expect(gave).toHaveTextContent('Sustituiste a Carlos Ruiz Márquez en Adultos I');
+    expect(received).toHaveTextContent('Te sustituyó Ana Belén Torres en Iniciación A');
+
+    const table = screen.getByRole('table', { name: /Clases dadas en/ });
+    expect(within(table).getByText('(Sustitución) Adultos I')).toBeVisible();
+    expect(within(table).queryByText(/€/)).not.toBeInTheDocument();
+    const byHours = within(table).getByRole('button', { name: 'Ordenar por horas' });
+    await userEvent.click(byHours);
+    await userEvent.click(byHours);
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Iniciación A');
+  });
+});
+
 describe('Actividades del club', () => {
   const activity = (overrides: Record<string, unknown>) => ({
     ...CLASS,

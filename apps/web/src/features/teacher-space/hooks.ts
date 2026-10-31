@@ -48,6 +48,10 @@ export function useSaveRollCall(groupId: string, date: string) {
   });
 }
 
+export function useTeacherHours(month: string) {
+  return useQuery({ queryKey: ['teacher-hours', month], queryFn: () => api.fetchHours(month) });
+}
+
 export function useTeacherPay() {
   return useQuery({ queryKey: ['teacher-pay'], queryFn: api.fetchPay });
 }
