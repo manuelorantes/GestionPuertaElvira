@@ -193,6 +193,7 @@ ha dado de alta más de una vez, la ficha MUST mostrar «Última alta en el club
 Un alumno MAY estar en varios grupos, pero MUST NOT estar en dos cuyos horarios reales coincidan en algún día y hora,
 ni dos veces en el mismo grupo.
 Un alumno MUST poder dejar cualquiera de sus grupos, también el último: sigue de alta, como socio sin clases.
+Quitarle de un grupo desde la ficha MUST pedir confirmación antes.
 Cada inscripción tiene la fecha desde la que el alumno está en el grupo, que es la que cuenta para sus listas y sus
 cuotas. Al añadir un grupo MUST poder elegirse «Desde» (por defecto hoy), y la ficha MUST mostrar «En el grupo desde» en
 cada grupo y permitir corregirla (por ejemplo, si venía antes de que se le inscribiera). Esa fecha nunca puede ser futura,
@@ -237,7 +238,7 @@ El horario especial MUST poder cambiarse o quitarse después, con las mismas com
 - **THEN** sale del primero y entra en el segundo en una sola operación, y la ocupación de ambos se actualiza
 
 #### Scenario: Quitar el único grupo
-- **WHEN** administración quita el único grupo de un alumno activo
+- **WHEN** administración quita el único grupo de un alumno activo y lo confirma
 - **THEN** sale del grupo, sigue de alta como socio sin clases (aparece en «Socios sin clases») y no se le dan de baja
   ni se le cancelan las cuotas ya emitidas
 
@@ -252,7 +253,7 @@ Inscribir o mover a un alumno a un grupo completo MUST requerir una confirmació
 La familia directa son hermanos, padres y madres que están en el club; da derecho al descuento familiar.
 La familia es un grupo: la relación MUST ser mutua y transitiva. Vincular a dos alumnos MUST unir sus familias (cada
 uno queda vinculado con todos los familiares del otro), y quitar a un familiar desde la ficha de un alumno MUST sacarlo
-de toda la familia de ese alumno.
+de toda la familia de ese alumno, tras confirmarlo.
 
 #### Scenario: Vincular familia directa
 - **WHEN** administración indica que A es familia directa de B (por ejemplo, su madre o su hermano)
@@ -263,8 +264,12 @@ de toda la familia de ese alumno.
 - **THEN** C queda vinculado también con A, y las fichas de los tres muestran a los otros dos
 
 #### Scenario: Quitar a uno de la familia
-- **WHEN** A, B y C son familia directa y administración quita a C desde la ficha de A
+- **WHEN** A, B y C son familia directa y administración quita a C desde la ficha de A y lo confirma
 - **THEN** C deja de ser familia directa de A y de B, que siguen siéndolo entre ellos
+
+#### Scenario: Se arrepiente de quitar a un familiar
+- **WHEN** administración pulsa quitar a C de la familia de A y cancela la confirmación
+- **THEN** la familia sigue igual
 
 ### Requirement: Acceso restringido
 Dar de alta, cambiar, inscribir, dar de baja, cobrar o apuntar pedidos MUST estar reservado a cuentas de

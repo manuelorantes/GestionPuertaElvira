@@ -181,7 +181,7 @@ desactivar su propia cuenta ni cambiar su propio rol. Cada acción queda en el h
 
 ### Requirement: Emails adicionales de una cuenta
 Superadministración MUST poder añadir a cualquier cuenta, de forma opcional, otros emails («Emails» en su fila de la
-sección Usuarios) y quitarlos. Con cualquiera de ellos se entra en la misma cuenta, con la misma contraseña y el mismo
+sección Usuarios) y quitarlos, tras confirmarlo. Con cualquiera de ellos se entra en la misma cuenta, con la misma contraseña y el mismo
 perfil (su email principal no cambia). Ningún email puede ser de dos cuentas, ni como principal ni como adicional. La
 lista de Usuarios muestra los adicionales debajo del principal. Cada cambio queda en el historial.
 
