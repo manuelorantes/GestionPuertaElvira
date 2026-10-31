@@ -323,9 +323,38 @@ export class RecordScheduledSession {
       )
       .find((p) => p.source === source);
     if (!planned) return;
-    if ((await this.timesheets.onDate(day)).some((e) => e.source === source)) return;
+    // Ya apuntada: por la tarea de la noche o a mano (una sesión de ese grupo ese día).
+    const recorded = (e: TimesheetEntry) =>
+      e.source === source ||
+      (planned.group !== null && e.group !== null && planned.group.equals(e.group));
+    if ((await this.timesheets.onDate(day)).some(recorded)) return;
     if ((await this.settlements.settlement(planned.teacher, YearMonth.of(day))) !== null) return;
     await this.timesheets.save(TimesheetEntry.planned(TimesheetEntryId.generate(), planned));
+  }
+}
+
+/** Quién da la clase de un grupo un día (su titular o quien le sustituye), o null si ese día no la hay. */
+export class GroupTeacherOn {
+  constructor(
+    private readonly schedule: ScheduleDirectory,
+    private readonly duties: DutyRepository,
+    private readonly substitutions: SubstitutionRepository,
+    private readonly holidays: HolidayCalendar,
+  ) {}
+
+  async execute(groupId: string, date: string): Promise<string | null> {
+    const day = LocalDate.fromString(date);
+    if (await this.holidays.isHoliday(day)) return null;
+    const planned = new DailyPlanner()
+      .plan(
+        day,
+        await this.schedule.groups(),
+        await this.duties.all(),
+        await this.substitutions.onDate(day),
+        null,
+      )
+      .find((p) => p.source === `group:${groupId}`);
+    return planned?.teacher.value ?? null;
   }
 }
 
