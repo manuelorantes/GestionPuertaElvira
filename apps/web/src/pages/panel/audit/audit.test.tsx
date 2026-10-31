@@ -7,9 +7,11 @@ const action = (overrides: Record<string, unknown>) => ({
   id: 'a1',
   seq: 10,
   kind: 'change',
+  category: 'payments',
   userId: 'u1',
   userName: 'Lucía Moreno Gil',
   label: 'Registrar cobro',
+  detail: 'R-2026-0027 · Martina López Herrera',
   occurredAt: '2026-10-04T18:30:00+02:00',
   changeCount: 3,
   affected: ['Cobro', 'Cuota', 'Numeración de documentos'],
@@ -25,16 +27,18 @@ const ACTIONS = {
       id: 'a0',
       seq: 9,
       kind: 'security',
+      category: 'system',
       label: 'Inicio de sesión',
+      detail: null,
       changeCount: 0,
       affected: [],
       undoable: false,
     }),
   ],
   people: [{ id: 'u1', name: 'Lucía Moreno Gil' }],
-  labels: [
-    { label: 'Inicio de sesión', count: 1 },
-    { label: 'Registrar cobro', count: 1 },
+  categories: [
+    { category: 'payments', count: 1 },
+    { category: 'system', count: 1 },
   ],
 };
 
@@ -110,6 +114,8 @@ describe('Historial', () => {
     const table = await screen.findByRole('table', { name: 'Historial de acciones' });
     const payment = within(table).getByRole('row', { name: /Registrar cobro/ });
     expect(payment).toHaveTextContent('Lucía Moreno Gil');
+    // La categoría encima de la acción y, debajo, a quién afectó.
+    expect(payment).toHaveTextContent('CobrosRegistrar cobroR-2026-0027 · Martina López Herrera');
     expect(payment).toHaveTextContent('04/10/2026 18:30');
     expect(payment).toHaveTextContent('Cobro, Cuota, Numeración de documentos');
     const login = within(table).getByRole('row', { name: /Inicio de sesión/ });
@@ -128,7 +134,7 @@ describe('Historial', () => {
     );
     expect(value('Pago')).toHaveTextContent('45 € · Efectivo');
     expect(value('Concepto')).toHaveTextContent('Octubre 2026');
-    expect(screen.queryByText(/R-2026-0027/)).not.toBeInTheDocument();
+    expect(within(summary).queryByText(/R-2026-0027/)).not.toBeInTheDocument();
     expect(screen.queryByText('Recibo')).not.toBeInTheDocument();
     expect(screen.queryByText(/Numeración de documentos ·|Último número/)).not.toBeInTheDocument();
     expect(screen.queryByText('Alta · Cobro')).not.toBeInTheDocument();
@@ -188,7 +194,9 @@ describe('Historial', () => {
               seq: 9,
               userId: null,
               userName: 'Sistema',
+              category: 'system',
               label: 'Inicio de sesión',
+              detail: null,
               occurredAt: '2026-10-04T09:15:00+02:00',
               changeCount: 0,
               affected: [],
@@ -205,7 +213,9 @@ describe('Historial', () => {
       within(table)
         .getAllByRole('row')
         .slice(1)
-        .map((row) => within(row).getAllByRole('cell')[3]?.textContent);
+        .map((row) =>
+          ['Registrar cobro', 'Inicio de sesión'].find((l) => row.textContent?.includes(l)),
+        );
 
     expect(labels()).toEqual(['Registrar cobro', 'Inicio de sesión']);
     await user.click(screen.getByRole('button', { name: 'Ordenar por fecha y hora' }));
@@ -218,9 +228,10 @@ describe('Historial', () => {
     await user.click(
       within(screen.getByRole('dialog', { name: 'Ordenar y filtrar por acción' })).getByRole(
         'radio',
-        { name: 'De la A a la Z' },
+        { name: 'De la Z a la A' },
       ),
     );
+    // Por categoría y, dentro, por acción: «Cuentas y sistema» va después de «Cobros».
     expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
     // Lo que no afectó a nada va primero.
     await user.click(screen.getByRole('button', { name: 'Ordenar por afecta a' }));
@@ -229,28 +240,27 @@ describe('Historial', () => {
     expect(labels()).toEqual(['Registrar cobro', 'Inicio de sesión']);
   });
 
-  it('filters by any action of the history from the action header, asking the server', async () => {
+  it('filters by category from the action header, asking the server for the whole history', async () => {
     const user = userEvent.setup();
+    const categories = [
+      { category: 'charges', count: 4 },
+      { category: 'payments', count: 1 },
+    ];
     const fetch = api({
-      'GET /api/admin/audit/actions': [
+      'GET /api/admin/audit/actions': [200, { ...ACTIONS, categories }],
+      'GET /api/admin/audit/actions?category=charges': [
         200,
         {
           ...ACTIONS,
-          labels: [
-            { label: 'Registrar cobro', count: 1 },
-            { label: 'Volver a la cuota calculada', count: 4 },
+          items: [
+            action({
+              id: 'a7',
+              category: 'charges',
+              label: 'Volver a la cuota calculada',
+              detail: 'Cuota de octubre 2026 · Martina López Herrera',
+            }),
           ],
-        },
-      ],
-      'GET /api/admin/audit/actions?label=Volver+a+la+cuota+calculada': [
-        200,
-        {
-          ...ACTIONS,
-          items: [action({ id: 'a7', label: 'Volver a la cuota calculada' })],
-          labels: [
-            { label: 'Registrar cobro', count: 1 },
-            { label: 'Volver a la cuota calculada', count: 4 },
-          ],
+          categories,
         },
       ],
     });
@@ -259,24 +269,23 @@ describe('Historial', () => {
     const table = await screen.findByRole('table', { name: 'Historial de acciones' });
     await user.click(within(table).getByRole('button', { name: /Acción/ }));
     const menu = screen.getByRole('dialog', { name: 'Ordenar y filtrar por acción' });
-    // Todas las del historial, aunque aún no se hayan cargado.
+    // Las categorías de todo el historial, aunque sus acciones aún no se hayan cargado.
     const options = within(within(menu).getByRole('group', { name: 'Filtrar' })).getAllByRole(
       'checkbox',
     );
     expect(options.map((o) => o.closest('label')?.textContent)).toEqual([
-      'Registrar cobro (1)',
-      'Volver a la cuota calculada (4)',
+      'Cuotas (4)',
+      'Cobros (1)',
     ]);
-    await user.click(options[1] as HTMLElement);
+    await user.click(options[0] as HTMLElement);
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
-        '/api/admin/audit/actions?label=Volver+a+la+cuota+calculada',
+        '/api/admin/audit/actions?category=charges',
         expect.anything(),
       ),
     );
-    expect(
-      await within(table).findByRole('row', { name: /Volver a la cuota calculada/ }),
-    ).toBeInTheDocument();
+    const row = await within(table).findByRole('row', { name: /Volver a la cuota calculada/ });
+    expect(row).toHaveTextContent('Cuota de octubre 2026 · Martina López Herrera');
     expect(within(table).queryByRole('row', { name: /Registrar cobro/ })).not.toBeInTheDocument();
     expect(within(table).getByRole('button', { name: /Acción/ })).toHaveTextContent('(1)');
   });

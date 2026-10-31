@@ -3,7 +3,13 @@ import { ChevronDown, ChevronRight, LogIn } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { type AuditAction, type AuditQuery, fetchActions } from '@/features/audit/api';
+import {
+  type AuditAction,
+  type AuditCategory,
+  type AuditQuery,
+  fetchActions,
+} from '@/features/audit/api';
+import { CATEGORY_NAMES } from '@/features/audit/sections';
 import { madridDateTime } from '@/shared/dateTime';
 import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
@@ -20,13 +26,18 @@ const COLUMNS: Record<Column, SortColumn<AuditAction>> = {
   // El número de orden sigue la fecha y hora y nunca empata: el orden exacto en que pasaron las cosas.
   when: { label: 'Fecha y hora', name: 'fecha y hora', value: (a) => a.seq },
   user: { label: 'Persona', name: 'persona', value: (a) => a.userName },
-  label: { label: 'Acción', name: 'acción', value: (a) => a.label },
+  // Por categoría y, dentro de cada una, por acción.
+  label: {
+    label: 'Acción',
+    name: 'acción',
+    value: (a) => `${CATEGORY_NAMES[a.category]} · ${a.label}`,
+  },
   affected: { label: 'Afecta a', name: 'afecta a', value: (a) => a.affected.join(', ') || null },
 };
 
 /**
  * Las acciones que cumplen `query`, con su detalle, deshacer y volver aquí; `onPeople` recibe quién aparece. La
- * cabecera «Acción» filtra por cualquier acción del historial (las cargadas o no): el filtro lo resuelve el servidor.
+ * cabecera «Acción» filtra por categoría en todo el historial (cargado o no): el filtro lo resuelve el servidor.
  */
 export function ActionsHistory({
   query,
@@ -38,10 +49,10 @@ export function ActionsHistory({
   onPeople?: (people: { id: string; name: string }[]) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
-  const [labels, setLabels] = useState<string[]>([]);
+  const [categories, setCategories] = useState<AuditCategory[]>([]);
   const revert = useRevert();
   const { header, apply } = useTableSort(COLUMNS, { key: 'when', descending: true });
-  const filtered = { ...query, labels };
+  const filtered = { ...query, categories };
   const actions = useInfiniteQuery({
     queryKey: ['audit', filtered],
     queryFn: async ({ pageParam }) => {
@@ -60,13 +71,13 @@ export function ActionsHistory({
     key === 'label'
       ? header(key, {
           filter: {
-            options: (actions.data?.pages[0]?.labels ?? []).map((l) => ({
-              value: l.label,
-              label: l.label,
-              count: l.count,
+            options: (actions.data?.pages[0]?.categories ?? []).map((c) => ({
+              value: c.category,
+              label: CATEGORY_NAMES[c.category],
+              count: c.count,
             })),
-            selected: labels,
-            onChange: setLabels,
+            selected: categories,
+            onChange: (selected) => setCategories(selected as AuditCategory[]),
           },
         })
       : header(key);
@@ -78,7 +89,7 @@ export function ActionsHistory({
         <Alert>{apiErrorMessage(actions.error)}</Alert>
       </div>
     );
-  if (items.length === 0 && labels.length === 0)
+  if (items.length === 0 && categories.length === 0)
     return <p className="px-5 py-12 text-center text-ink-muted">{emptyMessage}</p>;
 
   return (
@@ -126,6 +137,9 @@ export function ActionsHistory({
                 </td>
                 <td className="px-4 py-2.5 font-medium">{a.userName}</td>
                 <td className="px-4 py-2.5">
+                  <span className="block text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+                    {CATEGORY_NAMES[a.category]}
+                  </span>
                   <span className="flex flex-wrap items-center gap-2">
                     {a.kind === 'security' && (
                       <LogIn aria-hidden size={16} className="text-ink-muted" />
@@ -134,6 +148,7 @@ export function ActionsHistory({
                     {a.kind === 'undo' && <Badge tone="warning">Deshacer</Badge>}
                     {a.kind === 'restore' && <Badge tone="danger">Vuelta atrás</Badge>}
                   </span>
+                  {a.detail && <span className="block text-[13px] text-ink-soft">{a.detail}</span>}
                 </td>
                 <td className="px-4 py-2.5 text-ink-soft">
                   {a.affected.join(', ') || '—'}
@@ -162,10 +177,10 @@ export function ActionsHistory({
       </table>
       {items.length === 0 && (
         <p className="px-5 py-12 text-center text-ink-muted">
-          Ninguna acción de ese tipo.{' '}
+          Ninguna acción de esa categoría.{' '}
           <button
             type="button"
-            onClick={() => setLabels([])}
+            onClick={() => setCategories([])}
             className="cursor-pointer font-semibold text-brand"
           >
             Ver todas
