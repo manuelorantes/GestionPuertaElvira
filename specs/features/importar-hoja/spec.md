@@ -46,4 +46,4 @@ y ofrecer vincular la fila a ese alumno o confirmar que es otra persona. Sin esa
 - **THEN** se muestra el aviso con ese alumno y las opciones «Es la misma persona: vincular» y «Es otra persona: crear igualmente»
 
 ### Requirement: Historial
-Cada fila importada MUST ser una acción del historial («Importar fila de la hoja: <nombre>») firmada por quien la acepta, y MUST poder deshacerse por separado.
+Cada fila importada MUST ser una acción del historial («Importar fila de la hoja», en Alumnos, con el alumno o sus cobros como detalle) firmada por quien la acepta, y MUST poder deshacerse por separado.
