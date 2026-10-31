@@ -5,10 +5,12 @@ import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/comm
 import {
   ClubDuty,
   DutyRef,
+  SessionMinutes,
   SettlementAlreadyPaid,
   Substitution,
   TeacherRef,
-  type TimesheetEntry,
+  TimesheetEntry,
+  TimesheetEntryId,
 } from '../../src/domain/payroll/mod.ts';
 import {
   AddHoliday,
@@ -17,6 +19,7 @@ import {
   DeleteAdvance,
   DeleteSession,
   ExpectedPayroll,
+  GroupTeacherOn,
   ListSessions,
   ListSettlements,
   PayAllSettlements,
@@ -709,6 +712,29 @@ Deno.test('TeacherAgenda should list the classes a teacher gives each day, with 
   );
 });
 
+Deno.test('GroupTeacherOn should tell who gives a group a day: its teacher, a substitute or nobody', async () => {
+  const { fx, lucia, carlos, duties, substitutions } = setUp();
+  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
+  const iniciacion = fx.scheduledGroups[0];
+  if (!iniciacion) throw new Error('Falta el grupo');
+  fx.substitutions.set(
+    'sub-1',
+    new Substitution(
+      iniciacion.id,
+      LocalDate.fromString('2026-10-14'),
+      TeacherRef.fromString(carlos),
+      'Torneo',
+    ),
+  );
+  const teacherOn = (date: string) =>
+    new GroupTeacherOn(fx, duties, substitutions, fx).execute(iniciacion.id.value, date);
+
+  assertEquals(await teacherOn('2026-10-19'), lucia);
+  assertEquals(await teacherOn('2026-10-14'), carlos, 'la sustituye Carlos');
+  assertEquals(await teacherOn('2026-10-12'), null, 'festivo');
+  assertEquals(await teacherOn('2026-10-13'), null, 'los martes no tiene clase');
+});
+
 Deno.test('TeacherPayStatus should show a teacher their hours and pay month by month and the season totals', async () => {
   const { fx, lucia, propose, pay } = setUp();
   await propose();
@@ -749,13 +775,27 @@ Deno.test('RecordScheduledSession should record a class right away, once, and no
   ]]);
   await record('2026-10-15');
   assertEquals(entries().length, 1, 'el jueves no tiene esa clase');
+  // Apuntada a mano ese día, ya cuenta como apuntada.
+  await fx.save(
+    TimesheetEntry.record(
+      TimesheetEntryId.generate(),
+      TeacherRef.fromString(lucia),
+      LocalDate.fromString('2026-10-21'),
+      group.id,
+      'Iniciación A',
+      SessionMinutes.fromHours(1),
+      false,
+    ),
+  );
+  await record('2026-10-21');
+  assertEquals(entries().length, 2, 'no se duplica la que se apuntó a mano');
   await fx.add(LocalDate.fromString('2026-10-19'), 'Festivo');
   await record('2026-10-19');
-  assertEquals(entries().length, 1, 'festivo');
+  assertEquals(entries().length, 2, 'festivo');
   await record('2026-09-28');
   await pay().execute(lucia, '2026-09', '2026-10-01');
   await record('2026-09-30');
-  assertEquals(entries().length, 2, 'septiembre ya está pagado: el 30 no entra');
+  assertEquals(entries().length, 3, 'septiembre ya está pagado: el 30 no entra');
 });
 
 Deno.test('ListSessions should show the newest first, what each session counts and with what it overlaps', async () => {
