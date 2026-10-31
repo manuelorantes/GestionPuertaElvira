@@ -33,6 +33,7 @@ import { useToast } from '@/shared/ui/Toast';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 
+import { SessionsCalendar } from './SessionsCalendar';
 import { SettlementPaymentDateDialog } from './SettlementPaymentDateDialog';
 
 const DUTY_DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
@@ -124,8 +125,8 @@ function sortHeaders<K extends string>(keys: K[], header: (key: K) => ReactNode)
 }
 
 /**
- * Ficha de un profesor: saldo (lo que le debemos o lo pagado de más), mes a mes de la temporada, clases dadas, sus
- * clases con su ocupación, alumnos, pagos recibidos (con anticipos), sustituciones y turnos.
+ * Ficha de un profesor: saldo (lo que le debemos o lo pagado de más), mes a mes de la temporada, clases dadas (con su
+ * calendario), sus clases con su ocupación, alumnos, pagos recibidos (con anticipos), sustituciones y turnos.
  */
 export function TeacherPage() {
   const { id = '' } = useParams();
@@ -327,6 +328,7 @@ function SessionsSection({ teacherId }: { teacherId: string }) {
           {items.length} sesiones · {hoursLabel(total)}
         </span>
       </div>
+      <SessionsCalendar month={month} sessions={items} />
       {items.length === 0 ? (
         <Empty>Sin sesiones en {monthLabel(month).toLowerCase()}.</Empty>
       ) : (
