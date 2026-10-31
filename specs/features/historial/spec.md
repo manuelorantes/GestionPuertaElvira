@@ -16,22 +16,48 @@ pero el historial MUST mostrar solo las acciones que cambiaron datos guardados: 
 (sirven para la seguridad y para la última conexión de la sección Usuarios).
 Las consultas (ver pantallas) no se registran.
 
+Cada acción MUST pertenecer a una categoría, la parte de la aplicación que tocó:
+Alumnos (altas, bajas, datos, familia e importación de la hoja),
+Grupos (grupos e inscripciones),
+Cuotas (cuotas, descuentos, avisos, datos de cobro, tarifas y ajustes),
+Cobros (cobros, sus correcciones y facturas),
+Asistencia (listas, comentarios y clases o actividades dadas por buenas),
+Puntos (viernes, ajustes y fotos de torneo),
+Profesorado (profesores, horas, festivos, sustituciones y turnos de encargado),
+Nóminas (liquidaciones y anticipos),
+Contabilidad (movimientos, facturas de proveedor, gastos esperados, categorías, traspasos y cierres),
+Material (productos, pedidos y compras)
+y Cuentas y sistema (cuentas de usuario, diagnóstico y cambios desde la consola).
+Deshacer y volver a un punto pertenecen a la categoría de lo que revierten.
+Cada acción MUST mostrar su categoría, su nombre y,
+cuando se sabe, a quién o a qué afectó (por ejemplo, «Cuota de octubre 2026 · Martina López Herrera»;
+si tocó varios registros del mismo tipo, «… y N más»).
+El nombre de la acción no incluye a quién afectó:
+así las mismas acciones se llaman igual.
+Toda petición que cambie datos MUST tener nombre propio:
+no hay acciones genéricas del tipo «Cambio de datos».
+
 La lista MUST poder ordenarse desde las cabeceras por fecha y hora
-(por defecto, de la más reciente a la más antigua), persona, acción
+(por defecto, de la más reciente a la más antigua), persona,
+acción (por categoría y, dentro, por nombre)
 o lo que afectó, en ambos sentidos.
 Se ordena lo que ya está cargado:
 las acciones más antiguas que trae «Ver más» se colocan en el orden elegido.
 
 La cabecera «Acción» MUST permitir, además de ordenar,
-mostrar solo las acciones elegidas.
-Ofrece todas las acciones distintas del historial que cumplen el resto de filtros
-(persona, sección y periodo), estén cargadas o no, con cuántas hay de cada,
+mostrar solo las acciones de las categorías elegidas.
+Ofrece las categorías con acciones que cumplen el resto de filtros
+(persona, sección y periodo), estén cargadas o no, en el orden de arriba y con cuántas hay de cada,
 y el filtro abarca todo el historial, no solo lo cargado.
 Si ninguna acción cumple el filtro, la lista lo dice y ofrece volver a verlas todas.
 
-#### Scenario: Filtrar por acción
-- **WHEN** superadministración abre el menú de la cabecera «Acción» y marca «Volver a la cuota calculada»
-- **THEN** la lista muestra solo esas acciones, también las que aún no se habían cargado, y la cabecera indica que hay una acción elegida
+#### Scenario: Filtrar por categoría
+- **WHEN** superadministración abre el menú de la cabecera «Acción» y marca «Cuotas»
+- **THEN** la lista muestra solo las acciones de cuotas (por ejemplo, «Volver a la cuota calculada» con la cuota y el alumno debajo), también las que aún no se habían cargado, y la cabecera indica que hay una categoría elegida
+
+#### Scenario: Deshacer en su categoría
+- **WHEN** se deshace «Editar profesor»
+- **THEN** «Deshacer: Editar profesor» aparece en Profesorado
 
 #### Scenario: Ver quién hizo qué
 - **WHEN** superadministración abre el historial
