@@ -30,6 +30,41 @@ pasar»).
 - **WHEN** Lucía intenta pasar la lista de una clase que ese día da otro profesor
 - **THEN** el sistema lo rechaza
 
+### Requirement: Superadministración pasa lista
+Superadministración MUST poder pasar (o corregir) la lista de cualquier clase un día en que la hay
+(no los festivos ni los días en que el grupo no tiene clase),
+con la misma lista que ve quien la da (alumnos de ese día y asistencia especial)
+y el nombre de quien la da ese día (su titular o quien le sustituye).
+Puede desde 15 minutos antes de que empiece la clase y sin plazo hacia atrás,
+sin confirmar que cambia una clase pasada.
+La lista queda pasada en nombre de quien da la clase y de la cuenta que la pasó,
+y deja de salir en «Listas sin pasar» para todas las cuentas.
+Al guardarla, la sesión de esa clase MUST apuntarse en las horas del profesor que la da, si no estaba apuntada
+(tampoco a mano), salvo que la liquidación de ese mes ya esté pagada.
+Se llega a la lista:
+- desde «Listas sin pasar», con el botón «Pasar lista» de cada clase (las actividades del club no lo tienen);
+- desde la asistencia del grupo (pestaña «Asistencia» de Clases y hoja del grupo), pulsando el día de clase en la
+  cabecera (no los festivos).
+Al guardar, vuelve a la ficha de la clase en Clases, en el mes de ese día.
+Administración, profesorado y asistente no la ven ni pueden pasarla.
+
+#### Scenario: Una clase de hace un mes
+- **WHEN** superadministración pasa el 20 de noviembre la lista del martes 13 de octubre de Carlos, que nadie había
+  apuntado en las horas
+- **THEN** la lista queda pasada sin pedir confirmación y la clase del 13 se apunta en las horas de Carlos
+
+#### Scenario: Ya apuntada
+- **WHEN** superadministración pasa la lista de una clase que sale en «Listas sin pasar»
+- **THEN** deja de salir en el aviso de todas las cuentas y su sesión no se duplica
+
+#### Scenario: Mes pagado
+- **WHEN** superadministración pasa la lista de una clase de octubre de Carlos y su liquidación de octubre está pagada
+- **THEN** la lista se guarda, pero sus horas no cambian
+
+#### Scenario: Administración
+- **WHEN** una cuenta de administración abre «Listas sin pasar» o la asistencia de un grupo
+- **THEN** no ve «Pasar lista» ni los días de la cabecera como enlace, y la API le rechaza la lista
+
 ### Requirement: Asistencia especial
 Junto a la lista de cada clase, quien la pasa MUST poder marcar, en «Asistencia especial», a alumnos de alta en el club
 que no son de esa clase ese día y han venido (a recuperar o por otro motivo), buscándolos por nombre; y quitarlos. Esa
@@ -108,7 +143,8 @@ MUST poder:
 - **quitar la sesión** («No se dio»): deja de contar horas y de salir en el aviso de todos;
   no se puede si la liquidación de ese mes ya está pagada;
 - **darla por buena** («Se dio»): sigue contando para las horas
-  y deja de salir en el aviso de quien lo hace.
+  y deja de salir en el aviso de quien lo hace;
+- solo superadministración, en las clases, **pasar su lista** («Pasar lista»; ver «Superadministración pasa lista»).
 No se puede dar por buena una clase cuyo plazo para pasar lista no ha acabado.
 
 El aviso es de cada cuenta de administración:
@@ -116,7 +152,7 @@ una clase que alguien dio por buena sigue saliendo a las demás cuentas
 con quién la dio por buena y qué día,
 hasta que cada una la marca como vista («Visto»).
 Las que nadie ha dado por buena lo indican.
-Si el profesor pasa la lista después, deja de salir para todos.
+Si el profesor (o superadministración) pasa la lista después, deja de salir para todos.
 El nombre de una clase del aviso lleva a su ficha en Clases,
 con la asistencia y los comentarios del mes de esa clase y sus alumnos;
 pulsarlo no da nada por bueno ni por visto.
