@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, MessageSquarePlus, X } from 'lucide-react';
+import { ArrowLeft, MessageSquarePlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 
@@ -11,18 +11,18 @@ import {
   rewriteOwnComment,
 } from '@/features/class-comments/api';
 import { useCommentChange, useRollCallComments } from '@/features/class-comments/hooks';
-import { classroomLabel } from '@/features/classes/classrooms';
 import type { RollCall, RosterStudent } from '@/features/teacher-space/api';
 import { dayLabel } from '@/features/teacher-space/dates';
 import { useRollCall, useSaveRollCall } from '@/features/teacher-space/hooks';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { Combobox } from '@/shared/ui/Combobox';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { useToast } from '@/shared/ui/Toast';
 
 import { CommentForm, CommentList } from '../attendance/ClassComments';
+import { RollCallHeading, RollCallStudents, SpecialAttendance } from '../attendance/RollCallSheet';
+import { useRollCallMarks } from '../attendance/useRollCallMarks';
 
 /**
  * Pasar lista de una clase: nadie marcado al abrirla; se marca a quien ha venido y se guarda (el resto, falta). Abajo, la
@@ -129,19 +129,13 @@ function CommentsAbout({ label, formLabel, comments, writing, ...actions }: Comm
 }
 
 function RollCallForm({ data }: { data: RollCall }) {
-  const [absent, setAbsent] = useState(
-    () => new Set(data.list.filter((s) => !s.present).map((s) => s.id)),
-  );
-  const [guests, setGuests] = useState<RosterStudent[]>(data.guests);
-  const [picked, setPicked] = useState('');
+  const marks = useRollCallMarks(data);
   const [confirming, setConfirming] = useState(false);
   const save = useSaveRollCall(data.groupId ?? '', data.date);
   const navigate = useNavigate();
   const toast = useToast();
   const editable = data.period !== 'upcoming';
   const past = data.period === 'past';
-  const present = data.list.length - absent.size;
-  const chosen = new Set(guests.map((g) => g.id));
   const savedGuests = new Set(data.guests.map((g) => g.id));
   const comments = useClassComments(data.groupId ?? '', data.date);
   /** A quién se está comentando: un alumno, la clase (CLASS_COMMENT) o nadie. */
@@ -158,18 +152,12 @@ function RollCallForm({ data }: { data: RollCall }) {
       onRemove={comments.remove}
     />
   );
-
-  function toggle(id: string) {
-    setAbsent((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  const commentButton = (student: RosterStudent) => (
+    <CommentButton name={student.name} onClick={() => setWritingFor(student.id)} />
+  );
 
   function submit() {
-    void save.mutateAsync({ absent: [...absent], guests: [...chosen], past }).then(
+    void save.mutateAsync({ ...marks.changes(), past }).then(
       () => {
         toast('Lista guardada');
         void navigate('/panel');
@@ -180,15 +168,7 @@ function RollCallForm({ data }: { data: RollCall }) {
 
   return (
     <>
-      <div>
-        <p className="text-sm text-ink-muted">
-          {dayLabel(data.date)} · {data.start}–{data.end}
-          {data.classroom ? ` · ${classroomLabel(data.classroom)}` : ''}
-        </p>
-        <h1 className="font-display text-[26px] leading-tight font-bold tracking-[0.04em] text-ink-strong uppercase">
-          {data.label}
-        </h1>
-      </div>
+      <RollCallHeading data={data} />
       {data.period === 'upcoming' && (
         <Alert>La lista se puede pasar desde 15 minutos antes de que empiece la clase.</Alert>
       )}
@@ -199,113 +179,20 @@ function RollCallForm({ data }: { data: RollCall }) {
         </Alert>
       )}
       {save.isError && <Alert>{apiErrorMessage(save.error)}</Alert>}
-      <Card className="overflow-hidden">
-        <p className="border-b border-line px-4 py-3 text-sm text-ink-muted">
-          {present} de {data.list.length} {data.list.length === 1 ? 'alumno' : 'alumnos'} · marca a
-          quien ha venido
-        </p>
-        {data.list.length === 0 ? (
-          <p className="px-4 py-6 text-center text-ink-muted">No hay alumnos ese día.</p>
-        ) : (
-          <ul aria-label="Alumnos">
-            {data.list.map((student) => {
-              const here = !absent.has(student.id);
-              return (
-                <li key={student.id} className="border-b border-line-soft last:border-b-0">
-                  <div className="flex items-center pr-2">
-                    <label className="flex min-h-14 flex-1 cursor-pointer items-center gap-3 px-4">
-                      <input
-                        type="checkbox"
-                        checked={here}
-                        disabled={!editable}
-                        onChange={() => toggle(student.id)}
-                        className="peer sr-only"
-                      />
-                      <span
-                        aria-hidden
-                        className={`flex size-7 shrink-0 items-center justify-center rounded-sm border-2 peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40 ${
-                          here ? 'border-brand bg-brand text-surface-raised' : 'border-line-strong'
-                        }`}
-                      >
-                        {here && <Check size={18} strokeWidth={3} />}
-                      </span>
-                      <span className={`flex-1 ${here ? '' : 'text-ink-muted line-through'}`}>
-                        {student.name}
-                      </span>
-                      {!here && <span className="text-[13px] text-ink-muted">No vino</span>}
-                    </label>
-                    {editable && (
-                      <CommentButton
-                        name={student.name}
-                        onClick={() => setWritingFor(student.id)}
-                      />
-                    )}
-                  </div>
-                  <div className="px-4 pb-3 empty:hidden">
-                    {commentsAbout(student.id, student.name)}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </Card>
-      <Card className="flex flex-col gap-3 p-4">
-        <div>
-          <h2 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-            Asistencia especial
-          </h2>
-          <p className="mt-1 text-[13px] text-ink-muted">
-            Alumnos que no son de esta clase y han venido (a recuperar, por ejemplo).
-          </p>
-        </div>
-        {guests.length > 0 && (
-          <ul aria-label="Asistencia especial" className="divide-y divide-line-soft">
-            {guests.map((g) => (
-              <li key={g.id}>
-                <div className="flex min-h-12 items-center gap-3">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-sm border-2 border-brand bg-brand text-surface-raised">
-                    <Check aria-hidden size={18} strokeWidth={3} />
-                  </span>
-                  <span className="flex-1">
-                    {g.name} <span className="font-semibold text-brand">*</span>
-                  </span>
-                  {editable && (
-                    <button
-                      type="button"
-                      aria-label={`Quitar a ${g.name} de la asistencia especial`}
-                      onClick={() => setGuests((current) => current.filter((c) => c.id !== g.id))}
-                      className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
-                    >
-                      <X aria-hidden size={16} />
-                    </button>
-                  )}
-                  {editable && savedGuests.has(g.id) && (
-                    <CommentButton name={g.name} onClick={() => setWritingFor(g.id)} />
-                  )}
-                </div>
-                {commentsAbout(g.id, g.name)}
-              </li>
-            ))}
-          </ul>
-        )}
-        {editable && (
-          <Combobox
-            label="Añadir alumno de otra clase"
-            placeholder="Escribe para buscar…"
-            emptyText="Ningún alumno coincide"
-            options={data.others
-              .filter((s) => !chosen.has(s.id))
-              .map((s) => ({ value: s.id, label: s.name }))}
-            value={picked}
-            onChange={(id) => {
-              const student = data.others.find((s) => s.id === id);
-              if (student) setGuests((current) => [...current, student]);
-              setPicked('');
-            }}
-          />
-        )}
-      </Card>
+      <RollCallStudents
+        data={data}
+        marks={marks}
+        editable={editable}
+        actions={(student) => editable && commentButton(student)}
+        details={(student) => commentsAbout(student.id, student.name)}
+      />
+      <SpecialAttendance
+        data={data}
+        marks={marks}
+        editable={editable}
+        actions={(guest) => editable && savedGuests.has(guest.id) && commentButton(guest)}
+        details={(guest) => commentsAbout(guest.id, guest.name)}
+      />
       <Card className="flex flex-col gap-3 p-4">
         <div>
           <h2 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">

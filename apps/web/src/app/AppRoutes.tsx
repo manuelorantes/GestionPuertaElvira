@@ -19,6 +19,7 @@ import { PanelLayout } from '@/pages/panel/PanelLayout';
 import { StudentPanel } from '@/pages/panel/students/StudentPanel';
 import { StudentsPage } from '@/pages/panel/students/StudentsPage';
 import { RollCallPage } from '@/pages/panel/teacher/RollCallPage';
+import { StaffRollCallPage } from '@/pages/panel/attendance/StaffRollCallPage';
 import { FridayListPage } from '@/pages/panel/teacher/FridayListPage';
 import { TeacherPayPage } from '@/pages/panel/teacher/TeacherPayPage';
 import { TeacherGroupPage } from '@/pages/panel/teacher/TeacherGroupPage';
@@ -55,6 +56,7 @@ export function AppRoutes() {
             <Route path="puntos" element={<PointsPage />} />
             <Route path="importar" element={<ImportPage />} />
             <Route path="alumnos/pendientes" element={<PendingDataPage />} />
+            <Route path="clases/lista/:groupId/:date" element={<StaffRollCallPage />} />
           </Route>
         </Route>
       </Route>
