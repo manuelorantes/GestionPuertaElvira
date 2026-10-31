@@ -388,6 +388,7 @@ Table audit_action {
   id uuid [pk, note: 'una petición de la web, una transacción de consola, un evento de seguridad o una reversión']
   seq bigserial [unique, not null, note: 'orden del historial']
   kind varchar(12) [not null, note: 'change | security | undo | restore']
+  category varchar(20) [not null, default: 'system', note: 'students | groups | charges | payments | attendance | points | teachers | payroll | accounting | equipment | system; deshacer y volver a un punto, la de lo que revierten']
   user_id uuid [note: 'quién (nulo = Sistema)']
   user_name varchar(120) [not null, note: 'nombre en ese momento']
   label varchar(160) [not null, note: 'p. ej. «Registrar cobro»']
@@ -428,9 +429,9 @@ Table cache_items {
 Table attendance_roll_call {
   group_id uuid [not null]
   roll_date date [not null]
-  kind varchar(20) [not null, note: 'taken (la pasó quien da la clase) | confirmed (administración la dio por buena sin lista)']
-  taken_by_teacher uuid [note: 'profesor que la pasó']
-  taken_by_user uuid [note: 'cuenta de administración que la dio por buena']
+  kind varchar(20) [not null, note: 'taken (la pasó quien da la clase o superadministración) | confirmed (administración la dio por buena sin lista)']
+  taken_by_teacher uuid [note: 'profesor que da la clase (la pasó él o superadministración en su nombre)']
+  taken_by_user uuid [note: 'cuenta de administración que la dio por buena o de superadministración que la pasó']
   taken_at timestamptz [not null]
 
   indexes {

@@ -1,14 +1,44 @@
 import { type HasErrorDetails, InvalidValue, LocalDate } from '../../domain/common/mod.ts';
 import type { Locks, TransactionRunner } from '../common/mod.ts';
 
+/**
+ * La parte de la aplicación a la que pertenece una acción, en el orden de sus secciones: por ella se filtra el
+ * historial (las acciones concretas son demasiadas para elegir entre ellas).
+ */
+export const AUDIT_CATEGORIES = [
+  'students',
+  'groups',
+  'charges',
+  'payments',
+  'attendance',
+  'points',
+  'teachers',
+  'payroll',
+  'accounting',
+  'equipment',
+  'system',
+] as const;
+
+export type AuditCategory = typeof AUDIT_CATEGORIES[number];
+
+export function auditCategoryFrom(value: string): AuditCategory {
+  if (!AUDIT_CATEGORIES.includes(value as AuditCategory)) {
+    throw new InvalidValue('category', 'Categoría desconocida.');
+  }
+  return value as AuditCategory;
+}
+
 /** Una acción del historial: quién, cuándo, qué y cuántos registros tocó. */
 export interface AuditActionView {
   id: string;
   seq: number;
   kind: string;
+  category: string;
   userId: string | null;
   userName: string;
   label: string;
+  /** A quién o a qué afectó («Cuota de octubre 2026 · Martina López Herrera»); null si no se sabe decir. */
+  detail: string | null;
   occurredAt: string;
   changeCount: number;
   /** Nombres legibles de lo que tocó (p. ej. «Cobro», «Cuota»). */
@@ -127,8 +157,8 @@ export interface AuditFilter {
   tables?: readonly string[] | null;
   /** Solo las acciones desde este instante (null: desde siempre). */
   since?: Date | null;
-  /** Solo las acciones con alguno de estos nombres (null: todas). */
-  labels?: readonly string[] | null;
+  /** Solo las acciones de alguna de estas categorías (null: todas). */
+  categories?: readonly AuditCategory[] | null;
   /** Solo las clases desde este día (null: todas); ver `classes`. */
   sinceDay?: LocalDate | null;
 }
@@ -179,13 +209,13 @@ export interface AuditLog {
   changes(actionId: string): Promise<AuditDetail>;
   /** Personas que aparecen en el historial. */
   people(): Promise<{ id: string; name: string }[]>;
-  /** Las distintas acciones que cumplen `filter` (sin mirar `labels`), por orden alfabético y cuántas hay de cada. */
-  labels(filter: AuditFilter): Promise<{ label: string; count: number }[]>;
+  /** Las categorías con acciones que cumplen `filter` (sin mirar `categories`), en su orden y cuántas hay de cada. */
+  categories(filter: AuditFilter): Promise<{ category: AuditCategory; count: number }[]>;
 }
 
 /** Reversión de cambios registrados. Se usa dentro de una transacción. */
 export interface AuditReverter {
-  /** Abre la acción que firma la reversión (los cambios que haga quedan registrados con ella). */
+  /** Abre la acción que firma la reversión, en la categoría de lo que revierte (sus cambios quedan registrados con ella). */
   begin(label: string, kind: string, reverts: string): Promise<void>;
   /** Cambios revertibles de la acción, del más reciente al más antiguo. */
   changesOf(actionId: string): Promise<number[]>;
