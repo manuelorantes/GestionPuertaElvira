@@ -6,6 +6,7 @@ import {
   Pencil,
   Plus,
   UserMinus,
+  Trash2,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -52,7 +53,9 @@ type Action =
   | { kind: 'attendance'; groupId: string }
   | { kind: 'since'; groupId: string; groupName: string; since: string }
   | { kind: 'move'; groupId: string; groupName: string }
-  | { kind: 'sibling' };
+  | { kind: 'removeGroup'; groupId: string; groupName: string }
+  | { kind: 'sibling' }
+  | { kind: 'unlinkSibling'; siblingId: string; siblingName: string };
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -160,14 +163,21 @@ export function StudentSheet({
     else setAction(null);
   };
 
-  async function removeGroup(groupId: string, groupName: string) {
-    try {
-      await mutate.mutateAsync(() => api.removeGroup(s.id, groupId));
-      done(`Quitado de ${groupName}`);
-    } catch (failure) {
-      setError(apiErrorMessage(failure));
-    }
-  }
+  /** Para los diálogos de confirmación: el error que muestran es solo el de su acción. */
+  const ask = (next: Action) => {
+    mutate.reset();
+    setAction(next);
+  };
+  const cancelAction = () => {
+    mutate.reset();
+    setAction(null);
+  };
+  const confirmWork = (work: () => Promise<unknown>, message: string) =>
+    void mutate.mutateAsync(work).then(
+      () => done(message),
+      () => undefined,
+    );
+  const actionError = mutate.isError ? apiErrorMessage(mutate.error) : null;
 
   return (
     <SidePanel labelledBy="student-name" onClose={close} aside={aside}>
@@ -295,10 +305,10 @@ export function StudentSheet({
                       type="button"
                       aria-label={`Quitar de ${g.name}`}
                       title="Quitar del grupo"
-                      onClick={() => void removeGroup(g.id, g.name)}
+                      onClick={() => ask({ kind: 'removeGroup', groupId: g.id, groupName: g.name })}
                       className="flex size-9 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
                     >
-                      <X aria-hidden size={16} />
+                      <Trash2 aria-hidden size={16} />
                     </button>
                   </>
                 )}
@@ -382,17 +392,17 @@ export function StudentSheet({
                 <button
                   type="button"
                   aria-label={`Quitar de la familia directa a ${sibling.fullName}`}
+                  title="Quitar de la familia directa"
                   onClick={() =>
-                    void mutate
-                      .mutateAsync(() => api.unlinkSibling(s.id, sibling.id))
-                      .then(
-                        () => done('Familiar desvinculado'),
-                        (failure: unknown) => setError(apiErrorMessage(failure)),
-                      )
+                    ask({
+                      kind: 'unlinkSibling',
+                      siblingId: sibling.id,
+                      siblingName: sibling.fullName,
+                    })
                   }
                   className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
                 >
-                  <X aria-hidden size={14} />
+                  <Trash2 aria-hidden size={14} />
                 </button>
               )}
             </div>
@@ -521,6 +531,35 @@ export function StudentSheet({
             mutate
               .mutateAsync(() => api.linkSibling(s.id, siblingId))
               .then(() => done('Familiar vinculado'))
+          }
+        />
+      )}
+      {action?.kind === 'removeGroup' && (
+        <ConfirmDialog
+          title="Quitar del grupo"
+          message={`${s.fullName} dejará de estar en ${action.groupName}; sigue de alta en el club.`}
+          confirmLabel="Quitar"
+          busy={mutate.isPending}
+          error={actionError}
+          onCancel={cancelAction}
+          onConfirm={() =>
+            confirmWork(
+              () => api.removeGroup(s.id, action.groupId),
+              `Quitado de ${action.groupName}`,
+            )
+          }
+        />
+      )}
+      {action?.kind === 'unlinkSibling' && (
+        <ConfirmDialog
+          title="Quitar de la familia directa"
+          message={`${action.siblingName} dejará de ser familia directa de ${s.fullName} y del resto de su familia.`}
+          confirmLabel="Quitar"
+          busy={mutate.isPending}
+          error={actionError}
+          onCancel={cancelAction}
+          onConfirm={() =>
+            confirmWork(() => api.unlinkSibling(s.id, action.siblingId), 'Familiar desvinculado')
           }
         />
       )}
