@@ -15,7 +15,8 @@ AuditPage (/panel/historial)
     │   ├── Secciones: PeriodFilter, grupo «Periodo» de chips: Hoy · Esta semana · Este mes · Todo (?periodo=hoy|semana|mes|todo; sin parámetro, Hoy)
     │   └── Nota con icono history: «Cada acción guarda cómo estaban los datos antes y después…» (en Pagos: «Cada cobro tal como se registró; los deshechos restan de la suma.»; en Asistencia y notas: «Una fila por clase y día: al abrirla, todo lo que se hizo con su lista y sus notas.»)
     ├── ActionsHistory (General, Alumnos): tabla «Historial de acciones»
-    │   ├── Cabeceras ordenables: Fecha y hora | Persona | Acción | Afecta a
+    │   ├── Cabeceras ordenables: Fecha y hora | Persona | «Acción ▾» | Afecta a
+    │   ├── Menú «Acción» (ColumnMenu): Ordenar (De la A a la Z · De la Z a la A) · Mostrar (casillas de todas las acciones del historial con su número) · «Ver todos»; filtrado vacío: «Ninguna acción de ese tipo. Ver todas»
     │   ├── Fila: botón «Ver detalle de <acción>» (chevron) | fecha y hora de Madrid | persona | acción (+ Badge «Deshacer» o «Vuelta atrás») | tablas afectadas · N cambios | «Deshacer» · «Volver aquí»
     │   ├── Fila de detalle (desplegada): por cada registro, «Alta/Cambio/Baja · <tabla> · <título>», botón «Ir a…» y lista campo: antes → después
     │   ├── «Ver más» (secundario) cuando hay más de 50

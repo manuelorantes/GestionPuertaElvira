@@ -22,6 +22,17 @@ o lo que afectó, en ambos sentidos.
 Se ordena lo que ya está cargado:
 las acciones más antiguas que trae «Ver más» se colocan en el orden elegido.
 
+La cabecera «Acción» MUST permitir, además de ordenar,
+mostrar solo las acciones elegidas.
+Ofrece todas las acciones distintas del historial que cumplen el resto de filtros
+(persona, sección y periodo), estén cargadas o no, con cuántas hay de cada,
+y el filtro abarca todo el historial, no solo lo cargado.
+Si ninguna acción cumple el filtro, la lista lo dice y ofrece volver a verlas todas.
+
+#### Scenario: Filtrar por acción
+- **WHEN** superadministración abre el menú de la cabecera «Acción» y marca «Volver a la cuota calculada»
+- **THEN** la lista muestra solo esas acciones, también las que aún no se habían cargado, y la cabecera indica que hay una acción elegida
+
 #### Scenario: Ver quién hizo qué
 - **WHEN** superadministración abre el historial
 - **THEN** ve las acciones de la más reciente a la más antigua con fecha y hora (de Madrid), persona, acción y lo que afectó, puede filtrar por persona y ver el detalle campo a campo (sin contraseñas)
