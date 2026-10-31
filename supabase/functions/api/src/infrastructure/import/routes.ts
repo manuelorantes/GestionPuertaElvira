@@ -11,7 +11,6 @@ import {
   SpreadsheetParser,
 } from '../../application/import/mod.ts';
 import { RegisterStudent } from '../../application/students/mod.ts';
-import { SqlAuditContext } from '../audit/mod.ts';
 import { type ApiApp, type RequestScope } from '../http/app.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
@@ -113,7 +112,6 @@ export function registerImportRoutes(api: ApiApp): void {
         new RecordEntry(new SqlAccountingRepository(tx), closed, new SqlAccountingRepository(tx)),
         transactions,
         clock,
-        new SqlAuditContext(tx),
       );
       return c.json(await apply.execute(body.requiredString('text'), decision));
     },

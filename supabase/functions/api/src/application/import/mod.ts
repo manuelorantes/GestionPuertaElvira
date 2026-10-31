@@ -12,7 +12,7 @@ import {
 import { StudentAccount, StudentRef } from '../../domain/billing/mod.ts';
 import type { RecordEntry } from '../accounting/mod.ts';
 import type { ImportPayment, StudentAccountRepository } from '../billing/mod.ts';
-import type { AuditContext, TransactionRunner } from '../common/mod.ts';
+import type { TransactionRunner } from '../common/mod.ts';
 import type { RegisterStudent } from '../students/mod.ts';
 
 // ---- Lectura de la hoja ----------------------------------------------------------------------
@@ -421,7 +421,6 @@ export class ApplyImport {
     private readonly recordEntry: RecordEntry,
     private readonly transactions: TransactionRunner,
     private readonly clock: Clock,
-    private readonly audit: AuditContext,
   ) {}
 
   /** Importa una sola fila (cada fila es su propia acción: si falla, no afecta a las demás). */
@@ -442,8 +441,6 @@ export class ApplyImport {
     }
     return await this.transactions.run(async () => {
       const name = decision.fullName ?? row.fullName;
-      // La acción del historial nace con el primer cambio: la etiqueta va antes del alta.
-      await this.audit.relabel(`Importar fila de la hoja: ${name}`);
       const studentId = await this.student(row, decision, today);
       let payments = 0;
       for (const [month, amount] of Object.entries(row.monthlyCents)) {

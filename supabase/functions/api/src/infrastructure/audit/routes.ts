@@ -1,6 +1,7 @@
 import { parseUuid } from '../../domain/common/mod.ts';
 import {
   AuditActionNotFound,
+  auditCategoryFrom,
   auditPeriodFrom,
   auditSectionFrom,
   periodFirstDay,
@@ -33,7 +34,7 @@ export function registerAuditRoutes(api: ApiApp): void {
   });
 
   // ?section=students|payments|attendance (sin ella, todo) y ?period=today|week|month|all (sin él, todo).
-  // ?label= (repetible) deja solo esas acciones; `labels` dice cuáles hay y cuántas, sin contar ese filtro.
+  // ?category= (repetible) deja solo esas categorías; `categories` dice cuáles hay y cuántas, sin contar ese filtro.
   api.defineRoute(reader('/api/admin/audit/actions'), async (c, scope) => {
     const user = c.req.query('userId');
     const before = c.req.query('before');
@@ -50,7 +51,7 @@ export function registerAuditRoutes(api: ApiApp): void {
       tables: section ? SECTION_TABLES[auditSectionFrom(section)] : null,
       since: firstDay?.startInMadrid() ?? null,
       sinceDay: firstDay,
-      labels: c.req.queries('label') ?? null,
+      categories: c.req.queries('category')?.map(auditCategoryFrom) ?? null,
     };
     const people = await log(scope).people();
     if (section === 'payments') return c.json({ ...(await log(scope).payments(filter)), people });
@@ -61,7 +62,7 @@ export function registerAuditRoutes(api: ApiApp): void {
     return c.json({
       items: await log(scope).actions(filter),
       people,
-      labels: await log(scope).labels(filter),
+      categories: await log(scope).categories(filter),
     });
   });
 

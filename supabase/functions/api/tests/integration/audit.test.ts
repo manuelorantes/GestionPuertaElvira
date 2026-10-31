@@ -175,35 +175,52 @@ Deno.test('audit should list only data changes, not session events, and filter b
   assert(filtered.every((a) => Number(a.seq) < Number(list[0]?.seq)));
 });
 
-Deno.test('audit should offer every action of the history and filter by the chosen ones', async () => {
+Deno.test('audit should group the actions by category, with what each one touched as detail', async () => {
   const client = await superadmin();
   const first = await newTeacher(client, 'Ana Belén Torres');
   await newTeacher(client, 'Pablo Ruiz Soto');
   assertEquals((await rename(client, first, 'Ana Belén Torres Gil', '15.00')).status, 204);
-  const created = 'Crear profesor';
-  const edited = 'Editar profesor';
+  const student = await client.json('POST', '/api/admin/students', {
+    fullName: 'Martina López Herrera',
+  });
+  assertEquals(student.status, 201, JSON.stringify(student.body));
 
+  type Page = {
+    items: { id: string; category: string; label: string; detail: string | null; seq: number }[];
+    categories: { category: string; count: number }[];
+  };
   const page = async (query: string) =>
-    (await client.get(`/api/admin/audit/actions${query}`)).body as {
-      items: { label: string; seq: number }[];
-      labels: { label: string; count: number }[];
-    };
+    (await client.get(`/api/admin/audit/actions${query}`)).body as Page;
   const all = await page('');
-  assertEquals(all.labels, [
-    { label: 'Cambio desde la consola', count: 1 },
-    { label: created, count: 2 },
-    { label: edited, count: 1 },
+  assertEquals(
+    all.items.slice(0, 2).map(({ category, label, detail }) => ({ category, label, detail })),
+    [
+      { category: 'students', label: 'Dar de alta alumno', detail: 'Martina López Herrera' },
+      { category: 'teachers', label: 'Editar profesor', detail: 'Ana Belén Torres Gil' },
+    ],
+  );
+  // En el orden de las secciones de la aplicación, no alfabético.
+  assertEquals(all.categories, [
+    { category: 'students', count: 1 },
+    { category: 'teachers', count: 3 },
+    { category: 'system', count: 1 },
   ]);
 
-  const chosen = await page(`?label=${encodeURIComponent(created)}`);
-  assertEquals(chosen.items.map((a) => a.label), [created, created]);
-  assertEquals(chosen.labels, all.labels);
-  const both = await page(
-    `?label=${encodeURIComponent(created)}&label=${encodeURIComponent(edited)}&before=${
-      all.items[0]?.seq
-    }`,
-  );
-  assertEquals(both.items.map((a) => a.label), [created, created]);
+  const teachers = await page('?category=teachers');
+  assertEquals(teachers.items.map((a) => a.label), [
+    'Editar profesor',
+    'Crear profesor',
+    'Crear profesor',
+  ]);
+  assertEquals(teachers.categories, all.categories);
+  const both = await page(`?category=teachers&category=students&before=${all.items[0]?.seq}`);
+  assertEquals(both.items.map((a) => a.category), ['teachers', 'teachers', 'teachers']);
+
+  // Deshacer cae en la categoría de lo que deshace.
+  const edit = String(teachers.items[0]?.id);
+  assertEquals((await client.json('POST', `/api/admin/audit/actions/${edit}/undo`)).status, 204);
+  assertEquals((await page('?category=teachers')).items[0]?.label, 'Deshacer: Editar profesor');
+  assertError(await client.get('/api/admin/audit/actions?category=nope'), 422, 'unprocessable');
 });
 
 Deno.test('audit should say where each change can be seen in the app', async () => {
