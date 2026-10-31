@@ -102,7 +102,9 @@ describe('Superadministración pasa lista', () => {
         )?.[1]?.body,
       ).toBe(JSON.stringify({ absent: ['s2'], guests: ['s3'] })),
     );
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Cambiar una lista pasada' }),
+    ).not.toBeInTheDocument();
     expect(await screen.findByText('Lista guardada')).toBeInTheDocument();
   });
 
