@@ -35,6 +35,7 @@ import {
   SubstituteTeacher,
   SubstitutionNeedsReason,
   TeacherAgenda,
+  TeacherHours,
   TeacherPayStatus,
   TeacherReport,
   UpdateSession,
@@ -835,5 +836,76 @@ Deno.test('ListSessions should show the newest first, what each session counts a
       ['2026-10-08', 'Jueves 17:00', 90, 90, 2250, []],
       ['2026-10-08', 'Martes 17:00 (sustitución)', 90, 0, 0, ['Jueves 17:00']],
     ],
+  );
+});
+
+Deno.test('TeacherHours should show a teacher their sessions of a month and who substituted whom', async () => {
+  const row = (date: string, label: string, minutes: number, substitution = false): SessionRow => ({
+    id: `${date}-${label}`,
+    date,
+    teacherId: 'lucia',
+    teacherName: 'Lucía Moreno Gil',
+    groupId: 'g1',
+    label,
+    minutes,
+    start: substitution ? 19 * 60 : 17 * 60,
+    rateCents: 1600,
+    fromSchedule: true,
+    locked: false,
+    substitution,
+  });
+  const listed: [string, string | null][] = [];
+  const sessions = new ListSessions({
+    sessions: (month, teacher) => {
+      listed.push([month.toString(), teacher]);
+      return Promise.resolve([
+        row('2026-10-14', 'Iniciación A', 120),
+        row('2026-10-14', 'Adultos I', 90, true),
+      ]);
+    },
+  });
+  const asked: string[] = [];
+  const query = {
+    substitutions: (teacher: string, from: LocalDate, to: LocalDate) => {
+      asked.push(`${teacher} ${from.toString()}/${to.toString()}`);
+      return Promise.resolve([
+        {
+          date: '2026-10-15',
+          label: 'Iniciación A',
+          role: 'received' as const,
+          otherName: 'Ana Belén Torres',
+          reason: null,
+        },
+        {
+          date: '2026-10-14',
+          label: 'Adultos I',
+          role: 'gave' as const,
+          otherName: 'Carlos Ruiz Márquez',
+          reason: 'Torneo',
+        },
+      ]);
+    },
+  };
+
+  const hours = await new TeacherHours(sessions, query).execute('lucia', '2026-10');
+
+  assertEquals([listed, asked], [[['2026-10', 'lucia']], ['lucia 2026-10-01/2026-10-31']]);
+  assertEquals(hours.month, '2026-10');
+  assertEquals(
+    hours.sessions.map((s) => [s.date, s.label, s.minutes, s.countedMinutes, s.substitution]),
+    [
+      ['2026-10-14', 'Iniciación A', 120, 120, false],
+      ['2026-10-14', 'Adultos I', 90, 90, true],
+    ],
+  );
+  assertEquals(Object.keys(hours.sessions[0] ?? {}).includes('costCents'), false, 'sin coste');
+  // Del primero al último del mes.
+  assertEquals(hours.substitutions.map((x) => [x.date, x.role, x.otherName]), [
+    ['2026-10-14', 'gave', 'Carlos Ruiz Márquez'],
+    ['2026-10-15', 'received', 'Ana Belén Torres'],
+  ]);
+  await assertRejects(
+    () => new TeacherHours(sessions, query).execute('lucia', 'octubre'),
+    InvalidValue,
   );
 });

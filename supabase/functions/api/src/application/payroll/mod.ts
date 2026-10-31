@@ -171,6 +171,49 @@ export class ListSessions {
   }
 }
 
+/** Una sesión de sus horas tal como la ve el profesor: sin coste. */
+export type TeacherSessionView = Pick<
+  SessionView,
+  'id' | 'date' | 'label' | 'minutes' | 'countedMinutes' | 'substitution'
+>;
+
+export interface TeacherHoursView {
+  month: string;
+  sessions: TeacherSessionView[];
+  /** Los días en que sustituyó a otro o le sustituyeron, del primero al último. */
+  substitutions: TeacherSubstitutionView[];
+}
+
+/** Mis horas: las sesiones de un mes del profesor (lo que cuenta cada una) y sus sustituciones de ese mes. */
+export class TeacherHours {
+  constructor(
+    private readonly sessions: ListSessions,
+    private readonly query: Pick<TeacherReportQuery, 'substitutions'>,
+  ) {}
+
+  async execute(teacherId: string, month: string): Promise<TeacherHoursView> {
+    const period = YearMonth.fromString(month);
+    const sessions = await this.sessions.execute(period, teacherId);
+    const substitutions = await this.query.substitutions(
+      teacherId,
+      period.firstDay(),
+      period.lastDay(),
+    );
+    return {
+      month: period.toString(),
+      sessions: sessions.map(({ id, date, label, minutes, countedMinutes, substitution }) => ({
+        id,
+        date,
+        label,
+        minutes,
+        countedMinutes,
+        substitution,
+      })),
+      substitutions: [...substitutions].sort((x, y) => x.date.localeCompare(y.date)),
+    };
+  }
+}
+
 /** Grupos de un profesor y plazas de sus clases: ocupadas y totales, contando cada día de clase. */
 export interface TeacherSeats {
   groups: string[];

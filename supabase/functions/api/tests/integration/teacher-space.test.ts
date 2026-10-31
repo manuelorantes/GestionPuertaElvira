@@ -67,7 +67,7 @@ Deno.test({
   name: 'a linked teacher should see their classes of the week and their pay, and nothing else',
   ignore: outsideSeason,
   async fn() {
-    const { admin, teacher, lucia } = await fixture();
+    const { admin, teacher, lucia, groupB } = await fixture();
 
     assertEquals(body(await teacher.get('/api/teacher/me')), {
       teacher: { id: lucia, name: 'Lucía Moreno Gil' },
@@ -92,6 +92,36 @@ Deno.test({
     assertEquals(pay.months.at(-1)?.month, today.toString().slice(0, 7));
     assertEquals(pay.months.some((m) => 'incomeCents' in m || 'marginCents' in m), false);
     assertEquals(Object.keys(pay.totals), ['minutes', 'amountCents', 'receivedCents', 'owedCents']);
+
+    // Mis horas del mes: sus sesiones (sin coste) y la sustitución que hace a Carlos.
+    const recorded = await admin.json('POST', '/api/admin/payroll/sessions', {
+      teacherId: lucia,
+      groupId: groupB,
+      date: day(1),
+      hours: 1.5,
+    });
+    assertEquals(recorded.status, 201, JSON.stringify(recorded.body));
+    const hours = body<{
+      month: string;
+      sessions: Record<string, unknown>[];
+      substitutions: Record<string, unknown>[];
+    }>(await teacher.get(`/api/teacher/hours?month=${day(1).slice(0, 7)}`));
+    assertEquals(
+      hours.sessions.map((
+        s,
+      ) => [s.date, s.label, s.countedMinutes, s.substitution, 'costCents' in s]),
+      [[day(1), 'Adultos I', 90, true, false]],
+    );
+    assertEquals(hours.substitutions, [
+      {
+        date: day(1),
+        label: 'Adultos I',
+        role: 'gave',
+        otherName: 'Carlos Ruiz Márquez',
+        reason: null,
+      },
+    ]);
+    assertError(await teacher.get('/api/teacher/hours?month=octubre'), 422, 'unprocessable');
 
     // Nada de administración para el profesorado, ni del profesorado para administración.
     assertError(await teacher.get('/api/admin/payroll/settlements'), 403, 'forbidden');
