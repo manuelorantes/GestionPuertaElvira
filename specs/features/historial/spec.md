@@ -122,6 +122,34 @@ a la derecha MUST quedar un botón por cada sitio adonde ir (el cobro, las cuota
 - **WHEN** superadministración abre el detalle de «Editar alumno»
 - **THEN** ve el cambio campo a campo, con el valor anterior tachado y el nuevo
 
+### Requirement: Grupos antes y después
+El detalle de una acción que toca inscripciones (inscribir, quitar o cambiar de grupo, dar de alta o de baja,
+importar, y deshacer o volver atrás cualquiera de ellas) MUST mostrar, por cada alumno afectado,
+todos los grupos en los que estaba justo antes de la acción y todos en los que quedó justo después,
+no solo el grupo que cambió.
+Cada grupo MUST llevar su nombre con enlace a su página;
+si el alumno no estaba o no quedó en ningún grupo, MUST decir «Sin grupos».
+Un grupo cuenta si su inscripción seguía en vigor el día de la acción;
+si aún no había empezado ese día, se indica «desde» su fecha, y si ya tenía fecha de fin, «hasta» esa fecha.
+Lo que pasó después no cambia la respuesta:
+el detalle de una acción antigua sigue mostrando los grupos de aquel momento aunque luego se haya deshecho o cambiado.
+Debajo sigue el detalle campo a campo.
+
+#### Scenario: Quitar de un grupo a quien sigue en otro
+- **WHEN** superadministración abre el detalle de «Quitar de grupo» de un alumno que estaba en
+  «Martes 17:00 · Iniciación · Peón» y en «Miércoles 17:00 · Iniciación · Peón» y salió del primero
+- **THEN** ve «Antes: Martes 17:00 · Iniciación · Peón, Miércoles 17:00 · Iniciación · Peón»
+  y «Después: Miércoles 17:00 · Iniciación · Peón»
+
+#### Scenario: Quitar del único grupo
+- **WHEN** superadministración abre el detalle de «Quitar de grupo» de un alumno que solo estaba en ese grupo
+- **THEN** ve el grupo en «Antes» y «Después: Sin grupos»
+
+#### Scenario: Una acción que luego se deshizo
+- **WHEN** superadministración abre el detalle de «Quitar de grupo» después de haberla deshecho
+- **THEN** sigue viendo el grupo en «Antes» y no en «Después»,
+  y el detalle de «Deshacer: Quitar de grupo» lo muestra al revés
+
 ### Requirement: Ir al elemento cambiado
 En el detalle de una acción, cada cambio MUST ofrecer un botón para ir al sitio de la aplicación donde se ve lo
 que tocó: el recibo del cobro, la ficha del alumno (también para sus datos de cobro e inscripciones), el grupo,
