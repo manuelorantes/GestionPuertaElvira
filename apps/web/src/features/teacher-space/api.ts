@@ -104,6 +104,37 @@ export function saveRollCall(
   return apiSend('PUT', `${BASE}/roll-calls/${groupId}/${date}`, changes);
 }
 
+/** Una sesión de mis horas: lo que dura y lo que cuenta (sin coste). */
+export interface TeacherSession {
+  id: string;
+  date: string;
+  label: string;
+  minutes: number;
+  countedMinutes: number;
+  /** La dio en lugar de su profesor. */
+  substitution: boolean;
+}
+
+/** Un día en que sustituí a otro (`gave`) o en que otro me sustituyó (`received`). */
+export interface TeacherSubstitution {
+  date: string;
+  label: string;
+  role: 'gave' | 'received';
+  otherName: string;
+  reason: string | null;
+}
+
+/** Mis horas de un mes: sesiones y sustituciones. */
+export interface TeacherHours {
+  month: string;
+  sessions: TeacherSession[];
+  substitutions: TeacherSubstitution[];
+}
+
+export function fetchHours(month: string): Promise<TeacherHours> {
+  return apiGet<TeacherHours>(`${BASE}/hours?month=${month}`);
+}
+
 export interface TeacherPayMonth {
   month: string;
   minutes: number;

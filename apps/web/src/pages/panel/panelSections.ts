@@ -34,7 +34,10 @@ export function sectionsFor(sections: PanelSection[], role: Role): PanelSection[
   return sections.filter((section) => !section.roles || section.roles.includes(role));
 }
 
-/** Lo que ve una cuenta de profesorado: sus clases (para pasar lista), sus grupos, las clases y alumnos del club y sus pagos. */
+/**
+ * Lo que ve una cuenta de profesorado: sus clases (para pasar lista), sus grupos, las clases y alumnos del club, sus horas
+ * y sus pagos.
+ */
 const TEACHER_SECTIONS: PanelSection[] = [
   { id: 'mis-clases', label: 'Mis clases', icon: CalendarDays, path: '/panel', roles: ['teacher'] },
   {
@@ -57,6 +60,13 @@ const TEACHER_SECTIONS: PanelSection[] = [
     label: 'Alumnos',
     icon: Contact,
     path: '/panel/alumnos',
+    roles: ['teacher'],
+  },
+  {
+    id: 'mis-horas',
+    label: 'Mis horas',
+    icon: Clock,
+    path: '/panel/mis-horas',
     roles: ['teacher'],
   },
   {

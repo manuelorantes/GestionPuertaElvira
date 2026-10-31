@@ -19,6 +19,7 @@ import { PanelLayout } from '@/pages/panel/PanelLayout';
 import { StudentPanel } from '@/pages/panel/students/StudentPanel';
 import { StudentsPage } from '@/pages/panel/students/StudentsPage';
 import { RollCallPage } from '@/pages/panel/teacher/RollCallPage';
+import { TeacherHoursPage } from '@/pages/panel/teacher/TeacherHoursPage';
 import { StaffRollCallPage } from '@/pages/panel/attendance/StaffRollCallPage';
 import { FridayListPage } from '@/pages/panel/teacher/FridayListPage';
 import { TeacherPayPage } from '@/pages/panel/teacher/TeacherPayPage';
@@ -37,6 +38,7 @@ export function AppRoutes() {
           <Route path="mis-grupos" element={<TeacherGroupsPage />} />
           <Route path="mis-grupos/:groupId" element={<TeacherGroupPage />} />
           <Route path="mis-alumnos" element={<Navigate to="/panel/mis-grupos" replace />} />
+          <Route path="mis-horas" element={<TeacherHoursPage />} />
           <Route path="mis-pagos" element={<TeacherPayPage />} />
           <Route path="lista/:groupId/:date" element={<RollCallPage />} />
           <Route path="viernes/:dutyId/:date" element={<FridayListPage />} />

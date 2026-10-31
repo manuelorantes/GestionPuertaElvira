@@ -6,21 +6,34 @@ import { hoursLabel } from '@/features/payroll/hours';
 
 const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
+/** Quien mira el calendario: administración (la ficha del profesor) o el propio profesor (Mis horas). */
+export type CalendarViewer = 'staff' | 'teacher';
+
 /** Sus clases, con el verde de intermedio; las sustituciones que dio, con el negro de avanzado. */
 const KINDS = {
-  own: { legend: 'Sus clases', suffix: 'de sus clases', className: LEVELS.intermediate.className },
-  substitution: {
-    legend: 'Sustituciones',
-    suffix: 'de sustitución',
-    className: LEVELS.advanced.className,
-  },
+  own: { className: LEVELS.intermediate.className },
+  substitution: { className: LEVELS.advanced.className },
 } as const;
 type Kind = keyof typeof KINDS;
+
+const WORDING: Record<CalendarViewer, Record<Kind, { legend: string; suffix: string }>> = {
+  staff: {
+    own: { legend: 'Sus clases', suffix: 'de sus clases' },
+    substitution: { legend: 'Sustituciones', suffix: 'de sustitución' },
+  },
+  teacher: {
+    own: { legend: 'Mis clases', suffix: 'de mis clases' },
+    substitution: { legend: 'Sustituciones', suffix: 'de sustitución' },
+  },
+};
+
+/** Lo que el calendario necesita de cada sesión. */
+type CalendarSession = Pick<Session, 'date' | 'substitution' | 'countedMinutes'>;
 
 type DayMinutes = Record<Kind, number>;
 
 /** Lo que cuenta de cada sesión, sumado por día y por si la dio como suya o sustituyendo. */
-function minutesByDay(sessions: Session[]): Map<string, DayMinutes> {
+function minutesByDay(sessions: CalendarSession[]): Map<string, DayMinutes> {
   const byDay = new Map<string, DayMinutes>();
   for (const s of sessions) {
     const day = byDay.get(s.date) ?? { own: 0, substitution: 0 };
@@ -39,8 +52,17 @@ function isWeekend(date: string): boolean {
  * Calendario del mes con las horas que dio cada día. Las clases en las que le sustituyeron no están entre sus
  * sesiones, así que ese día sale vacío. Sábado y domingo solo aparecen si ese mes dio algo en fin de semana.
  */
-export function SessionsCalendar({ month, sessions }: { month: string; sessions: Session[] }) {
+export function SessionsCalendar({
+  month,
+  sessions,
+  viewer = 'staff',
+}: {
+  month: string;
+  sessions: CalendarSession[];
+  viewer?: CalendarViewer;
+}) {
   const byDay = minutesByDay(sessions);
+  const wording = WORDING[viewer];
   const weekLength = sessions.some((s) => isWeekend(s.date)) ? 7 : 5;
   return (
     <div className="px-5 pt-4">
@@ -65,7 +87,7 @@ export function SessionsCalendar({ month, sessions }: { month: string; sessions:
                   key={date ?? `vacío-${i}`}
                   className="h-16 border-r border-line-soft p-1.5 last:border-r-0"
                 >
-                  {date && <CalendarDay date={date} minutes={byDay.get(date)} />}
+                  {date && <CalendarDay date={date} minutes={byDay.get(date)} wording={wording} />}
                 </td>
               ))}
             </tr>
@@ -76,10 +98,10 @@ export function SessionsCalendar({ month, sessions }: { month: string; sessions:
         aria-label="Leyenda del calendario"
         className="mt-2 flex flex-wrap gap-4 text-[13px] text-ink-muted"
       >
-        {Object.values(KINDS).map((k) => (
-          <li key={k.legend} className="flex items-center gap-1.5">
-            <span aria-hidden className={`size-3 rounded-sm border ${k.className}`} />
-            {k.legend}
+        {(Object.keys(KINDS) as Kind[]).map((kind) => (
+          <li key={kind} className="flex items-center gap-1.5">
+            <span aria-hidden className={`size-3 rounded-sm border ${KINDS[kind].className}`} />
+            {wording[kind].legend}
           </li>
         ))}
       </ul>
@@ -87,7 +109,15 @@ export function SessionsCalendar({ month, sessions }: { month: string; sessions:
   );
 }
 
-function CalendarDay({ date, minutes }: { date: string; minutes: DayMinutes | undefined }) {
+function CalendarDay({
+  date,
+  minutes,
+  wording,
+}: {
+  date: string;
+  minutes: DayMinutes | undefined;
+  wording: (typeof WORDING)[CalendarViewer];
+}) {
   const kinds = (Object.keys(KINDS) as Kind[]).filter((k) => (minutes?.[k] ?? 0) > 0);
   return (
     <div className="flex h-full flex-col gap-1">
@@ -101,7 +131,7 @@ function CalendarDay({ date, minutes }: { date: string; minutes: DayMinutes | un
           data-kind={kind}
           className={`rounded-sm border px-1 py-0.5 text-[12px] leading-tight font-semibold whitespace-nowrap sm:px-1.5 ${KINDS[kind].className}`}
         >
-          {hoursLabel(minutes?.[kind] ?? 0)} <span className="sr-only">{KINDS[kind].suffix}</span>
+          {hoursLabel(minutes?.[kind] ?? 0)} <span className="sr-only">{wording[kind].suffix}</span>
         </span>
       ))}
     </div>
