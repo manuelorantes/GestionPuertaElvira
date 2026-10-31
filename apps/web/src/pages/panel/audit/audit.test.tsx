@@ -32,6 +32,10 @@ const ACTIONS = {
     }),
   ],
   people: [{ id: 'u1', name: 'Lucía Moreno Gil' }],
+  labels: [
+    { label: 'Inicio de sesión', count: 1 },
+    { label: 'Registrar cobro', count: 1 },
+  ],
 };
 
 const DETAIL = {
@@ -210,13 +214,71 @@ describe('Historial', () => {
     expect(labels()).toEqual(['Registrar cobro', 'Inicio de sesión']);
     await user.click(screen.getByRole('button', { name: 'Ordenar por persona' }));
     expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
-    await user.click(screen.getByRole('button', { name: 'Ordenar por acción' }));
+    await user.click(within(table).getByRole('button', { name: /Acción/ }));
+    await user.click(
+      within(screen.getByRole('dialog', { name: 'Ordenar y filtrar por acción' })).getByRole(
+        'radio',
+        { name: 'De la A a la Z' },
+      ),
+    );
     expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
     // Lo que no afectó a nada va primero.
     await user.click(screen.getByRole('button', { name: 'Ordenar por afecta a' }));
     expect(labels()).toEqual(['Inicio de sesión', 'Registrar cobro']);
     await user.click(screen.getByRole('button', { name: 'Ordenar por afecta a' }));
     expect(labels()).toEqual(['Registrar cobro', 'Inicio de sesión']);
+  });
+
+  it('filters by any action of the history from the action header, asking the server', async () => {
+    const user = userEvent.setup();
+    const fetch = api({
+      'GET /api/admin/audit/actions': [
+        200,
+        {
+          ...ACTIONS,
+          labels: [
+            { label: 'Registrar cobro', count: 1 },
+            { label: 'Volver a la cuota calculada', count: 4 },
+          ],
+        },
+      ],
+      'GET /api/admin/audit/actions?label=Volver+a+la+cuota+calculada': [
+        200,
+        {
+          ...ACTIONS,
+          items: [action({ id: 'a7', label: 'Volver a la cuota calculada' })],
+          labels: [
+            { label: 'Registrar cobro', count: 1 },
+            { label: 'Volver a la cuota calculada', count: 4 },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/historial');
+
+    const table = await screen.findByRole('table', { name: 'Historial de acciones' });
+    await user.click(within(table).getByRole('button', { name: /Acción/ }));
+    const menu = screen.getByRole('dialog', { name: 'Ordenar y filtrar por acción' });
+    // Todas las del historial, aunque aún no se hayan cargado.
+    const options = within(within(menu).getByRole('group', { name: 'Filtrar' })).getAllByRole(
+      'checkbox',
+    );
+    expect(options.map((o) => o.closest('label')?.textContent)).toEqual([
+      'Registrar cobro (1)',
+      'Volver a la cuota calculada (4)',
+    ]);
+    await user.click(options[1] as HTMLElement);
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/admin/audit/actions?label=Volver+a+la+cuota+calculada',
+        expect.anything(),
+      ),
+    );
+    expect(
+      await within(table).findByRole('row', { name: /Volver a la cuota calculada/ }),
+    ).toBeInTheDocument();
+    expect(within(table).queryByRole('row', { name: /Registrar cobro/ })).not.toBeInTheDocument();
+    expect(within(table).getByRole('button', { name: /Acción/ })).toHaveTextContent('(1)');
   });
 
   it('undoes an action after confirming', async () => {
