@@ -217,24 +217,54 @@ export class OpenRollCall {
   async execute(teacherId: string, groupId: string, date: string): Promise<RollCallView> {
     const day = LocalDate.fromString(date);
     const item = await givenClass(this.assignments, teacherId, groupId, day);
-    const students = await this.roster.studentsOn(groupId, day);
-    const roll = await this.rollCalls.find(groupId, day);
-    // Sin pasar, nadie está marcado (el profesor marca a quien viene); pasada, se ve lo que se guardó.
-    const absent = roll?.absent() ?? students.map((s) => s.id);
-    // Quien ya es de la lista ese día no es asistencia especial (p. ej. si se le inscribió después con fecha anterior).
-    const guestIds = (roll?.guests() ?? []).filter((id) => !students.some((s) => s.id === id));
-    const now = this.clock.now();
-    const inClass = new Set([...students.map((s) => s.id), ...guestIds]);
-    return {
-      ...item,
-      classroom: await this.roster.classroomOf(groupId),
-      students: students.length,
-      rollCall: statusOf(item, roll !== null, now),
-      period: periodOf(item, now),
-      list: students.map((s) => ({ ...s, present: !absent.includes(s.id) })),
-      guests: guestIds.length === 0 ? [] : await this.roster.namesOf(guestIds),
-      others: (await this.roster.clubStudentsOn(day)).filter((s) => !inClass.has(s.id)),
-    };
+    return await rollCallView(item, this.roster, this.rollCalls, this.clock.now());
+  }
+}
+
+/** La lista de una clase que se da ese día, con lo que se guardó si ya se pasó. */
+async function rollCallView(
+  item: ClassOnDay & { groupId: string },
+  roster: ClassRoster,
+  rollCalls: RollCallRepository,
+  now: Date,
+): Promise<RollCallView> {
+  const { groupId } = item;
+  const day = LocalDate.fromString(item.date);
+  const students = await roster.studentsOn(groupId, day);
+  const roll = await rollCalls.find(groupId, day);
+  // Sin pasar, nadie está marcado (se marca a quien viene); pasada, se ve lo que se guardó.
+  const absent = roll?.absent() ?? students.map((s) => s.id);
+  // Quien ya es de la lista ese día no es asistencia especial (p. ej. si se le inscribió después con fecha anterior).
+  const guestIds = (roll?.guests() ?? []).filter((id) => !students.some((s) => s.id === id));
+  const inClass = new Set([...students.map((s) => s.id), ...guestIds]);
+  return {
+    ...item,
+    classroom: await roster.classroomOf(groupId),
+    students: students.length,
+    rollCall: statusOf(item, roll !== null, now),
+    period: periodOf(item, now),
+    list: students.map((s) => ({ ...s, present: !absent.includes(s.id) })),
+    guests: guestIds.length === 0 ? [] : await roster.namesOf(guestIds),
+    others: (await roster.clubStudentsOn(day)).filter((s) => !inClass.has(s.id)),
+  };
+}
+
+/**
+ * Los de asistencia especial tienen que ser alumnos de alta ese día (o que ya estaban en la lista aunque luego se
+ * dieran de baja).
+ */
+async function assertGuestsAllowed(
+  roster: ClassRoster,
+  day: LocalDate,
+  existing: RollCall | null,
+  marks: RollCallMarks,
+): Promise<void> {
+  const allowed = new Set([
+    ...(await roster.clubStudentsOn(day)).map((s) => s.id),
+    ...(existing?.guests() ?? []),
+  ]);
+  if ((marks.guests ?? []).some((id) => !allowed.has(id))) {
+    throw new InvalidValue('guests', 'Elige alumnos de alta en el club ese día.');
   }
 }
 
@@ -264,20 +294,91 @@ export class TakeRollCall {
     const now = this.clock.now();
     const start = minutesOf(item.start);
     const existing = await this.rollCalls.find(groupId, day);
-    // Asistencia especial: alumnos de alta ese día (o que ya estaban en la lista aunque luego se dieran de baja).
-    const allowed = new Set([
-      ...(await this.roster.clubStudentsOn(day)).map((s) => s.id),
-      ...(existing?.guests() ?? []),
-    ]);
-    if ((marks.guests ?? []).some((id) => !allowed.has(id))) {
-      throw new InvalidValue('guests', 'Elige alumnos de alta en el club ese día.');
-    }
+    await assertGuestsAllowed(this.roster, day, existing, marks);
     const roll = existing ??
       RollCall.take(groupId, day, start, teacherId, roster, marks, now, past);
     if (existing) existing.correct(start, teacherId, roster, marks, now, past);
     await this.rollCalls.save(roll);
     // Pasar lista en plazo apunta ya las horas de la clase (una lista pasada no: administración ya decidió sobre ellas).
     if (periodOf(item, now) === 'open') await this.sessions?.record(item);
+  }
+}
+
+/** Quién da la clase de un grupo un día (su titular o quien le sustituye); null si ese día no hay clase. */
+export interface ClassTeachers {
+  teacherOn(groupId: string, date: LocalDate): Promise<{ id: string; name: string } | null>;
+}
+
+/** La clase de ese grupo ese día y quién la da, o ClassNotGiven si ese día no hay clase. */
+async function classOfGroup(
+  teachers: ClassTeachers,
+  assignments: ClassAssignments,
+  groupId: string,
+  day: LocalDate,
+): Promise<{ teacher: { id: string; name: string }; item: ClassOnDay & { groupId: string } }> {
+  const teacher = await teachers.teacherOn(groupId, day);
+  if (teacher === null) throw new ClassNotGiven();
+  return { teacher, item: await givenClass(assignments, teacher.id, groupId, day) };
+}
+
+/** La lista de una clase tal y como la ve superadministración: la de quien la da, con su nombre. */
+export interface StaffRollCallView extends RollCallView {
+  teacher: { id: string; name: string };
+}
+
+/** Superadministración abre la lista de la clase de cualquier grupo un día en que la hay. */
+export class OpenRollCallAsStaff {
+  constructor(
+    private readonly teachers: ClassTeachers,
+    private readonly assignments: ClassAssignments,
+    private readonly roster: ClassRoster,
+    private readonly rollCalls: RollCallRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(groupId: string, date: string): Promise<StaffRollCallView> {
+    const day = LocalDate.fromString(date);
+    const { teacher, item } = await classOfGroup(this.teachers, this.assignments, groupId, day);
+    return {
+      ...(await rollCallView(item, this.roster, this.rollCalls, this.clock.now())),
+      teacher,
+    };
+  }
+}
+
+/**
+ * Superadministración pasa (o corrige) la lista de cualquier clase, desde que se abre y sin plazo, en nombre de quien
+ * la da ese día; y apunta la sesión en sus horas si no lo estaba (sin tocar liquidaciones pagadas).
+ */
+export class TakeRollCallAsStaff {
+  constructor(
+    private readonly teachers: ClassTeachers,
+    private readonly assignments: ClassAssignments,
+    private readonly roster: ClassRoster,
+    private readonly rollCalls: RollCallRepository,
+    private readonly clock: Clock,
+    private readonly sessions: SessionRecorder,
+  ) {}
+
+  async execute(
+    userId: string,
+    groupId: string,
+    date: string,
+    marks: RollCallMarks,
+  ): Promise<void> {
+    const day = LocalDate.fromString(date);
+    const { teacher, item } = await classOfGroup(this.teachers, this.assignments, groupId, day);
+    const roster = (await this.roster.studentsOn(groupId, day)).map((s) => s.id);
+    const existing = await this.rollCalls.find(groupId, day);
+    await assertGuestsAllowed(this.roster, day, existing, marks);
+    const by = { teacher: teacher.id, user: userId };
+    const now = this.clock.now();
+    const start = minutesOf(item.start);
+    const roll = existing ??
+      RollCall.takeAsStaff(groupId, day, start, by, roster, marks, now);
+    if (existing) existing.correctAsStaff(start, by, roster, marks, now);
+    await this.rollCalls.save(roll);
+    await this.sessions.record(item);
   }
 }
 

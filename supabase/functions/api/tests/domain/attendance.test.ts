@@ -78,6 +78,25 @@ Deno.test('RollCall should keep the students from other classes who came (specia
   assertEquals(RollCall.confirm('g1', TUESDAY, 'u1', at('2026-10-16T09:00:00')).guests(), []);
 });
 
+Deno.test('RollCall should be taken by superadministration any day once the class opens, without a deadline', () => {
+  const by = { teacher: 't1', user: 'u1' };
+  const takeAsStaff = (now: Date, absent: string[] = ['s2']) =>
+    RollCall.takeAsStaff('g1', TUESDAY, START, by, ROSTER, { absent }, now);
+
+  assertThrows(() => takeAsStaff(at('2026-10-13T16:44:00')), RollCallNotOpenYet);
+  const roll = takeAsStaff(at('2026-11-20T09:00:00'));
+  assertEquals([roll.kind(), roll.absent(), roll.takenBy()], ['taken', ['s2'], by]);
+  assertThrows(() => takeAsStaff(at('2026-11-20T09:00:00'), ['s9']), InvalidValue, 'lista');
+  // Corrige también una lista que pasó el profesor (y queda a nombre de los dos).
+  const teachers = take(at('2026-10-13T18:00:00'));
+  teachers.correctAsStaff(START, by, ROSTER, { absent: [] }, at('2026-12-01T09:00:00'));
+  assertEquals([teachers.absent(), teachers.takenBy()], [[], by]);
+  // Y convierte en lista una clase dada por buena sin lista.
+  const confirmed = RollCall.confirm('g1', TUESDAY, 'u2', at('2026-10-16T09:00:00'));
+  confirmed.correctAsStaff(START, by, ROSTER, { absent: ['s1'] }, at('2026-10-20T09:00:00'));
+  assertEquals([confirmed.kind(), confirmed.absent()], ['taken', ['s1']]);
+});
+
 Deno.test('RollCall can be confirmed by administration without a list', () => {
   const roll = RollCall.confirm('g1', TUESDAY, 'u1', at('2026-10-16T09:00:00'));
   assertEquals(roll.kind(), 'confirmed');
