@@ -32,9 +32,11 @@ import {
 } from '../../application/attendance/mod.ts';
 import {
   GroupTeacherOn,
+  ListSessions,
   ListSettlements,
   RecordScheduledSession,
   TeacherAgenda,
+  TeacherHours,
   TeacherPayStatus,
 } from '../../application/payroll/mod.ts';
 import { type ApiApp, param, type RequestScope, sessionTeacher } from '../http/app.ts';
@@ -55,10 +57,12 @@ import {
   SqlAdvanceRepository,
   SqlDutyRepository,
   SqlHolidayCalendar,
+  SqlPayrollQuery,
   SqlScheduleDirectory,
   SqlSettlementRepository,
   SqlSubstitutionRepository,
   SqlTeacherRates,
+  SqlTeacherReportQuery,
   SqlTimesheetRepository,
 } from '../persistence/payroll.ts';
 import {
@@ -329,6 +333,18 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         sessionTeacher(scope),
         season === undefined ? null : Number(season),
       ),
+    );
+  });
+
+  api.defineRoute(teacher('GET', '/api/teacher/hours'), async (c, scope) => {
+    const tx = scope.tx;
+    return c.json(
+      await new TeacherHours(
+        new ListSessions(
+          new SqlPayrollQuery(tx, () => LocalDate.fromInstant(api.deps.clock.now())),
+        ),
+        new SqlTeacherReportQuery(tx),
+      ).execute(sessionTeacher(scope), c.req.query('month') ?? today().slice(0, 7)),
     );
   });
 
