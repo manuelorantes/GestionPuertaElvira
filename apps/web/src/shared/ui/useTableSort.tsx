@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { type ColumnFilter, ColumnMenu } from './ColumnMenu';
 import { SortHeader } from './SortHeader';
 
 /** Lo que se compara de cada fila: texto, número, fecha ISO o nada (lo vacío va primero de menor a mayor). */
@@ -21,12 +22,20 @@ function compareValues(a: SortValue, b: SortValue): number {
   return collator.compare(String(a), String(b));
 }
 
+/** Lo que convierte una cabecera en menú: el filtro y, si no bastan las de por defecto, otras formas de ordenar. */
+interface HeaderMenu<K extends string> {
+  filter: ColumnFilter;
+  /** Por defecto, de la A a la Z y de la Z a la A por la propia columna. */
+  sorts?: { label: string; sort: { key: K; descending: boolean } }[];
+}
+
 /**
  * Ordenación de una tabla desde sus cabeceras (la forma de ordenar de toda la aplicación): `header(key)` pinta la
  * cabecera de una columna y `apply(items)` devuelve las filas en el orden elegido. Pinchar la columna activa invierte
  * el orden; otra columna empieza de menor a mayor (o de la A a la Z). A igualdad, decide la columna por defecto y,
  * si sigue el empate, el orden de llegada. `setSort` permite elegir el orden desde fuera de las cabeceras (un menú),
- * incluso por una columna sin cabecera.
+ * incluso por una columna sin cabecera. Una columna que además filtra pasa `menu` a `header` y su cabecera es un
+ * `ColumnMenu` (ordenar y mostrar solo algunos valores); filtrar las filas sigue siendo cosa de quien lo usa.
  */
 export function useTableSort<T, K extends string>(
   columns: Record<K, SortColumn<T>>,
@@ -37,20 +46,41 @@ export function useTableSort<T, K extends string>(
     descending: initial.descending ?? false,
   });
 
-  const header = (key: K) => (
-    <SortHeader
-      label={columns[key].label}
-      name={columns[key].name}
-      active={sort.key === key}
-      descending={sort.descending}
-      onSort={() =>
-        setSort((current) => ({
-          key,
-          descending: current.key === key ? !current.descending : false,
-        }))
-      }
-    />
-  );
+  const header = (key: K, menu?: HeaderMenu<K>) => {
+    if (menu) {
+      const sorts = menu.sorts ?? [
+        { label: 'De la A a la Z', sort: { key, descending: false } },
+        { label: 'De la Z a la A', sort: { key, descending: true } },
+      ];
+      return (
+        <ColumnMenu
+          label={columns[key].label}
+          name={columns[key].name}
+          sorted={sort.key === key ? (sort.descending ? 'descending' : 'ascending') : null}
+          sorts={sorts.map((choice) => ({
+            label: choice.label,
+            checked: choice.sort.key === sort.key && choice.sort.descending === sort.descending,
+            onSelect: () => setSort(choice.sort),
+          }))}
+          filter={menu.filter}
+        />
+      );
+    }
+    return (
+      <SortHeader
+        label={columns[key].label}
+        name={columns[key].name}
+        active={sort.key === key}
+        descending={sort.descending}
+        onSort={() =>
+          setSort((current) => ({
+            key,
+            descending: current.key === key ? !current.descending : false,
+          }))
+        }
+      />
+    );
+  };
 
   const apply = (items: readonly T[]): T[] => {
     const value = columns[sort.key].value;
