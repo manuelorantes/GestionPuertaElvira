@@ -127,6 +127,8 @@ export interface AuditFilter {
   tables?: readonly string[] | null;
   /** Solo las acciones desde este instante (null: desde siempre). */
   since?: Date | null;
+  /** Solo las acciones con alguno de estos nombres (null: todas). */
+  labels?: readonly string[] | null;
   /** Solo las clases desde este día (null: todas); ver `classes`. */
   sinceDay?: LocalDate | null;
 }
@@ -177,6 +179,8 @@ export interface AuditLog {
   changes(actionId: string): Promise<AuditDetail>;
   /** Personas que aparecen en el historial. */
   people(): Promise<{ id: string; name: string }[]>;
+  /** Las distintas acciones que cumplen `filter` (sin mirar `labels`), por orden alfabético y cuántas hay de cada. */
+  labels(filter: AuditFilter): Promise<{ label: string; count: number }[]>;
 }
 
 /** Reversión de cambios registrados. Se usa dentro de una transacción. */
