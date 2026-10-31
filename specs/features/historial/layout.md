@@ -16,8 +16,8 @@ AuditPage (/panel/historial)
     │   └── Nota con icono history: «Cada acción guarda cómo estaban los datos antes y después…» (en Pagos: «Cada cobro tal como se registró; los deshechos restan de la suma.»; en Asistencia y notas: «Una fila por clase y día: al abrirla, todo lo que se hizo con su lista y sus notas.»)
     ├── ActionsHistory (General, Alumnos): tabla «Historial de acciones»
     │   ├── Cabeceras ordenables: Fecha y hora | Persona | «Acción ▾» | Afecta a
-    │   ├── Menú «Acción» (ColumnMenu): Ordenar (De la A a la Z · De la Z a la A) · Mostrar (casillas de todas las acciones del historial con su número) · «Ver todos»; filtrado vacío: «Ninguna acción de ese tipo. Ver todas»
-    │   ├── Fila: botón «Ver detalle de <acción>» (chevron) | fecha y hora de Madrid | persona | acción (+ Badge «Deshacer» o «Vuelta atrás») | tablas afectadas · N cambios | «Deshacer» · «Volver aquí»
+    │   ├── Menú «Acción» (ColumnMenu): Ordenar (De la A a la Z · De la Z a la A, por categoría y acción) · Mostrar (casillas de las categorías del historial con su número, en el orden de la aplicación) · «Ver todos»; filtrado vacío: «Ninguna acción de esa categoría. Ver todas»
+    │   ├── Fila: botón «Ver detalle de <acción>» (chevron) | fecha y hora de Madrid | persona | acción: categoría (12px mayúsculas `ink-muted`) / nombre (+ Badge «Deshacer» o «Vuelta atrás») / detalle (13px `ink-soft`, si lo hay) | tablas afectadas · N cambios | «Deshacer» · «Volver aquí»
     │   ├── Fila de detalle (desplegada): por cada registro, «Alta/Cambio/Baja · <tabla> · <título>», botón «Ir a…» y lista campo: antes → después
     │   ├── «Ver más» (secundario) cuando hay más de 50
     │   └── Vacío: «Todavía no hay acciones registradas.» / «No hay cambios de alumnos hoy.» / «No hay asistencias ni notas esta semana.» / «Todavía no hay … registrados.»
