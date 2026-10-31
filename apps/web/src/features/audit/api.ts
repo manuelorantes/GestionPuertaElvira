@@ -58,11 +58,29 @@ export interface AuditReference {
   target: AuditTarget | null;
 }
 
+/** Un grupo en el que estaba un alumno: «desde» si aún no había empezado, «hasta» si ya tenía fin (AAAA-MM-DD). */
+export interface AuditGroupStay {
+  groupId: string;
+  groupName: string;
+  startsOn: string | null;
+  endsOn: string | null;
+}
+
+/** Todos los grupos de un alumno justo antes y justo después de una acción que tocó sus inscripciones. */
+export interface AuditStudentGroups {
+  studentId: string;
+  studentName: string;
+  before: AuditGroupStay[];
+  after: AuditGroupStay[];
+}
+
 export interface AuditDetail {
   action: AuditAction;
   changes: AuditChange[];
   /** Por identificador, lo que mencionan los cambios. */
   references: Record<string, AuditReference>;
+  /** Por cada alumno cuyas inscripciones tocó la acción, sus grupos antes y después. */
+  studentGroups: AuditStudentGroups[];
 }
 
 export interface AuditPage {
