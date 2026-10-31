@@ -4,6 +4,7 @@ import { Link } from 'react-router';
 import type { MissedRollCall } from '@/features/attendance/api';
 import { useMissedRollCalls, useSettleMissedRollCall } from '@/features/attendance/hooks';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { useSession } from '@/features/auth/useSession';
 import { formatDate } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
@@ -20,6 +21,7 @@ const ACTION =
  */
 export function MissedRollCalls() {
   const missed = useMissedRollCalls();
+  const canTakeRollCalls = useSession().data?.role === 'superadministrator';
   const settle = useSettleMissedRollCall();
   const toast = useToast();
   const [removing, setRemoving] = useState<MissedRollCall | null>(null);
@@ -81,6 +83,15 @@ export function MissedRollCalls() {
                 </p>
               </div>
               <div className="flex gap-2">
+                {canTakeRollCalls && item.groupId !== null && (
+                  <Link
+                    to={`/panel/clases/lista/${item.groupId}/${item.date}`}
+                    className={`${ACTION} inline-flex items-center text-ink no-underline`}
+                    aria-label={`Pasar lista del ${formatDate(item.date)} de ${item.label}`}
+                  >
+                    Pasar lista
+                  </Link>
+                )}
                 <button
                   type="button"
                   className={ACTION}

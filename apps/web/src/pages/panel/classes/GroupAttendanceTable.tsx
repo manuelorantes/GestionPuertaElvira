@@ -1,8 +1,10 @@
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useState } from 'react';
+import { Link } from 'react-router';
 
 import type { AttendanceMark, GroupAttendance } from '@/features/attendance/api';
 import { useGroupAttendance } from '@/features/attendance/hooks';
+import { useSession } from '@/features/auth/useSession';
 import { monthLabel } from '@/features/billing/money';
 import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { SortHeader } from '@/shared/ui/SortHeader';
@@ -60,11 +62,15 @@ export function GroupAttendanceTable({
   /** Día (AAAA-MM-DD) cuya columna se resalta. */
   highlight?: string;
 }) {
+  const canTakeRollCalls = useSession().data?.role === 'superadministrator';
   return (
     <GroupAttendanceGrid
       attendance={useGroupAttendance(groupId, month)}
       month={month}
       highlight={highlight}
+      rollCallLink={
+        canTakeRollCalls ? (date) => `/panel/clases/lista/${groupId}/${date}` : undefined
+      }
     />
   );
 }
@@ -76,10 +82,13 @@ export function GroupAttendanceGrid({
   attendance,
   month,
   highlight,
+  rollCallLink,
 }: {
   attendance: UseQueryResult<GroupAttendance>;
   month: string;
   highlight?: string | undefined;
+  /** Adónde lleva cada día de clase para pasar su lista (solo superadministración). */
+  rollCallLink?: ((date: string) => string) | undefined;
 }) {
   const [sort, setSort] = useState<{ key: SortKey; descending: boolean }>({
     key: 'name',
@@ -144,7 +153,18 @@ export function GroupAttendanceGrid({
                 <span className="block text-[11px] font-normal tracking-normal normal-case">
                   {weekday(d.date)}
                 </span>
-                {dayMonth(d.date)}
+                {rollCallLink && d.status !== 'holiday' ? (
+                  <Link
+                    to={rollCallLink(d.date)}
+                    aria-label={`Pasar lista del ${dayMonth(d.date)}`}
+                    title="Pasar lista"
+                    className="text-ink underline decoration-1 underline-offset-2"
+                  >
+                    {dayMonth(d.date)}
+                  </Link>
+                ) : (
+                  dayMonth(d.date)
+                )}
                 {DAY_NOTE[d.status] && (
                   <span className="block text-[11px] font-normal tracking-normal normal-case">
                     {DAY_NOTE[d.status]}
