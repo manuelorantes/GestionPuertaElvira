@@ -16,10 +16,11 @@
 6. **Grupos desde la ficha:**
    - «Añadir grupo» → elegir → inscribir (con confirmación si está lleno).
    - «Mover» → elegir destino → mover (con confirmación si está lleno).
-   - «Quitar» → se quita al momento con el aviso «Quitado de <grupo>».
+   - Papelera «Quitar del grupo» → confirmación «Quitar del grupo» → «Quitar» → aviso «Quitado de <grupo>».
      Si era su único grupo, la ficha pasa a «Sin grupos activos.» y el alumno sigue de alta.
 7. **Hermanos:** «Añadir hermano» → elegir → se vinculan los dos.
-   «Quitar» desvincula; «Abrir» navega a la ficha del hermano.
+   La papelera pide confirmación («Quitar de la familia directa») y, al confirmar, desvincula con el aviso
+   «Familiar desvinculado»; «Abrir» navega a la ficha del hermano.
 8. **Desde Clases:** pulsar un bloque o «Alumnos» en la tabla abre `ClassGroupPanel`,
    donde se puede inscribir a un alumno o abrir la ficha de uno inscrito.
 
