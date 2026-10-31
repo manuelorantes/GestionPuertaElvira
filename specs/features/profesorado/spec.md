@@ -235,6 +235,15 @@ y, de solo lectura, lo del club que se indica:
     el mes en curso; cada nombre lleva a la ficha del alumno, como en el resto del panel.
   No puede ver así ningún otro grupo.
 - **Clases** y **Alumnos** del club, de solo lectura (ver las specs de clases y alumnos).
+- **Mis horas** (en el menú, entre Alumnos y Mis pagos): las clases que dio en el mes que elija (de septiembre al mes en
+  curso; por defecto, el actual), con el número de sesiones y las horas del mes:
+  - el mismo calendario que ve administración en su ficha (ver «Ficha del profesor»), con la leyenda «Mis clases» y
+    «Sustituciones»;
+  - debajo, las **sustituciones** del mes, del primer día al último: «Sustituiste a Carlos Ruiz Márquez en Adultos I»
+    los días que dio la clase de otro, y «Te sustituyó Ana Belén Torres en Iniciación A» los días que otro dio la suya,
+    con el motivo si lo hay;
+  - la lista de clases dadas (fecha, clase o actividad, con «(Sustitución)» delante si la dio sustituyendo, y horas),
+    sin coste, ordenable desde las cabeceras (por defecto, de la más reciente a la más antigua).
 - **Mis pagos**: el mes a mes de la temporada hasta el mes en curso (horas, importe, anticipos, a pagar y estado:
   pagada y cuándo, pendiente o en curso) y los totales (lo que se le debe, lo cobrado, horas e importe), sin ingresos
   ni márgenes del club.
@@ -252,6 +261,12 @@ No MUST poder apuntar ni cambiar horas, sustituciones, turnos ni pagos.
 #### Scenario: El grupo que sustituye
 - **WHEN** Lucía sustituye a Carlos el martes 13
 - **THEN** ve el grupo de Carlos en Mis grupos, marcado «Sustitución», del martes 6 al martes 20, y no después
+
+#### Scenario: Sus horas
+- **WHEN** Lucía da el miércoles 14 sus 2 h y 1,5 h sustituyendo a Carlos, el jueves 15 la sustituye Ana y abre
+  Mis horas
+- **THEN** el miércoles sale con 2 h en verde y 1,5 h en negro, y debajo «Sustituiste a Carlos Ruiz Márquez en
+  Adultos I» el miércoles y «Te sustituyó Ana Belén Torres en Iniciación A» el jueves
 
 #### Scenario: Sus pagos
 - **WHEN** Lucía abre Mis pagos con septiembre pagado y octubre en curso
