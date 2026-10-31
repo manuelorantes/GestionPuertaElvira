@@ -17,6 +17,7 @@ import {
   ClassNotGiven,
   type ClassOnDay,
   type ClassRoster,
+  type ClassTeachers,
   CommentClass,
   ConfirmWithoutRollCall,
   EditClassComment,
@@ -29,10 +30,12 @@ import {
   MissedRollCalls,
   NotYourComment,
   OpenRollCall,
+  OpenRollCallAsStaff,
   type RollCallRepository,
   RollCallStillOpen,
   StudentAttendance,
   TakeRollCall,
+  TakeRollCallAsStaff,
   TeacherClasses,
   TeacherGroupAccess,
   TeacherGroupAttendance,
@@ -183,6 +186,57 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, n
   await lateTake(true);
   assertEquals((await rolls.find('g1', LocalDate.fromString('2026-10-13')))?.absent(), ['s1']);
   assertEquals(recorded, []);
+});
+
+/** Lucía (t1) da g1 los martes y jueves; los demás días no hay clase. */
+const classTeachers: ClassTeachers = {
+  teacherOn: (groupId, date) =>
+    Promise.resolve(
+      groupId === 'g1' && [2, 4].includes(date.isoWeekday())
+        ? { id: 't1', name: 'Lucía Moreno Gil' }
+        : null,
+    ),
+};
+
+Deno.test('Superadministration should take the roll call of any class any day once it opens and record its hours', async () => {
+  const rolls = new InMemoryRollCalls();
+  const agenda = assignments([class_({}), class_({ date: '2026-10-15' })]);
+  const recorded: string[] = [];
+  const recorder = { record: (item: ClassOnDay) => Promise.resolve(void recorded.push(item.date)) };
+  const late = new FrozenClock('2026-11-20T09:00:00+01:00');
+  const open = (date: string, clock = late) =>
+    new OpenRollCallAsStaff(classTeachers, agenda, roster, rolls, clock).execute('g1', date);
+  const take = (date: string, marks: { absent: string[]; guests?: string[] }, clock = late) =>
+    new TakeRollCallAsStaff(classTeachers, agenda, roster, rolls, clock, recorder).execute(
+      'u1',
+      'g1',
+      date,
+      marks,
+    );
+
+  const view = await open('2026-10-13');
+  assertEquals(
+    [view.teacher, view.list.map((s) => s.present), view.rollCall],
+    [{ id: 't1', name: 'Lucía Moreno Gil' }, [false, false], 'missed'],
+  );
+  // Un mes después, sin confirmar nada: queda a nombre de Lucía y de la cuenta, y apunta las horas.
+  await take('2026-10-13', { absent: ['s2'], guests: ['s3'] });
+  const roll = await rolls.find('g1', LocalDate.fromString('2026-10-13'));
+  assertEquals([roll?.absent(), roll?.guests(), roll?.takenBy()], [
+    ['s2'],
+    ['s3'],
+    { teacher: 't1', user: 'u1' },
+  ]);
+  assertEquals((await open('2026-10-13')).rollCall, 'taken');
+  assertEquals(recorded, ['2026-10-13']);
+
+  await assertRejects(() => open('2026-10-14'), ClassNotGiven, undefined, 'ese día no hay clase');
+  await assertRejects(() => take('2026-10-14', { absent: [] }), ClassNotGiven);
+  await assertRejects(() => take('2026-10-13', { absent: [], guests: ['s9'] }), InvalidValue);
+  await assertRejects(
+    () => take('2026-10-15', { absent: [] }, new FrozenClock('2026-10-15T16:44:00+02:00')),
+    RollCallNotOpenYet,
+  );
 });
 
 const MISSED = {

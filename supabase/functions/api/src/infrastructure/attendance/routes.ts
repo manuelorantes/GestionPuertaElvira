@@ -3,6 +3,7 @@ import {
   ActivityProgress,
   type ClassAssignments,
   type ClassOnDay,
+  type ClassTeachers,
   CommentClass,
   type CommentEditor,
   ConfirmActivity,
@@ -16,11 +17,13 @@ import {
   MissedRollCalls,
   OpenFridayList,
   OpenRollCall,
+  OpenRollCallAsStaff,
   RollCallComments,
   type SessionRecorder,
   StudentAttendance,
   StudentClassComments,
   TakeRollCall,
+  TakeRollCallAsStaff,
   TeacherClasses,
   TeacherGroupAccess,
   TeacherGroupAttendance,
@@ -28,6 +31,7 @@ import {
   TeacherGroups,
 } from '../../application/attendance/mod.ts';
 import {
+  GroupTeacherOn,
   ListSettlements,
   RecordScheduledSession,
   TeacherAgenda,
@@ -111,6 +115,23 @@ class PayrollClassAssignments implements ClassAssignments {
       new SqlSubstitutionRepository(this.sql),
       new SqlHolidayCalendar(this.sql),
     ).execute(teacherId, from, to);
+  }
+}
+
+/** Quién da la clase de un grupo un día, según la agenda de nómina, con su nombre. */
+class PayrollClassTeachers implements ClassTeachers {
+  constructor(private readonly sql: Sql) {}
+
+  async teacherOn(groupId: string, date: Day) {
+    const id = await new GroupTeacherOn(
+      new SqlScheduleDirectory(this.sql),
+      new SqlDutyRepository(this.sql),
+      new SqlSubstitutionRepository(this.sql),
+      new SqlHolidayCalendar(this.sql),
+    ).execute(groupId, date.toString());
+    if (id === null) return null;
+    const found = (await new SqlTeacherRates(this.sql).all()).find((t) => t.id === id);
+    return { id, name: found?.name ?? '' };
   }
 }
 
@@ -353,6 +374,42 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         param(c, 'studentId'),
         body.bool('present'),
       );
+      return c.body(null, 204);
+    },
+  );
+
+  // ---- Superadministración: pasar la lista de cualquier clase ----------------------------------
+  const staffPorts = (scope: RequestScope) =>
+    [
+      new PayrollClassTeachers(scope.tx),
+      new PayrollClassAssignments(scope.tx),
+      new SqlClassRoster(scope.tx),
+      new SqlRollCallRepository(scope.tx),
+      api.deps.clock,
+    ] as const;
+
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/roll-calls/:groupId/:date', access: 'superadmin' },
+    async (c, scope) => {
+      return c.json(
+        await new OpenRollCallAsStaff(...staffPorts(scope)).execute(
+          param(c, 'groupId'),
+          param(c, 'date'),
+        ),
+      );
+    },
+  );
+
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/roll-calls/:groupId/:date', access: 'superadmin' },
+    async (c, scope) => {
+      if (scope.user === null) throw httpError(401);
+      const body = await JsonBody.from(c.req.raw);
+      await new TakeRollCallAsStaff(...staffPorts(scope), new PayrollSessionRecorder(scope.tx))
+        .execute(scope.user.id, param(c, 'groupId'), param(c, 'date'), {
+          absent: body.stringList('absent'),
+          guests: body.stringList('guests'),
+        });
       return c.body(null, 204);
     },
   );
