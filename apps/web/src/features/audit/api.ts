@@ -1,12 +1,29 @@
 import { apiGet, apiSend } from '@/shared/api/client';
 
+/** La parte de la aplicación a la que pertenece una acción; por ella se filtra el historial. */
+export type AuditCategory =
+  | 'students'
+  | 'groups'
+  | 'charges'
+  | 'payments'
+  | 'attendance'
+  | 'points'
+  | 'teachers'
+  | 'payroll'
+  | 'accounting'
+  | 'equipment'
+  | 'system';
+
 export interface AuditAction {
   id: string;
   seq: number;
   kind: 'change' | 'security' | 'undo' | 'restore';
+  category: AuditCategory;
   userId: string | null;
   userName: string;
   label: string;
+  /** A quién o a qué afectó («Cuota de octubre 2026 · Martina López Herrera»); null si no se sabe decir. */
+  detail: string | null;
   occurredAt: string;
   changeCount: number;
   affected: string[];
@@ -51,8 +68,8 @@ export interface AuditDetail {
 export interface AuditPage {
   items: AuditAction[];
   people: { id: string; name: string }[];
-  /** Las distintas acciones del historial (sin contar el filtro por acción) y cuántas hay de cada. */
-  labels: { label: string; count: number }[];
+  /** Las categorías con acciones (sin contar el filtro por categoría), en su orden, y cuántas hay de cada. */
+  categories: { category: AuditCategory; count: number }[];
 }
 
 /** Una sección del historial: solo las acciones que tocaron lo suyo. */
@@ -63,8 +80,8 @@ export interface AuditQuery {
   userId?: string;
   section?: AuditSection;
   period?: AuditPeriod;
-  /** Solo estas acciones (vacío o sin él: todas). */
-  labels?: string[];
+  /** Solo estas categorías (vacío o sin él: todas). */
+  categories?: AuditCategory[];
 }
 
 /** Un cobro tal como lo registró (o lo quitó, al deshacer) una acción: el importe lleva el signo. */
@@ -108,7 +125,7 @@ function url(query: AuditQuery, before: number | undefined): string {
   if (query.userId) params.set('userId', query.userId);
   if (query.section) params.set('section', query.section);
   if (query.period) params.set('period', query.period);
-  for (const label of query.labels ?? []) params.append('label', label);
+  for (const category of query.categories ?? []) params.append('category', category);
   if (before) params.set('before', String(before));
   const search = params.toString();
   return `${BASE}${search ? `?${search}` : ''}`;
