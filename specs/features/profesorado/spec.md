@@ -236,7 +236,9 @@ y, de solo lectura, lo del club que se indica:
   No puede ver así ningún otro grupo.
 - **Clases** y **Alumnos** del club, de solo lectura (ver las specs de clases y alumnos).
 - **Mis horas** (en el menú, entre Alumnos y Mis pagos): las clases que dio en el mes que elija (de septiembre al mes en
-  curso; por defecto, el actual), con el número de sesiones y las horas del mes:
+  curso; por defecto, el actual):
+  - el **total del mes**, que cambia al cambiar de mes: las horas del mes (lo que cuenta cada sesión, como en su
+    liquidación) con el número de sesiones, y por separado las de sus clases y las de sustitución;
   - el mismo calendario que ve administración en su ficha (ver «Ficha del profesor»), con la leyenda «Mis clases» y
     «Sustituciones»;
   - debajo, las **sustituciones** del mes, del primer día al último: «Sustituiste a Carlos Ruiz Márquez en Adultos I»
@@ -267,6 +269,11 @@ No MUST poder apuntar ni cambiar horas, sustituciones, turnos ni pagos.
   Mis horas
 - **THEN** el miércoles sale con 2 h en verde y 1,5 h en negro, y debajo «Sustituiste a Carlos Ruiz Márquez en
   Adultos I» el miércoles y «Te sustituyó Ana Belén Torres en Iniciación A» el jueves
+
+#### Scenario: El total de otro mes
+- **WHEN** Lucía tiene 3,5 h en octubre (2 h de sus clases y 1,5 h de sustitución) y 1 h en septiembre, y en Mis horas
+  pasa de octubre a septiembre
+- **THEN** el total pasa de 3,5 h (2 h y 1,5 h) a 1 h (1 h y 0 h)
 
 #### Scenario: Sus pagos
 - **WHEN** Lucía abre Mis pagos con septiembre pagado y octubre en curso
