@@ -53,6 +53,7 @@ export function assertWithinWindow(date: LocalDate, start: number, now: Date): v
  * empiece hasta el final del día siguiente, marcando ausentes a alumnos de la lista de ese día y, como asistencia
  * especial, a alumnos de fuera de la clase que vinieron (a recuperar, por ejemplo); después del plazo la puede cambiar
  * confirmando que es una lista pasada. O administración la da por buena sin lista cuando el plazo acabó sin pasarla.
+ * Superadministración la pasa en nombre de quien da la clase, sin plazo.
  */
 export class RollCall {
   private constructor(
@@ -78,6 +79,24 @@ export class RollCall {
   ): RollCall {
     const roll = new RollCall(group, date, 'taken', [], [], { teacher, user: null }, now);
     roll.correct(start, teacher, roster, marks, now, past);
+    return roll;
+  }
+
+  /**
+   * Superadministración pasa la lista de la clase que da `by.teacher` ese día: desde que se abre, sin plazo para
+   * cerrarla.
+   */
+  static takeAsStaff(
+    group: string,
+    date: LocalDate,
+    start: number,
+    by: { teacher: string; user: string },
+    roster: readonly string[],
+    marks: RollCallMarks,
+    now: Date,
+  ): RollCall {
+    const roll = new RollCall(group, date, 'taken', [], [], { ...by }, now);
+    roll.correctAsStaff(start, by, roster, marks, now);
     return roll;
   }
 
@@ -123,6 +142,31 @@ export class RollCall {
     } catch (error) {
       if (!(past && error instanceof RollCallClosed)) throw error;
     }
+    this.mark(roster, marks, { teacher, user: null }, now);
+  }
+
+  /** Superadministración pasa (o corrige) la lista en nombre de quien da la clase, cualquier día en que ya se abrió. */
+  correctAsStaff(
+    start: number,
+    by: { teacher: string; user: string },
+    roster: readonly string[],
+    marks: RollCallMarks,
+    now: Date,
+  ): void {
+    try {
+      assertWithinWindow(this.date, start, now);
+    } catch (error) {
+      if (!(error instanceof RollCallClosed)) throw error;
+    }
+    this.mark(roster, marks, { ...by }, now);
+  }
+
+  private mark(
+    roster: readonly string[],
+    marks: RollCallMarks,
+    by: { teacher: string | null; user: string | null },
+    now: Date,
+  ): void {
     if (marks.absent.some((id) => !roster.includes(id))) {
       throw new InvalidValue(
         'absent',
@@ -139,7 +183,7 @@ export class RollCall {
     this.currentKind = 'taken';
     this.absentStudents = [...new Set(marks.absent)];
     this.guestStudents = [...new Set(guests)];
-    this.by = { teacher, user: null };
+    this.by = by;
     this.at = now;
   }
 
