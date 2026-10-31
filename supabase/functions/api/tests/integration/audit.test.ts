@@ -302,6 +302,65 @@ Deno.test('audit should describe each change with names instead of identifiers',
   assertEquals(enrolment?.title, 'Martina López Herrera · ' + removed.references[group]?.label);
 });
 
+Deno.test('audit should show every group of the student before and after an enrolment change', async () => {
+  const client = await superadmin();
+  const teacherId = await newTeacher(client);
+  const tuesday = await newGroup(client, teacherId, { name: 'Martes Peón', days: ['tue'] });
+  const wednesday = await newGroup(client, teacherId, { name: 'Miércoles Peón', days: ['wed'] });
+  const created = await client.json('POST', '/api/admin/students', {
+    fullName: 'Miguel Ángel Cabezas',
+    groupIds: [tuesday, wednesday],
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const studentId = (created.body as { id: string }).id;
+
+  type Groups = {
+    studentId: string;
+    studentName: string;
+    before: { groupId: string; groupName: string }[];
+    after: { groupId: string; groupName: string }[];
+  };
+  const groupsOf = async (actionId: string) => {
+    const response = await client.get(`/api/admin/audit/actions/${actionId}`);
+    assertEquals(response.status, 200);
+    const [student, ...others] = (response.body as { studentGroups: Groups[] }).studentGroups;
+    assertEquals(others, []);
+    return {
+      studentId: student?.studentId,
+      studentName: student?.studentName,
+      before: student?.before.map((g) => g.groupName),
+      after: student?.after.map((g) => g.groupName),
+    };
+  };
+
+  assertEquals(
+    (await client.json('DELETE', `/api/admin/students/${studentId}/enrolments/${tuesday}`)).status,
+    204,
+  );
+  const removal = await latestId(client);
+  const removed = {
+    studentId,
+    studentName: 'Miguel Ángel Cabezas',
+    before: ['Martes Peón', 'Miércoles Peón'],
+    after: ['Miércoles Peón'],
+  };
+  assertEquals(await groupsOf(removal), removed);
+
+  // Deshacerla no cambia lo que muestra la acción original; el deshacer lo muestra al revés.
+  assertEquals((await client.json('POST', `/api/admin/audit/actions/${removal}/undo`)).status, 204);
+  assertEquals(await groupsOf(removal), removed);
+  assertEquals(await groupsOf(await latestId(client)), {
+    ...removed,
+    before: ['Miércoles Peón'],
+    after: ['Martes Peón', 'Miércoles Peón'],
+  });
+
+  // Una acción que no toca inscripciones no lo muestra.
+  await newTeacher(client, 'Carlos Ruiz Márquez');
+  const response = await client.get(`/api/admin/audit/actions/${await latestId(client)}`);
+  assertEquals((response.body as { studentGroups: Groups[] }).studentGroups, []);
+});
+
 /** Da de alta un alumno y le cobra la cuota de socio: devuelve su identificador y lo cobrado. */
 async function studentWithPayment(
   client: ApiClient,
