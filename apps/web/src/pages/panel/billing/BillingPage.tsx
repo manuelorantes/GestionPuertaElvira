@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { Charge, ChargeKind } from '@/features/billing/api';
-import { currentMonth, monthName } from '@/features/billing/money';
+import { currentMonth, monthName, selectedMonth } from '@/features/billing/money';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
 
@@ -32,9 +32,7 @@ export function BillingPage() {
       : searchParams.get('mes') === 'canceladas'
         ? 'cancelled'
         : 'month';
-  const month = /^\d{4}-\d{2}$/.test(searchParams.get('mes') ?? '')
-    ? (searchParams.get('mes') as string)
-    : currentMonth();
+  const month = selectedMonth(searchParams.get('mes'));
   const tabs = [
     { id: 'cuotas', label: 'Cuotas' },
     { id: 'material', label: 'Material deportivo' },

@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router';
 
-import { currentMonth } from '@/features/billing/money';
+import { selectedMonth } from '@/features/billing/money';
 import { SeasonMonths } from '@/features/billing/SeasonMonths';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
@@ -28,9 +28,7 @@ export function PointsPage() {
   const tab = TABS.some((t) => t.id === params.get('pestana'))
     ? (params.get('pestana') as string)
     : 'alumnos';
-  const month = /^\d{4}-\d{2}$/.test(params.get('mes') ?? '')
-    ? (params.get('mes') as string)
-    : currentMonth();
+  const month = selectedMonth(params.get('mes'));
   const focus = params.get('alumno');
 
   function update(changes: Record<string, string | null>) {
