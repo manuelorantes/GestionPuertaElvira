@@ -11,6 +11,7 @@ import {
   type Holiday,
   type Substitution,
 } from '@/features/payroll/api';
+import { monthWeeks } from '@/features/payroll/calendar';
 import { useHolidays, usePayrollMutation, useSubstitutions } from '@/features/payroll/hooks';
 import { formatDate, todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
@@ -23,25 +24,6 @@ import { HolidayDialog } from './HolidayDialog';
 import { SubstitutionDialog } from './SubstitutionDialog';
 
 const WEEKDAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
-
-/** Semanas (de lunes a viernes) del mes: cada día como «AAAA-MM-DD» o null fuera del mes. */
-function weeks(month: string): (string | null)[][] {
-  const [year = 2000, number = 1] = month.split('-').map(Number);
-  const days = new Date(year, number, 0).getDate();
-  const rows: (string | null)[][] = [];
-  let row: (string | null)[] = [null, null, null, null, null];
-  for (let day = 1; day <= days; day++) {
-    const weekday = (new Date(year, number - 1, day).getDay() + 6) % 7; // 0 = lunes
-    if (weekday > 4) continue;
-    row[weekday] = `${month}-${String(day).padStart(2, '0')}`;
-    if (weekday === 4) {
-      rows.push(row);
-      row = [null, null, null, null, null];
-    }
-  }
-  if (row.some((d) => d !== null)) rows.push(row);
-  return rows;
-}
 
 /** Calendario de sustituciones planificadas y festivos (sin horas automáticas). */
 export function SubstitutionsTab({ month, teachers }: { month: string; teachers: Teacher[] }) {
@@ -92,7 +74,7 @@ export function SubstitutionsTab({ month, teachers }: { month: string; teachers:
             </tr>
           </thead>
           <tbody>
-            {weeks(month).map((week, index) => (
+            {monthWeeks(month, 5).map((week, index) => (
               <tr key={index} className="border-b border-line-soft align-top last:border-b-0">
                 {week.map((date, i) => (
                   <td
