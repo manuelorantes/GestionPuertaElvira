@@ -42,6 +42,8 @@ borre no vuelve) y no se tocan las liquidaciones pagadas. Consultar el registro 
 rentabilidad o la ficha de un profesor no apunta nada.
 Un profesor con cuenta no espera a la noche: al pasar la lista de una clase, al pulsar «Turno hecho» o al marcar a
 alguien en la lista de los viernes, su sesión de esa clase o actividad se apunta en el momento (si no estaba ya).
+Igual cuando superadministración pasa la lista de una clase, sea del día que sea (ver la spec de asistencia).
+Una sesión de ese grupo ese día apuntada a mano cuenta como ya apuntada.
 
 #### Scenario: Horas al pasar lista
 - **WHEN** Lucía pasa la lista de su clase del martes a las 18:00
