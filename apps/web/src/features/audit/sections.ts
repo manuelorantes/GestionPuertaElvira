@@ -1,4 +1,19 @@
-import type { AuditPeriod, AuditSection } from './api';
+import type { AuditCategory, AuditPeriod, AuditSection } from './api';
+
+/** Cómo se llama cada categoría del historial: las secciones de la aplicación. */
+export const CATEGORY_NAMES: Record<AuditCategory, string> = {
+  students: 'Alumnos',
+  groups: 'Grupos',
+  charges: 'Cuotas',
+  payments: 'Cobros',
+  attendance: 'Asistencia',
+  points: 'Puntos',
+  teachers: 'Profesorado',
+  payroll: 'Nóminas',
+  accounting: 'Contabilidad',
+  equipment: 'Material',
+  system: 'Cuentas y sistema',
+};
 
 /** Una pestaña del historial: la general (todo) o una sección. Su `id` va en la URL (?seccion=). */
 interface AuditTab {
