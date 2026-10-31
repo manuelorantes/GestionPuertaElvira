@@ -49,6 +49,7 @@ test('should review the sheet, import row by row and warn about a possible dupli
   await expect(page.getByRole('button', { name: /Importado De Prueba/ })).toBeVisible();
   await page.goto('/panel/historial');
   await expect(
-    page.getByRole('row', { name: /Importar fila de la hoja: Importado De Prueba/ }).first(),
+    // La acción es la misma para todas las filas; el alumno va en el detalle.
+    page.getByRole('row', { name: /Importar fila de la hoja.*Importado De Prueba/ }).first(),
   ).toBeVisible();
 });
