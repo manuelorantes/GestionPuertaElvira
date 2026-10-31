@@ -175,6 +175,37 @@ Deno.test('audit should list only data changes, not session events, and filter b
   assert(filtered.every((a) => Number(a.seq) < Number(list[0]?.seq)));
 });
 
+Deno.test('audit should offer every action of the history and filter by the chosen ones', async () => {
+  const client = await superadmin();
+  const first = await newTeacher(client, 'Ana Belén Torres');
+  await newTeacher(client, 'Pablo Ruiz Soto');
+  assertEquals((await rename(client, first, 'Ana Belén Torres Gil', '15.00')).status, 204);
+  const created = 'Crear profesor';
+  const edited = 'Editar profesor';
+
+  const page = async (query: string) =>
+    (await client.get(`/api/admin/audit/actions${query}`)).body as {
+      items: { label: string; seq: number }[];
+      labels: { label: string; count: number }[];
+    };
+  const all = await page('');
+  assertEquals(all.labels, [
+    { label: 'Cambio desde la consola', count: 1 },
+    { label: created, count: 2 },
+    { label: edited, count: 1 },
+  ]);
+
+  const chosen = await page(`?label=${encodeURIComponent(created)}`);
+  assertEquals(chosen.items.map((a) => a.label), [created, created]);
+  assertEquals(chosen.labels, all.labels);
+  const both = await page(
+    `?label=${encodeURIComponent(created)}&label=${encodeURIComponent(edited)}&before=${
+      all.items[0]?.seq
+    }`,
+  );
+  assertEquals(both.items.map((a) => a.label), [created, created]);
+});
+
 Deno.test('audit should say where each change can be seen in the app', async () => {
   const client = await superadmin();
   const teacherId = await newTeacher(client, 'Lucía Moreno Gil');

@@ -26,6 +26,9 @@ import { AuditLabels } from '../audit/mod.ts';
 import { SqlClassCommentQuery } from './rollcalls.ts';
 import { Row, type Sql } from './sql.ts';
 
+/** Orden alfabético de las acciones, como se leen en español. */
+const LABEL_ORDER = new Intl.Collator('es', { sensitivity: 'base', numeric: true });
+
 /** Las cuentas de usuario se registran pero no se revierten. */
 const NOT_REVERTIBLE = 'identity_user';
 /** Campos que nunca se muestran. */
@@ -82,15 +85,21 @@ function view(row: Row): AuditActionView {
 const PERSISTED =
   `a.kind <> 'security' AND EXISTS (SELECT 1 FROM audit_change c WHERE c.action_id = a.id)`;
 
-/** Persona ($1), tablas de la sección ($2) y desde cuándo ($3): ver `filterParams`. */
+/** Persona ($1), tablas de la sección ($2), desde cuándo ($3) y acciones ($4): ver `filterParams`. */
 const FILTERED = `($1::uuid IS NULL OR a.user_id = $1::uuid)
   AND ($2::text[] IS NULL OR EXISTS (SELECT 1 FROM audit_change t WHERE t.action_id = a.id AND t.table_name = ANY($2::text[])))
-  AND ($3::timestamptz IS NULL OR a.occurred_at >= $3::timestamptz)`;
-/** Página: anterior a ($4) y cuántas ($5), tras los parámetros de `FILTERED`. */
-const PAGED = `($4::bigint IS NULL OR a.seq < $4::bigint) ORDER BY a.seq DESC`;
+  AND ($3::timestamptz IS NULL OR a.occurred_at >= $3::timestamptz)
+  AND ($4::text[] IS NULL OR a.label = ANY($4::text[]))`;
+/** Página: anterior a ($5) y cuántas ($6), tras los parámetros de `FILTERED`. */
+const PAGED = `($5::bigint IS NULL OR a.seq < $5::bigint) ORDER BY a.seq DESC`;
 
 function filterParams(filter: AuditFilter): (string | string[] | Date | null)[] {
-  return [filter.userId ?? null, filter.tables ? [...filter.tables] : null, filter.since ?? null];
+  return [
+    filter.userId ?? null,
+    filter.tables ? [...filter.tables] : null,
+    filter.since ?? null,
+    filter.labels?.length ? [...filter.labels] : null,
+  ];
 }
 
 function pageParams(filter: AuditFilter): (string | number | string[] | Date | null)[] {
@@ -128,7 +137,7 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
   async actions(filter: AuditFilter): Promise<AuditActionView[]> {
     const rows = await this.sql.unsafe(
       `SELECT ${ACTION_COLUMNS} FROM audit_action a
-        WHERE ${PERSISTED} AND ${FILTERED} AND ${PAGED} LIMIT $5`,
+        WHERE ${PERSISTED} AND ${FILTERED} AND ${PAGED} LIMIT $6`,
       pageParams(filter),
     );
     return Row.all(rows).map(view);
@@ -137,7 +146,7 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
   async payments(filter: AuditFilter): Promise<AuditPaymentsPage> {
     const rows = await this.sql.unsafe(
       `SELECT ${ACTION_COLUMNS}, ${PAYMENT_COLUMNS} FROM audit_action a JOIN audit_change c ON ${PAYMENT_CHANGE}
-        WHERE ${PERSISTED} AND ${FILTERED} AND ${PAGED}, c.id LIMIT $5`,
+        WHERE ${PERSISTED} AND ${FILTERED} AND ${PAGED}, c.id LIMIT $6`,
       pageParams(filter),
     );
     const totals = await this.sql.unsafe(
@@ -273,6 +282,17 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
         WHERE a.user_id IS NOT NULL AND ${PERSISTED} ORDER BY a.user_id, a.seq DESC`,
     );
     return Row.all(rows).map((r) => ({ id: r.string('user_id'), name: r.string('user_name') }));
+  }
+
+  async labels(filter: AuditFilter): Promise<{ label: string; count: number }[]> {
+    const rows = await this.sql.unsafe(
+      `SELECT a.label, COUNT(*)::int AS count FROM audit_action a
+        WHERE ${PERSISTED} AND ${FILTERED} GROUP BY a.label`,
+      filterParams({ ...filter, labels: null }),
+    );
+    return Row.all(rows)
+      .map((r) => ({ label: r.string('label'), count: r.int('count') }))
+      .sort((a, b) => LABEL_ORDER.compare(a.label, b.label));
   }
 
   async begin(label: string, kind: string, reverts: string): Promise<void> {
