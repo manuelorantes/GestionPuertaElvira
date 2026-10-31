@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { todayIso } from '@/features/students/format';
-import { currentMonth, shiftMonth } from '@/features/billing/money';
+import { currentMonth, monthLabel, seasonMonths, shiftMonth } from '@/features/billing/money';
 import { addDays, weekOf } from '@/features/teacher-space/dates';
 import { seasonFirstMonth } from '@/features/teacher-space/groups';
 import { TEACHER, mockApi, renderApp } from '@/test/render';
@@ -559,6 +559,57 @@ describe('Mis horas', () => {
     await userEvent.click(byHours);
     await userEvent.click(byHours);
     expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Iniciación A');
+  });
+});
+
+describe('Mis horas: total del mes', () => {
+  it('shows the total hours of each month, split into own classes and substitutions', async () => {
+    const month = currentMonth();
+    const other = seasonMonths(month).find((m) => m !== month) ?? month;
+    const session = (id: string, date: string, minutes: number, substitution: boolean) => ({
+      id,
+      date,
+      label: substitution ? 'Adultos I' : 'Iniciación A',
+      minutes,
+      countedMinutes: minutes,
+      substitution,
+    });
+    mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      [`GET /api/teacher/hours?month=${month}`]: [
+        200,
+        {
+          month,
+          sessions: [
+            session('p1', `${month}-06`, 120, false),
+            session('p2', `${month}-07`, 90, true),
+          ],
+          substitutions: [],
+        },
+      ],
+      [`GET /api/teacher/hours?month=${other}`]: [
+        200,
+        { month: other, sessions: [session('p3', `${other}-08`, 60, false)], substitutions: [] },
+      ],
+    });
+    renderApp('/panel/mis-horas');
+
+    const total = await screen.findByRole('region', { name: 'Total del mes' });
+    expect(total).toHaveTextContent(`Horas de ${monthLabel(month).toLowerCase()}3,5 h`);
+    expect(total).toHaveTextContent('De mis clases2 h');
+    expect(total).toHaveTextContent('De sustitución1,5 h');
+    expect(total).toHaveTextContent('2 sesiones');
+
+    await userEvent.click(screen.getByRole('button', { name: monthLabel(other) }));
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Total del mes' })).toHaveTextContent(
+        `Horas de ${monthLabel(other).toLowerCase()}1 h`,
+      ),
+    );
+    expect(screen.getByRole('region', { name: 'Total del mes' })).toHaveTextContent(
+      'De sustitución0 h',
+    );
+    expect(screen.getByRole('region', { name: 'Total del mes' })).toHaveTextContent('1 sesión');
   });
 });
 
