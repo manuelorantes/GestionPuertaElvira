@@ -51,6 +51,8 @@ export interface AuditDetail {
 export interface AuditPage {
   items: AuditAction[];
   people: { id: string; name: string }[];
+  /** Las distintas acciones del historial (sin contar el filtro por acción) y cuántas hay de cada. */
+  labels: { label: string; count: number }[];
 }
 
 /** Una sección del historial: solo las acciones que tocaron lo suyo. */
@@ -61,6 +63,8 @@ export interface AuditQuery {
   userId?: string;
   section?: AuditSection;
   period?: AuditPeriod;
+  /** Solo estas acciones (vacío o sin él: todas). */
+  labels?: string[];
 }
 
 /** Un cobro tal como lo registró (o lo quitó, al deshacer) una acción: el importe lleva el signo. */
@@ -104,6 +108,7 @@ function url(query: AuditQuery, before: number | undefined): string {
   if (query.userId) params.set('userId', query.userId);
   if (query.section) params.set('section', query.section);
   if (query.period) params.set('period', query.period);
+  for (const label of query.labels ?? []) params.append('label', label);
   if (before) params.set('before', String(before));
   const search = params.toString();
   return `${BASE}${search ? `?${search}` : ''}`;

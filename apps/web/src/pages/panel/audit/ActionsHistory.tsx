@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, LogIn } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
@@ -24,7 +24,10 @@ const COLUMNS: Record<Column, SortColumn<AuditAction>> = {
   affected: { label: 'Afecta a', name: 'afecta a', value: (a) => a.affected.join(', ') || null },
 };
 
-/** Las acciones que cumplen `query`, con su detalle, deshacer y volver aquí; `onPeople` recibe quién aparece. */
+/**
+ * Las acciones que cumplen `query`, con su detalle, deshacer y volver aquí; `onPeople` recibe quién aparece. La
+ * cabecera «Acción» filtra por cualquier acción del historial (las cargadas o no): el filtro lo resuelve el servidor.
+ */
 export function ActionsHistory({
   query,
   emptyMessage,
@@ -35,20 +38,38 @@ export function ActionsHistory({
   onPeople?: (people: { id: string; name: string }[]) => void;
 }) {
   const [open, setOpen] = useState<string | null>(null);
+  const [labels, setLabels] = useState<string[]>([]);
   const revert = useRevert();
   const { header, apply } = useTableSort(COLUMNS, { key: 'when', descending: true });
+  const filtered = { ...query, labels };
   const actions = useInfiniteQuery({
-    queryKey: ['audit', query],
+    queryKey: ['audit', filtered],
     queryFn: async ({ pageParam }) => {
-      const page = await fetchActions(query, pageParam);
+      const page = await fetchActions(filtered, pageParam);
       if (pageParam === undefined) onPeople?.(page.people);
       return page;
     },
     initialPageParam: undefined as number | undefined,
     getNextPageParam: (last) =>
       last.items.length >= 50 ? last.items[last.items.length - 1]?.seq : undefined,
+    // Al cambiar el filtro sigue la tabla (y su menú abierto) hasta que llega la respuesta.
+    placeholderData: keepPreviousData,
   });
   const items = actions.data?.pages.flatMap((page) => page.items) ?? [];
+  const headerOf = (key: Column) =>
+    key === 'label'
+      ? header(key, {
+          filter: {
+            options: (actions.data?.pages[0]?.labels ?? []).map((l) => ({
+              value: l.label,
+              label: l.label,
+              count: l.count,
+            })),
+            selected: labels,
+            onChange: setLabels,
+          },
+        })
+      : header(key);
 
   if (actions.isPending) return <p className="p-5 text-ink-muted">Cargando historial…</p>;
   if (actions.isError)
@@ -57,7 +78,7 @@ export function ActionsHistory({
         <Alert>{apiErrorMessage(actions.error)}</Alert>
       </div>
     );
-  if (items.length === 0)
+  if (items.length === 0 && labels.length === 0)
     return <p className="px-5 py-12 text-center text-ink-muted">{emptyMessage}</p>;
 
   return (
@@ -71,7 +92,7 @@ export function ActionsHistory({
             </th>
             {(Object.keys(COLUMNS) as Column[]).map((key) => (
               <th key={key} scope="col" className="px-4 py-3 font-semibold">
-                {header(key)}
+                {headerOf(key)}
               </th>
             ))}
             <th scope="col">
@@ -139,6 +160,18 @@ export function ActionsHistory({
           ))}
         </tbody>
       </table>
+      {items.length === 0 && (
+        <p className="px-5 py-12 text-center text-ink-muted">
+          Ninguna acción de ese tipo.{' '}
+          <button
+            type="button"
+            onClick={() => setLabels([])}
+            className="cursor-pointer font-semibold text-brand"
+          >
+            Ver todas
+          </button>
+        </p>
+      )}
       {actions.hasNextPage && (
         <div className="flex justify-center border-t border-line p-4">
           <Button
