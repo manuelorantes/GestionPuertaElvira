@@ -133,7 +133,8 @@ son iguales en eso, a la que va antes).
 #### Scenario: Clase durante la actividad de los viernes
 - **WHEN** Ángel tiene clase de 16:30 a 18:00 y la actividad «Viernes» de 17:00 a 20:00
 - **THEN** se le pagan 3,5 horas: 1,5 de la clase y 2 de la actividad
-Se paga a mes vencido: por defecto se muestra el mes anterior. Se puede imprimir y marcar como pagada, una a una o todas.
+Se paga a mes vencido, pero, como en todos los selectores de meses, por defecto se muestra el mes en curso.
+Se puede imprimir y marcar como pagada, una a una o todas.
 La lista MUST poder ordenarse desde las cabeceras por profesor (por defecto), horas, tarifa, importe o estado, en ambos
 sentidos.
 

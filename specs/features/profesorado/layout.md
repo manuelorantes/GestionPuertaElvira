@@ -8,8 +8,7 @@ de `GestionClub.dc.html`. La lista de profesores con su tarifa sigue en Clases �
 ```
 TeachersPayPage (/panel/profesores)
 ├── SectionHeader: «5 profesores · pago por hora» | «Profesores» | acción «Registrar horas» (icono plus)
-├── Barra de mes: «Mes anterior» · «Septiembre 2026» · «Mes siguiente» (?mes=AAAA-MM; por defecto el actual,
-│   y el anterior en Liquidación porque se paga a mes vencido)
+├── Barra de mes: un botón por mes de la temporada (?mes=AAAA-MM; por defecto el actual, en todas las pestañas)
 ├── Tabs: Rentabilidad · Registro de horas · Liquidación mensual (?pestana=rentabilidad|horas|liquidacion)
 ├── ProfitabilityTab
 │   ├── 3 tarjetas: Horas impartidas · Coste de profesores · Margen de las clases (del mes)
