@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { currentMonth } from '@/features/billing/money';
+import { currentMonth, monthLabel } from '@/features/billing/money';
 import { todayIso } from '@/features/students/format';
 import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
@@ -690,6 +690,68 @@ describe('Profesorado', () => {
         ),
       ).toBe(true),
     );
+  });
+
+  it('shows on a calendar the hours given each day, its own classes apart from substitutions', async () => {
+    const month = currentMonth();
+    // Lunes, martes y miércoles de la primera semana entera del mes.
+    const monday = [1, 2, 3, 4, 5, 6, 7].find(
+      (d) => new Date(`${month}-0${d}T12:00:00`).getDay() === 1,
+    ) as number;
+    const [first, second, third] = [monday, monday + 1, monday + 2];
+    const date = (d: number) => `${month}-${String(d).padStart(2, '0')}`;
+    api({
+      'GET /api/admin/payroll/teachers/t1/report': [
+        200,
+        {
+          teacher: { id: 't1', name: 'Lucía Moreno Gil', rateCents: 1600, active: true },
+          season: 2026,
+          months: [],
+          balanceCents: 0,
+          payments: [],
+          groups: [],
+          occupancy: { occupied: 0, capacity: 0 },
+          students: [],
+          substitutions: [],
+          duties: [],
+        },
+      ],
+      [`GET /api/admin/payroll/sessions?month=${month}&teacherId=t1`]: [
+        200,
+        {
+          items: [
+            session({ id: 's1', date: date(first), minutes: 60, countedMinutes: 60 }),
+            // Se pisa media hora con la anterior: ese día cuenta lo que cuenta cada sesión.
+            session({ id: 's2', date: date(first), minutes: 90, countedMinutes: 60 }),
+            session({ id: 's3', date: date(first), substitution: true, countedMinutes: 90 }),
+            session({ id: 's4', date: date(second), substitution: true, countedMinutes: 60 }),
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/profesores/t1');
+
+    const calendar = await screen.findByRole('table', {
+      name: `Calendario de clases dadas en ${monthLabel(month).toLowerCase()}`,
+    });
+    const day = (n: number) =>
+      within(calendar).getByRole('cell', { name: new RegExp(`^Día ${n}(\\D|$)`) });
+    await waitFor(() => expect(day(first)).toHaveTextContent('2 h de sus clases'));
+    expect(day(first)).toHaveTextContent('1,5 h de sustitución');
+    expect(
+      within(day(first)).getByText('2 h', { exact: false }).closest('[data-kind]'),
+    ).toHaveAttribute('data-kind', 'own');
+    expect(day(second)).toHaveTextContent('1 h de sustitución');
+    expect(day(second)).not.toHaveTextContent('de sus clases');
+    expect(day(second).querySelector('[data-kind="substitution"]')).toHaveClass('bg-ink-strong');
+    expect(day(first).querySelector('[data-kind="own"]')).toHaveClass('bg-brand');
+    // Un día sin clases dadas (también cuando le sustituyeron) no lleva horas.
+    expect(day(third)).not.toHaveTextContent(' h');
+    const legend = screen.getByRole('list', { name: 'Leyenda del calendario' });
+    expect(legend).toHaveTextContent('Sus clases');
+    expect(legend).toHaveTextContent('Sustituciones');
+    // Sin clases en fin de semana, el calendario va de lunes a viernes.
+    expect(within(calendar).queryByRole('columnheader', { name: 'Sáb' })).not.toBeInTheDocument();
   });
 
   it('links each teacher name to their page', async () => {
