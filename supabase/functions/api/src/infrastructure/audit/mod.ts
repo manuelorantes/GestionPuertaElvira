@@ -1,5 +1,5 @@
 import { generateUuidV7 } from '../../domain/common/mod.ts';
-import type { AuditContext } from '../../application/common/mod.ts';
+import type { AuditCategory } from '../../application/audit/mod.ts';
 import type { UserId } from '../../domain/identity/mod.ts';
 import type {
   AuthenticatedUser,
@@ -15,8 +15,16 @@ export class AuditLabels {
     'POST /api/admin/diagnostics/run': 'Diagnosticar',
     'POST /api/admin/diagnostics/findings/:id/accept': 'Aceptar hallazgo',
     'POST /api/admin/diagnostics/findings/:id/dismiss': 'Descartar hallazgo',
+    'DELETE /api/admin/diagnostics/findings/:id': 'Quitar hallazgo',
     'POST /api/admin/accounting/entries': 'Añadir movimiento',
     'DELETE /api/admin/accounting/entries/:id': 'Quitar movimiento',
+    'PUT /api/admin/accounting/movements': 'Corregir movimiento del libro',
+    'POST /api/admin/accounting/categories': 'Crear categoría del club',
+    'PUT /api/admin/accounting/categories/:code': 'Editar categoría del club',
+    'DELETE /api/admin/accounting/categories/:code': 'Quitar categoría del club',
+    'PUT /api/admin/accounting/monthly-categories': 'Elegir las categorías de cada mes',
+    'POST /api/admin/accounting/transfers': 'Apuntar traspaso entre caja y banco',
+    'DELETE /api/admin/accounting/transfers/:id': 'Quitar traspaso entre caja y banco',
     'POST /api/admin/accounting/invoices': 'Registrar factura de proveedor',
     'POST /api/admin/accounting/invoices/:id/payment': 'Pagar factura de proveedor',
     'PUT /api/admin/accounting/invoices/:id': 'Editar factura de proveedor',
@@ -34,8 +42,12 @@ export class AuditLabels {
     'POST /api/admin/billing/charges/:id/reactivate': 'Reactivar cuota',
     'POST /api/admin/billing/payments': 'Registrar cobro',
     'POST /api/admin/billing/payments/:id/invoice': 'Emitir factura',
+    'PUT /api/admin/billing/payments/:id/date': 'Cambiar la fecha de un cobro',
+    'PUT /api/admin/billing/payments/:id/amount': 'Cambiar el importe de un cobro',
+    'PUT /api/admin/billing/payments/:id/method': 'Cambiar la forma de pago de un cobro',
     'PUT /api/admin/billing/accounts/:id': 'Cambiar datos de cobro del alumno',
     'PUT /api/admin/points/fridays/:date/students/:id': 'Marcar asistencia de un viernes',
+    'PUT /api/teacher/fridays/:dutyId/:date/students/:studentId': 'Marcar asistencia de un viernes',
     'POST /api/admin/points/adjustments': 'Ajustar puntos a mano',
     'POST /api/admin/points/photos': 'Añadir foto de torneo',
     'DELETE /api/admin/points/photos/:id': 'Quitar foto de torneo',
@@ -66,6 +78,8 @@ export class AuditLabels {
     'DELETE /api/admin/payroll/advances/:id': 'Quitar un anticipo',
     'POST /api/admin/students/:id/enrolments': 'Inscribir en grupo',
     'DELETE /api/admin/students/:id/enrolments/:groupId': 'Quitar de grupo',
+    'PUT /api/admin/students/:id/enrolments/:groupId': 'Cambiar la asistencia a un grupo',
+    'PUT /api/admin/students/member-numbers': 'Renumerar socios',
     'PUT /api/admin/students/:id/enrolments/:groupId/start':
       'Cambiar desde cuándo está en un grupo',
     'POST /api/admin/students/:id/enrolments/:groupId/move': 'Mover de grupo',
@@ -89,6 +103,10 @@ export class AuditLabels {
     'POST /api/admin/users/:id/emails': 'Añadir email a una cuenta',
     'DELETE /api/admin/users/:id/emails': 'Quitar email de una cuenta',
     'PUT /api/teacher/roll-calls/:groupId/:date': 'Pasar lista',
+    'PUT /api/admin/roll-calls/:groupId/:date': 'Pasar lista',
+    'POST /api/teacher/activities/:dutyId/:date/done': 'Confirmar una actividad del club',
+    'POST /api/admin/attendance/pending/activities/:dutyId/:date/confirm':
+      'Dar por buena una actividad sin confirmar',
     'POST /api/teacher/roll-calls/:groupId/:date/comments': 'Comentar una clase',
     'PUT /api/teacher/comments/:id': 'Cambiar comentario de una clase',
     'DELETE /api/teacher/comments/:id': 'Quitar comentario de una clase',
@@ -170,8 +188,38 @@ export class AuditLabels {
     'email_removed.success': 'Quitar email de una cuenta',
   };
 
-  static route(method: string, path: string): string {
-    return AuditLabels.ROUTES[`${method} ${path}`] ?? 'Cambio de datos';
+  /**
+   * A qué categoría pertenece cada ruta, por su prefijo: la primera que encaja. Las inscripciones van con los grupos
+   * (aunque cuelguen del alumno) y, en Profesorado, lo que se paga (liquidaciones y anticipos) va a Nóminas.
+   */
+  private static readonly CATEGORIES: [string, AuditCategory][] = [
+    ['/api/admin/students/:id/enrolments', 'groups'],
+    ['/api/admin/groups', 'groups'],
+    ['/api/admin/students', 'students'],
+    ['/api/admin/import', 'students'],
+    ['/api/admin/billing/payments', 'payments'],
+    ['/api/admin/billing', 'charges'],
+    ['/api/teacher/fridays', 'points'],
+    ['/api/admin/points', 'points'],
+    ['/api/teacher', 'attendance'],
+    ['/api/admin/attendance', 'attendance'],
+    ['/api/admin/roll-calls', 'attendance'],
+    ['/api/admin/payroll/settlements', 'payroll'],
+    ['/api/admin/payroll/advances', 'payroll'],
+    ['/api/admin/payroll', 'teachers'],
+    ['/api/admin/teachers', 'teachers'],
+    ['/api/admin/accounting', 'accounting'],
+    ['/api/admin/equipment', 'equipment'],
+  ];
+
+  /** Nombre de la acción de una ruta; null si no tiene (las que no cambian datos). */
+  static route(method: string, path: string): string | null {
+    return AuditLabels.ROUTES[`${method} ${path}`] ?? null;
+  }
+
+  /** Cuentas, contraseñas, diagnóstico y lo demás van a «system». */
+  static category(path: string): AuditCategory {
+    return AuditLabels.CATEGORIES.find(([prefix]) => path.startsWith(prefix))?.[1] ?? 'system';
   }
 
   static table(table: string): string {
@@ -200,21 +248,13 @@ function signature(user: AuthenticatedUser | null): string {
 export async function startAuditAction(
   tx: Sql,
   user: AuthenticatedUser | null,
-  label: string,
+  action: { label: string; category: AuditCategory },
 ): Promise<void> {
   await tx`SELECT set_config('audit.action_id', ${generateUuidV7()}, true), set_config('audit.kind', 'change', true),
     set_config('audit.user_id', ${user?.id ?? ''}, true), set_config('audit.user_name', ${
     signature(user)
   }, true),
-    set_config('audit.label', ${label}, true)`;
-}
-
-export class SqlAuditContext implements AuditContext {
-  constructor(private readonly tx: Sql) {}
-
-  async relabel(label: string): Promise<void> {
-    await this.tx`SELECT set_config('audit.label', ${[...label].slice(0, 160).join('')}, true)`;
-  }
+    set_config('audit.label', ${action.label}, true), set_config('audit.category', ${action.category}, true)`;
 }
 
 /** Los eventos de seguridad van al log y, además, al historial como acciones sin cambios de datos. */

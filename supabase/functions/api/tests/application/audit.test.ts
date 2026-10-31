@@ -3,6 +3,7 @@ import { assertEquals, assertRejects, assertThrows } from '@std/assert';
 import {
   AuditActionNotFound,
   type AuditActionView,
+  type AuditCategory,
   type AuditClassView,
   type AuditDetail,
   type AuditLog,
@@ -25,9 +26,11 @@ function action(id: string, seq: number, label: string): AuditActionView {
     id,
     seq,
     kind: 'change',
+    category: 'teachers',
     userId: null,
     userName: 'Junta',
     label,
+    detail: null,
     occurredAt: '',
     changeCount: 1,
     affected: ['Profesor'],
@@ -68,7 +71,7 @@ class FakeAudit implements AuditLog, AuditReverter {
     return Promise.resolve([]);
   }
 
-  labels(): Promise<{ label: string; count: number }[]> {
+  categories(): Promise<{ category: AuditCategory; count: number }[]> {
     return Promise.resolve([]);
   }
 

@@ -1,18 +1,20 @@
 import { generateUuidV7 } from '../../domain/common/mod.ts';
 import { LocalDate } from '../../domain/common/mod.ts';
-import type {
-  AuditActionView,
-  AuditChangeView,
-  AuditClassView,
-  AuditDetail,
-  AuditFilter,
-  AuditLog,
-  AuditPaymentsPage,
-  AuditPaymentView,
-  AuditReference,
-  AuditReferenceKind,
-  AuditReverter,
-  AuditTarget,
+import {
+  AUDIT_CATEGORIES,
+  type AuditActionView,
+  type AuditCategory,
+  type AuditChangeView,
+  type AuditClassView,
+  type AuditDetail,
+  type AuditFilter,
+  type AuditLog,
+  type AuditPaymentsPage,
+  type AuditPaymentView,
+  type AuditReference,
+  type AuditReferenceKind,
+  type AuditReverter,
+  type AuditTarget,
 } from '../../application/audit/mod.ts';
 import {
   type AuditRow,
@@ -26,8 +28,8 @@ import { AuditLabels } from '../audit/mod.ts';
 import { SqlClassCommentQuery } from './rollcalls.ts';
 import { Row, type Sql } from './sql.ts';
 
-/** Orden alfabético de las acciones, como se leen en español. */
-const LABEL_ORDER = new Intl.Collator('es', { sensitivity: 'base', numeric: true });
+/** Tablas que acompañan a otros cambios (la numeración de los recibos) y no dicen a quién afectó una acción. */
+const NOT_DESCRIBING = ['billing_document_sequence'];
 
 /** Las cuentas de usuario se registran pero no se revierten. */
 const NOT_REVERTIBLE = 'identity_user';
@@ -35,7 +37,7 @@ const NOT_REVERTIBLE = 'identity_user';
 const SECRET = /password|token|hash/i;
 
 const ACTION_COLUMNS = `
-  a.id, a.seq, a.kind, a.user_id, a.user_name, a.label, a.occurred_at, a.reverts,
+  a.id, a.seq, a.kind, a.category, a.user_id, a.user_name, a.label, a.occurred_at, a.reverts,
   (SELECT COUNT(*) FROM audit_change c WHERE c.action_id = a.id) AS change_count,
   (SELECT COUNT(*) FROM audit_change c WHERE c.action_id = a.id AND c.table_name <> 'identity_user') AS revertible,
   (SELECT COALESCE(json_agg(DISTINCT c.table_name), '[]') FROM audit_change c WHERE c.action_id = a.id) AS tables`;
@@ -64,9 +66,11 @@ function view(row: Row): AuditActionView {
     id: row.string('id'),
     seq: row.int('seq'),
     kind: row.string('kind'),
+    category: row.string('category'),
     userId: row.nullableString('user_id'),
     userName: row.string('user_name'),
     label: row.string('label'),
+    detail: null,
     occurredAt: madridIso(row.date('occurred_at')),
     changeCount: row.int('change_count'),
     affected: [...new Set(tables.map((t) => AuditLabels.table(t)))],
@@ -85,11 +89,11 @@ function view(row: Row): AuditActionView {
 const PERSISTED =
   `a.kind <> 'security' AND EXISTS (SELECT 1 FROM audit_change c WHERE c.action_id = a.id)`;
 
-/** Persona ($1), tablas de la sección ($2), desde cuándo ($3) y acciones ($4): ver `filterParams`. */
+/** Persona ($1), tablas de la sección ($2), desde cuándo ($3) y categorías ($4): ver `filterParams`. */
 const FILTERED = `($1::uuid IS NULL OR a.user_id = $1::uuid)
   AND ($2::text[] IS NULL OR EXISTS (SELECT 1 FROM audit_change t WHERE t.action_id = a.id AND t.table_name = ANY($2::text[])))
   AND ($3::timestamptz IS NULL OR a.occurred_at >= $3::timestamptz)
-  AND ($4::text[] IS NULL OR a.label = ANY($4::text[]))`;
+  AND ($4::text[] IS NULL OR a.category = ANY($4::text[]))`;
 /** Página: anterior a ($5) y cuántas ($6), tras los parámetros de `FILTERED`. */
 const PAGED = `($5::bigint IS NULL OR a.seq < $5::bigint) ORDER BY a.seq DESC`;
 
@@ -98,7 +102,7 @@ function filterParams(filter: AuditFilter): (string | string[] | Date | null)[] 
     filter.userId ?? null,
     filter.tables ? [...filter.tables] : null,
     filter.since ?? null,
-    filter.labels?.length ? [...filter.labels] : null,
+    filter.categories?.length ? [...filter.categories] : null,
   ];
 }
 
@@ -140,7 +144,45 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
         WHERE ${PERSISTED} AND ${FILTERED} AND ${PAGED} LIMIT $6`,
       pageParams(filter),
     );
-    return Row.all(rows).map(view);
+    return await this.described(Row.all(rows).map(view));
+  }
+
+  /**
+   * Cada acción con su detalle: el nombre de lo primero que tocó (sin contar la numeración de documentos) y, si tocó
+   * más registros de esa tabla, cuántos más («Cuota de octubre 2026 · Martina López Herrera y 40 más»).
+   */
+  private async described(actions: AuditActionView[]): Promise<AuditActionView[]> {
+    if (actions.length === 0) return actions;
+    const rows = Row.all(
+      await this.sql.unsafe(
+        `SELECT action_id, table_name, row, same_table FROM (
+           SELECT c.action_id, c.table_name, COALESCE(c.after, c.before) AS row,
+                  COUNT(*) OVER (PARTITION BY c.action_id, c.table_name) AS same_table,
+                  ROW_NUMBER() OVER (PARTITION BY c.action_id ORDER BY c.id) AS position
+             FROM audit_change c
+            WHERE c.action_id = ANY($1::uuid[]) AND c.table_name <> ALL($2::text[])) first
+          WHERE position = 1`,
+        [actions.map((a) => a.id), NOT_DESCRIBING],
+      ),
+    );
+    const snapshot = (row: Row) => (row.json('row') ?? {}) as AuditRow;
+    const names = new AuditNames(this.sql);
+    for (const row of rows) {
+      for (const ref of referencesOf(snapshot(row))) names.want(ref.kind, ref.id);
+    }
+    await names.resolve();
+    const details = new Map<string, string>();
+    for (const row of rows) {
+      const title = titleOf(
+        row.string('table_name'),
+        snapshot(row),
+        (kind, id) => names.label(kind, id),
+      );
+      if (title === null) continue;
+      const more = row.int('same_table') - 1;
+      details.set(row.string('action_id'), more > 0 ? `${title} y ${more} más` : title);
+    }
+    return actions.map((a) => ({ ...a, detail: details.get(a.id) ?? null }));
   }
 
   async payments(filter: AuditFilter): Promise<AuditPaymentsPage> {
@@ -180,7 +222,9 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
       `SELECT ${ACTION_COLUMNS} FROM audit_action a WHERE a.id = $1::uuid`,
       [id],
     );
-    return rows[0] ? view(new Row(rows[0])) : null;
+    if (!rows[0]) return null;
+    const [action] = await this.described([view(new Row(rows[0]))]);
+    return action ?? null;
   }
 
   async changes(actionId: string): Promise<AuditDetail> {
@@ -284,21 +328,24 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
     return Row.all(rows).map((r) => ({ id: r.string('user_id'), name: r.string('user_name') }));
   }
 
-  async labels(filter: AuditFilter): Promise<{ label: string; count: number }[]> {
+  async categories(filter: AuditFilter): Promise<{ category: AuditCategory; count: number }[]> {
     const rows = await this.sql.unsafe(
-      `SELECT a.label, COUNT(*)::int AS count FROM audit_action a
-        WHERE ${PERSISTED} AND ${FILTERED} GROUP BY a.label`,
-      filterParams({ ...filter, labels: null }),
+      `SELECT a.category, COUNT(*)::int AS count FROM audit_action a
+        WHERE ${PERSISTED} AND ${FILTERED} GROUP BY a.category`,
+      filterParams({ ...filter, categories: null }),
     );
-    return Row.all(rows)
-      .map((r) => ({ label: r.string('label'), count: r.int('count') }))
-      .sort((a, b) => LABEL_ORDER.compare(a.label, b.label));
+    const counts = new Map(Row.all(rows).map((r) => [r.string('category'), r.int('count')]));
+    return AUDIT_CATEGORIES.filter((c) => counts.has(c)).map((category) => ({
+      category,
+      count: counts.get(category) ?? 0,
+    }));
   }
 
   async begin(label: string, kind: string, reverts: string): Promise<void> {
     const id = generateUuidV7();
-    await this.sql`INSERT INTO audit_action (id, kind, user_id, user_name, label, reverts)
-      VALUES (${id}, ${kind}, NULLIF(current_setting('audit.user_id', true), '')::uuid,
+    await this.sql`INSERT INTO audit_action (id, kind, category, user_id, user_name, label, reverts)
+      VALUES (${id}, ${kind}, (SELECT category FROM audit_action WHERE id = ${reverts}::uuid),
+              NULLIF(current_setting('audit.user_id', true), '')::uuid,
               COALESCE(NULLIF(current_setting('audit.user_name', true), ''), 'Sistema'), ${
       [...label].slice(0, 160).join('')
     }, ${reverts})`;

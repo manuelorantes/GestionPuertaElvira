@@ -1,4 +1,4 @@
-import { assert, assertEquals, assertStringIncludes } from '@std/assert';
+import { assert, assertEquals, assertMatch, assertStringIncludes } from '@std/assert';
 
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
@@ -118,10 +118,14 @@ Deno.test('import should import each row on its own as an undoable action', asyn
   const actions =
     body<{ items: Record<string, unknown>[] }>(await fx.client.get('/api/admin/audit/actions'))
       .items;
-  assertEquals(actions.slice(0, 2).map((a) => a.label), [
-    'Importar fila de la hoja: Julio Requena Montenegro',
-    'Importar fila de la hoja: Hector Perez Ratkovsky',
+  // El nombre va en el detalle, no en la acción: todas las filas son la misma acción. Al vincular con un alumno
+  // que ya estaba, lo primero que toca la fila son sus cobros.
+  assertEquals(actions.slice(0, 2).map((a) => [a.category, a.label]), [
+    ['students', 'Importar fila de la hoja'],
+    ['students', 'Importar fila de la hoja'],
   ]);
+  assertEquals(actions[0]?.detail, 'Julio Requena Montenegro');
+  assertMatch(String(actions[1]?.detail), /^R-\d{4}-0001 · Héctor Pérez Ratkovsky y 2 más$/);
   assertEquals(
     (await fx.client.json('POST', `/api/admin/audit/actions/${actions[0]?.id}/undo`)).status,
     204,

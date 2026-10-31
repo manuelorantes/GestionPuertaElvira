@@ -156,11 +156,10 @@ export class ApiApp {
       try {
         enforceJsonPolicy(c, options);
         enforceAccess(scope.user, options);
-        await startAuditAction(
-          scope.tx,
-          scope.user,
-          AuditLabels.route(options.method, options.path),
-        );
+        await startAuditAction(scope.tx, scope.user, {
+          label: AuditLabels.route(options.method, options.path) ?? 'Cambio de datos',
+          category: AuditLabels.category(options.path),
+        });
         return await handler(c, scope);
       } catch (error) {
         if (isOperationalError(error)) return toErrorResponse(error, scope.log);
