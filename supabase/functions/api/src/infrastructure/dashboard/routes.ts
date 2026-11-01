@@ -1,16 +1,19 @@
 import { FiscalYearSummary, MonthLedger } from '../../application/accounting/mod.ts';
 import { ClubSummary } from '../../application/dashboard/mod.ts';
-import { ExpectedPayroll } from '../../application/payroll/mod.ts';
+import { ExpectedPayroll, ListSettlements, PendingPayroll } from '../../application/payroll/mod.ts';
 import { billing } from '../billing/routes.ts';
 import type { ApiApp } from '../http/app.ts';
 import { SqlAccountingRepository, SqlLedgerQuery } from '../persistence/accounting.ts';
 import { SqlFeeIncome } from '../persistence/billing.ts';
 import { SqlClassQuery } from '../persistence/classes.ts';
 import {
+  SqlAdvanceRepository,
   SqlDutyRepository,
   SqlHolidayCalendar,
   SqlScheduleDirectory,
+  SqlSettlementRepository,
   SqlTeacherRates,
+  SqlTimesheetRepository,
 } from '../persistence/payroll.ts';
 import { SqlStudentQuery } from '../persistence/students.ts';
 
@@ -41,6 +44,14 @@ export function registerDashboardRoutes(api: ApiApp): void {
           api.deps.clock,
         ),
         new SqlAccountingRepository(scope.tx),
+        new PendingPayroll(
+          new ListSettlements(
+            new SqlTimesheetRepository(scope.tx),
+            new SqlSettlementRepository(scope.tx),
+            new SqlTeacherRates(scope.tx),
+            new SqlAdvanceRepository(scope.tx),
+          ),
+        ),
       );
       return c.json(await summary.execute());
     },

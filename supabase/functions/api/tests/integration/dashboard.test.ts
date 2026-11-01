@@ -93,6 +93,25 @@ Deno.test({
       204,
     );
 
+    // Una clase de la profesora el mes pasado, aún sin pagar.
+    const lastMonthDay = `${previousMonth}-10`;
+    const owedBefore = Season.teachingSeason(YearMonth.fromString(previousMonth)) === null
+      ? 0
+      : await (async () => {
+        assertEquals(
+          (await client.json('POST', '/api/admin/payroll/sessions', {
+            teacherId: teacher,
+            groupId: group,
+            date: lastMonthDay,
+            hours: 1,
+          })).status,
+          201,
+        );
+        return ((await client.get(`/api/admin/payroll/settlements?month=${previousMonth}`))
+          .body as { items: { toPayCents: number }[] }).items
+          .reduce((total, s) => total + s.toPayCents, 0);
+      })();
+
     const response = await client.get('/api/admin/dashboard');
     assertEquals(response.status, 200);
     const summary = response.body as Record<string, unknown>;
@@ -148,11 +167,9 @@ Deno.test({
     });
     if (season.includes(YearMonth.fromString(previousMonth))) {
       assertEquals(at(ofMonth, previousMonth)?.expenseCents, 1000);
-      assertEquals(
-        at(ofMonth, previousMonth)?.expectedExpenseCents,
-        0,
-        'los meses pasados no prevén',
-      );
+      // Un mes ya pasado prevé lo que aún se debe al profesorado (su liquidación sin pagar) hasta que se paga.
+      assertEquals(at(ofMonth, previousMonth)?.expectedExpenseCents, owedBefore);
+      assert(owedBefore > 0, 'la profesora dio una clase el mes pasado');
     }
     // En los meses que vienen, la cuota prevista de la alumna matriculada y el coste de la profesora según el
     // horario; en julio y agosto no hay clases.
@@ -185,6 +202,26 @@ Deno.test({
     });
     assertEquals((summary.latest as unknown[]).length, 3);
     assertEquals(summary.overdue, []);
+
+    // Pagada la liquidación del mes pasado, ya es gasto y deja de preverse.
+    if (season.includes(YearMonth.fromString(previousMonth))) {
+      assertEquals(
+        (await client.json(
+          'POST',
+          `/api/admin/payroll/settlements/${teacher}/${previousMonth}/payment`,
+          { date: today },
+        )).status,
+        204,
+      );
+      const paid = (await client.get('/api/admin/dashboard')).body as { monthChart: Chart };
+      assertEquals(at(paid.monthChart, previousMonth), {
+        month: previousMonth,
+        incomeCents: 0,
+        expenseCents: 1000 + owedBefore,
+        expectedCents: 0,
+        expectedExpenseCents: 0,
+      });
+    }
   },
 });
 

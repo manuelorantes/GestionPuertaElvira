@@ -26,6 +26,7 @@ import {
   ListSettlements,
   PayAllSettlements,
   PaySettlement,
+  PendingPayroll,
   PlanSubstitution,
   Profitability,
   ProposeSessions,
@@ -311,6 +312,23 @@ Deno.test('PaySettlement should freeze the settlement, lock its sessions and res
     () => closed.pay().execute(closed.lucia, '2026-10', '2026-11-02'),
     PeriodClosed,
   );
+});
+
+Deno.test('PendingPayroll should keep owing the unpaid settlements of each month until they are paid', async () => {
+  const { lucia, propose, pay, list } = setUp();
+  await propose('2026-10');
+  const owed = async () =>
+    Object.fromEntries(
+      await new PendingPayroll(list()).between(
+        YearMonth.fromString('2026-09'),
+        YearMonth.fromString('2026-10'),
+      ),
+    );
+  // Octubre: Lucía 8 h a 16 € y Carlos 4 × 1,5 h a 18 €; septiembre, nada apuntado.
+  assertEquals(await owed(), { '2026-09': 0, '2026-10': 12800 + 10800 });
+  // Pagada la de Lucía, ya está en el libro: solo queda la de Carlos.
+  await pay().execute(lucia, '2026-10', '2026-11-02');
+  assertEquals(await owed(), { '2026-09': 0, '2026-10': 10800 });
 });
 
 Deno.test('PayAllSettlements should pay every pending settlement of the month', async () => {
