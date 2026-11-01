@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-// Datos de `make e2e`: tarifas del diseño, sesiones propuestas desde septiembre y liquidaciones anteriores pagadas salvo una.
+// Datos de `make e2e`: tarifas del diseño, sesiones propuestas desde el mes anterior y su liquidación pagada salvo una.
 const month = new Date().getMonth() + 1;
 test.skip(({ isMobile }) => isMobile, 'Modifica datos compartidos: solo en escritorio');
 test.skip(month === 7 || month === 8, 'En julio y agosto no hay clases');

@@ -589,7 +589,7 @@ async function seedBilling(
   return count;
 }
 
-/** Sesiones propuestas desde septiembre y liquidaciones de los meses anteriores pagadas (salvo una). */
+/** Sesiones propuestas desde el mes anterior y su liquidación pagada (salvo una). */
 async function seedPayroll(
   app: UseCases,
   clock: Clock,
@@ -598,18 +598,13 @@ async function seedPayroll(
   const current = YearMonth.of(LocalDate.fromInstant(clock.now()));
   const season = Season.teachingSeason(current);
   if (season === null) return;
-  // Las horas se apuntan solas día a día (desde el mes anterior hasta hoy).
+  // Las horas se apuntan solas día a día (desde el mes anterior hasta hoy): solo ese mes tiene horas que liquidar.
   await app.proposeSessions.execute();
-  for (let month = season.firstMonth(); !current.isBefore(month); month = month.next()) {
-    if (!month.isBefore(current)) continue;
-    for (const [key, teacherId] of Object.entries(teacherIds)) {
-      if (key !== UNPAID_TEACHER || month.next().isBefore(current)) {
-        await app.paySettlement.execute(
-          teacherId,
-          month.toString(),
-          `${month.next().toString()}-02`,
-        );
-      }
+  const previous = current.previous();
+  if (!season.includes(previous)) return;
+  for (const [key, teacherId] of Object.entries(teacherIds)) {
+    if (key !== UNPAID_TEACHER) {
+      await app.paySettlement.execute(teacherId, previous.toString(), `${current.toString()}-02`);
     }
   }
 }
