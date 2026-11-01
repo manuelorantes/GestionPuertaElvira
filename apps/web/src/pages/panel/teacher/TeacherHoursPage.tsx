@@ -45,7 +45,8 @@ function monthTotal(sessions: TeacherSession[]): { own: number; substitution: nu
 
 /**
  * Mis horas: las clases que he dado en un mes, en el mismo calendario que ve administración en mi ficha (mis clases en
- * verde, las sustituciones en negro), los días en que sustituí a alguien o me sustituyeron, y la lista de sesiones.
+ * verde, las sustituciones en negro; lo que aún me queda por dar, en sus tonos claros), los días en que sustituí a
+ * alguien o me sustituyeron, y la lista de sesiones.
  */
 export function TeacherHoursPage() {
   const [month, setMonth] = useState(currentMonth());
@@ -85,7 +86,12 @@ export function TeacherHoursPage() {
             ))}
           </section>
           <Card className="overflow-x-auto pb-4">
-            <SessionsCalendar month={month} sessions={sessions} viewer="teacher" />
+            <SessionsCalendar
+              month={month}
+              sessions={sessions}
+              upcoming={hours.data?.upcoming ?? []}
+              viewer="teacher"
+            />
             {substitutions.length > 0 && (
               <div className="px-5 pt-4">
                 <h2 className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">

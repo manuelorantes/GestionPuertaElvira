@@ -313,7 +313,7 @@ function SessionsSection({ teacherId }: { teacherId: string }) {
   const sessions = useSessions(month, teacherId);
   // De lo más reciente a lo más antiguo, salvo que se elija otra columna.
   const { header, apply } = useTableSort(SESSION_COLUMNS, { key: 'date', descending: true });
-  const items = sessions.data ?? [];
+  const items = sessions.data?.items ?? [];
   const total = items.reduce((sum, s) => sum + s.minutes, 0);
   return (
     <Section title="Clases dadas">
@@ -328,7 +328,7 @@ function SessionsSection({ teacherId }: { teacherId: string }) {
           {items.length} sesiones · {hoursLabel(total)}
         </span>
       </div>
-      <SessionsCalendar month={month} sessions={items} />
+      <SessionsCalendar month={month} sessions={items} upcoming={sessions.data?.upcoming ?? []} />
       {items.length === 0 ? (
         <Empty>Sin sesiones en {monthLabel(month).toLowerCase()}.</Empty>
       ) : (

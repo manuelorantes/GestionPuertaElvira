@@ -692,13 +692,19 @@ describe('Profesorado', () => {
     );
   });
 
-  it('shows on a calendar the hours given each day, its own classes apart from substitutions', async () => {
+  it('shows on a calendar the hours given each day, its own classes apart from substitutions and what is still to give', async () => {
     const month = currentMonth();
     // Lunes, martes y miércoles de la primera semana entera del mes.
     const monday = [1, 2, 3, 4, 5, 6, 7].find(
       (d) => new Date(`${month}-0${d}T12:00:00`).getDay() === 1,
     ) as number;
-    const [first, second, third] = [monday, monday + 1, monday + 2];
+    const [first, second, third, fourth, fifth] = [0, 1, 2, 3, 4].map((n) => monday + n) as [
+      number,
+      number,
+      number,
+      number,
+      number,
+    ];
     const date = (d: number) => `${month}-${String(d).padStart(2, '0')}`;
     api({
       'GET /api/admin/payroll/teachers/t1/report': [
@@ -726,13 +732,17 @@ describe('Profesorado', () => {
             session({ id: 's3', date: date(first), substitution: true, countedMinutes: 90 }),
             session({ id: 's4', date: date(second), substitution: true, countedMinutes: 60 }),
           ],
+          upcoming: [
+            { date: date(fourth), label: 'Iniciación A', minutes: 60, substitution: false },
+            { date: date(fifth), label: 'Adultos I', minutes: 90, substitution: true },
+          ],
         },
       ],
     });
     renderApp('/panel/profesores/t1');
 
     const calendar = await screen.findByRole('table', {
-      name: `Calendario de clases dadas en ${monthLabel(month).toLowerCase()}`,
+      name: `Calendario de clases de ${monthLabel(month).toLowerCase()}`,
     });
     const day = (n: number) =>
       within(calendar).getByRole('cell', { name: new RegExp(`^Día ${n}(\\D|$)`) });
@@ -747,9 +757,18 @@ describe('Profesorado', () => {
     expect(day(first).querySelector('[data-kind="own"]')).toHaveClass('bg-brand');
     // Un día sin clases dadas (también cuando le sustituyeron) no lleva horas.
     expect(day(third)).not.toHaveTextContent(' h');
+    // Lo que aún le queda por dar, en los tonos claros: verde sus clases, gris las sustituciones.
+    expect(day(fourth)).toHaveTextContent('1 h previstas de sus clases');
+    expect(day(fourth).querySelector('[data-kind="upcomingOwn"]')).toHaveClass('bg-brand-soft');
+    expect(day(fifth)).toHaveTextContent('1,5 h previstas de sustitución');
+    expect(day(fifth).querySelector('[data-kind="upcomingSubstitution"]')).toHaveClass(
+      'bg-ink-muted',
+    );
     const legend = screen.getByRole('list', { name: 'Leyenda del calendario' });
     expect(legend).toHaveTextContent('Sus clases');
     expect(legend).toHaveTextContent('Sustituciones');
+    expect(legend).toHaveTextContent('Sus clases previstas');
+    expect(legend).toHaveTextContent('Sustituciones previstas');
     // Sin clases en fin de semana, el calendario va de lunes a viernes.
     expect(within(calendar).queryByRole('columnheader', { name: 'Sáb' })).not.toBeInTheDocument();
   });

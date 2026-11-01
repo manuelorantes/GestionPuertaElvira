@@ -509,6 +509,7 @@ describe('Mis horas', () => {
               substitution: false,
             },
           ],
+          upcoming: [{ date: day(14), label: 'Iniciación B', minutes: 60, substitution: false }],
           substitutions: [
             {
               date: day(14),
@@ -539,13 +540,16 @@ describe('Mis horas', () => {
     expect(labels.indexOf('Mis horas')).toBe(labels.indexOf('Alumnos') + 1);
     expect(labels.indexOf('Mis pagos')).toBe(labels.indexOf('Mis horas') + 1);
 
-    const calendar = await screen.findByRole('table', { name: /Calendario de clases dadas/ });
+    const calendar = await screen.findByRole('table', { name: /Calendario de clases de/ });
     const cell = within(calendar).getByText('14', { exact: false }).closest('td');
     expect(cell).toHaveTextContent('2 h de mis clases');
     expect(cell).toHaveTextContent('1,5 h de sustitución');
-    expect(screen.getByRole('list', { name: 'Leyenda del calendario' })).toHaveTextContent(
-      'Mis clases',
-    );
+    // Lo que aún le queda por dar, en verde claro.
+    expect(cell).toHaveTextContent('1 h previstas de mis clases');
+    expect(cell?.querySelector('[data-kind="upcomingOwn"]')).toHaveClass('bg-brand-soft');
+    const legend = screen.getByRole('list', { name: 'Leyenda del calendario' });
+    expect(legend).toHaveTextContent('Mis clases');
+    expect(legend).toHaveTextContent('Mis clases previstas');
 
     const notes = screen.getByRole('list', { name: 'Sustituciones del mes' });
     const [gave, received] = within(notes).getAllByRole('listitem');
