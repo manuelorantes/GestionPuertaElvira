@@ -180,15 +180,21 @@ export type TeacherSessionView = Pick<
 export interface TeacherHoursView {
   month: string;
   sessions: TeacherSessionView[];
+  /** Lo que aún le queda por dar ese mes según el horario (ver `UpcomingSessions`). */
+  upcoming: UpcomingSessionView[];
   /** Los días en que sustituyó a otro o le sustituyeron, del primero al último. */
   substitutions: TeacherSubstitutionView[];
 }
 
-/** Mis horas: las sesiones de un mes del profesor (lo que cuenta cada una) y sus sustituciones de ese mes. */
+/**
+ * Mis horas: las sesiones de un mes del profesor (lo que cuenta cada una), lo que aún le queda por dar y sus
+ * sustituciones de ese mes.
+ */
 export class TeacherHours {
   constructor(
     private readonly sessions: ListSessions,
     private readonly query: Pick<TeacherReportQuery, 'substitutions'>,
+    private readonly upcoming: UpcomingSessions,
   ) {}
 
   async execute(teacherId: string, month: string): Promise<TeacherHoursView> {
@@ -209,6 +215,7 @@ export class TeacherHours {
         countedMinutes,
         substitution,
       })),
+      upcoming: await this.upcoming.execute(teacherId, period),
       substitutions: [...substitutions].sort((x, y) => x.date.localeCompare(y.date)),
     };
   }
@@ -1549,6 +1556,50 @@ export class TeacherAgenda {
       }
     }
     return items;
+  }
+}
+
+/** Una clase o turno que un profesor todavía no ha dado. */
+export type UpcomingSessionView = Pick<AgendaItem, 'date' | 'label' | 'minutes' | 'substitution'>;
+
+const minutesOfClock = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
+
+/**
+ * Lo que le queda por dar a un profesor en un mes según su agenda (sus clases y turnos, con las sustituciones
+ * planificadas y sin festivos), de hoy a fin de mes: de hoy, solo lo que aún no ha acabado; y nunca lo que ya se le ha
+ * apuntado (al pasar lista o a mano). Nada en los meses ya pasados.
+ */
+export class UpcomingSessions {
+  constructor(
+    private readonly agenda: TeacherAgenda,
+    private readonly timesheets: Pick<TimesheetRepository, 'forMonth'>,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string, month: YearMonth): Promise<UpcomingSessionView[]> {
+    const now = this.clock.now();
+    const today = LocalDate.fromInstant(now);
+    if (month.lastDay().isBefore(today)) return [];
+    const first = month.firstDay().isBefore(today) ? today : month.firstDay();
+    const nowMinutes = minutesOfDayInMadrid(now);
+    const recorded = new Set(
+      (await this.timesheets.forMonth(month))
+        .filter((e) => e.teacher().value === teacherId)
+        .map((e) =>
+          `${e.date.toString()}|${e.source ?? (e.group ? `group:${e.group.value}` : '')}`
+        ),
+    );
+    const items = await this.agenda.execute(
+      teacherId,
+      first.toString(),
+      month.lastDay().toString(),
+    );
+    return items
+      .filter((i) => i.date !== today.toString() || minutesOfClock(i.end) > nowMinutes)
+      .filter((i) =>
+        !recorded.has(`${i.date}|${i.groupId !== null ? `group:${i.groupId}` : `duty:${i.dutyId}`}`)
+      )
+      .map(({ date, label, minutes, substitution }) => ({ date, label, minutes, substitution }));
   }
 }
 

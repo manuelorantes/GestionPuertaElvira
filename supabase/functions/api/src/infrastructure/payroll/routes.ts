@@ -1,4 +1,4 @@
-import { InvalidValue, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
+import { type Clock, InvalidValue, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
 import {
   AddHoliday,
   CancelSubstitution,
@@ -18,7 +18,9 @@ import {
   RemoveHoliday,
   SaveDuty,
   SubstituteTeacher,
+  TeacherAgenda,
   TeacherReport,
+  UpcomingSessions,
   UpdateSession,
 } from '../../application/payroll/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
@@ -40,8 +42,22 @@ import {
   SqlTeacherReportQuery,
   SqlTimesheetRepository,
 } from '../persistence/payroll.ts';
-import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
+import { PostgresAdvisoryLocks, SavepointTransactionRunner, type Sql } from '../persistence/sql.ts';
 import { dutyKindFromName } from '../../domain/payroll/mod.ts';
+
+/** Lo que le queda por dar a un profesor en un mes (en la ficha del profesor y en Mis horas). */
+export function upcomingSessions(sql: Sql, clock: Clock): UpcomingSessions {
+  return new UpcomingSessions(
+    new TeacherAgenda(
+      new SqlScheduleDirectory(sql),
+      new SqlDutyRepository(sql),
+      new SqlSubstitutionRepository(sql),
+      new SqlHolidayCalendar(sql),
+    ),
+    new SqlTimesheetRepository(sql),
+    clock,
+  );
+}
 
 /** Casos de uso de nómina montados sobre la transacción de la petición. */
 function payroll(api: ApiApp, scope: RequestScope) {
@@ -138,6 +154,10 @@ export function registerPayrollRoutes(api: ApiApp): void {
     return c.json({
       month: period.toString(),
       items: await new ListSessions(p.query).execute(period, teacher ? teacher : null),
+      // Lo que aún le queda por dar ese mes, solo al mirar un profesor.
+      upcoming: teacher
+        ? await upcomingSessions(scope.tx, api.deps.clock).execute(teacher, period)
+        : [],
     });
   });
 
