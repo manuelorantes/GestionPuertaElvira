@@ -2,17 +2,29 @@ import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import type { ClassGroup } from '@/features/classes/api';
+import {
+  FULL_FIRST_MONTH,
+  type FirstMonthPayload,
+  firstMonthPayload,
+  type FirstMonthValue,
+} from '@/features/students/firstMonth';
 import { todayIso } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { DateField } from '@/shared/ui/DateField';
 import { Dialog } from '@/shared/ui/Dialog';
 
+import { FirstMonthFeeField } from './FirstMonthFeeField';
+
 interface RejoinDialogProps {
   name: string;
   groups: ClassGroup[];
   onClose: () => void;
-  onRejoin: (date: string, groupIds: string[]) => Promise<unknown>;
+  onRejoin: (
+    date: string,
+    groupIds: string[],
+    firstMonth: FirstMonthPayload | undefined,
+  ) => Promise<unknown>;
 }
 
 /**
@@ -22,6 +34,8 @@ interface RejoinDialogProps {
 export function RejoinDialog({ name, groups, onClose, onRejoin }: RejoinDialogProps) {
   const [date, setDate] = useState(todayIso());
   const [chosen, setChosen] = useState<string[]>([]);
+  const [firstMonth, setFirstMonth] = useState<FirstMonthValue>(FULL_FIRST_MONTH);
+  const firstMonthChoice = firstMonthPayload(firstMonth, date, chosen.length > 0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const year = new Date().getFullYear();
@@ -35,10 +49,11 @@ export function RejoinDialog({ name, groups, onClose, onRejoin }: RejoinDialogPr
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!date) return setError('Indica la fecha de alta.');
+    if (firstMonthChoice === 'invalid') return setError('Indica cuánto paga de este mes.');
     setBusy(true);
     setError(null);
     try {
-      await onRejoin(date, chosen);
+      await onRejoin(date, chosen, firstMonthChoice);
     } catch (failure) {
       setError(apiErrorMessage(failure));
     } finally {
@@ -89,6 +104,12 @@ export function RejoinDialog({ name, groups, onClose, onRejoin }: RejoinDialogPr
             y su historial.
           </p>
         </fieldset>
+        <FirstMonthFeeField
+          joinedOn={date}
+          hasClasses={chosen.length > 0}
+          value={firstMonth}
+          onChange={setFirstMonth}
+        />
         <div className="flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
