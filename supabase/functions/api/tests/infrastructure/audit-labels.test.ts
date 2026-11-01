@@ -11,6 +11,7 @@ const NOT_CHANGING_DATA = [
   'POST /api/admin/groups/resolve-schedule',
   'POST /api/admin/billing/quote',
   'POST /api/admin/import/preview',
+  'POST /api/admin/accounting/reconciliation',
   'POST /api/admin/audit/actions/:id/undo',
   'POST /api/admin/audit/actions/:id/restore',
 ];

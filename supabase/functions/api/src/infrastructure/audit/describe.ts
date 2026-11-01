@@ -202,6 +202,10 @@ export function titleOf(
       return monthLabel(text(row, 'period'));
     case 'accounting_invoice':
       return join(text(row, 'number'), text(row, 'supplier'));
+    case 'accounting_bank_match':
+      return join(text(row, 'concept'), dateLabel(text(row, 'operation_date')));
+    case 'accounting_bank_rule':
+      return text(row, 'counterparty');
     case 'accounting_transfer':
       return join(
         `${accountName(text(row, 'from_account'))} → ${accountName(text(row, 'to_account'))}`,
