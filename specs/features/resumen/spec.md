@@ -14,9 +14,12 @@ El resumen MUST mostrar:
 - el margen previsto del mes: las cuotas del mes en curso (cobradas y previstas) menos sus gastos fijos (anotados y
   previstos), las mismas cifras que el mes en curso de «Cuotas vs gastos fijos», con el detalle debajo
   (p. ej. «3920 € de cuotas · 2100 € de gastos fijos»);
-- los socios activos (de alta hoy) y, debajo, cuántos se han dado de alta este mes (p. ej. «107» y «+6 este mes»);
-- los socios en clases (de alta hoy y en al menos una clase) y, debajo, cuántos han empezado este mes a tener
-  clase: los que su inscripción vigente más antigua empieza en el mes (p. ej. «92» y «+4 este mes»).
+- los socios activos (de alta hoy) y, debajo, cuántos más o menos hay que al empezar el mes:
+  las altas menos las bajas (p. ej. «107» y «+6 este mes», o «-1 este mes»);
+- los socios en clases (de alta hoy y en al menos una clase) y, debajo, cuántos más o menos hay
+  que al empezar el mes (p. ej. «92» y «+4 este mes»).
+
+Si la cifra no ha cambiado en el mes, debajo no se pone nada (nunca «+0 este mes»).
 
 #### Scenario: Saldo y margen
 - **WHEN** el ejercicio arrastra 14.100 € y en lo que va de temporada han entrado 5.000 € y salido 3.760 €
