@@ -96,6 +96,33 @@ En los meses futuros, además de las cuotas ya cobradas por adelantado, MUST mos
 esperada de cada alumno activo ese mes que aún no la tenga (con la tarifa de hoy). Las previstas no se guardan: pasan a
 ser cuotas al cobrarlas o al llegar el mes.
 
+### Requirement: Cuota del mes de un alta tardía
+Al dar de alta (o de alta de nuevo) a un alumno con clases con fecha del día 16 en adelante del mes en curso
+(en la temporada), administración MUST elegir qué paga de ese mes:
+«El mes completo» (por defecto), «Una parte» o «Nada este mes».
+Con «Una parte», la cuota de ese mes MUST quedar fijada a mano en el importe indicado
+(más de 0 € y menos que la cuota) con el motivo «Alta el dd/mm: parte del mes».
+Con «Nada este mes», ese mes MUST quedar sin cuota en ningún sitio (ni cancelada ni prevista):
+la tarea de cada noche no la crea, «Registrar cobro» empieza por el mes siguiente y no cuenta en las sumas.
+Si la elección no vale, el alta no se guarda.
+Del día 1 al 15, o con fecha de un mes anterior, no se pregunta: se cobra el mes entero.
+
+Al cambiar la fecha de alta a un mes posterior, las cuotas mensuales de los meses que ya no le tocan MUST borrarse
+y lo que cubrían sus cobros pasa a los meses siguientes, con el concepto del recibo recalculado
+(un cobro de «Septiembre 2026» pasa a «Octubre 2026»).
+
+#### Scenario: Alta el día 20 pagando una parte
+- **WHEN** administración da de alta el día 20 de noviembre a una alumna con clases y elige «Una parte» con 20 €
+- **THEN** su cuota de noviembre queda fijada a mano en 20 € con el motivo «Alta el 20/11: parte del mes»
+
+#### Scenario: Alta el día 20 sin pagar ese mes
+- **WHEN** administración da de alta el día 20 de noviembre a un alumno con clases y elige «Nada este mes»
+- **THEN** no tiene cuota de noviembre en ningún sitio y su primer cobro es el de diciembre
+
+#### Scenario: Empezó un mes más tarde
+- **WHEN** administración cambia la fecha de alta de un alumno del 1/9 al 1/10 y tenía cobrado septiembre
+- **THEN** su cuota de septiembre desaparece y ese cobro pasa a cubrir octubre, con el concepto «Octubre 2026»
+
 #### Scenario: Alta a mitad de mes
 - **WHEN** administración da de alta el día 15 a una alumna en un grupo
 - **THEN** su cuota de ese mes aparece al momento en «Cuotas», sin esperar a la noche

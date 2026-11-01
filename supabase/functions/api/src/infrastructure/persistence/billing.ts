@@ -127,6 +127,7 @@ function toAccount(row: Row): StudentAccount {
     preferredPlanFromName(row.string('preferred_plan')),
     row.bool('member'),
     rate === null ? null : Money.cents(rate),
+    row.stringList('unbilled_months').map((m) => YearMonth.fromString(m)),
   );
 }
 
@@ -151,10 +152,11 @@ export class SqlStudentAccountRepository implements StudentAccountRepository {
       preferred_plan: account.preferredPlan(),
       member: account.isMember(),
       private_rate_cents: account.privateRate()?.cents ?? null,
+      unbilled_months: this.sql.json(account.unbilledMonths().map((m) => m.toString())),
     };
     await this.sql`INSERT INTO billing_account ${this.sql(record)}
       ON CONFLICT (student_id) DO UPDATE SET ${
-      this.sql(record, 'preferred_plan', 'member', 'private_rate_cents')
+      this.sql(record, 'preferred_plan', 'member', 'private_rate_cents', 'unbilled_months')
     }`;
   }
 }
@@ -379,7 +381,7 @@ export class SqlPaymentRepository implements PaymentRepository {
     };
     await this.sql`INSERT INTO billing_payment ${this.sql(record)}
       ON CONFLICT (id) DO UPDATE SET method = EXCLUDED.method, paid_on = EXCLUDED.paid_on,
-        lines = EXCLUDED.lines, total_cents = EXCLUDED.total_cents, credit_cents = EXCLUDED.credit_cents,
+        concept = EXCLUDED.concept, periods = EXCLUDED.periods, lines = EXCLUDED.lines, total_cents = EXCLUDED.total_cents, credit_cents = EXCLUDED.credit_cents,
         invoice_number = EXCLUDED.invoice_number, invoice = EXCLUDED.invoice`;
   }
 }
