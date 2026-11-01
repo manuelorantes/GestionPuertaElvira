@@ -20,7 +20,10 @@ import {
   type EnrolmentSnapshot,
   groupsAroundAction,
   type GroupStay,
+  STUDENT_HISTORY_TABLES,
   type StudentGroupsAround,
+  type StudentHistoryEntry,
+  type StudentHistoryPage,
 } from '../../application/audit/mod.ts';
 import {
   type AuditRow,
@@ -259,26 +262,7 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
     }
     await names.resolve();
     const name = (kind: AuditReferenceKind, id: string) => names.label(kind, id);
-    const changes = raw.map(({ table, key, operation, before, after }): AuditChangeView => {
-      const fields: AuditChangeView['fields'] = [];
-      for (const field of new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])) {
-        if (SECRET.test(field) || isHiddenField(field)) continue;
-        const old = before?.[field] ?? null;
-        const fresh = after?.[field] ?? null;
-        if (operation !== 'U' || JSON.stringify(old) !== JSON.stringify(fresh)) {
-          fields.push({ field, before: old, after: fresh });
-        }
-      }
-      return {
-        table,
-        tableLabel: AuditLabels.table(table),
-        title: titleOf(table, after ?? before ?? {}, name),
-        key,
-        operation,
-        fields,
-        target: auditTarget(table, operation, before, after),
-      };
-    });
+    const changes = raw.map((change) => changeView(change, name));
     const named = (stays: GroupStay[]) =>
       stays
         .map((stay) => ({ ...stay, groupName: name('group', stay.groupId) ?? 'Grupo borrado' }))
@@ -290,6 +274,74 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
       after: named(s.after),
     }));
     return { changes, references: names.references(), studentGroups };
+  }
+
+  async studentHistory(
+    studentId: string,
+    beforeSeq: number | null,
+    limit: number,
+  ): Promise<StudentHistoryPage> {
+    const size = Math.max(1, Math.min(100, limit));
+    // Sus cambios: su fila, y las de sus periodos de alta, inscripciones y datos de cobro.
+    const rows = await this.sql.unsafe(
+      `SELECT a.id AS action_id, a.seq, a.label, a.user_name, a.occurred_at,
+              c.table_name, c.row_key, c.operation, c.before, c.after
+         FROM audit_change c JOIN audit_action a ON a.id = c.action_id
+        WHERE a.kind <> 'security'
+          AND a.seq IN (
+            SELECT DISTINCT x.seq FROM audit_change y JOIN audit_action x ON x.id = y.action_id
+             WHERE x.kind <> 'security' AND y.table_name = ANY($2::text[])
+               AND (y.row_key->>'id' = $1 AND y.table_name = 'students_student'
+                    OR COALESCE(y.after, y.before)->>'student_id' = $1)
+               AND ($3::bigint IS NULL OR x.seq < $3::bigint)
+             ORDER BY x.seq DESC LIMIT $4)
+          AND c.table_name = ANY($2::text[])
+          AND (c.row_key->>'id' = $1 AND c.table_name = 'students_student'
+               OR COALESCE(c.after, c.before)->>'student_id' = $1)
+        ORDER BY a.seq DESC, c.id`,
+      [studentId, [...STUDENT_HISTORY_TABLES], beforeSeq, size + 1],
+    );
+    const names = new AuditNames(this.sql);
+    const entries = new Map<number, { entry: StudentHistoryEntry; raw: RawChange[] }>();
+    for (const row of Row.all(rows)) {
+      const seq = row.int('seq');
+      const change: RawChange = {
+        table: row.string('table_name'),
+        key: (row.json('row_key') ?? {}) as AuditRow,
+        operation: row.string('operation'),
+        before: row.json('before') as AuditRow | null,
+        after: row.json('after') as AuditRow | null,
+      };
+      for (const snapshot of [change.before, change.after]) {
+        for (const ref of referencesOf(snapshot ?? {})) names.want(ref.kind, ref.id);
+      }
+      const found = entries.get(seq) ?? {
+        entry: {
+          id: row.string('action_id'),
+          seq,
+          label: row.string('label'),
+          userName: row.string('user_name'),
+          occurredAt: madridIso(row.date('occurred_at')),
+          changes: [],
+        },
+        raw: [],
+      };
+      found.raw.push(change);
+      entries.set(seq, found);
+    }
+    await names.resolve();
+    const name = (kind: AuditReferenceKind, id: string) => names.label(kind, id);
+    const all = [...entries.values()].map(({ entry, raw }) => ({
+      ...entry,
+      // Un cambio que solo tocó columnas internas no dice nada.
+      changes: raw.map((c) => changeView(c, name)).filter((c) => c.fields.length > 0),
+    }));
+    const page = all.slice(0, size);
+    return {
+      items: page.filter((e) => e.changes.length > 0),
+      references: names.references(),
+      nextBefore: all.length > size ? (page.at(-1)?.seq ?? null) : null,
+    };
   }
 
   /**
@@ -456,6 +508,40 @@ export class SqlAuditLog implements AuditLog, AuditReverter {
 }
 
 /** Una inscripción tal como la guarda el historial (o la tabla), con solo lo que dice en qué grupo está quién. */
+
+interface RawChange {
+  table: string;
+  key: AuditRow;
+  operation: string;
+  before: AuditRow | null;
+  after: AuditRow | null;
+}
+
+/** Un cambio tal como se enseña: los campos que cambiaron (sin secretos ni columnas internas) y cómo se llama. */
+function changeView(
+  { table, key, operation, before, after }: RawChange,
+  name: (kind: AuditReferenceKind, id: string) => string | null,
+): AuditChangeView {
+  const fields: AuditChangeView['fields'] = [];
+  for (const field of new Set([...Object.keys(before ?? {}), ...Object.keys(after ?? {})])) {
+    if (SECRET.test(field) || isHiddenField(field)) continue;
+    const old = before?.[field] ?? null;
+    const fresh = after?.[field] ?? null;
+    if (operation !== 'U' || JSON.stringify(old) !== JSON.stringify(fresh)) {
+      fields.push({ field, before: old, after: fresh });
+    }
+  }
+  return {
+    table,
+    tableLabel: AuditLabels.table(table),
+    title: titleOf(table, after ?? before ?? {}, name),
+    key,
+    operation,
+    fields,
+    target: auditTarget(table, operation, before, after),
+  };
+}
+
 function enrolmentSnapshot(row: AuditRow): EnrolmentSnapshot {
   const date = (field: string) =>
     typeof row[field] === 'string' ? (row[field] as string).slice(0, 10) : null;

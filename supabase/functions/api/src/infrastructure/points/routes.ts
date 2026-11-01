@@ -74,6 +74,21 @@ export function registerPointsRoutes(api: ApiApp, storage: PhotoStorage): void {
     });
   });
 
+  // Historial de puntos de un alumno en su ficha (la temporada en curso): lo ve quien ve la ficha.
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/students/:id/points', access: 'clubReader' },
+    async (c, scope) => {
+      const season = seasonOf(monthOf(undefined));
+      return c.json({
+        items: await query(scope).movements(
+          season.firstMonth().firstDay(),
+          season.lastMonth().lastDay(),
+          { kind: null, student: param(c, 'id') },
+        ),
+      });
+    },
+  );
+
   api.defineRoute(admin('POST', '/api/admin/points/adjustments'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
     await new AdjustPointsByHand(movements(scope), students(scope), clock).execute(

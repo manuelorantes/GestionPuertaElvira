@@ -1,4 +1,5 @@
 import { parseUuid } from '../../domain/common/mod.ts';
+import { StudentRef } from '../../domain/billing/mod.ts';
 import {
   AuditActionNotFound,
   auditCategoryFrom,
@@ -32,6 +33,23 @@ export function registerAuditRoutes(api: ApiApp): void {
     path,
     access: 'auditReader' as const,
   });
+
+  // Historial de un alumno en su ficha: lo que cambió de sus datos, sus altas y bajas, sus grupos y sus datos de cobro.
+  // Solo superadministración. ?before= (seq) y ?limit= para ver los anteriores.
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/students/:id/history', access: 'superadmin' },
+    async (c, scope) => {
+      const before = Number(c.req.query('before'));
+      const limit = Number(c.req.query('limit'));
+      return c.json(
+        await log(scope).studentHistory(
+          StudentRef.fromString(param(c, 'id')).value,
+          Number.isInteger(before) && before > 0 ? before : null,
+          Number.isInteger(limit) && limit > 0 ? limit : 20,
+        ),
+      );
+    },
+  );
 
   // ?section=students|payments|attendance (sin ella, todo) y ?period=today|week|month|all (sin él, todo).
   // ?category= (repetible) deja solo esas categorías; `categories` dice cuáles hay y cuántas, sin contar ese filtro.

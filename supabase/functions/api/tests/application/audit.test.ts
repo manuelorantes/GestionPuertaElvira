@@ -16,6 +16,7 @@ import {
   NothingToUndo,
   periodStart,
   RestoreToPoint,
+  type StudentHistoryPage,
   UndoAction,
   UndoConflict,
 } from '../../src/application/audit/mod.ts';
@@ -67,6 +68,10 @@ class FakeAudit implements AuditLog, AuditReverter {
 
   changes(): Promise<AuditDetail> {
     return Promise.resolve({ changes: [], references: {}, studentGroups: [] });
+  }
+
+  studentHistory(): Promise<StudentHistoryPage> {
+    return Promise.resolve({ items: [], references: {}, nextBefore: null });
   }
 
   people(): Promise<{ id: string; name: string }[]> {
