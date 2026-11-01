@@ -66,14 +66,6 @@ export interface ClubSummaryView {
   latest: LedgerLine[];
 }
 
-/**
- * Cuotas mensuales para el gráfico de la temporada: no por cuándo se cobran, sino por el mes al que corresponden.
- */
-export interface FeeIncome {
-  /** Cada cobro de cuotas mensuales repartido a partes iguales entre los meses que paga. */
-  earnedByMonth(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
-}
-
 /** Lo que costará el profesorado cada mes según el horario, a la tarifa de hoy (céntimos por «AAAA-MM»). */
 export interface ExpectedPayroll {
   between(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
@@ -99,7 +91,6 @@ export class ClubSummary {
     private readonly students: StudentQuery,
     private readonly classes: ClassQuery,
     private readonly clock: Clock,
-    private readonly fees: FeeIncome,
     private readonly settings: AccountingSettingsRepository,
     private readonly expectedPayroll: ExpectedPayroll,
     private readonly fiscalYear: FiscalYearSummary,
@@ -203,8 +194,8 @@ export class ClubSummary {
     };
   }
   /**
-   * Las categorías «del mes», cada movimiento en los meses a los que corresponde. Las cuotas mensuales, repartidas entre los
-   * meses que paga cada cobro; y lo que falta por cobrar de las cuotas de cada mes: las emitidas y pendientes (lo
+   * Las categorías «del mes», cada movimiento en los meses a los que corresponde. De las cuotas mensuales de cada mes, lo
+   * que tienen cubierto (cobrado, sea cual sea el recibo que lo pagó) y lo que les falta: las emitidas y pendientes (lo
    * cancelado no se debe) y, en los meses que vienen, las previstas de los alumnos matriculados hoy. Del mes en curso
    * en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes; en los
    * meses ya pasados, lo que aún se le debe (sus liquidaciones sin pagar), que no se va al cambiar de mes; y, en
@@ -219,9 +210,6 @@ export class ClubSummary {
   ): Promise<MonthFeeBars[]> {
     const categories = await this.settings.monthlyCategories();
     const withFees = categories.includes('fees');
-    const earned = withFees
-      ? await this.fees.earnedByMonth(first, last)
-      : new Map<string, number>();
     const payroll = categories.includes('teachers') && !last.isBefore(current)
       ? await this.expectedPayroll.between(current.isBefore(first) ? first : current, last)
       : new Map<string, number>();
@@ -239,7 +227,7 @@ export class ClubSummary {
     }
     const bars = new Map(
       months.map((m) => [m, {
-        income: earned.get(m) ?? 0,
+        income: 0,
         expected: 0,
         expense: 0,
         teachers: 0,
@@ -249,10 +237,15 @@ export class ClubSummary {
       }]),
     );
     if (withFees) {
+      // Las cuotas de cada mes: lo que tienen cubierto (cobrado) y lo que les falta, sea cual sea el recibo que lo pagó.
       for (const [month, bar] of bars) {
-        bar.expected = (await this.charges.execute(month, 'monthly')).items
-          .filter((charge) => charge.kind === 'monthly')
-          .reduce((total, c) => total + Math.max(0, c.amountCents - c.coveredCents), 0);
+        const fees = (await this.charges.execute(month, 'monthly')).items
+          .filter((charge) => charge.kind === 'monthly');
+        bar.income = fees.reduce((total, c) => total + Math.min(c.coveredCents, c.amountCents), 0);
+        bar.expected = fees.reduce(
+          (total, c) => total + Math.max(0, c.amountCents - c.coveredCents),
+          0,
+        );
       }
     }
     for (const line of lines) {
