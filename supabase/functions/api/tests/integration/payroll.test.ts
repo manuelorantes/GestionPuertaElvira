@@ -9,6 +9,14 @@ import { runCommand } from '../../scripts/console.ts';
 const today = LocalDate.fromInstant(new Date()).toString();
 const month = today.slice(0, 7);
 const outsideSeason = Season.teachingSeason(YearMonth.fromString(month)) === null;
+// Las horas del mes salen de las clases ya pasadas (de lunes a viernes): los primeros días del mes puede no haber.
+const noPastWeekdayYet = (() => {
+  const start = LocalDate.fromString(today).startOfMonth();
+  for (let day = start; day.isBefore(LocalDate.fromString(today)); day = day.plusDays(1)) {
+    if (day.isoWeekday() <= 5) return false;
+  }
+  return true;
+})();
 
 async function fixture(): Promise<{ client: ApiClient; teacher: string }> {
   await resetDatabase();
@@ -36,7 +44,7 @@ const proposeSessions = () =>
 
 Deno.test({
   name: 'payroll should propose, edit and settle the sessions of the month',
-  ignore: outsideSeason,
+  ignore: outsideSeason || noPastWeekdayYet,
   async fn() {
     const { client, teacher } = await fixture();
     const list = async () =>
