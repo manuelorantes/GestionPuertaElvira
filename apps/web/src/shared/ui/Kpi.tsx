@@ -9,7 +9,8 @@ export function Kpi({
 }: {
   label: string;
   value: string;
-  hint: string;
+  /** Sin él, la tarjeta solo muestra la cifra. */
+  hint?: string | undefined;
   accent?: boolean;
 }) {
   return (
@@ -22,7 +23,7 @@ export function Kpi({
       )}
       <p className="relative text-[13px] font-medium text-ink-muted">{label}</p>
       <p className="relative mt-1 font-display text-[40px] leading-tight font-bold">{value}</p>
-      <p className="relative text-[13px] text-ink-muted">{hint}</p>
+      {hint && <p className="relative text-[13px] text-ink-muted">{hint}</p>}
     </Card>
   );
 }
