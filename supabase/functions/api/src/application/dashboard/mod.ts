@@ -79,6 +79,11 @@ export interface ExpectedPayroll {
   between(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
 }
 
+/** Lo que aún se debe al profesorado de cada mes: sus liquidaciones sin pagar (céntimos por «AAAA-MM»). */
+export interface PendingPayroll {
+  between(first: YearMonth, last: YearMonth): Promise<Map<string, number>>;
+}
+
 /**
  * Resumen del club con cifras reales: lo compone a partir de Cobros, Contabilidad, Alumnado y Clases.
  */
@@ -99,6 +104,7 @@ export class ClubSummary {
     private readonly expectedPayroll: ExpectedPayroll,
     private readonly fiscalYear: FiscalYearSummary,
     private readonly expected: ExpectedExpenseRepository,
+    private readonly pendingPayroll: PendingPayroll,
   ) {}
 
   /**
@@ -200,7 +206,8 @@ export class ClubSummary {
    * Las categorías «del mes», cada movimiento en los meses a los que corresponde. Las cuotas mensuales, repartidas entre los
    * meses que paga cada cobro; y lo que falta por cobrar de las cuotas de cada mes: las emitidas y pendientes (lo
    * cancelado no se debe) y, en los meses que vienen, las previstas de los alumnos matriculados hoy. Del mes en curso
-   * en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes; y, en
+   * en adelante, lo que costará el profesorado según el horario menos lo suyo que ya está en el libro ese mes; en los
+   * meses ya pasados, lo que aún se le debe (sus liquidaciones sin pagar), que no se va al cambiar de mes; y, en
    * cualquier mes, lo esperado de los gastos esperados de esas categorías que aún no se han pagado ni saltado.
    */
   private async monthChart(
@@ -218,6 +225,10 @@ export class ClubSummary {
     const payroll = categories.includes('teachers') && !last.isBefore(current)
       ? await this.expectedPayroll.between(current.isBefore(first) ? first : current, last)
       : new Map<string, number>();
+    const lastPast = current.previous();
+    const owed = categories.includes('teachers') && !lastPast.isBefore(first)
+      ? await this.pendingPayroll.between(first, last.isBefore(lastPast) ? last : lastPast)
+      : new Map<string, number>();
     const pendingExpected = new Map<string, number>();
     for (const view of await expectedMonths(this.expected, first, last)) {
       if (view.status !== 'pending' || !categories.includes(view.category)) continue;
@@ -234,6 +245,7 @@ export class ClubSummary {
         teachers: 0,
         expectedExpense: payroll.get(m) ?? 0,
         expectedOther: pendingExpected.get(m) ?? 0,
+        owed: owed.get(m) ?? 0,
       }]),
     );
     if (withFees) {
@@ -263,7 +275,7 @@ export class ClubSummary {
         expenseCents: bar?.expense ?? 0,
         expectedCents: bar?.expected ?? 0,
         expectedExpenseCents: Math.max(0, (bar?.expectedExpense ?? 0) - (bar?.teachers ?? 0)) +
-          (bar?.expectedOther ?? 0),
+          (bar?.owed ?? 0) + (bar?.expectedOther ?? 0),
       };
     });
   }

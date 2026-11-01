@@ -866,6 +866,26 @@ export class ExpectedPayroll {
   }
 }
 
+/**
+ * Lo que aún se debe al profesorado de cada mes ya pasado: lo que queda por pagar (importe menos anticipos) de sus
+ * liquidaciones pendientes. Sigue previsto hasta que se paga cada liquidación; entonces ya está en el libro.
+ */
+export class PendingPayroll {
+  constructor(private readonly settlements: ListSettlements) {}
+
+  /** Céntimos por mes («AAAA-MM»), de `first` a `last`. */
+  async between(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    for (let month = first; !last.isBefore(month); month = month.next()) {
+      const pending = (await this.settlements.execute(month.toString()))
+        .filter((s) => s.status === 'pending')
+        .reduce((total, s) => total + Math.max(0, s.toPayCents), 0);
+      result.set(month.toString(), pending);
+    }
+    return result;
+  }
+}
+
 // ---- Sustituciones ---------------------------------------------------------------------------
 
 export class SubstitutionNeedsReason extends Error {
