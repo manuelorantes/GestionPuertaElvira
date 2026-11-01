@@ -221,6 +221,17 @@ describe('Alumnos', () => {
     );
   });
 
+  it('should link each group of the sheet to that group in Clases', async () => {
+    api();
+    renderApp('/panel/alumnos/s1');
+
+    const card = await screen.findByRole('dialog', { name: 'Martina López Herrera' });
+    expect(await within(card).findByRole('link', { name: 'Iniciación A' })).toHaveAttribute(
+      'href',
+      '/panel/clases?grupo=g1',
+    );
+  });
+
   it('should change since when the student is in a group from their sheet', async () => {
     const user = userEvent.setup();
     const spy = api({ 'PUT /api/admin/students/s1/enrolments/g1/start': [204] });

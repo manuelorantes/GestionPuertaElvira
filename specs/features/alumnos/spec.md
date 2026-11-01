@@ -199,6 +199,7 @@ Un alumno MAY estar en varios grupos, pero MUST NOT estar en dos cuyos horarios 
 ni dos veces en el mismo grupo.
 Un alumno MUST poder dejar cualquiera de sus grupos, también el último: sigue de alta, como socio sin clases.
 Quitarle de un grupo desde la ficha MUST pedir confirmación antes.
+En la ficha, el nombre de cada grupo MUST ser un enlace que abre ese grupo en Clases.
 Cada inscripción tiene la fecha desde la que el alumno está en el grupo, que es la que cuenta para sus listas y sus
 cuotas. Al añadir un grupo MUST poder elegirse «Desde» (por defecto hoy), y la ficha MUST mostrar «En el grupo desde» en
 cada grupo y permitir corregirla (por ejemplo, si venía antes de que se le inscribiera). Esa fecha nunca puede ser futura,
