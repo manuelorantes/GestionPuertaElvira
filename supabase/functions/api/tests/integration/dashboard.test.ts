@@ -77,20 +77,36 @@ Deno.test({
       201,
     );
 
+    // Una socia de alta desde antes del mes, sin clase, que se da de baja hoy: resta en «este mes».
+    const eve = LocalDate.fromString(today).startOfMonth().plusDays(-1).toString();
+    const leaving = ((await client.json('POST', '/api/admin/students', {
+      fullName: 'Lucía Pardo Gil',
+      birthDate: '1985-01-20',
+      guardians: [],
+      imageConsent: false,
+      groupIds: [],
+      joinedOn: eve,
+    })).body as { id: string }).id;
+    assertEquals(
+      (await client.json('POST', `/api/admin/students/${leaving}/withdrawal`, { date: today }))
+        .status,
+      204,
+    );
+
     const response = await client.get('/api/admin/dashboard');
     assertEquals(response.status, 200);
     const summary = response.body as Record<string, unknown>;
     // El saldo: sin ejercicios cerrados, lo cobrado (45 €) menos lo gastado (20 € + 30 €).
     assertEquals(summary.balanceCents, -500);
     assertEquals(summary.seasonResultCents, -500);
-    // Las cifras del mes son solo sus cuotas; las cuotas de socio pendientes (una por socio) van aparte.
+    // Las cifras del mes son solo sus cuotas; las cuotas de socio pendientes (una por socio, también la de quien se ha dado de baja) van aparte.
     assertEquals(summary.pendingCents, 0);
-    assertEquals(summary.membershipPendingCents, 10000);
-    // Los dos socios son de este mes; solo uno tiene clase, y empezó este mes.
+    assertEquals(summary.membershipPendingCents, 15000);
+    // Dos altas este mes y una baja: uno más que al empezarlo; solo uno tiene clase, y empezó este mes.
     assertEquals(summary.activeStudents, 2);
-    assertEquals(summary.newStudents, 2);
+    assertEquals(summary.studentsChange, 1);
     assertEquals(summary.studentsInClasses, 1);
-    assertEquals(summary.newInClasses, 1);
+    assertEquals(summary.inClassesChange, 1);
     // Dos gráficas de la temporada, de septiembre a agosto.
     type Chart = {
       month: string;
