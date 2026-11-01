@@ -90,6 +90,7 @@ export function TeacherHoursPage() {
               month={month}
               sessions={sessions}
               upcoming={hours.data?.upcoming ?? []}
+              holidays={hours.data?.holidays ?? []}
               viewer="teacher"
             />
             {substitutions.length > 0 && (
