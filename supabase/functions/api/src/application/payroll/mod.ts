@@ -23,6 +23,7 @@ import {
   SettlementAlreadyPaid,
   SettlementCalculator,
   Substitution,
+  SUBSTITUTION_SUFFIX,
   TeacherRef,
   TimesheetEntry,
   TimesheetEntryId,
@@ -1559,15 +1560,21 @@ export class TeacherAgenda {
   }
 }
 
-/** Una clase o turno que un profesor todavía no ha dado. */
-export type UpcomingSessionView = Pick<AgendaItem, 'date' | 'label' | 'minutes' | 'substitution'>;
+/**
+ * Una clase o turno que un profesor todavía no ha dado, con lo que contará (`countedMinutes`): menos si se pisa con
+ * otra el mismo día, como en la liquidación (ver `overlapShares`).
+ */
+export type UpcomingSessionView =
+  & Pick<AgendaItem, 'date' | 'label' | 'minutes' | 'substitution'>
+  & { countedMinutes: number };
 
 const minutesOfClock = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
 
 /**
  * Lo que le queda por dar a un profesor en un mes según su agenda (sus clases y turnos, con las sustituciones
  * planificadas y sin festivos), de hoy a fin de mes: de hoy, solo lo que aún no ha acabado; y nunca lo que ya se le ha
- * apuntado (al pasar lista o a mano). Nada en los meses ya pasados.
+ * apuntado (al pasar lista o a mano). Lo que se pisa el mismo día (con otra prevista o con una ya apuntada) no cuenta
+ * dos veces. Nada en los meses ya pasados.
  */
 export class UpcomingSessions {
   constructor(
@@ -1582,24 +1589,50 @@ export class UpcomingSessions {
     if (month.lastDay().isBefore(today)) return [];
     const first = month.firstDay().isBefore(today) ? today : month.firstDay();
     const nowMinutes = minutesOfDayInMadrid(now);
-    const recorded = new Set(
-      (await this.timesheets.forMonth(month))
-        .filter((e) => e.teacher().value === teacherId)
-        .map((e) =>
-          `${e.date.toString()}|${e.source ?? (e.group ? `group:${e.group.value}` : '')}`
-        ),
+    const entries = (await this.timesheets.forMonth(month)).filter((e) =>
+      e.teacher().value === teacherId
     );
-    const items = await this.agenda.execute(
+    const recorded = new Set(
+      entries.map((e) =>
+        `${e.date.toString()}|${e.source ?? (e.group ? `group:${e.group.value}` : '')}`
+      ),
+    );
+    const items = (await this.agenda.execute(
       teacherId,
       first.toString(),
       month.lastDay().toString(),
-    );
-    return items
+    ))
       .filter((i) => i.date !== today.toString() || minutesOfClock(i.end) > nowMinutes)
       .filter((i) =>
         !recorded.has(`${i.date}|${i.groupId !== null ? `group:${i.groupId}` : `duty:${i.dutyId}`}`)
-      )
-      .map(({ date, label, minutes, substitution }) => ({ date, label, minutes, substitution }));
+      );
+    // Lo previsto se reparte los minutos solapados con lo demás de su día, previsto o ya apuntado.
+    const days = new Set(items.map((i) => i.date));
+    const shares = overlapShares<AgendaItem | TimesheetEntry>(
+      [...items, ...entries.filter((e) => days.has(e.date.toString()))],
+      (x) =>
+        x instanceof TimesheetEntry
+          ? {
+            day: x.date.toString(),
+            start: x.start,
+            minutes: x.minutes().minutes,
+            substitution: x.label.endsWith(SUBSTITUTION_SUFFIX),
+          }
+          : {
+            day: x.date,
+            start: minutesOfClock(x.start),
+            minutes: x.minutes,
+            substitution: x.substitution,
+          },
+    );
+    const counted = new Map(shares.map((s) => [s.item, s.minutes]));
+    return items.map((i) => ({
+      date: i.date,
+      label: i.label,
+      minutes: i.minutes,
+      countedMinutes: counted.get(i) ?? i.minutes,
+      substitution: i.substitution,
+    }));
   }
 }
 
