@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
@@ -251,7 +251,14 @@ export function StudentSheet({
             {s.groups.map((g) => (
               <li key={g.id} className="flex items-center gap-2 py-2">
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium">{g.name}</p>
+                  <p className="font-medium">
+                    <Link
+                      to={`/panel/clases?grupo=${g.id}`}
+                      className="decoration-1 underline-offset-2 hover:underline"
+                    >
+                      {g.name}
+                    </Link>
+                  </p>
                   <p className="text-[13px] text-ink-muted">{g.slotLabel}</p>
                   {g.attendanceLabel && (
                     <p className="text-[13px] font-medium text-warning-fg">
