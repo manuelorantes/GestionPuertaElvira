@@ -1,5 +1,6 @@
 import type { GroupAttendance } from '@/features/attendance/api';
 import type { ClassComment } from '@/features/class-comments/api';
+import type { UpcomingSession } from '@/features/payroll/api';
 import { apiGet, apiSend } from '@/shared/api/client';
 
 /** Lista pasada (o dada por buena), abierta (se puede pasar ya), aún no (no ha empezado) o sin pasar (acabó el plazo). */
@@ -128,6 +129,8 @@ export interface TeacherSubstitution {
 export interface TeacherHours {
   month: string;
   sessions: TeacherSession[];
+  /** Lo que aún le queda por dar ese mes. */
+  upcoming: UpcomingSession[];
   substitutions: TeacherSubstitution[];
 }
 

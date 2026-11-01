@@ -75,9 +75,24 @@ export interface SessionPayload {
 
 const BASE = '/api/admin/payroll';
 
-export async function fetchSessions(month: string, teacherId: string): Promise<Session[]> {
+/** Una clase o turno que el profesor aún no ha dado ese mes, según el horario. */
+export interface UpcomingSession {
+  date: string;
+  label: string;
+  minutes: number;
+  /** La dará sustituyendo a su titular. */
+  substitution: boolean;
+}
+
+/** Las sesiones del mes y, al mirar un profesor, lo que aún le queda por dar (vacío si no). */
+export interface MonthSessions {
+  items: Session[];
+  upcoming: UpcomingSession[];
+}
+
+export function fetchSessions(month: string, teacherId: string): Promise<MonthSessions> {
   const teacher = teacherId ? `&teacherId=${teacherId}` : '';
-  return (await apiGet<{ items: Session[] }>(`${BASE}/sessions?month=${month}${teacher}`)).items;
+  return apiGet<MonthSessions>(`${BASE}/sessions?month=${month}${teacher}`);
 }
 
 export async function fetchSettlements(month: string): Promise<Settlement[]> {
