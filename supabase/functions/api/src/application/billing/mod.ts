@@ -19,6 +19,8 @@ import {
   InvalidPaymentRequest,
   InvoiceAlreadyIssued,
   InvoiceCustomer,
+  LATE_JOIN_FROM_DAY,
+  lateJoinMonth,
   monthsWithin,
   Payment,
   PaymentId,
@@ -327,6 +329,7 @@ export class GenerateMonthlyCharges {
     for (const student of students) {
       if (charged.has(student.id)) continue;
       const account = accounts.get(student.id) ?? null;
+      if (account !== null && !account.bills(period)) continue;
       const amount = calculator.quote(feeProfileOf(student, account, settings), settings, 1).total;
       if (amount.cents > 0) result.push({ student, amount });
     }
@@ -353,7 +356,7 @@ export class GenerateMonthlyCharges {
     for (const student of students) {
       const ref = StudentRef.fromString(student.id);
       const account = accounts.get(student.id) ?? null;
-      if (!monthly.has(student.id)) {
+      if (!monthly.has(student.id) && (account === null || account.bills(period))) {
         const amount =
           calculator.quote(feeProfileOf(student, account, settings), settings, 1).total;
         if (amount.cents > 0) {
@@ -375,6 +378,107 @@ export class GenerateMonthlyCharges {
       }
     }
   }
+}
+
+/** Qué se cobra del mes de un alta a final de mes (ver `lateJoinMonth`). */
+export type FirstMonthChoice =
+  | { kind: 'full' }
+  | { kind: 'part'; amount: Money }
+  | { kind: 'none' };
+
+/**
+ * Aplica lo elegido para la cuota del mes en un alta del día 16 en adelante, ya creada su cuota: entera (no cambia),
+ * una parte (queda fijada a mano con el motivo) o nada (ese mes no tiene cuota y no se le vuelve a crear).
+ */
+export class ChooseFirstMonthFee {
+  constructor(
+    private readonly accounts: StudentAccountRepository,
+    private readonly charges: ChargeRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string, joinedOn: string, choice: FirstMonthChoice): Promise<void> {
+    const joined = LocalDate.fromString(joinedOn);
+    const month = lateJoinMonth(joined, LocalDate.fromInstant(this.clock.now()));
+    if (choice.kind === 'full') return;
+    if (month === null) {
+      throw new InvalidValue(
+        'firstMonth',
+        `Solo se elige qué se cobra del mes en un alta del día ${LATE_JOIN_FROM_DAY} en adelante del mes en curso.`,
+      );
+    }
+    const ref = StudentRef.fromString(studentId);
+    const charge = await this.charges.chargeFor(ref, 'monthly', month);
+    if (choice.kind === 'none') {
+      const account = (await this.accounts.account(ref)) ?? StudentAccount.open(ref);
+      account.skipMonth(month);
+      await this.accounts.saveAccount(account);
+      if (charge !== null) await this.charges.deleteCharge(charge.id);
+      return;
+    }
+    if (charge === null) {
+      throw new InvalidValue(
+        'firstMonth',
+        `No tiene cuota de ${month.label()} de la que pagar una parte.`,
+      );
+    }
+    if (choice.amount.cents <= 0 || choice.amount.cents >= charge.amount.cents) {
+      throw new InvalidValue(
+        'firstMonth',
+        `La parte del mes debe ser de más de 0 € y menos que la cuota (${
+          charge.amount.cents / 100
+        } €).`,
+      );
+    }
+    const day = `${String(joined.day).padStart(2, '0')}/${String(joined.month).padStart(2, '0')}`;
+    charge.adjust(choice.amount, `Alta el ${day}: parte del mes`);
+    await this.charges.saveCharge(charge);
+  }
+}
+
+/**
+ * Al retrasar el alta a un mes posterior, las cuotas mensuales de los meses que ya no le tocan dejan de existir; los
+ * cobros que iban a esos meses pasan a los siguientes que sí paga (lo que cubren se reparte como siempre).
+ */
+export class DropChargesBeforeJoining {
+  constructor(
+    private readonly charges: ChargeRepository,
+    private readonly payments: PaymentRepository,
+  ) {}
+
+  async execute(studentId: string, previous: LocalDate, joined: LocalDate): Promise<void> {
+    const from = YearMonth.of(previous);
+    const to = YearMonth.of(joined);
+    if (!from.isBefore(to)) return;
+    const ref = StudentRef.fromString(studentId);
+    const dropped = (await this.charges.allFor(ref, 'monthly')).filter((c) =>
+      !c.period.isBefore(from) && c.period.isBefore(to)
+    );
+    for (const charge of dropped) await this.charges.deleteCharge(charge.id);
+    const gone = (m: YearMonth) => !m.isBefore(from) && m.isBefore(to);
+    for (const payment of await this.payments.paymentsFor(ref, 'monthly')) {
+      if (!payment.periods.some(gone)) continue;
+      const periods = movedMonths(payment.periods, gone, to);
+      payment.coverMonths(periods, concept(periods));
+      await this.payments.savePayment(payment);
+    }
+  }
+}
+
+/** Los meses de un cobro con los que ya no existen cambiados por los siguientes libres desde `first`. */
+function movedMonths(
+  periods: readonly YearMonth[],
+  gone: (m: YearMonth) => boolean,
+  first: YearMonth,
+): YearMonth[] {
+  const kept = periods.filter((m) => !gone(m));
+  const season = Season.containing(first);
+  let next = first;
+  while (kept.length < periods.length && season.includes(next)) {
+    if (!kept.some((m) => m.equals(next))) kept.push(next);
+    next = next.next();
+  }
+  return kept.sort((a, b) => a.isBefore(b) ? -1 : 1);
 }
 
 /** Cuotas del mes con sus totales. */
@@ -761,7 +865,9 @@ export class QuotePayment {
     let start = YearMonth.of(date);
     if (Season.teachingSeason(start) === null) start = Season.containing(start).firstMonth();
     const season = Season.containing(start);
+    const account = await this.accounts.account(ref);
     for (let month = start; season.includes(month); month = month.next()) {
+      if (account !== null && !account.bills(month)) continue;
       if ((await this.charges.chargeFor(ref, 'monthly', month)) === null) periods.push(month);
     }
     return periods;
@@ -1354,6 +1460,8 @@ export class AdjustCharge {
   constructor(
     private readonly charges: ChargeRepository,
     private readonly payments: PaymentRepository,
+    /** Para no crear la cuota de un mes que se dejó sin cobrar (alta tardía). */
+    private readonly accounts?: StudentAccountRepository,
   ) {}
 
   async execute(
@@ -1373,8 +1481,10 @@ export class AdjustCharge {
     if (season === null) throw new InvalidValue('month', 'Julio y agosto no tienen cuotas.');
     const amount = Money.cents(amountCents);
     const last = scope === 'one' ? first : season.lastMonth();
+    const account = this.accounts ? await this.accounts.account(ref) : null;
     for (let period = first; !last.isBefore(period); period = period.next()) {
       const existing = await this.charges.chargeFor(ref, 'monthly', period);
+      if (existing === null && account !== null && !account.bills(period)) continue;
       const charge = existing ?? Charge.create(ChargeId.generate(), ref, 'monthly', period, amount);
       const before = existing === null ? Money.zero() : existing.amount;
       const covered = existing === null ? Money.zero() : await coveredOf(this.charges, existing);

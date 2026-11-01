@@ -83,6 +83,8 @@ hay clase en varias aulas, MUST pedirse el aula; si no hay clase, MUST avisarse 
 hasta corregirlo. Se puede indicar familia directa ya inscrita. Un alumno MAY darse de alta sin ningún horario:
 es un socio sin clases, queda marcado como socio (se le pedirá la cuota de socio) y se podrá inscribir más adelante.
 La fecha de alta MUST poder elegirse (por defecto hoy, nunca futura): sus grupos empiezan ese día.
+Si es del día 16 en adelante del mes en curso y tiene horario, el alta MUST preguntar qué paga de ese mes
+(ver [cuota del mes de un alta tardía](../cobros/spec.md)).
 Mientras se escribe el nombre de un alumno nuevo, el sistema MUST avisar de los alumnos que coinciden en **nombre y
 primer apellido** (todas las palabras menos la última, o las dos si solo hay dos; sin tildes ni mayúsculas), con su
 número de socio, edad y grupos: primero los de baja, con la fecha de la baja y «Es este: darle de alta de nuevo», que
@@ -144,6 +146,8 @@ Administración MUST poder modificar los datos personales de un alumno, con las 
 alta en el club mientras está de alta: nunca futura, antes de su baja anterior ni desde su última baja. Los grupos que
 empezaban el mismo día que el alta se mueven con ella; si otro de sus grupos empieza antes de la fecha nueva, se rechaza
 (hay que cambiar antes su «En el grupo desde»).
+Si la fecha nueva es de un mes posterior, sus cuotas de los meses anteriores se borran y sus cobros pasan a los
+meses siguientes (ver [cuota del mes de un alta tardía](../cobros/spec.md)).
 
 #### Scenario: Editar datos
 - **WHEN** administración corrige los datos de un alumno
@@ -182,7 +186,8 @@ cambia y el mes de la baja se queda como estaba).
 ### Requirement: Volver a darse de alta
 Un alumno de baja (con su baja ya llegada) MUST poder volver a darse de alta, tantas veces como haga falta, con
 «Dar de alta de nuevo» en su ficha: fecha de alta (por defecto hoy, nunca futura ni anterior a su última baja) y los
-grupos en los que entra desde ese día; sin grupos, vuelve como socio sin clases. Conserva su número de socio, su familia
+grupos en los que entra desde ese día; sin grupos, vuelve como socio sin clases. Con grupos y fecha del día 16 en
+adelante del mes en curso, MUST preguntar qué paga de ese mes, como en el alta. Conserva su número de socio, su familia
 y todo su historial. Cada periodo de alta MUST quedar guardado: mientras está de baja no está en ningún grupo (sus grupos
 terminan con la baja), no sale en las listas ni se le crean cuotas de los meses en que no estuvo de alta ningún día; y
 todo lo que depende de si estaba de alta un día (cuotas, puntos, listas) MUST tener en cuenta todos sus periodos. Si se
