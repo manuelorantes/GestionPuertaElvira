@@ -380,6 +380,26 @@ export class GenerateMonthlyCharges {
   }
 }
 
+/**
+ * Al volver a darse de alta en la misma temporada, la cuota de socio que se canceló con la baja vuelve a deberse: sigue
+ * siendo socio y lo cobrado de ella, si algo, sigue contando.
+ */
+export class ReactivateMembershipOnRejoin {
+  constructor(private readonly charges: ChargeRepository) {}
+
+  async execute(studentId: string, rejoinedOn: string): Promise<void> {
+    const season = Season.containing(YearMonth.of(LocalDate.fromString(rejoinedOn)));
+    const charge = await this.charges.chargeFor(
+      StudentRef.fromString(studentId),
+      'membership',
+      season.firstMonth(),
+    );
+    if (charge === null || charge.cancelledOn() === null) return;
+    charge.reactivate();
+    await this.charges.saveCharge(charge);
+  }
+}
+
 /** Qué se cobra del mes de un alta a final de mes (ver `lateJoinMonth`). */
 export type FirstMonthChoice =
   | { kind: 'full' }
