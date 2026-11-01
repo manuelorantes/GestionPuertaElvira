@@ -41,12 +41,12 @@ export interface ClubSummaryView {
   membershipPendingCents: number;
   /** Socios de alta hoy. */
   activeStudents: number;
-  /** De ellos, los dados de alta este mes. */
-  newStudents: number;
+  /** Cuántos más (o menos) que al empezar el mes: altas menos bajas. */
+  studentsChange: number;
   /** Socios de alta hoy que están en al menos una clase. */
   studentsInClasses: number;
-  /** De ellos, los que empezaron a tener clase este mes. */
-  newInClasses: number;
+  /** Cuántos más (o menos) que al empezar el mes. */
+  inClassesChange: number;
   /** Lo que entra y sale cada mes, por fecha (cuadra con Contabilidad). */
   cashChart: MonthBars[];
   /** Cuotas vs gastos fijos: lo que corresponde a cada mes, solo con las categorías «del mes» de Contabilidad. */
@@ -154,10 +154,12 @@ export class ClubSummary {
     const groups = await this.classes.groups(today);
     const active = await this.students.list('active', null, today);
     const inClasses = active.filter((s) => s.groups.length > 0);
-    // «+x este mes»: altas del mes y quienes empezaron este mes a tener clase (su inscripción vigente más antigua).
-    const monthStart = `${month.toString()}-01`;
-    const classesSince = (s: { groups: { since: string }[] }) =>
-      s.groups.map((g) => g.since).sort()[0] ?? '';
+    // «±x este mes»: frente al último día del mes anterior. Su alta vigente ha de ser de antes (quien vuelve
+    // este mes tras una baja anterior no estaba), y sus grupos son los de ese día.
+    const eve = today.startOfMonth().plusDays(-1);
+    const activeBefore = (await this.students.list('active', null, eve))
+      .filter((s) => s.joinedOn <= eve.toString());
+    const inClassesBefore = activeBefore.filter((s) => s.groups.length > 0);
     const capacity = groups.reduce((sum, g) => sum + g.capacity, 0);
     const occupied = groups.reduce((sum, g) => sum + Math.min(g.occupied, g.capacity), 0);
     const emptiest = [...groups].sort((a: GroupSummary, b: GroupSummary) =>
@@ -171,9 +173,9 @@ export class ClubSummary {
       pendingCents: charges.expectedCents - charges.collectedCents,
       membershipPendingCents: memberships.expectedCents - memberships.collectedCents,
       activeStudents: active.length,
-      newStudents: active.filter((s) => s.joinedOn >= monthStart).length,
+      studentsChange: active.length - activeBefore.length,
       studentsInClasses: inClasses.length,
-      newInClasses: inClasses.filter((s) => classesSince(s) >= monthStart).length,
+      inClassesChange: inClasses.length - inClassesBefore.length,
       cashChart,
       monthChart,
       occupancy: {
