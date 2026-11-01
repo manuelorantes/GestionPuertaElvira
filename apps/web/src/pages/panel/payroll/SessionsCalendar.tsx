@@ -1,6 +1,6 @@
 import { monthLabel } from '@/features/billing/money';
 import { LEVELS } from '@/features/classes/levels';
-import type { Session, UpcomingSession } from '@/features/payroll/api';
+import type { Holiday, Session, UpcomingSession } from '@/features/payroll/api';
 import { monthWeeks } from '@/features/payroll/calendar';
 import { hoursLabel } from '@/features/payroll/hours';
 
@@ -75,23 +75,28 @@ function isWeekend(date: string): boolean {
 
 /**
  * Calendario del mes con las horas que dio cada día y, en tonos claros, las que aún le quedan por dar según el
- * horario. Las clases en las que le sustituyeron no están entre sus sesiones, así que ese día sale vacío. Sábado y
+ * horario. Los festivos van en rojo, para que se vea por qué ese día no hay clase. Las clases en las que le sustituyeron no están entre sus sesiones, así que ese día sale vacío. Sábado y
  * domingo solo aparecen si ese mes tiene algo en fin de semana.
  */
 export function SessionsCalendar({
   month,
   sessions,
   upcoming = [],
+  holidays = [],
   viewer = 'staff',
 }: {
   month: string;
   sessions: CalendarSession[];
   upcoming?: UpcomingSession[];
+  holidays?: Holiday[];
   viewer?: CalendarViewer;
 }) {
+  const holidayOn = new Map(holidays.map((h) => [h.date, h.name]));
   const byDay = minutesByDay(sessions, upcoming);
   const wording = WORDING[viewer];
   const weekLength = [...sessions, ...upcoming].some((s) => isWeekend(s.date)) ? 7 : 5;
+  const shown = new Set(monthWeeks(month, weekLength).flat());
+  const anyHoliday = holidays.some((h) => shown.has(h.date));
   // Lo previsto solo sale en la leyenda cuando el mes tiene algo por dar.
   const legend = (Object.keys(KINDS) as Kind[]).filter(
     (kind) => !UPCOMING_KINDS.includes(kind) || upcoming.length > 0,
@@ -117,9 +122,16 @@ export function SessionsCalendar({
               {week.map((date, i) => (
                 <td
                   key={date ?? `vacío-${i}`}
-                  className="h-16 border-r border-line-soft p-1.5 last:border-r-0"
+                  className={`h-16 border-r border-line-soft p-1.5 last:border-r-0 ${date && holidayOn.has(date) ? 'bg-danger-bg/40' : ''}`}
                 >
-                  {date && <CalendarDay date={date} minutes={byDay.get(date)} wording={wording} />}
+                  {date && (
+                    <CalendarDay
+                      date={date}
+                      minutes={byDay.get(date)}
+                      holiday={holidayOn.get(date) ?? null}
+                      wording={wording}
+                    />
+                  )}
                 </td>
               ))}
             </tr>
@@ -136,6 +148,15 @@ export function SessionsCalendar({
             {wording[kind].legend}
           </li>
         ))}
+        {anyHoliday && (
+          <li className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="size-3 rounded-sm border border-danger-fg/30 bg-danger-bg"
+            />
+            Festivo
+          </li>
+        )}
       </ul>
     </div>
   );
@@ -144,10 +165,13 @@ export function SessionsCalendar({
 function CalendarDay({
   date,
   minutes,
+  holiday,
   wording,
 }: {
   date: string;
   minutes: DayMinutes | undefined;
+  /** Nombre del festivo, o null si ese día no lo es. */
+  holiday: string | null;
   wording: (typeof WORDING)[CalendarViewer];
 }) {
   const kinds = (Object.keys(KINDS) as Kind[]).filter((k) => (minutes?.[k] ?? 0) > 0);
@@ -157,6 +181,14 @@ function CalendarDay({
         <span className="sr-only">Día</span> {Number(date.slice(8))}
         <span className="sr-only">:</span>
       </span>
+      {holiday !== null && (
+        <span
+          title={holiday}
+          className="truncate rounded-sm bg-danger-bg px-1 py-0.5 text-[12px] leading-tight font-medium text-danger-fg sm:px-1.5"
+        >
+          Festivo<span className="hidden sm:inline"> · {holiday}</span>
+        </span>
+      )}
       {kinds.map((kind) => (
         <span
           key={kind}

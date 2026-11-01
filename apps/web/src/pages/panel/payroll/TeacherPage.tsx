@@ -328,7 +328,12 @@ function SessionsSection({ teacherId }: { teacherId: string }) {
           {items.length} sesiones · {hoursLabel(total)}
         </span>
       </div>
-      <SessionsCalendar month={month} sessions={items} upcoming={sessions.data?.upcoming ?? []} />
+      <SessionsCalendar
+        month={month}
+        sessions={items}
+        upcoming={sessions.data?.upcoming ?? []}
+        holidays={sessions.data?.holidays ?? []}
+      />
       {items.length === 0 ? (
         <Empty>Sin sesiones en {monthLabel(month).toLowerCase()}.</Empty>
       ) : (

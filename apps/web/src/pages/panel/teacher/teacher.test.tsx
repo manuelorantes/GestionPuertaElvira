@@ -485,6 +485,10 @@ describe('Mis horas', () => {
   it('shows the hours of the month on a calendar, the substitutions of the month and the sessions', async () => {
     const month = currentMonth();
     const day = (n: number) => `${month}-${String(n).padStart(2, '0')}`;
+    // Un día entre semana para el festivo (los fines de semana no salen si no hay clases).
+    const weekday = [20, 21, 22].find(
+      (n) => ![0, 6].includes(new Date(`${day(n)}T12:00:00`).getDay()),
+    ) as number;
     mockApi({
       'GET /api/auth/me': [200, { user: TEACHER }],
       [`GET /api/teacher/hours?month=${month}`]: [
@@ -509,6 +513,7 @@ describe('Mis horas', () => {
               substitution: false,
             },
           ],
+          holidays: [{ date: day(weekday), name: 'Fiesta local' }],
           upcoming: [
             {
               date: day(14),
@@ -558,6 +563,8 @@ describe('Mis horas', () => {
     const legend = screen.getByRole('list', { name: 'Leyenda del calendario' });
     expect(legend).toHaveTextContent('Mis clases');
     expect(legend).toHaveTextContent('Mis clases previstas');
+    expect(legend).toHaveTextContent('Festivo');
+    expect(within(calendar).getByTitle('Fiesta local')).toHaveTextContent('Festivo');
 
     const notes = screen.getByRole('list', { name: 'Sustituciones del mes' });
     const [gave, received] = within(notes).getAllByRole('listitem');
