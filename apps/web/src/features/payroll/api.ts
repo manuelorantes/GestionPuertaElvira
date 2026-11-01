@@ -86,10 +86,11 @@ export interface UpcomingSession {
   substitution: boolean;
 }
 
-/** Las sesiones del mes y, al mirar un profesor, lo que aún le queda por dar (vacío si no). */
+/** Las sesiones del mes, sus festivos y, al mirar un profesor, lo que aún le queda por dar (vacío si no). */
 export interface MonthSessions {
   items: Session[];
   upcoming: UpcomingSession[];
+  holidays: Holiday[];
 }
 
 export function fetchSessions(month: string, teacherId: string): Promise<MonthSessions> {

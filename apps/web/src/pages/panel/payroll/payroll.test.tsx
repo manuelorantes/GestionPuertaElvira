@@ -732,6 +732,7 @@ describe('Profesorado', () => {
             session({ id: 's3', date: date(first), substitution: true, countedMinutes: 90 }),
             session({ id: 's4', date: date(second), substitution: true, countedMinutes: 60 }),
           ],
+          holidays: [{ date: date(third), name: 'Fiesta local' }],
           upcoming: [
             {
               date: date(fourth),
@@ -777,6 +778,9 @@ describe('Profesorado', () => {
     expect(day(first).querySelector('[data-kind="own"]')).toHaveClass('bg-brand');
     // Un día sin clases dadas (también cuando le sustituyeron) no lleva horas.
     expect(day(third)).not.toHaveTextContent(' h');
+    // Un festivo, en rojo y con su nombre, para que se vea por qué no hubo clase.
+    expect(within(day(third)).getByTitle('Fiesta local')).toHaveClass('bg-danger-bg');
+    expect(day(third)).toHaveTextContent('Festivo · Fiesta local');
     // Lo que aún le queda por dar, en los tonos claros: verde sus clases, gris las sustituciones.
     expect(day(fourth)).toHaveTextContent('3 h previstas de sus clases');
     expect(day(fourth).querySelector('[data-kind="upcomingOwn"]')).toHaveClass('bg-brand-soft');
@@ -789,6 +793,7 @@ describe('Profesorado', () => {
     expect(legend).toHaveTextContent('Sustituciones');
     expect(legend).toHaveTextContent('Sus clases previstas');
     expect(legend).toHaveTextContent('Sustituciones previstas');
+    expect(legend).toHaveTextContent('Festivo');
     // Sin clases en fin de semana, el calendario va de lunes a viernes.
     expect(within(calendar).queryByRole('columnheader', { name: 'Sáb' })).not.toBeInTheDocument();
   });
