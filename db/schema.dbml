@@ -358,6 +358,21 @@ Table accounting_transfer {
   Note: 'Traspaso entre caja y banco: cambia dónde está el dinero, no cuánto tiene el club'
 }
 
+Table accounting_bank_match {
+  movement_key varchar(60) [pk, note: 'huella del movimiento del extracto: fechas, importe y saldo tras él']
+  operation_date date [not null]
+  amount_cents int [not null, note: 'con signo: positivo si entra dinero']
+  concept varchar(200) [not null]
+  targets jsonb [not null, note: 'lo que le corresponde en la app [{source, sourceId}]: cobros, gastos, apuntes o traspasos (source transfer)']
+  Note: 'Movimiento del extracto del banco ya conciliado: sale como «cuadra» y lo suyo no casa con otro'
+}
+
+Table accounting_bank_rule {
+  counterparty varchar(120) [pk, note: 'quien cobra o paga, sacado del concepto del banco']
+  category varchar(40) [not null]
+  Note: 'Categoría elegida al conciliar, para proponerla la próxima vez'
+}
+
 Table accounting_expected_expense {
   id uuid [pk]
   concept varchar(120) [not null]

@@ -224,5 +224,67 @@ club sigue siendo la suma del banco y la caja. Si no coinciden, la tarjeta de ci
 Contabilidad MUST tener una pestaña «Diagnóstico» con lo que no cuadra en los datos del club, explicado y con su
 solución, que se puede aceptar o descartar (ver [la spec de diagnóstico](../diagnostico/spec.md)).
 
+### Requirement: Conciliación con el banco
+Superadministración MUST tener en Contabilidad una pestaña «Conciliación» (el resto de cuentas no la ve ni puede usarla)
+para comprobar el saldo del banco contra el extracto de la cuenta y completar lo que falte.
+Se sube el extracto descargado de la banca online, en Excel (`.xls` o `.xlsx`) o en PDF.
+El sistema MUST leer sus movimientos (fecha de operación, fecha valor, concepto, importe y saldo tras el movimiento),
+detectar las fechas que cubre (del primer al último movimiento)
+y comprobar que cada saldo es el anterior más el importe;
+si un fichero no se entiende o sus saldos no encadenan, MUST decirlo y no seguir.
+Nada se guarda al subirlo.
+Arriba MUST verse, al empezar y al terminar el periodo, el saldo del banco según el extracto,
+el saldo del banco según la app y la diferencia.
+
+Cada movimiento del extracto MUST salir como **cuadra** (con lo que le corresponde en la app)
+o con una **sugerencia** que superadministración acepta una por una:
+- **Liquidación del datáfono** («Liquidación efectuada el DD/MM/AAAA»): es lo cobrado con tarjeta ese día.
+  Cuadra si los cobros con tarjeta de ese día suman su importe.
+  Si falta dinero, sugiere pasar a tarjeta y a ese día los cobros que completan la cifra entre los que no están en el
+  banco (cobros con otra forma de pago o en otra fecha que no casan con ninguna transferencia); si hay varias
+  combinaciones posibles, se eligen los cobros a mano, con el total elegido a la vista, hasta que coincide.
+  Si sobra, lo dice.
+- **Transferencia recibida**: cuadra con el cobro, o los cobros de un mismo alumno o familia, por transferencia que
+  suman su importe con fecha cercana. Si casan por importe y nombre (del alumno, del tutor o de quien paga) pero con
+  otra fecha u otra forma de pago, sugiere corregir la fecha y la forma de pago de esos cobros;
+  si no hay ninguno, sugiere apuntar un ingreso con su concepto y categoría, o elegir a mano los cobros a los que corresponde.
+- **Pago o recibo**: cuadra con el gasto del mismo importe en el banco con fecha cercana (del mismo mes o del siguiente).
+  Si el que casa está en efectivo, sugiere pasarlo al banco;
+  si no hay ninguno, sugiere apuntar el gasto con su fecha, un concepto sacado del extracto y una categoría propuesta.
+- **Sacar efectivo o ingresarlo**: cuadra con el traspaso entre caja y banco del mismo importe y fecha cercana;
+  si no lo hay, sugiere apuntarlo.
+
+Antes de aceptar, el concepto, la categoría y los cobros elegidos se pueden cambiar.
+Aceptar una sugerencia MUST hacer el cambio con las mismas operaciones que el resto de Contabilidad y Cobros
+(queda en el historial) y recordar qué movimiento del extracto corresponde a qué cobros, gasto o traspaso:
+así ese movimiento sale como «cuadra» en las siguientes pasadas y lo de la app que ya casó no vuelve a casar con otro,
+aunque los extractos se solapen.
+Lo que no se acepta no se hace y MUST volver a salir igual al subir de nuevo un extracto que lo incluya.
+La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse la próxima vez.
+
+#### Scenario: Liquidación del datáfono que cuadra
+- **WHEN** el extracto trae «Liquidación efectuada el 24/09/2026» por 648 € y ese día hay en la app dos cobros con
+  tarjeta de 158 € y 490 €
+- **THEN** el movimiento sale como «cuadra» con esos dos cobros
+
+#### Scenario: Cobros con tarjeta apuntados como transferencia
+- **WHEN** el extracto trae la liquidación del 10/09/2026 por 90 € y en la app no hay cobros con tarjeta ese día,
+  pero sí uno de 90 € por transferencia del 03/09 que no casa con ninguna transferencia del extracto
+- **THEN** se sugiere pasar ese cobro a tarjeta y al 10/09; al aceptarlo, el cobro cambia y el movimiento cuadra
+
+#### Scenario: Recibo sin apuntar
+- **WHEN** el extracto trae un recibo de agua de 43,76 € que no está en la app
+- **THEN** se sugiere apuntar un gasto de 43,76 € por transferencia con esa fecha; si no se acepta, no se apunta y
+  vuelve a sugerirse en la siguiente pasada
+
+#### Scenario: Categoría recordada
+- **WHEN** superadministración acepta apuntar el recibo de agua con la categoría «Agua» y el mes siguiente sube un
+  extracto con otro recibo de la misma empresa
+- **THEN** la sugerencia propone ya la categoría «Agua»
+
+#### Scenario: Sacar efectivo
+- **WHEN** el extracto trae «Disposición efectivo» por 2.000 € y no hay ningún traspaso
+- **THEN** se sugiere un traspaso de 2.000 € del banco a caja con esa fecha
+
 ### Requirement: Acceso restringido
 La contabilidad MUST estar reservada a cuentas de administración.
