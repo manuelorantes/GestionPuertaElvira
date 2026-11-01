@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { currentMonth } from '@/features/billing/money';
 import { ADMIN, mockApi, renderApp } from '@/test/render';
 
 const charge = (overrides: Record<string, unknown>) => ({
@@ -200,11 +201,10 @@ describe('Cobros y cuotas', () => {
   });
 
   it('moves between the months of the season and shows membership fees apart', async () => {
+    // Las cuotas de socio se piden con el mes en curso.
+    const membership = `/api/admin/billing/charges?month=${currentMonth()}&kind=membership`;
     const fetch = api({
-      'GET /api/admin/billing/charges?month=2026-10&kind=membership': [
-        200,
-        { ...OCTOBER, items: [] },
-      ],
+      [`GET ${membership}`]: [200, { ...OCTOBER, items: [] }],
     });
     renderApp('/panel/cobros?mes=2026-10');
 
@@ -236,11 +236,7 @@ describe('Cobros y cuotas', () => {
       }),
     );
     expect(await screen.findByText('No hay cuotas de socio esta temporada.')).toBeInTheDocument();
-    expect(
-      fetch.mock.calls.some(
-        ([u]) => u === '/api/admin/billing/charges?month=2026-10&kind=membership',
-      ),
-    ).toBe(true);
+    expect(fetch.mock.calls.some(([u]) => u === membership)).toBe(true);
   });
 
   it('shows expected charges of a future month', async () => {
