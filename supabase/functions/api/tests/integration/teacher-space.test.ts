@@ -101,12 +101,23 @@ Deno.test({
       hours: 1.5,
     });
     assertEquals(recorded.status, 201, JSON.stringify(recorded.body));
+    // Un festivo el viernes (sin clases): sale en Mis horas para marcarlo en el calendario.
+    const holiday = await admin.json('POST', '/api/admin/payroll/holidays', {
+      date: day(4),
+      name: 'Fiesta local',
+    });
+    assertEquals(holiday.status, 200, JSON.stringify(holiday.body));
     const hours = body<{
       month: string;
       sessions: Record<string, unknown>[];
       upcoming: Record<string, unknown>[];
       substitutions: Record<string, unknown>[];
+      holidays: { date: string; name: string }[];
     }>(await teacher.get(`/api/teacher/hours?month=${day(1).slice(0, 7)}`));
+    assertEquals(
+      hours.holidays,
+      day(4).startsWith(day(1).slice(0, 7)) ? [{ date: day(4), name: 'Fiesta local' }] : [],
+    );
     // Lo que le queda por dar ese mes: sus clases de la semana que viene, sin la sustitución ya apuntada.
     const upcoming = hours.upcoming.filter((u) =>
       String(u.date) >= day(0) && String(u.date) <= day(6)

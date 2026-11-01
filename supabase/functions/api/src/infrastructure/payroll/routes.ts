@@ -154,6 +154,8 @@ export function registerPayrollRoutes(api: ApiApp): void {
     return c.json({
       month: period.toString(),
       items: await new ListSessions(p.query).execute(period, teacher ? teacher : null),
+      // Los festivos del mes, para marcarlos en el calendario.
+      holidays: await p.holidays.between(period.firstDay(), period.lastDay()),
       // Lo que aún le queda por dar ese mes, solo al mirar un profesor.
       upcoming: teacher
         ? await upcomingSessions(scope.tx, api.deps.clock).execute(teacher, period)
