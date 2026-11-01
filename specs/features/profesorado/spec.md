@@ -200,6 +200,8 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
   sin contar dos veces lo que se pisa el mismo día, con lo previsto o con lo ya apuntado),
   en los tonos claros de lo previsto: las de sus clases en el verde de iniciación y las de sustitución en gris,
   con su leyenda («Sus clases previstas» y «Sustituciones previstas») solo si el mes tiene algo por dar;
+  los festivos van en rojo, con su nombre («Festivo · Fiesta local») y «Festivo» en la leyenda, para que se vea por qué
+  ese día no hay clase;
 - sus clases asignadas con días, horario, aula, alumnos y ocupación, y la ocupación total de sus clases; cuando hay
   alumnos que no vienen todos los días de la clase, un asterisco junto a los alumnos abre los alumnos de cada día
   frente a las plazas;
@@ -216,6 +218,10 @@ antiguo, las clases asignadas por horario y los alumnos por nombre.
 #### Scenario: Horas que aún quedan por dar
 - **WHEN** es martes a las 17:30, el profesor tiene clase de 17:00 a 18:30 los martes y el miércoles sustituye a otro
 - **THEN** el calendario marca hoy y el martes que viene su clase en verde claro, y el miércoles la sustitución en gris
+
+#### Scenario: Festivos en el calendario
+- **WHEN** el lunes 12 de octubre es festivo y el profesor da clase los lunes
+- **THEN** ese día sale en rojo con «Festivo · Fiesta Nacional» y sin horas
 
 #### Scenario: Lo previsto que se pisa cuenta una vez
 - **WHEN** un viernes que viene el profesor tiene clase de 17:00 a 18:30 y el turno de 17:00 a 20:00
@@ -255,8 +261,8 @@ y, de solo lectura, lo del club que se indica:
   - el **total del mes**, que cambia al cambiar de mes: las horas del mes (lo que cuenta cada sesión, como en su
     liquidación) con el número de sesiones, y por separado las de sus clases y las de sustitución;
   - el mismo calendario que ve administración en su ficha (ver «Ficha del profesor»), con lo que aún le queda por dar
-    en tonos claros, y la leyenda «Mis clases» y «Sustituciones» (y «Mis clases previstas» y «Sustituciones previstas»
-    cuando el mes tiene algo por dar);
+    en tonos claros y los festivos en rojo, y la leyenda «Mis clases» y «Sustituciones» (y «Mis clases previstas» y
+    «Sustituciones previstas» cuando el mes tiene algo por dar, y «Festivo» cuando tiene festivos);
   - debajo, las **sustituciones** del mes, del primer día al último: «Sustituiste a Carlos Ruiz Márquez en Adultos I»
     los días que dio la clase de otro, y «Te sustituyó Ana Belén Torres en Iniciación A» los días que otro dio la suya,
     con el motivo si lo hay;
