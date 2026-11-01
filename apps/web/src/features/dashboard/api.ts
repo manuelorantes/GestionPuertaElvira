@@ -30,12 +30,12 @@ export interface Dashboard {
   membershipPendingCents: number;
   /** Socios de alta hoy. */
   activeStudents: number;
-  /** De ellos, los dados de alta este mes. */
-  newStudents: number;
+  /** Cuántos más (o menos) que al empezar el mes: altas menos bajas. */
+  studentsChange: number;
   /** Socios de alta hoy que están en al menos una clase. */
   studentsInClasses: number;
-  /** De ellos, los que empezaron a tener clase este mes. */
-  newInClasses: number;
+  /** Cuántos más (o menos) que al empezar el mes. */
+  inClassesChange: number;
   /** Lo que entra y sale cada mes, por fecha. */
   cashChart: MonthBars[];
   /** Cuotas vs gastos fijos: lo que corresponde a cada mes, con las categorías «del mes» de Contabilidad. */

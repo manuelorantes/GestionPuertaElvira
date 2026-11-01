@@ -32,6 +32,12 @@ function formatSigned(cents: number): string {
   return `${cents > 0 ? '+' : ''}${formatCents(cents)}`;
 }
 
+/** «+3 este mes», «-1 este mes»; sin nada si no ha cambiado. */
+function monthChange(change: number): string | undefined {
+  if (change === 0) return undefined;
+  return `${change > 0 ? '+' : ''}${change} este mes`;
+}
+
 /** Cuotas (cobradas y previstas) menos gastos fijos (anotados y previstos) del mes en curso. */
 function monthMargin(data: Dashboard): { fees: number; fixed: number } {
   const bar = data.monthChart.find((m) => m.month === data.month);
@@ -72,12 +78,12 @@ function Summary({ data }: { data: Dashboard }) {
         <Kpi
           label="Socios activos"
           value={String(data.activeStudents)}
-          hint={`+${data.newStudents} este mes`}
+          hint={monthChange(data.studentsChange)}
         />
         <Kpi
           label="Socios en clases"
           value={String(data.studentsInClasses)}
-          hint={`+${data.newInClasses} este mes`}
+          hint={monthChange(data.inClassesChange)}
         />
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
