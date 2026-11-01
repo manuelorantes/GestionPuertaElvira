@@ -3,6 +3,7 @@ import {
   DropChargesBeforeJoining,
   type FirstMonthChoice,
   GenerateMonthlyCharges,
+  ReactivateMembershipOnRejoin,
   RecalculateCharges,
 } from '../../application/billing/mod.ts';
 import { InvalidValue, type LocalDate, Money, type YearMonth } from '../../domain/common/mod.ts';
@@ -28,6 +29,18 @@ function recalculator(api: ApiApp, scope: RequestScope): RecalculateCharges {
 }
 
 /** Crea en el momento las cuotas que les falten este mes a unos alumnos (sin esperar a la tarea de la noche). */
+/** Al volver a darse de alta, la cuota de socio de la temporada cancelada con la baja vuelve a deberse. */
+export async function reactivatingMembership(
+  scope: RequestScope,
+  studentId: string,
+  rejoinedOn: string,
+): Promise<void> {
+  await new ReactivateMembershipOnRejoin(new SqlChargeRepository(scope.tx)).execute(
+    studentId,
+    rejoinedOn,
+  );
+}
+
 export async function generatingCharges(
   api: ApiApp,
   scope: RequestScope,
