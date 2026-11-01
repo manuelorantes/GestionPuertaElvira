@@ -5,6 +5,8 @@ import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/comm
 import {
   ClubDuty,
   DutyRef,
+  GroupRef,
+  ScheduledGroup,
   SessionMinutes,
   SettlementAlreadyPaid,
   Substitution,
@@ -38,6 +40,7 @@ import {
   TeacherHours,
   TeacherPayStatus,
   TeacherReport,
+  UpcomingSessions,
   UpdateSession,
 } from '../../src/application/payroll/mod.ts';
 import { PeriodClosed } from '../../src/application/common/mod.ts';
@@ -887,7 +890,17 @@ Deno.test('TeacherHours should show a teacher their sessions of a month and who 
     },
   };
 
-  const hours = await new TeacherHours(sessions, query).execute('lucia', '2026-10');
+  const upcoming = {
+    execute: (teacher: string, month: YearMonth) =>
+      Promise.resolve([{
+        date: '2026-10-28',
+        label: `${teacher} ${month.toString()}`,
+        minutes: 60,
+        substitution: false,
+      }]),
+  } as unknown as UpcomingSessions;
+
+  const hours = await new TeacherHours(sessions, query, upcoming).execute('lucia', '2026-10');
 
   assertEquals([listed, asked], [[['2026-10', 'lucia']], ['lucia 2026-10-01/2026-10-31']]);
   assertEquals(hours.month, '2026-10');
@@ -899,13 +912,82 @@ Deno.test('TeacherHours should show a teacher their sessions of a month and who 
     ],
   );
   assertEquals(Object.keys(hours.sessions[0] ?? {}).includes('costCents'), false, 'sin coste');
+  assertEquals(hours.upcoming.map((u) => [u.date, u.label]), [['2026-10-28', 'lucia 2026-10']]);
   // Del primero al último del mes.
   assertEquals(hours.substitutions.map((x) => [x.date, x.role, x.otherName]), [
     ['2026-10-14', 'gave', 'Carlos Ruiz Márquez'],
     ['2026-10-15', 'received', 'Ana Belén Torres'],
   ]);
   await assertRejects(
-    () => new TeacherHours(sessions, query).execute('lucia', 'octubre'),
+    () => new TeacherHours(sessions, query, upcoming).execute('lucia', 'octubre'),
     InvalidValue,
   );
+});
+
+Deno.test('UpcomingSessions should list what a teacher still has to give in a month, with substitutions and without holidays', async () => {
+  // Martes 20 de octubre a las 17:30.
+  const fx = new PayrollFixture('2026-10-20T17:30:00+02:00');
+  const lucia = fx.teacherWithGroup('Lucía Moreno Gil', 1600, 'Iniciación A', [1, 3], 60);
+  const carlos = fx.teacherWithGroup('Carlos Ruiz Márquez', 1800, 'Adultos I', [2], 90);
+  fx.scheduledGroups.push(
+    new ScheduledGroup(
+      GroupRef.generate(),
+      'Martes temprano',
+      TeacherRef.fromString(carlos),
+      [2],
+      30,
+      16 * 60,
+    ),
+  );
+  const [iniciacion, adultos] = fx.scheduledGroups;
+  if (!iniciacion || !adultos) throw new Error('Faltan los grupos');
+  // Carlos da la clase de Lucía del miércoles 21; el lunes 26 es festivo.
+  fx.substitutions.set(
+    'sub-1',
+    new Substitution(
+      iniciacion.id,
+      LocalDate.fromString('2026-10-21'),
+      TeacherRef.fromString(carlos),
+      null,
+    ),
+  );
+  await fx.add(LocalDate.fromString('2026-10-26'), 'Puente');
+  const upcoming = new UpcomingSessions(
+    new TeacherAgenda(fx, new DutyFixture(fx), new SubstitutionFixture(fx), fx),
+    fx,
+    fx.clock,
+  );
+  const of = (teacher: string, month: string) =>
+    upcoming.execute(teacher, YearMonth.fromString(month)).then((items) =>
+      items.map((i) => [i.date, i.label, i.minutes, i.substitution])
+    );
+
+  // De hoy, la clase de las 16:00 ya acabó y la de las 17:00 aún no.
+  assertEquals(await of(carlos, '2026-10'), [
+    ['2026-10-20', 'Adultos I', 90, false],
+    ['2026-10-21', 'Iniciación A', 60, true],
+    ['2026-10-27', 'Martes temprano', 30, false],
+    ['2026-10-27', 'Adultos I', 90, false],
+  ]);
+  assertEquals(await of(lucia, '2026-10'), [['2026-10-28', 'Iniciación A', 60, false]]);
+
+  // La de hoy ya apuntada (pasó lista) no sale dos veces.
+  await fx.save(
+    TimesheetEntry.record(
+      TimesheetEntryId.generate(),
+      TeacherRef.fromString(carlos),
+      LocalDate.fromString('2026-10-20'),
+      adultos.id,
+      'Adultos I',
+      SessionMinutes.fromMinutes(90),
+      true,
+      17 * 60,
+      `group:${adultos.id.value}`,
+    ),
+  );
+  assertEquals((await of(carlos, '2026-10'))[0], ['2026-10-21', 'Iniciación A', 60, true]);
+
+  // Un mes que viene, entero; uno pasado, nada.
+  assertEquals((await of(lucia, '2026-11')).length, 9, '5 lunes y 4 miércoles de noviembre');
+  assertEquals(await of(lucia, '2026-09'), []);
 });

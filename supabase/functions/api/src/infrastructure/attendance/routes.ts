@@ -43,6 +43,7 @@ import { type ApiApp, param, type RequestScope, sessionTeacher } from '../http/a
 import { httpError } from '../http/errors.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
+import { upcomingSessions } from '../payroll/routes.ts';
 import {
   SqlActivityCheckRepository,
   SqlClassRoster,
@@ -344,6 +345,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
           new SqlPayrollQuery(tx, () => LocalDate.fromInstant(api.deps.clock.now())),
         ),
         new SqlTeacherReportQuery(tx),
+        upcomingSessions(tx, api.deps.clock),
       ).execute(sessionTeacher(scope), c.req.query('month') ?? today().slice(0, 7)),
     );
   });

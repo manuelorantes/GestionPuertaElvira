@@ -104,8 +104,19 @@ Deno.test({
     const hours = body<{
       month: string;
       sessions: Record<string, unknown>[];
+      upcoming: Record<string, unknown>[];
       substitutions: Record<string, unknown>[];
     }>(await teacher.get(`/api/teacher/hours?month=${day(1).slice(0, 7)}`));
+    // Lo que le queda por dar ese mes: sus clases de la semana que viene, sin la sustitución ya apuntada.
+    const upcoming = hours.upcoming.filter((u) =>
+      String(u.date) >= day(0) && String(u.date) <= day(6)
+    );
+    assertEquals(
+      upcoming.map((u) => [u.date, u.label, u.minutes, u.substitution]),
+      [[day(0), 'Iniciación A', 60, false], [day(2), 'Iniciación A', 60, false]].filter(([date]) =>
+        String(date).startsWith(day(1).slice(0, 7))
+      ),
+    );
     assertEquals(
       hours.sessions.map((
         s,
