@@ -2,6 +2,7 @@ import { apiGet, apiSend, apiUpload } from '@/shared/api/client';
 
 import type { EntryKind } from './categories';
 import type { Share } from './periodShares';
+import type { BankMovement } from './statement';
 
 export interface LedgerItem {
   source: 'payment' | 'settlement' | 'advance' | 'invoice' | 'manual';
@@ -330,4 +331,62 @@ export function skipExpected(input: { id: string; month: string }): Promise<void
 
 export function restoreExpected(input: { id: string; month: string }): Promise<void> {
   return apiSend('DELETE', `${BASE}/expected/${input.id}/months/${input.month}/skip`);
+}
+
+// ---- Conciliación con el banco ---------------------------------------------------------------
+
+export interface ReconciliationAppItem {
+  source: string;
+  sourceId: string;
+  date: string;
+  kind: string;
+  concept: string;
+  category: string;
+  method: string;
+  amountCents: number;
+}
+
+export interface ReconciliationItem {
+  key: string;
+  movement: BankMovement;
+  kind: 'card_settlement' | 'cash_withdrawal' | 'cash_deposit' | 'income' | 'expense';
+  status: 'matched' | 'suggested' | 'pending';
+  note: string;
+  matched: ReconciliationAppItem[];
+  proposal: {
+    items: ReconciliationAppItem[];
+    changes: string[];
+    record: {
+      kind: 'income' | 'expense';
+      concept: string;
+      category: string;
+      method: string;
+    } | null;
+    transfer: { from: 'bank' | 'cash'; to: 'bank' | 'cash' } | null;
+  } | null;
+  candidates: ReconciliationAppItem[];
+  fixed: ReconciliationAppItem[];
+}
+
+export interface Reconciliation {
+  from: string;
+  to: string;
+  bank: { openingCents: number; closingCents: number };
+  app: { openingCents: number; closingCents: number };
+  items: ReconciliationItem[];
+}
+
+export interface ReconciliationAcceptance {
+  movement: BankMovement;
+  items: { source: string; sourceId: string }[];
+  record: { concept: string; category: string } | null;
+  transfer: boolean;
+}
+
+export function reconcileStatement(movements: BankMovement[]): Promise<Reconciliation> {
+  return apiSend<Reconciliation>('POST', '/api/admin/accounting/reconciliation', { movements });
+}
+
+export function acceptReconciliation(acceptance: ReconciliationAcceptance): Promise<void> {
+  return apiSend('POST', '/api/admin/accounting/reconciliation/accept', acceptance);
 }
