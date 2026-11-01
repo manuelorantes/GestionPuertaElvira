@@ -896,6 +896,7 @@ Deno.test('TeacherHours should show a teacher their sessions of a month and who 
         date: '2026-10-28',
         label: `${teacher} ${month.toString()}`,
         minutes: 60,
+        countedMinutes: 60,
         substitution: false,
       }]),
   } as unknown as UpcomingSessions;
@@ -990,4 +991,27 @@ Deno.test('UpcomingSessions should list what a teacher still has to give in a mo
   // Un mes que viene, entero; uno pasado, nada.
   assertEquals((await of(lucia, '2026-11')).length, 9, '5 lunes y 4 miércoles de noviembre');
   assertEquals(await of(lucia, '2026-09'), []);
+
+  // Lo que se pisa no cuenta dos veces: el viernes, clase de 17:00 a 18:30 dentro del turno de 17:00 a 20:00.
+  const friday = new PayrollFixture('2026-10-20T17:30:00+02:00');
+  const angel = friday.teacherWithGroup('Ángel Castillo', 1500, 'Viernes 17:00', [5], 90);
+  const duties = new DutyFixture(friday);
+  await new SaveDuty(duties, friday).execute(null, {
+    teacherId: angel,
+    weekday: 5,
+    start: '17:00',
+    end: '20:00',
+    label: 'Viernes',
+  });
+  const fridays = await new UpcomingSessions(
+    new TeacherAgenda(friday, duties, new SubstitutionFixture(friday), friday),
+    friday,
+    friday.clock,
+  ).execute(angel, YearMonth.fromString('2026-10'));
+  assertEquals(fridays.map((u) => [u.date, u.label, u.minutes, u.countedMinutes]), [
+    ['2026-10-23', 'Viernes 17:00', 90, 90],
+    ['2026-10-23', 'Viernes', 180, 90],
+    ['2026-10-30', 'Viernes 17:00', 90, 90],
+    ['2026-10-30', 'Viernes', 180, 90],
+  ]);
 });
