@@ -2,7 +2,7 @@ import { assert, assertEquals } from '@std/assert';
 
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
-import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
+import { ApiClient, assertError, atTime, createUser, resetDatabase } from '../support/http.ts';
 
 const today = LocalDate.fromInstant(new Date()).toString();
 const outsideSeason = Season.teachingSeason(YearMonth.fromString(today.slice(0, 7))) === null;
@@ -311,4 +311,52 @@ Deno.test({
       assertEquals(chart.find((m) => m.month === month.toString())?.expectedCents, 4500);
     }
   },
+});
+
+Deno.test('dashboard chart should count in each month what its fee has covered, however the payments were split', async () => {
+  await atTime('2026-10-10T10:00:00+02:00', async () => {
+    await resetDatabase();
+    await createUser('junta@club.es');
+    const client = new ApiClient();
+    await client.logIn('junta@club.es');
+    const group = await newGroup(client, await newTeacher(client));
+    const student = ((await client.json('POST', '/api/admin/students', {
+      fullName: 'Pablo López Herrera',
+      groupIds: [group],
+    })).body as { id: string }).id;
+    const pay = async () => {
+      const paid = await client.json('POST', '/api/admin/billing/payments', {
+        studentId: student,
+        kind: 'monthly',
+        months: 3,
+        method: 'cash',
+        date: '2026-10-10',
+      });
+      assertEquals(paid.status, 201, JSON.stringify(paid.body));
+      return (paid.body as { id: string }).id;
+    };
+    // 3 × 45 € con un 10 % = 121,50 € (40,50 € al mes), pero lo pagó en dos veces: 81 € a cuenta y luego el resto.
+    const first = await pay();
+    const lowered = await client.json('PUT', `/api/admin/billing/payments/${first}/amount`, {
+      amountCents: 8100,
+      reason: 'Pagó 81 € a cuenta',
+    });
+    assertEquals(lowered.status, 204, JSON.stringify(lowered.body));
+    const rest = await client.json('POST', '/api/admin/billing/payments', {
+      studentId: student,
+      kind: 'monthly',
+      months: 1,
+      method: 'cash',
+      date: '2026-10-10',
+    });
+    assertEquals(rest.status, 201, JSON.stringify(rest.body));
+    const chart = ((await client.get('/api/admin/dashboard')).body as {
+      monthChart: { month: string; incomeCents: number; expectedCents: number }[];
+    }).monthChart;
+    const of = (month: string) => chart.find((m) => m.month === month);
+    assertEquals(
+      ['2026-10', '2026-11', '2026-12'].map((m) => [of(m)?.incomeCents, of(m)?.expectedCents]),
+      [[4050, 0], [4050, 0], [4050, 0]],
+    );
+  });
 });

@@ -33,8 +33,10 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
 - **Ingresos y gastos de cada mes**: todo lo que entra y sale en cada mes, por fecha (cuadra con los totales de
   Contabilidad de ese mes).
 - **Cuotas vs gastos fijos**: lo que corresponde a cada mes, solo las [categorías del mes](../contabilidad/spec.md)
-  de Contabilidad, cada movimiento en los meses a los que corresponde (repartido si son varios). Las cuotas
-  mensuales, repartidas a partes iguales entre los meses que paga cada cobro; lo del profesorado, en el mes de la
+  de Contabilidad, cada movimiento en los meses a los que corresponde (repartido si son varios). De las cuotas
+  mensuales, en cada mes lo que tienen cubierto las cuotas de ese mes de cada alumno (lo cobrado, sin importar cómo
+  se repartió en recibos: un pago partido en dos o un saldo a favor que pasa al mes siguiente cuentan en el mes de la
+  cuota que cubren); lo del profesorado, en el mes de la
   liquidación; apuntes y facturas, en los meses a los que corresponden. Sobre los ingresos de cada mes, apiladas en el verde claro de los grupos de iniciación, las
   **cuotas previstas**: lo que falta por cobrar de las cuotas mensuales de ese mes. En el mes en curso y los pasados,
   lo pendiente de las cuotas emitidas (una cuota cancelada ya no se debe y desaparece de ahí); en los meses que
@@ -56,6 +58,12 @@ octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «G
 - **WHEN** un alumno paga en octubre tres meses por 121,50 €
 - **THEN** «Ingresos y gastos de cada mes» suma 121,50 € a octubre y «Cuotas vs gastos fijos» suma 40,50 € a
   octubre, a noviembre y a diciembre, sin cuota prevista en esos meses
+
+#### Scenario: Un pago partido en dos recibos
+- **WHEN** un alumno con 40,50 € al mes paga octubre a diciembre en dos veces: 81 € a cuenta y luego los 40,50 € que
+  faltan
+- **THEN** «Cuotas vs gastos fijos» suma 40,50 € a octubre, a noviembre y a diciembre, como si lo hubiera pagado de una
+  vez
 
 #### Scenario: Cuotas previstas de los meses que vienen
 - **WHEN** en octubre un alumno matriculado en un grupo de dos horas semanales solo ha pagado octubre
