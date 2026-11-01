@@ -185,17 +185,32 @@ export interface TeacherHoursView {
   upcoming: UpcomingSessionView[];
   /** Los días en que sustituyó a otro o le sustituyeron, del primero al último. */
   substitutions: TeacherSubstitutionView[];
+  /** Los festivos del mes, para que se vea por qué esos días no hay clase. */
+  holidays: HolidayView[];
+}
+
+/** Un festivo del calendario del club. */
+export interface HolidayView {
+  /** «AAAA-MM-DD». */
+  date: string;
+  name: string;
+}
+
+/** Los festivos de un periodo, con su nombre, del primero al último. */
+export interface HolidayNames {
+  between(from: LocalDate, to: LocalDate): Promise<HolidayView[]>;
 }
 
 /**
- * Mis horas: las sesiones de un mes del profesor (lo que cuenta cada una), lo que aún le queda por dar y sus
- * sustituciones de ese mes.
+ * Mis horas: las sesiones de un mes del profesor (lo que cuenta cada una), lo que aún le queda por dar, sus
+ * sustituciones y los festivos de ese mes.
  */
 export class TeacherHours {
   constructor(
     private readonly sessions: ListSessions,
     private readonly query: Pick<TeacherReportQuery, 'substitutions'>,
     private readonly upcoming: UpcomingSessions,
+    private readonly holidays: HolidayNames,
   ) {}
 
   async execute(teacherId: string, month: string): Promise<TeacherHoursView> {
@@ -218,6 +233,7 @@ export class TeacherHours {
       })),
       upcoming: await this.upcoming.execute(teacherId, period),
       substitutions: [...substitutions].sort((x, y) => x.date.localeCompare(y.date)),
+      holidays: await this.holidays.between(period.firstDay(), period.lastDay()),
     };
   }
 }

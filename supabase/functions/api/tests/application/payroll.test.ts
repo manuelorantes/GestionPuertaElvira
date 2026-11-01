@@ -900,8 +900,15 @@ Deno.test('TeacherHours should show a teacher their sessions of a month and who 
         substitution: false,
       }]),
   } as unknown as UpcomingSessions;
+  const holidays = {
+    between: (from: LocalDate, to: LocalDate) =>
+      Promise.resolve([{ date: '2026-10-12', name: `${from.toString()}/${to.toString()}` }]),
+  };
 
-  const hours = await new TeacherHours(sessions, query, upcoming).execute('lucia', '2026-10');
+  const hours = await new TeacherHours(sessions, query, upcoming, holidays).execute(
+    'lucia',
+    '2026-10',
+  );
 
   assertEquals([listed, asked], [[['2026-10', 'lucia']], ['lucia 2026-10-01/2026-10-31']]);
   assertEquals(hours.month, '2026-10');
@@ -913,6 +920,7 @@ Deno.test('TeacherHours should show a teacher their sessions of a month and who 
     ],
   );
   assertEquals(Object.keys(hours.sessions[0] ?? {}).includes('costCents'), false, 'sin coste');
+  assertEquals(hours.holidays, [{ date: '2026-10-12', name: '2026-10-01/2026-10-31' }]);
   assertEquals(hours.upcoming.map((u) => [u.date, u.label]), [['2026-10-28', 'lucia 2026-10']]);
   // Del primero al último del mes.
   assertEquals(hours.substitutions.map((x) => [x.date, x.role, x.otherName]), [
@@ -920,7 +928,7 @@ Deno.test('TeacherHours should show a teacher their sessions of a month and who 
     ['2026-10-15', 'received', 'Ana Belén Torres'],
   ]);
   await assertRejects(
-    () => new TeacherHours(sessions, query, upcoming).execute('lucia', 'octubre'),
+    () => new TeacherHours(sessions, query, upcoming, holidays).execute('lucia', 'octubre'),
     InvalidValue,
   );
 });

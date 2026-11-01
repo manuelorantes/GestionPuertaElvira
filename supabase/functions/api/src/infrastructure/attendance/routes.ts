@@ -346,6 +346,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         ),
         new SqlTeacherReportQuery(tx),
         upcomingSessions(tx, api.deps.clock),
+        new SqlHolidayCalendar(tx),
       ).execute(sessionTeacher(scope), c.req.query('month') ?? today().slice(0, 7)),
     );
   });
