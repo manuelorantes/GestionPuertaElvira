@@ -137,6 +137,7 @@ Table billing_account {
   preferred_plan varchar(20) [not null, note: 'monthly | three_months | six_months | rest_of_season (solo propone meses)']
   member boolean [not null, note: 'socio: cuota de socio por temporada']
   private_rate_cents int [note: 'precio por hora pactado de sus particulares']
+  unbilled_months jsonb [not null, default: '[]', note: 'meses (AAAA-MM) sin cuota mensual: alta tardía que empieza a pagar el mes siguiente']
 }
 
 Table billing_charge {

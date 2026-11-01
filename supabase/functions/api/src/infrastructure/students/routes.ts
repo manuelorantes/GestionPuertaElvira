@@ -1,5 +1,5 @@
 import { LocalDate, YearMonth } from '../../domain/common/mod.ts';
-import type { StudentId } from '../../domain/students/mod.ts';
+import { StudentId } from '../../domain/students/mod.ts';
 import {
   type AttendanceInput,
   ChangeAttendance,
@@ -30,7 +30,13 @@ import {
 } from '../../application/students/mod.ts';
 import { StudentsJoinDates, today } from '../classes/routes.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
-import { generatingCharges, recalculatingFees } from '../billing/recalculate.ts';
+import {
+  choosingFirstMonthFee,
+  droppingChargesBeforeJoining,
+  firstMonthChoiceFrom,
+  generatingCharges,
+  recalculatingFees,
+} from '../billing/recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
@@ -227,22 +233,29 @@ export function registerStudentRoutes(api: ApiApp): void {
         new BillingMembership(scope.tx),
       );
       const requested = enrolmentRequests(body);
-      // Su familia directa pasa a tener descuento familiar.
-      const id = await recalculatingFees(
-        api,
-        scope,
-        body.stringList('siblingIds'),
-        () =>
-          register.execute(
-            studentInput(body),
-            requested,
-            body.stringList('siblingIds'),
-            body.bool('confirmOverCapacity'),
-            body.optionalString('joinedOn'),
-          ),
-      );
-      // Su cuota de este mes, al momento.
-      await generatingCharges(api, scope, [id]);
+      const firstMonth = firstMonthChoiceFrom(body);
+      const joinedOn = body.optionalString('joinedOn') ?? today(api).toString();
+      // Todo o nada: si lo elegido para el primer mes no vale, no queda el alta a medias.
+      const id = await transactions(scope).run(async () => {
+        // Su familia directa pasa a tener descuento familiar.
+        const id = await recalculatingFees(
+          api,
+          scope,
+          body.stringList('siblingIds'),
+          () =>
+            register.execute(
+              studentInput(body),
+              requested,
+              body.stringList('siblingIds'),
+              body.bool('confirmOverCapacity'),
+              joinedOn,
+            ),
+        );
+        // Su cuota de este mes, al momento (y, en un alta a final de mes, lo que se decidió cobrar de ella).
+        await generatingCharges(api, scope, [id]);
+        await choosingFirstMonthFee(api, scope, id, joinedOn, firstMonth);
+        return id;
+      });
       return c.json({ id }, 201);
     },
   );
@@ -263,20 +276,24 @@ export function registerStudentRoutes(api: ApiApp): void {
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
       const id = param(c, 'id');
-      await recalculatingFees(api, scope, [id], () =>
-        new RejoinStudent(
-          students(scope),
-          enrolments(scope),
-          transactions(scope),
-          clock,
-          new BillingMembership(scope.tx),
-        ).execute(
-          id,
-          body.requiredString('date'),
-          enrolmentRequests(body),
-          body.bool('confirmOverCapacity'),
-        ));
-      await generatingCharges(api, scope, [id]);
+      const firstMonth = firstMonthChoiceFrom(body);
+      await transactions(scope).run(async () => {
+        await recalculatingFees(api, scope, [id], () =>
+          new RejoinStudent(
+            students(scope),
+            enrolments(scope),
+            transactions(scope),
+            clock,
+            new BillingMembership(scope.tx),
+          ).execute(
+            id,
+            body.requiredString('date'),
+            enrolmentRequests(body),
+            body.bool('confirmOverCapacity'),
+          ));
+        await generatingCharges(api, scope, [id]);
+        await choosingFirstMonthFee(api, scope, id, body.requiredString('date'), firstMonth);
+      });
       return c.body(null, 204);
     },
   );
@@ -286,6 +303,7 @@ export function registerStudentRoutes(api: ApiApp): void {
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
       const id = param(c, 'id');
+      const previous = (await students(scope).find(StudentId.fromString(id)))?.joinedOn ?? null;
       await recalculatingFees(
         api,
         scope,
@@ -296,6 +314,14 @@ export function registerStudentRoutes(api: ApiApp): void {
             body.requiredString('date'),
           ),
       );
+      if (previous !== null) {
+        await droppingChargesBeforeJoining(
+          scope,
+          id,
+          previous,
+          LocalDate.fromString(body.requiredString('date')),
+        );
+      }
       await generatingCharges(api, scope, [id]);
       return c.body(null, 204);
     },

@@ -295,7 +295,12 @@ export function registerBillingRoutes(api: ApiApp): void {
     admin('PUT', '/api/admin/billing/accounts/:id/charges/:month'),
     async (c, scope) => {
       const body = await JsonBody.from(c.req.raw);
-      await new AdjustCharge(billing(api, scope).charges, new SqlPaymentRepository(scope.tx))
+      const repositories = billing(api, scope);
+      await new AdjustCharge(
+        repositories.charges,
+        new SqlPaymentRepository(scope.tx),
+        repositories.accounts,
+      )
         .execute(
           param(c, 'id'),
           param(c, 'month'),

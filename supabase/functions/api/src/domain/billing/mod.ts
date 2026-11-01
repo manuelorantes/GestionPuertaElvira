@@ -944,10 +944,10 @@ export class Payment {
     private paidWith: PaymentMethod,
     readonly receipt: DocumentNumber,
     readonly kind: ChargeKind,
-    readonly concept: string,
+    private label: string,
     private quoteLines: readonly QuoteLine[],
     private amount: Money,
-    readonly periods: readonly YearMonth[],
+    private months: readonly YearMonth[],
     private issued: Invoice | null,
     /** Lo que cubre en importes de cuota, antes de descuentos (ver cuotas-separadas-de-los-cobros.md). */
     private covering: Money,
@@ -1018,6 +1018,21 @@ export class Payment {
     return this.paidWith;
   }
 
+  get concept(): string {
+    return this.label;
+  }
+
+  get periods(): readonly YearMonth[] {
+    return this.months;
+  }
+
+  /** Pasa a cubrir otros meses (p. ej. los de antes del alta dejan de tener cuota); el importe no cambia. */
+  coverMonths(periods: readonly YearMonth[], concept: string): void {
+    if (periods.length === 0) throw new InvalidValue('periods', 'Un cobro cubre al menos un mes.');
+    this.months = [...periods];
+    this.label = concept;
+  }
+
   get paidOn(): LocalDate {
     return this.paidDay;
   }
@@ -1079,10 +1094,12 @@ export class StudentAccount {
     private plan: PreferredPlan,
     private member: boolean,
     private rate: Money | null,
+    /** Meses de la temporada en los que no se le cobra cuota mensual (p. ej. el de un alta a final de mes). */
+    private unbilled: readonly YearMonth[],
   ) {}
 
   static open(student: StudentRef): StudentAccount {
-    return new StudentAccount(student, 'monthly', false, null);
+    return new StudentAccount(student, 'monthly', false, null, []);
   }
 
   static restore(
@@ -1090,8 +1107,9 @@ export class StudentAccount {
     plan: PreferredPlan,
     member: boolean,
     privateRate: Money | null,
+    unbilledMonths: readonly YearMonth[] = [],
   ): StudentAccount {
-    return new StudentAccount(student, plan, member, privateRate);
+    return new StudentAccount(student, plan, member, privateRate, unbilledMonths);
   }
 
   update(plan: PreferredPlan, member: boolean, privateRate: Money | null): void {
@@ -1114,4 +1132,32 @@ export class StudentAccount {
   privateRate(): Money | null {
     return this.rate;
   }
+
+  /** Ese mes no se le cobra: no tiene cuota mensual y su primer cobro es el del mes siguiente. */
+  skipMonth(period: YearMonth): void {
+    if (!this.bills(period)) return;
+    this.unbilled = [...this.unbilled, period].sort((a, b) => a.isBefore(b) ? -1 : 1);
+  }
+
+  /** Si ese mes se le cobra cuota mensual. */
+  bills(period: YearMonth): boolean {
+    return !this.unbilled.some((m) => m.equals(period));
+  }
+
+  unbilledMonths(): readonly YearMonth[] {
+    return this.unbilled;
+  }
+}
+
+/** Desde este día del mes, un alta deja elegir qué se cobra de ese mes. */
+export const LATE_JOIN_FROM_DAY = 16;
+
+/**
+ * El mes cuya cuota se decide al dar de alta (o de nuevo) a alguien del día 16 en adelante del mes en curso: entero,
+ * una parte o nada. Null si se cobra entero sin preguntar (antes del 16, un alta de un mes anterior o en verano).
+ */
+export function lateJoinMonth(joinedOn: LocalDate, today: LocalDate): YearMonth | null {
+  const month = YearMonth.of(joinedOn);
+  if (!month.equals(YearMonth.of(today)) || joinedOn.day < LATE_JOIN_FROM_DAY) return null;
+  return Season.teachingSeason(month) === null ? null : month;
 }

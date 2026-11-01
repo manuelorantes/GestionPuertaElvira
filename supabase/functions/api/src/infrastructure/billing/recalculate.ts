@@ -1,9 +1,17 @@
-import { GenerateMonthlyCharges, RecalculateCharges } from '../../application/billing/mod.ts';
-import type { Money, YearMonth } from '../../domain/common/mod.ts';
+import {
+  ChooseFirstMonthFee,
+  DropChargesBeforeJoining,
+  type FirstMonthChoice,
+  GenerateMonthlyCharges,
+  RecalculateCharges,
+} from '../../application/billing/mod.ts';
+import { InvalidValue, type LocalDate, Money, type YearMonth } from '../../domain/common/mod.ts';
 import type { ApiApp, RequestScope } from '../http/app.ts';
+import type { JsonBody } from '../http/json-body.ts';
 import {
   SqlBillingSettingsRepository,
   SqlChargeRepository,
+  SqlPaymentRepository,
   SqlStudentAccountRepository,
   SqlStudentDirectory,
 } from '../persistence/billing.ts';
@@ -74,4 +82,45 @@ export async function recalculatingGroupFees<T>(
     Row.all(rows).map((r) => r.string('student_id')),
     change,
   );
+}
+
+/** `firstMonth`: { mode: 'full' | 'part' | 'none', amountCents? } (qué se cobra del mes en un alta a final de mes). */
+export function firstMonthChoiceFrom(body: JsonBody): FirstMonthChoice {
+  const raw = body.optionalObject('firstMonth');
+  const mode = raw?.optionalString('mode') ?? 'full';
+  if (mode === 'full' || mode === 'none') return { kind: mode };
+  if (mode === 'part') {
+    const cents = raw?.optionalInt('amountCents') ?? null;
+    if (cents === null) throw new InvalidValue('firstMonth', 'Indica cuánto paga de este mes.');
+    return { kind: 'part', amount: Money.cents(cents) };
+  }
+  throw new InvalidValue('firstMonth', 'Elige si paga el mes entero, una parte o nada.');
+}
+
+/** Aplica, ya creada su cuota del mes, lo elegido para la cuota del mes de un alta a final de mes. */
+export async function choosingFirstMonthFee(
+  api: ApiApp,
+  scope: RequestScope,
+  studentId: string,
+  joinedOn: string,
+  choice: FirstMonthChoice,
+): Promise<void> {
+  await new ChooseFirstMonthFee(
+    new SqlStudentAccountRepository(scope.tx),
+    new SqlChargeRepository(scope.tx),
+    api.deps.clock,
+  ).execute(studentId, joinedOn, choice);
+}
+
+/** Al retrasar el alta a otro mes, borra las cuotas de los meses que ya no le tocan y mueve sus cobros. */
+export async function droppingChargesBeforeJoining(
+  scope: RequestScope,
+  studentId: string,
+  previous: LocalDate,
+  joined: LocalDate,
+): Promise<void> {
+  await new DropChargesBeforeJoining(
+    new SqlChargeRepository(scope.tx),
+    new SqlPaymentRepository(scope.tx),
+  ).execute(studentId, previous, joined);
 }
