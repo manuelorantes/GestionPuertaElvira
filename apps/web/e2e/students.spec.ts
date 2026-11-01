@@ -136,3 +136,33 @@ test('should enrol with a special schedule and show it on the card and the group
 
   await expect(card.getByText('Horario especial: Lun · 18:30–19:30')).toBeVisible();
 });
+
+test('should ask what is charged of the month when someone joins from the 16th', async ({
+  page,
+}) => {
+  // El navegador cree que es día 20 del mes en curso (en julio y agosto no hay cuotas).
+  const now = new Date();
+  test.skip(now.getMonth() === 6 || now.getMonth() === 7, 'Sin cuotas en verano');
+  await page.clock.setFixedTime(new Date(now.getFullYear(), now.getMonth(), 20, 10));
+  await openStudents(page);
+  await page.getByRole('button', { name: 'Nuevo alumno' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Nuevo alumno' });
+  await dialog.getByLabel('Nombre y apellidos').fill('Lucía Fernández Ortiz');
+  await dialog.getByRole('button', { name: 'Añadir horario' }).click();
+  const block = dialog.getByRole('group', { name: 'Horario 1' });
+  await block.getByLabel('Día').selectOption('fri');
+  await block.getByLabel('Empieza').selectOption('16:30');
+  await block.getByLabel('Termina').selectOption('17:30');
+  await expect(dialog.getByText('Peques A', { exact: true })).toBeVisible();
+
+  const question = dialog.getByText(/^¿Qué paga de /);
+  await expect(question).toBeVisible();
+  await dialog.getByRole('button', { name: 'Una parte' }).click();
+  await dialog.getByLabel(/^Lo que paga de /).fill('20');
+  await question.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/capturas/alta-tardia-cuota-primer-mes.png' });
+
+  await dialog.getByRole('button', { name: 'Nada este mes' }).click();
+  await expect(dialog.getByText(/su primera cuota será la de /)).toBeVisible();
+  await page.screenshot({ path: 'test-results/capturas/alta-tardia-sin-cuota-este-mes.png' });
+});

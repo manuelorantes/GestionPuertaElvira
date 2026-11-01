@@ -13,6 +13,11 @@ import {
   type StudentDetail,
   updateStudent,
 } from '@/features/students/api';
+import {
+  FULL_FIRST_MONTH,
+  firstMonthPayload,
+  type FirstMonthValue,
+} from '@/features/students/firstMonth';
 import { missingSentence } from '@/features/students/pending';
 import { useStudentMutation, useStudents } from '@/features/students/hooks';
 import {
@@ -35,6 +40,7 @@ import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 
 import { EnrolmentDialog } from './EnrolmentDialog';
+import { FirstMonthFeeField } from './FirstMonthFeeField';
 import { ScheduleEditor } from './ScheduleEditor';
 import { SimilarStudentsNotice } from './SimilarStudentsNotice';
 
@@ -69,13 +75,24 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
   const groups = useGroups();
   // En el alta, desde cuándo; al editar, su última alta (los grupos que empezaban ese día se mueven con ella).
   const [joinedOn, setJoinedOn] = useState(detail?.joinedOn ?? todayIso());
+  // En un alta a final de mes, qué paga de ese mes.
+  const [firstMonth, setFirstMonth] = useState<FirstMonthValue>(FULL_FIRST_MONTH);
+  const firstMonthChoice = firstMonthPayload(firstMonth, joinedOn, schedule.length > 0);
   const enrolments: Registration['enrolments'] = (resolution.data?.enrolments ?? []).map((e) => ({
     groupId: e.groupId,
     attendance: e.groupId in overrides ? (overrides[e.groupId] ?? null) : e.attendance,
   }));
   const register = useStudentMutation(
     ({ values, confirm }: { values: StudentFormValues; confirm: boolean }) =>
-      registerStudent({ ...toRegistration(values, enrolments), joinedOn }, confirm),
+      registerStudent(
+        {
+          ...toRegistration(values, enrolments),
+          joinedOn,
+          ...(firstMonthChoice &&
+            firstMonthChoice !== 'invalid' && { firstMonth: firstMonthChoice }),
+        },
+        confirm,
+      ),
   );
   const update = useStudentMutation(async (values: StudentFormValues) => {
     if (detail && joinedOn !== detail.joinedOn) await changeJoinDate(detail.id, joinedOn);
@@ -244,6 +261,14 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                   onEditAttendance={setEditingAttendance}
                 />
               )}
+              {!form.isEdit && (
+                <FirstMonthFeeField
+                  joinedOn={joinedOn}
+                  hasClasses={schedule.length > 0}
+                  value={firstMonth}
+                  onChange={setFirstMonth}
+                />
+              )}
               <Switch
                 label="Federado"
                 checked={values.federated}
@@ -278,7 +303,7 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
               type="submit"
               busy={form.isSubmitting}
               busyLabel="Guardando…"
-              disabled={!form.isEdit && !scheduleReady}
+              disabled={!form.isEdit && (!scheduleReady || firstMonthChoice === 'invalid')}
             >
               {form.isEdit ? 'Guardar cambios' : 'Dar de alta'}
             </Button>
