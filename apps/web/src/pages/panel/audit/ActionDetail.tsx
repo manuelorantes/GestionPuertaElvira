@@ -117,6 +117,62 @@ function PaymentSummary({
  * El detalle de una acción: el resumen de un cobro o, para lo demás, campo a campo; si tocó inscripciones, antes van
  * todos los grupos de cada alumno antes y después.
  */
+/** Un registro tocado por una acción: qué fue (alta, cambio o baja), cómo se llama y cada campo con su antes y después. */
+export function ChangeCard({
+  change,
+  references,
+  showTarget = true,
+}: {
+  change: Change;
+  references: AuditDetail['references'];
+  /** Sin el botón «Ir a…» (p. ej. en la propia ficha a la que llevaría). */
+  showTarget?: boolean;
+}) {
+  return (
+    <div className="rounded-sm border border-line-soft bg-surface p-3">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[13px]">
+          <span className="font-semibold">
+            {OPERATION[change.operation]} · {change.tableLabel}
+          </span>
+          {change.title && <span className="text-ink-soft"> · {change.title}</span>}
+        </p>
+        {showTarget && change.target && <TargetLink target={change.target} />}
+      </div>
+      <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-3 gap-y-1 text-[13px]">
+        {change.fields
+          // En altas y bajas solo se enseña lo que tiene algo; en cambios, todo lo que cambió.
+          .filter(
+            (f) =>
+              change.operation === 'U' ||
+              !isEmptyValue(change.operation === 'D' ? f.before : f.after),
+          )
+          .map((f) => (
+            <Fragment key={f.field}>
+              <dt className="text-ink-muted">{fieldLabel(f.field, change.table)}</dt>
+              <dd className="break-words">
+                {change.operation === 'U' && (
+                  <>
+                    <Value parts={fieldValue(f.field, f.before, change.table, references)} muted />
+                    {' → '}
+                  </>
+                )}
+                <Value
+                  parts={fieldValue(
+                    f.field,
+                    change.operation === 'D' ? f.before : f.after,
+                    change.table,
+                    references,
+                  )}
+                />
+              </dd>
+            </Fragment>
+          ))}
+      </dl>
+    </div>
+  );
+}
+
 export function ActionDetail({ id }: { id: string }) {
   const detail = useQuery({ queryKey: ['audit-action', id], queryFn: () => fetchAction(id) });
   if (detail.isPending) return <p className="text-sm text-ink-muted">Cargando detalle…</p>;
@@ -132,53 +188,7 @@ export function ActionDetail({ id }: { id: string }) {
     <div className="flex flex-col gap-3">
       <StudentGroups students={detail.data.studentGroups} />
       {detail.data.changes.map((change, index) => (
-        <div
-          key={`${change.table}-${index}`}
-          className="rounded-sm border border-line-soft bg-surface p-3"
-        >
-          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-[13px]">
-              <span className="font-semibold">
-                {OPERATION[change.operation]} · {change.tableLabel}
-              </span>
-              {change.title && <span className="text-ink-soft"> · {change.title}</span>}
-            </p>
-            {change.target && <TargetLink target={change.target} />}
-          </div>
-          <dl className="grid grid-cols-[minmax(120px,auto)_1fr] gap-x-3 gap-y-1 text-[13px]">
-            {change.fields
-              // En altas y bajas solo se enseña lo que tiene algo; en cambios, todo lo que cambió.
-              .filter(
-                (f) =>
-                  change.operation === 'U' ||
-                  !isEmptyValue(change.operation === 'D' ? f.before : f.after),
-              )
-              .map((f) => (
-                <Fragment key={f.field}>
-                  <dt className="text-ink-muted">{fieldLabel(f.field, change.table)}</dt>
-                  <dd className="break-words">
-                    {change.operation === 'U' && (
-                      <>
-                        <Value
-                          parts={fieldValue(f.field, f.before, change.table, references)}
-                          muted
-                        />
-                        {' → '}
-                      </>
-                    )}
-                    <Value
-                      parts={fieldValue(
-                        f.field,
-                        change.operation === 'D' ? f.before : f.after,
-                        change.table,
-                        references,
-                      )}
-                    />
-                  </dd>
-                </Fragment>
-              ))}
-          </dl>
-        </div>
+        <ChangeCard key={`${change.table}-${index}`} change={change} references={references} />
       ))}
     </div>
   );

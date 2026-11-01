@@ -67,8 +67,10 @@ test('should register a minor in two groups, with the guardian added before savi
   await dialog.getByRole('button', { name: 'Dar de alta' }).click();
 
   const card = page.getByRole('dialog', { name: 'Lucía Fernández Ortiz' });
-  await expect(card.getByText('Iniciación A', { exact: true })).toBeVisible();
-  await expect(card.getByText('Peques A', { exact: true })).toBeVisible();
+  // La primera, en «Grupos» (el historial de cambios también lo nombra).
+  await expect(card.getByText('Iniciación A', { exact: true }).first()).toBeVisible();
+  // La primera, en «Grupos» (el historial de cambios también lo nombra).
+  await expect(card.getByText('Peques A', { exact: true }).first()).toBeVisible();
 });
 
 test('should confirm before enrolling in a full group', async ({ page }) => {
@@ -84,7 +86,8 @@ test('should confirm before enrolling in a full group', async ({ page }) => {
     .getByRole('dialog', { name: 'Añadir grupo' })
     .getByRole('button', { name: 'Añadir' })
     .click();
-  await expect(card.getByText('Particular · viernes', { exact: true })).toBeVisible();
+  // La primera, en «Grupos» (el historial de cambios también lo nombra).
+  await expect(card.getByText('Particular · viernes', { exact: true }).first()).toBeVisible();
   await page.keyboard.press('Escape');
 
   card = await openCard(page, /clara ibáñez soto/i);
@@ -101,7 +104,8 @@ test('should confirm before enrolling in a full group', async ({ page }) => {
   const confirm = page.getByRole('dialog', { name: 'Grupo completo' });
   await expect(confirm).toContainText('El grupo está completo (2/2). ¿Inscribir igualmente?');
   await confirm.getByRole('button', { name: 'Inscribir igualmente' }).click();
-  await expect(card.getByText('Particular · viernes', { exact: true })).toBeVisible();
+  // La primera, en «Grupos» (el historial de cambios también lo nombra).
+  await expect(card.getByText('Particular · viernes', { exact: true }).first()).toBeVisible();
 });
 
 test('should withdraw a student and show them as withdrawn', async ({ page }) => {
@@ -165,4 +169,29 @@ test('should ask what is charged of the month when someone joins from the 16th',
   await dialog.getByRole('button', { name: 'Nada este mes' }).click();
   await expect(dialog.getByText(/su primera cuota será la de /)).toBeVisible();
   await page.screenshot({ path: 'test-results/capturas/alta-tardia-sin-cuota-este-mes.png' });
+});
+
+test('should show the superadministration the history of changes on the student card', async ({
+  page,
+}) => {
+  await openStudents(page);
+  const card = await openCard(page, /pablo lópez herrera/i);
+  await card.getByRole('button', { name: 'Editar' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Editar alumno' });
+  await dialog.getByLabel('Teléfono del alumno').fill('600123456');
+  await dialog.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(dialog).toBeHidden();
+
+  const history = card.getByRole('list', { name: 'Historial de cambios' });
+  await expect(history.getByText('Editar alumno').first()).toBeVisible();
+  await expect(history).toContainText('600 12 34 56');
+  await expect(
+    card
+      .getByRole('table', { name: 'Movimientos de puntos' })
+      .or(card.getByText('No tiene movimientos de puntos esta temporada.')),
+  ).toBeVisible();
+  await card.getByText('Puntos', { exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/capturas/ficha-puntos.png' });
+  await history.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'test-results/capturas/ficha-historial-de-cambios.png' });
 });
