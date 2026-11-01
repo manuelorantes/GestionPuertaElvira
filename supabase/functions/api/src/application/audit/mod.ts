@@ -295,6 +295,34 @@ export interface AuditPaymentsPage {
   totalCents: number;
 }
 
+/**
+ * Lo que cuenta en el historial de un alumno: sus datos, sus periodos de alta, sus grupos y sus datos de cobro. Cuotas,
+ * cobros, puntos, asistencia, comentarios y material tienen su propia sección en la ficha.
+ */
+export const STUDENT_HISTORY_TABLES = [
+  'students_student',
+  'students_past_membership',
+  'classes_enrolment',
+  'billing_account',
+] as const;
+
+/** Una acción del historial de un alumno, solo con los cambios que le tocan a él. */
+export interface StudentHistoryEntry {
+  id: string;
+  seq: number;
+  label: string;
+  userName: string;
+  occurredAt: string;
+  changes: AuditChangeView[];
+}
+
+export interface StudentHistoryPage {
+  items: StudentHistoryEntry[];
+  references: Record<string, AuditReference>;
+  /** Para pedir las siguientes (más antiguas); null si no hay más. */
+  nextBefore: number | null;
+}
+
 export interface AuditLog {
   /** Acciones del historial, de la más reciente a la más antigua. */
   actions(filter: AuditFilter): Promise<AuditActionView[]>;
@@ -304,6 +332,12 @@ export interface AuditLog {
   classes(filter: AuditFilter): Promise<AuditClassView[]>;
   action(id: string): Promise<AuditActionView | null>;
   changes(actionId: string): Promise<AuditDetail>;
+  /** Las acciones que cambiaron algo de un alumno (ver `STUDENT_HISTORY_TABLES`), de la más reciente a la más antigua. */
+  studentHistory(
+    studentId: string,
+    beforeSeq: number | null,
+    limit: number,
+  ): Promise<StudentHistoryPage>;
   /** Personas que aparecen en el historial. */
   people(): Promise<{ id: string; name: string }[]>;
   /** Las categorías con acciones que cumplen `filter` (sin mirar `categories`), en su orden y cuántas hay de cada. */
