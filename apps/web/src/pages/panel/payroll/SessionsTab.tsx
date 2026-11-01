@@ -48,7 +48,7 @@ export function SessionsTab({ month, teachers, teacherId, onTeacherChange }: Ses
   const toast = useToast();
   // De lo más reciente a lo más antiguo, salvo que se elija otra columna.
   const { header, apply } = useTableSort(COLUMNS, { key: 'date', descending: true });
-  const items = sessions.data ?? [];
+  const items = sessions.data?.items ?? [];
   const summer = ['07', '08'].includes(month.slice(5));
 
   function renderBody() {

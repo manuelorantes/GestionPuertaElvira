@@ -1,6 +1,6 @@
 import { monthLabel } from '@/features/billing/money';
 import { LEVELS } from '@/features/classes/levels';
-import type { Session } from '@/features/payroll/api';
+import type { Session, UpcomingSession } from '@/features/payroll/api';
 import { monthWeeks } from '@/features/payroll/calendar';
 import { hoursLabel } from '@/features/payroll/hours';
 
@@ -9,21 +9,31 @@ const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 /** Quien mira el calendario: administración (la ficha del profesor) o el propio profesor (Mis horas). */
 export type CalendarViewer = 'staff' | 'teacher';
 
-/** Sus clases, con el verde de intermedio; las sustituciones que dio, con el negro de avanzado. */
+/**
+ * Sus clases, con el verde de intermedio; las sustituciones que dio, con el negro de avanzado. Lo que aún le queda por
+ * dar, en los tonos claros de lo previsto (como en la gráfica de cuotas y gastos): el verde de iniciación y el gris.
+ */
 const KINDS = {
   own: { className: LEVELS.intermediate.className },
   substitution: { className: LEVELS.advanced.className },
+  upcomingOwn: { className: LEVELS.beginner.className },
+  upcomingSubstitution: { className: 'bg-ink-muted text-paper border-ink-muted' },
 } as const;
 type Kind = keyof typeof KINDS;
+const UPCOMING_KINDS: readonly Kind[] = ['upcomingOwn', 'upcomingSubstitution'];
 
 const WORDING: Record<CalendarViewer, Record<Kind, { legend: string; suffix: string }>> = {
   staff: {
     own: { legend: 'Sus clases', suffix: 'de sus clases' },
     substitution: { legend: 'Sustituciones', suffix: 'de sustitución' },
+    upcomingOwn: { legend: 'Sus clases previstas', suffix: 'previstas de sus clases' },
+    upcomingSubstitution: { legend: 'Sustituciones previstas', suffix: 'previstas de sustitución' },
   },
   teacher: {
     own: { legend: 'Mis clases', suffix: 'de mis clases' },
     substitution: { legend: 'Sustituciones', suffix: 'de sustitución' },
+    upcomingOwn: { legend: 'Mis clases previstas', suffix: 'previstas de mis clases' },
+    upcomingSubstitution: { legend: 'Sustituciones previstas', suffix: 'previstas de sustitución' },
   },
 };
 
@@ -32,13 +42,28 @@ type CalendarSession = Pick<Session, 'date' | 'substitution' | 'countedMinutes'>
 
 type DayMinutes = Record<Kind, number>;
 
-/** Lo que cuenta de cada sesión, sumado por día y por si la dio como suya o sustituyendo. */
-function minutesByDay(sessions: CalendarSession[]): Map<string, DayMinutes> {
+/**
+ * Lo que cuenta de cada sesión, sumado por día y por si la dio como suya o sustituyendo; y aparte, lo que aún le
+ * queda por dar.
+ */
+function minutesByDay(
+  sessions: CalendarSession[],
+  upcoming: UpcomingSession[],
+): Map<string, DayMinutes> {
   const byDay = new Map<string, DayMinutes>();
-  for (const s of sessions) {
-    const day = byDay.get(s.date) ?? { own: 0, substitution: 0 };
-    day[s.substitution ? 'substitution' : 'own'] += s.countedMinutes;
-    byDay.set(s.date, day);
+  const add = (date: string, kind: Kind, minutes: number) => {
+    const day = byDay.get(date) ?? {
+      own: 0,
+      substitution: 0,
+      upcomingOwn: 0,
+      upcomingSubstitution: 0,
+    };
+    day[kind] += minutes;
+    byDay.set(date, day);
+  };
+  for (const s of sessions) add(s.date, s.substitution ? 'substitution' : 'own', s.countedMinutes);
+  for (const u of upcoming) {
+    add(u.date, u.substitution ? 'upcomingSubstitution' : 'upcomingOwn', u.minutes);
   }
   return byDay;
 }
@@ -49,26 +74,33 @@ function isWeekend(date: string): boolean {
 }
 
 /**
- * Calendario del mes con las horas que dio cada día. Las clases en las que le sustituyeron no están entre sus
- * sesiones, así que ese día sale vacío. Sábado y domingo solo aparecen si ese mes dio algo en fin de semana.
+ * Calendario del mes con las horas que dio cada día y, en tonos claros, las que aún le quedan por dar según el
+ * horario. Las clases en las que le sustituyeron no están entre sus sesiones, así que ese día sale vacío. Sábado y
+ * domingo solo aparecen si ese mes tiene algo en fin de semana.
  */
 export function SessionsCalendar({
   month,
   sessions,
+  upcoming = [],
   viewer = 'staff',
 }: {
   month: string;
   sessions: CalendarSession[];
+  upcoming?: UpcomingSession[];
   viewer?: CalendarViewer;
 }) {
-  const byDay = minutesByDay(sessions);
+  const byDay = minutesByDay(sessions, upcoming);
   const wording = WORDING[viewer];
-  const weekLength = sessions.some((s) => isWeekend(s.date)) ? 7 : 5;
+  const weekLength = [...sessions, ...upcoming].some((s) => isWeekend(s.date)) ? 7 : 5;
+  // Lo previsto solo sale en la leyenda cuando el mes tiene algo por dar.
+  const legend = (Object.keys(KINDS) as Kind[]).filter(
+    (kind) => !UPCOMING_KINDS.includes(kind) || upcoming.length > 0,
+  );
   return (
     <div className="px-5 pt-4">
       <table className="w-full table-fixed border border-line-soft text-left text-sm">
         <caption className="sr-only">
-          Calendario de clases dadas en {monthLabel(month).toLowerCase()}
+          Calendario de clases de {monthLabel(month).toLowerCase()}
         </caption>
         <thead className="border-b border-line text-xs tracking-[0.06em] text-ink-muted uppercase">
           <tr>
@@ -98,7 +130,7 @@ export function SessionsCalendar({
         aria-label="Leyenda del calendario"
         className="mt-2 flex flex-wrap gap-4 text-[13px] text-ink-muted"
       >
-        {(Object.keys(KINDS) as Kind[]).map((kind) => (
+        {legend.map((kind) => (
           <li key={kind} className="flex items-center gap-1.5">
             <span aria-hidden className={`size-3 rounded-sm border ${KINDS[kind].className}`} />
             {wording[kind].legend}
