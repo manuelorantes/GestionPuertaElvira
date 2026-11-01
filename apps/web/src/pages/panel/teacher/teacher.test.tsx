@@ -509,7 +509,15 @@ describe('Mis horas', () => {
               substitution: false,
             },
           ],
-          upcoming: [{ date: day(14), label: 'Iniciación B', minutes: 60, substitution: false }],
+          upcoming: [
+            {
+              date: day(14),
+              label: 'Iniciación B',
+              minutes: 60,
+              countedMinutes: 60,
+              substitution: false,
+            },
+          ],
           substitutions: [
             {
               date: day(14),

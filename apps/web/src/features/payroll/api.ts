@@ -80,6 +80,8 @@ export interface UpcomingSession {
   date: string;
   label: string;
   minutes: number;
+  /** Lo que contará: menos si se pisa con otra el mismo día (lo solapado solo se paga una vez). */
+  countedMinutes: number;
   /** La dará sustituyendo a su titular. */
   substitution: boolean;
 }
