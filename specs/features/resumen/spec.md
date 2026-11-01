@@ -43,7 +43,9 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
   en gris, los **gastos previstos**: lo que costará el
   profesorado ese mes según el horario (las [horas esperadas](../profesorado/spec.md) de Rentabilidad: clases y
   actividades de los días del mes salvo festivos, a la tarifa de hoy), menos lo del profesorado que ya esté en el
-  libro ese mes, del mes en curso en adelante (los meses pasados, julio y agosto no tienen); y lo esperado de los
+  libro ese mes, del mes en curso en adelante (julio y agosto no tienen); en los meses ya pasados, lo que aún se le
+  debe: lo que queda por pagar (importe menos anticipos) de sus liquidaciones sin pagar de ese mes, que no se va al
+  cambiar de mes y desaparece al pagar cada liquidación (ya es gasto); y lo esperado de los
   [gastos esperados](../contabilidad/spec.md#requirement-gastos-esperados) de categorías del mes que siguen
   pendientes, también en los meses pasados, hasta que se pagan o se marcan «No hay este mes».
 Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cuánto dinero equivale, p. ej. «Ingresos de
@@ -70,6 +72,10 @@ octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «G
   su liquidación
 - **THEN** «Cuotas vs gastos fijos» muestra en octubre y en cada mes hasta junio, sobre los gastos, el profesorado
   previsto de ese mes (sus lunes y miércoles no festivos × 15 €), y nada en julio ni en agosto
+
+#### Scenario: Profesorado de un mes pasado sin pagar
+- **WHEN** llega noviembre y la liquidación de octubre de la profesora (8 h × 15 €) sigue sin pagar
+- **THEN** octubre sigue mostrando 120 € de gastos previstos; al pagarla, pasan a gasto y octubre se queda sin previstos
 
 ### Requirement: Ocupación
 El resumen MUST mostrar la ocupación media de los grupos (plazas ocupadas sobre plazas totales), cuántos están completos
