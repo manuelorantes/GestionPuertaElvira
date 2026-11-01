@@ -4,7 +4,7 @@ name: puerta-elvira
 services:
   # API en Deno (la Edge Function de Supabase, ejecutada tal cual contra el PostgreSQL local).
   api:
-    image: denoland/deno:2.9.7
+    image: denoland/deno:2.9.8
     user: "${HOST_UID:-1000}:${HOST_GID:-1000}"
     working_dir: /app/supabase/functions/api
     command: deno task serve
