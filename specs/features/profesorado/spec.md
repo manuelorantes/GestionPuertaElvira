@@ -195,7 +195,8 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
   cada sesión cuenta lo que cuenta en su liquidación (sin contar dos veces lo que se pisa);
   el día en que le sustituyeron no lleva nada de esa clase;
   también marca, según el horario, las horas que aún le quedan por dar ese mes (de hoy, lo que no ha acabado;
-  sin festivos; con las sustituciones planificadas; nunca lo que ya se le ha apuntado),
+  sin festivos; con las sustituciones planificadas; nunca lo que ya se le ha apuntado; y, como en la liquidación,
+  sin contar dos veces lo que se pisa el mismo día, con lo previsto o con lo ya apuntado),
   en los tonos claros de lo previsto: las de sus clases en el verde de iniciación y las de sustitución en gris,
   con su leyenda («Sus clases previstas» y «Sustituciones previstas») solo si el mes tiene algo por dar;
 - sus clases asignadas con días, horario, aula, alumnos y ocupación, y la ocupación total de sus clases; cuando hay
@@ -214,6 +215,10 @@ antiguo, las clases asignadas por horario y los alumnos por nombre.
 #### Scenario: Horas que aún quedan por dar
 - **WHEN** es martes a las 17:30, el profesor tiene clase de 17:00 a 18:30 los martes y el miércoles sustituye a otro
 - **THEN** el calendario marca hoy y el martes que viene su clase en verde claro, y el miércoles la sustitución en gris
+
+#### Scenario: Lo previsto que se pisa cuenta una vez
+- **WHEN** un viernes que viene el profesor tiene clase de 17:00 a 18:30 y el turno de 17:00 a 20:00
+- **THEN** ese viernes marca 3 h previstas, no 4,5 h
 
 ### Requirement: Anticipos y fecha de pago
 Administración MUST poder apuntar un anticipo a un profesor (importe, mes del que se descuenta, día en que se pagó y
