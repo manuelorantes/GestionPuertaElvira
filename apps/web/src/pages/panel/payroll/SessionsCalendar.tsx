@@ -44,7 +44,7 @@ type DayMinutes = Record<Kind, number>;
 
 /**
  * Lo que cuenta de cada sesión, sumado por día y por si la dio como suya o sustituyendo; y aparte, lo que aún le
- * queda por dar.
+ * queda por dar, también sin contar dos veces lo que se pisa.
  */
 function minutesByDay(
   sessions: CalendarSession[],
@@ -63,7 +63,7 @@ function minutesByDay(
   };
   for (const s of sessions) add(s.date, s.substitution ? 'substitution' : 'own', s.countedMinutes);
   for (const u of upcoming) {
-    add(u.date, u.substitution ? 'upcomingSubstitution' : 'upcomingOwn', u.minutes);
+    add(u.date, u.substitution ? 'upcomingSubstitution' : 'upcomingOwn', u.countedMinutes);
   }
   return byDay;
 }

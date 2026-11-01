@@ -733,8 +733,28 @@ describe('Profesorado', () => {
             session({ id: 's4', date: date(second), substitution: true, countedMinutes: 60 }),
           ],
           upcoming: [
-            { date: date(fourth), label: 'Iniciación A', minutes: 60, substitution: false },
-            { date: date(fifth), label: 'Adultos I', minutes: 90, substitution: true },
+            {
+              date: date(fourth),
+              label: 'Iniciación A',
+              minutes: 60,
+              countedMinutes: 60,
+              substitution: false,
+            },
+            // Dentro de un turno de 3 h: solo cuenta lo que no se pisa.
+            {
+              date: date(fourth),
+              label: 'Encargado del club',
+              minutes: 180,
+              countedMinutes: 120,
+              substitution: false,
+            },
+            {
+              date: date(fifth),
+              label: 'Adultos I',
+              minutes: 90,
+              countedMinutes: 90,
+              substitution: true,
+            },
           ],
         },
       ],
@@ -758,7 +778,7 @@ describe('Profesorado', () => {
     // Un día sin clases dadas (también cuando le sustituyeron) no lleva horas.
     expect(day(third)).not.toHaveTextContent(' h');
     // Lo que aún le queda por dar, en los tonos claros: verde sus clases, gris las sustituciones.
-    expect(day(fourth)).toHaveTextContent('1 h previstas de sus clases');
+    expect(day(fourth)).toHaveTextContent('3 h previstas de sus clases');
     expect(day(fourth).querySelector('[data-kind="upcomingOwn"]')).toHaveClass('bg-brand-soft');
     expect(day(fifth)).toHaveTextContent('1,5 h previstas de sustitución');
     expect(day(fifth).querySelector('[data-kind="upcomingSubstitution"]')).toHaveClass(
