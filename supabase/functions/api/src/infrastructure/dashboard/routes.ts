@@ -4,7 +4,6 @@ import { ExpectedPayroll, ListSettlements, PendingPayroll } from '../../applicat
 import { billing } from '../billing/routes.ts';
 import type { ApiApp } from '../http/app.ts';
 import { SqlAccountingRepository, SqlLedgerQuery } from '../persistence/accounting.ts';
-import { SqlFeeIncome } from '../persistence/billing.ts';
 import { SqlClassQuery } from '../persistence/classes.ts';
 import {
   SqlAdvanceRepository,
@@ -30,7 +29,6 @@ export function registerDashboardRoutes(api: ApiApp): void {
         new SqlStudentQuery(scope.tx, new SqlClassQuery(scope.tx)),
         new SqlClassQuery(scope.tx),
         api.deps.clock,
-        new SqlFeeIncome(scope.tx),
         new SqlAccountingRepository(scope.tx),
         new ExpectedPayroll(
           new SqlScheduleDirectory(scope.tx),
