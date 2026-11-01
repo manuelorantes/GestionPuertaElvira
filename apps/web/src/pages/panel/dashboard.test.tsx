@@ -42,9 +42,9 @@ const SUMMARY = {
   pendingCents: 246000,
   membershipPendingCents: 275000,
   activeStudents: 157,
-  newStudents: 6,
+  studentsChange: 6,
   studentsInClasses: 142,
-  newInClasses: 4,
+  inClassesChange: 4,
   cashChart: chart,
   // Cuotas vs gastos fijos: solo las categorías del mes, y las cuotas previstas de los meses que vienen.
   monthChart: chart.map((m, i) => ({
@@ -119,7 +119,7 @@ describe('Resumen', () => {
     expect(
       screen.getByText('Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio'),
     ).toBeInTheDocument();
-    // Socios activos y socios en clases, cada uno con los nuevos del mes.
+    // Socios activos y socios en clases, cada uno con lo que ha cambiado en el mes.
     expect(screen.getByText('Socios activos')).toBeInTheDocument();
     expect(screen.getByText('157')).toBeInTheDocument();
     expect(screen.getByText('+6 este mes')).toBeInTheDocument();
@@ -175,6 +175,18 @@ describe('Resumen', () => {
       'href',
       '/panel?ficha=s9',
     );
+  });
+
+  it('shows a drop in the month with its sign and hides the change when there is none', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/dashboard': [200, { ...SUMMARY, studentsChange: -2, inClassesChange: 0 }],
+    });
+    renderApp('/panel');
+
+    expect(await screen.findByText('-2 este mes')).toBeInTheDocument();
+    expect(screen.queryByText(/[+-]?0 este mes/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/este mes$/)).toHaveLength(1);
   });
 
   it("opens a student's sheet over the summary, which stays put, with a way to go to «Alumnos»", async () => {
