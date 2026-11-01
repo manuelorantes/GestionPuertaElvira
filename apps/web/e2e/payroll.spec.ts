@@ -38,7 +38,11 @@ test('should record extra hours for an activity', async ({ page }) => {
 
 test('should pay the pending settlement of last month', async ({ page }) => {
   test.skip(month === 9, 'En septiembre no hay mes anterior de temporada');
-  await openTeachers(page, '?pestana=liquidacion');
+  // La pestaña abre en el mes en curso: se pide el anterior.
+  const now = new Date();
+  const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonth = `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}`;
+  await openTeachers(page, `?pestana=liquidacion&mes=${lastMonth}`);
 
   const row = page.getByRole('row', { name: /Miguel Á. Fernández/ });
   await expect(row.getByText('Pendiente')).toBeVisible();
