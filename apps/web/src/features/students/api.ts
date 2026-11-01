@@ -1,6 +1,8 @@
 import type { Weekday } from '@/features/classes/api';
 import { apiGet, apiSend } from '@/shared/api/client';
 
+import type { FirstMonthPayload } from './firstMonth';
+
 /** `no_classes`: socios activos sin ningún grupo. */
 export type StudentFilter = 'all' | 'active' | 'withdrawn' | 'siblings' | 'no_classes';
 
@@ -87,6 +89,8 @@ export interface Registration extends StudentPayload {
   siblingIds: string[];
   /** Fecha de alta en el club (por defecto hoy): sus grupos empiezan ese día. */
   joinedOn?: string;
+  /** En un alta del día 16 en adelante, qué se cobra de ese mes (por defecto, entero). */
+  firstMonth?: FirstMonthPayload;
 }
 
 export async function fetchStudents(
@@ -139,13 +143,11 @@ export function updateStudent(id: string, payload: StudentPayload): Promise<void
 /** Vuelve a dar de alta a un alumno de baja, desde un día y en unos grupos (sin grupos, como socio). */
 export function rejoinStudent(
   id: string,
-  date: string,
-  groupIds: string[],
+  rejoin: { date: string; groupIds: string[]; firstMonth?: FirstMonthPayload },
   confirmOverCapacity: boolean,
 ): Promise<void> {
   return apiSend('POST', `/api/admin/students/${id}/rejoin`, {
-    date,
-    groupIds,
+    ...rejoin,
     confirmOverCapacity,
   });
 }

@@ -449,9 +449,14 @@ export function StudentSheet({
           name={s.fullName.split(' ')[0] ?? s.fullName}
           groups={groups.data ?? []}
           onClose={() => setAction(null)}
-          onRejoin={(date, groupIds) =>
+          onRejoin={(date, groupIds, firstMonth) =>
             enrolWithConfirm(
-              (confirm) => api.rejoinStudent(s.id, date, groupIds, confirm),
+              (confirm) =>
+                api.rejoinStudent(
+                  s.id,
+                  { date, groupIds, ...(firstMonth && { firstMonth }) },
+                  confirm,
+                ),
               'Alta registrada',
             )
           }
