@@ -186,7 +186,8 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
 - saldo a día de hoy: lo que le debemos (liquidaciones pendientes hasta hoy menos anticipos) o lo pagado de más;
 - mes a mes de la temporada hasta hoy: horas, importe, anticipos, a pagar, estado (pagada y cuándo, pendiente o en
   curso), ingresos atribuidos y margen;
-- clases dadas en el mes que se elija (fecha, clase o actividad, horas y coste); las que dio sustituyendo a otro
+- clases dadas en el mes que se elija de la temporada, también los que vienen (fecha, clase o actividad, horas y
+  coste); las que dio sustituyendo a otro
   profesor llevan delante «(Sustitución)»;
   antes de la lista, un calendario de ese mes (de lunes a viernes, o la semana entera si dio algo en fin de semana)
   marca cada día las horas que dio:
@@ -244,8 +245,8 @@ y, de solo lectura, lo del club que se indica:
     el mes en curso; cada nombre lleva a la ficha del alumno, como en el resto del panel.
   No puede ver así ningún otro grupo.
 - **Clases** y **Alumnos** del club, de solo lectura (ver las specs de clases y alumnos).
-- **Mis horas** (en el menú, entre Alumnos y Mis pagos): las clases que dio en el mes que elija (de septiembre al mes en
-  curso; por defecto, el actual):
+- **Mis horas** (en el menú, entre Alumnos y Mis pagos): las clases que dio en el mes que elija, y las que le quedan
+  por dar (cualquier mes de la temporada, de septiembre a junio, también los que vienen; por defecto, el actual):
   - el **total del mes**, que cambia al cambiar de mes: las horas del mes (lo que cuenta cada sesión, como en su
     liquidación) con el número de sesiones, y por separado las de sus clases y las de sustitución;
   - el mismo calendario que ve administración en su ficha (ver «Ficha del profesor»), con lo que aún le queda por dar
