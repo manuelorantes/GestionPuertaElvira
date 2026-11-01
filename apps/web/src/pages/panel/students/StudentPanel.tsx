@@ -15,6 +15,8 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
+import { usePanelRole } from '@/features/auth/panelView';
+import { useSession } from '@/features/auth/useSession';
 import { REJOIN_ACTION } from '@/features/students/links';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { useGroups } from '@/features/classes/hooks';
@@ -35,6 +37,8 @@ import { useToast } from '@/shared/ui/Toast';
 
 import { StudentAttendanceCard } from './StudentAttendanceCard';
 import { StudentCommentsCard } from './StudentCommentsCard';
+import { StudentHistoryCard } from './StudentHistoryCard';
+import { StudentPointsCard } from './StudentPointsCard';
 import { StudentBillingCard } from './StudentBillingCard';
 import { StudentMaterialCard } from './StudentMaterialCard';
 import { EnrolmentDialog } from './EnrolmentDialog';
@@ -115,6 +119,8 @@ export function StudentSheet({
 }) {
   const student = useStudent(id);
   const canManage = useCanManageClub();
+  // El historial de cambios del alumno es solo de superadministración (y no en el espacio de profesor).
+  const isSuperadmin = usePanelRole(useSession().data) === 'superadministrator';
   const groups = useGroups();
   const others = useStudents('active', '');
   const toast = useToast();
@@ -425,6 +431,10 @@ export function StudentSheet({
         <StudentMaterialCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentAttendanceCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentCommentsCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
+        <StudentPointsCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
+        {isSuperadmin && (
+          <StudentHistoryCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
+        )}
       </div>
 
       {action?.kind === 'edit' && (

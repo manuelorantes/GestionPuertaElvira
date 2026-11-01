@@ -56,6 +56,12 @@ export async function fetchMovements(filter: {
   return (await apiGet<{ items: PointMovement[] }>(`${BASE}/movements?${query}`)).items;
 }
 
+/** Los movimientos de puntos de un alumno en la temporada, del más reciente al más antiguo. */
+export async function fetchStudentPointsHistory(studentId: string): Promise<PointMovement[]> {
+  return (await apiGet<{ items: PointMovement[] }>(`/api/admin/students/${studentId}/points`))
+    .items;
+}
+
 export function adjustPoints(studentId: string, delta: number, note: string): Promise<void> {
   return apiSend('POST', `${BASE}/adjustments`, { studentId, delta, note });
 }

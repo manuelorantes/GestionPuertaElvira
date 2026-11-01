@@ -161,6 +161,31 @@ export function fetchClasses(period: AuditPeriod): Promise<{ items: AuditClass[]
   return apiGet(url({ section: 'attendance', period }, undefined));
 }
 
+/** Una acción del historial de un alumno, solo con los cambios que le tocan a él. */
+interface StudentHistoryEntry {
+  id: string;
+  seq: number;
+  label: string;
+  userName: string;
+  occurredAt: string;
+  changes: AuditDetail['changes'];
+}
+
+export interface StudentHistoryPage {
+  items: StudentHistoryEntry[];
+  references: AuditDetail['references'];
+  nextBefore: number | null;
+}
+
+/** Lo que cambió de un alumno (datos, altas y bajas, grupos y datos de cobro); solo superadministración. */
+export function fetchStudentHistory(
+  studentId: string,
+  before?: number,
+): Promise<StudentHistoryPage> {
+  const query = before === undefined ? '' : `?before=${before}`;
+  return apiGet(`/api/admin/students/${studentId}/history${query}`);
+}
+
 export function fetchAction(id: string): Promise<AuditDetail> {
   return apiGet(`${BASE}/${id}`);
 }
