@@ -35,6 +35,7 @@ import {
   droppingChargesBeforeJoining,
   firstMonthChoiceFrom,
   generatingCharges,
+  reactivatingMembership,
   recalculatingFees,
 } from '../billing/recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
@@ -291,6 +292,7 @@ export function registerStudentRoutes(api: ApiApp): void {
             enrolmentRequests(body),
             body.bool('confirmOverCapacity'),
           ));
+        await reactivatingMembership(scope, id, body.requiredString('date'));
         await generatingCharges(api, scope, [id]);
         await choosingFirstMonthFee(api, scope, id, body.requiredString('date'), firstMonth);
       });

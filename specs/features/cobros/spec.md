@@ -73,6 +73,8 @@ mes nuevo, la noche del día 1, con la tarea de cada noche, que además crea cua
 cuotas o el resumen no crea nada.
 Toda persona que se da de alta (o vuelve a darse de alta), con clases o sin ellas, MUST quedar como socia.
 Los socios MUST tener una cuota de socio por temporada (50 € por defecto, sin descuentos salvo el especial).
+Si al darse de baja se canceló su cuota de socio y vuelve a darse de alta en la misma temporada,
+esa cuota MUST volver a deberse (lo que se hubiera cobrado de ella sigue contando).
 Cualquier alumno que no haya pagado la cuota de socio de la temporada MUST poder pagarla desde «Registrar cobro»
 (concepto «Cuota de socio»); al pagarla pasa a ser socio.
 Los pedidos de [material deportivo](../material/spec.md) con precio MUST generar un cobro que sale con las cuotas del
@@ -126,6 +128,10 @@ y lo que cubrían sus cobros pasa a los meses siguientes, con el concepto del re
 #### Scenario: Alta a mitad de mes
 - **WHEN** administración da de alta el día 15 a una alumna en un grupo
 - **THEN** su cuota de ese mes aparece al momento en «Cuotas», sin esperar a la noche
+
+#### Scenario: Vuelve en la misma temporada
+- **WHEN** un socio se da de baja el 12/10 con su cuota de socio cancelada sin pagar y vuelve a darse de alta el 14/10
+- **THEN** vuelve a deber los 50 € de la cuota de socio
 
 #### Scenario: Estados según la fecha
 - **WHEN** administración consulta las cuotas del mes
