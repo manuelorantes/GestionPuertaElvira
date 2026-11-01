@@ -5,6 +5,7 @@ import { type SetURLSearchParams, useSearchParams } from 'react-router';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
 import { useEntry } from '@/features/accounting/hooks';
 import { ledgerFilterFrom, withLedgerFilter } from '@/features/accounting/ledgerFilter';
+import { useSession } from '@/features/auth/useSession';
 import { currentMonth } from '@/features/billing/money';
 import { Alert } from '@/shared/ui/Alert';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
@@ -16,6 +17,7 @@ import { InvoiceDialog } from './InvoiceDialog';
 import { InvoicesTab } from './InvoicesTab';
 import { LedgerTab } from './LedgerTab';
 import { MonthlyCategoriesTab } from './MonthlyCategoriesTab';
+import { ReconciliationTab } from './ReconciliationTab';
 import { TransfersTab } from './TransfersTab';
 import { YearTab } from './YearTab';
 
@@ -27,6 +29,9 @@ const TABS = [
   { id: 'ajustes', label: 'Ajustes' },
   { id: 'diagnostico', label: 'Diagnóstico' },
 ];
+
+/** Solo superadministración concilia con el banco. */
+const RECONCILIATION_TAB = { id: 'conciliacion', label: 'Conciliación' };
 
 /**
  * Un enlace a un movimiento (`?movimiento=id`) sin mes: se busca el apunte y se abre su mes con el filtro de su
@@ -54,7 +59,9 @@ function useMovementLocation(
 
 export function AccountingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = TABS.some((t) => t.id === searchParams.get('pestana'))
+  const superadmin = useSession().data?.role === 'superadministrator';
+  const tabs = superadmin ? [...TABS, RECONCILIATION_TAB] : TABS;
+  const tab = tabs.some((t) => t.id === searchParams.get('pestana'))
     ? (searchParams.get('pestana') as string)
     : 'movimientos';
   const month = /^\d{4}-\d{2}$/.test(searchParams.get('mes') ?? '')
@@ -75,6 +82,7 @@ export function AccountingPage() {
     if (tab === 'traspasos') return <TransfersTab />;
     if (tab === 'ajustes') return <MonthlyCategoriesTab />;
     if (tab === 'diagnostico') return <DiagnosticsTab />;
+    if (tab === 'conciliacion') return <ReconciliationTab />;
     if (tab === 'cierre')
       return (
         <YearTab startYear={season} onChange={(year) => setParam('temporada', String(year))} />
@@ -109,7 +117,7 @@ export function AccountingPage() {
       <BalanceCards />
       <Tabs
         label="Vistas de contabilidad"
-        tabs={TABS}
+        tabs={tabs}
         value={tab}
         onChange={(id) => setParam('pestana', id)}
       >
