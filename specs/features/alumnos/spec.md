@@ -72,6 +72,26 @@ La ficha MUST mostrar:
 - **WHEN** administración abre un alumno
 - **THEN** ve todos sus datos y puede llamar a sus tutores desde el teléfono
 
+### Requirement: Historial de cambios del alumno
+La ficha MUST mostrar a la superadministración, debajo de los comentarios de las clases, «Historial de cambios»:
+cada acción que cambió algo del alumno, de la más reciente a la más antigua, con fecha y hora, quién la hizo
+(«Sistema» si fue desde la consola) y, por cada registro tocado, los campos con su valor anterior y el nuevo.
+Cuenta lo que no cambia en el día a día: datos personales y de contacto, familia directa, número de socio,
+altas, bajas y fecha de alta, grupos (inscribir, quitar, mover, horario especial, desde cuándo)
+y datos de cobro del alumno.
+Cuotas, cobros, puntos, asistencia, comentarios y material no salen: tienen su propia sección.
+Se muestran las 20 últimas y «Ver más» trae las anteriores.
+Administración y profesorado MUST NOT verlo.
+
+#### Scenario: Rastrear un cambio de grupo
+- **WHEN** la superadministración abre la ficha de un alumno al que movieron de grupo
+- **THEN** ve «Mover de grupo» con la fecha, quién lo hizo y el grupo anterior y el nuevo
+
+### Requirement: Puntos en la ficha
+La ficha MUST mostrar «Puntos»: los puntos de este mes y cada movimiento de la temporada
+(fecha, tipo, motivo y puntos ganados o gastados), del más reciente al más antiguo.
+La ven quienes ven la ficha (administración y profesorado).
+
 ### Requirement: Alta de alumnos
 Para dar de alta a un alumno solo MUST ser obligatorio el nombre y apellidos; todo lo demás es opcional.
 La fecha de nacimiento, si se indica, no puede ser futura ni de hace más de cien años,
