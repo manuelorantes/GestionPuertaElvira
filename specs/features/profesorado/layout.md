@@ -24,7 +24,7 @@ TeachersPayPage (/panel/profesores)
 │   └── Tabla: (desplegar) | Profesor | Horas | Tarifa | Importe | Estado (Pendiente/Pagada el dd/mm) | Imprimir · «Marcar como pagada» (pendiente) · lápiz «Editar» (pagada, solo superadministración)
 │       └── Detalle desplegado: líneas por grupo (nombre · horas · importe)
 ├── SessionDialog («Registrar horas» / «Editar sesión»): Profesor · Clase (grupo, actividad del club —propone su encargado y sus horas— u «Otra actividad» + descripción) · Fecha (DateField) · Horas (−/+ de 0,5) ·
-│   «Coste a 16 €/h: 24 €» · Cancelar | «Guardar horas»   (al editar: solo Profesor y Horas)
+│   «Coste a 16,00 €/h: 24,00 €» · Cancelar | «Guardar horas»   (al editar: solo Profesor y Horas)
 ├── HolidayDialog («Marcar festivo», desde «Añadir festivo» en Sustituciones y festivos): DateField · aviso «Se quitarán todas las sesiones de ese día (salvo liquidaciones pagadas).» · Cancelar | «Marcar festivo»
 ├── SettlementSheetDialog («Liquidación»): hoja imprimible (receipt-sheet): club, «Liquidación <mes> · <profesor>», líneas por grupo, total horas × tarifa = importe, estado; Cerrar | Imprimir
 └── SettlementPaymentDateDialog («Fecha de pago», desde el lápiz de una liquidación pagada y desde «Pagos recibidos» en la ficha del profesor): «Liquidación de <mes> · <importe>» · «Pagada el» (DateField) · Cancelar | Guardar → ConfirmChangesDialog «¿Guardar estos cambios?» («Fecha de pago: antes → después»; Volver | Confirmar)

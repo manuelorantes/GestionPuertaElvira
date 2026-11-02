@@ -19,7 +19,7 @@ El saldo del club MUST ser siempre la suma del banco y la caja.
 
 #### Scenario: Dónde está el dinero
 - **WHEN** en el ejercicio han entrado 600 € por transferencia y 80 € en efectivo
-- **THEN** el saldo del club es «680 €», el del banco «600 €» y el de caja «80 €»
+- **THEN** el saldo del club es «680,00 €», el del banco «600,00 €» y el de caja «80,00 €»
 
 ### Requirement: Traspasos entre caja y banco
 Administración MUST poder anotar traspasos de dinero de caja al banco o del banco a caja,
@@ -32,11 +32,11 @@ No se pueden anotar ni quitar traspasos con fecha de una temporada cerrada.
 
 #### Scenario: Ingresar el efectivo en el banco
 - **WHEN** con 600 € en el banco y 80 € en caja, administración traspasa 50 € de caja al banco
-- **THEN** el banco pasa a «650 €», la caja a «30 €» y el saldo del club sigue en «680 €»
+- **THEN** el banco pasa a «650,00 €», la caja a «30,00 €» y el saldo del club sigue en «680,00 €»
 
 #### Scenario: Quitar un traspaso
 - **WHEN** administración quita ese traspaso y confirma
-- **THEN** el dinero vuelve a donde estaba: «600 €» en el banco y «80 €» en caja
+- **THEN** el dinero vuelve a donde estaba: «600,00 €» en el banco y «80,00 €» en caja
 
 ### Requirement: Movimientos del mes
 El sistema MUST mostrar los movimientos del mes, del más reciente al más antiguo, con fecha, concepto, categoría, forma de pago e importe,
@@ -90,7 +90,7 @@ e importe mayor que cero, y quitarlos.
 ### Requirement: Editar movimientos
 Cada movimiento del libro MUST tener un botón de editar (lápiz) junto a los demás, para cambiar su concepto, categoría
 (de su mismo tipo), forma de pago, importe y meses a los que corresponde. Antes de guardar MUST pedirse confirmación con la
-lista de lo que cambia («Importe: 45 € → 40 €»). No se pueden editar los de una temporada cerrada.
+lista de lo que cambia («Importe: 45,00 € → 40,00 €»). No se pueden editar los de una temporada cerrada.
 
 - En apuntes manuales y facturas se cambia el apunte o la factura.
 - En cobros, liquidaciones y anticipos se corrige solo cómo salen en contabilidad (el libro, sus totales y las gráficas
@@ -111,7 +111,7 @@ Al anotarlos se puede elegir en «Mes al que corresponde»: por defecto, el mes 
 facturas); otro mes; o «Varios meses…», que reparte el importe a partes iguales entre los meses elegidos (los
 céntimos que sobran, a los primeros) y deja escribir a mano lo que va a cada mes.
 Un reparto MUST sumar el importe, sin meses repetidos y con más de 0 € en cada mes; si no, no se guarda y se explica
-(«El reparto suma 250 € y el importe es 300 €.»).
+(«El reparto suma 250,00 € y el importe es 300,00 €.»).
 Los meses MUST estar a menos de un año de la fecha del movimiento y no MAY ser de una temporada cerrada.
 En los demás movimientos, lo que corresponde a cada mes MUST ser: en las liquidaciones y anticipos, su mes; en los
 cobros de cuotas, el importe a partes iguales entre los meses que pagan; en los demás cobros, el mes del cobro.
@@ -166,7 +166,7 @@ No MAY pagarse ni saltarse un mes de una temporada cerrada.
 #### Scenario: La limpieza costó más
 - **WHEN** la limpieza se espera a 120 € al mes y en noviembre se pagan 135,50 € el 2 de diciembre
 - **THEN** en Movimientos de diciembre sale «Limpieza» por −135,50 €, que corresponde a noviembre;
-  en noviembre la limpieza sale pagada («se esperaban 120 €») y ya no cuenta como prevista en el resumen
+  en noviembre la limpieza sale pagada («se esperaban 120,00 €») y ya no cuenta como prevista en el resumen
 
 #### Scenario: Un mes sin limpieza
 - **WHEN** en agosto no hay limpieza y administración pulsa «No hay este mes»
@@ -197,7 +197,7 @@ Solo superadministración MUST poder editar una factura desde «Facturas», tamb
 con un botón de editar (lápiz) a la derecha del todo de su fila que administración no ve.
 Se cambian la fecha, el número, el proveedor, el concepto, la categoría, el importe y los meses a los que corresponde
 y, en una factura pagada, la fecha y la forma de pago; el documento no cambia.
-Antes de guardar MUST pedirse confirmación con la lista de lo que cambia («Importe: 950 € → 900 €»).
+Antes de guardar MUST pedirse confirmación con la lista de lo que cambia («Importe: 950,00 € → 900,00 €»).
 No se puede editar una factura de una temporada cerrada ni moverla a una.
 
 #### Scenario: Corregir el pago de una factura pagada
@@ -257,7 +257,7 @@ Con otra temporada elegida no sale esta sección.
 #### Scenario: Qué hay en los gastos de octubre
 - **WHEN** en octubre se han pagado el alquiler (510 €) y una factura de luz de 90 € repartida entre septiembre y
   octubre, y administración pincha los gastos de octubre
-- **THEN** debajo salen «Alquiler» por 510 € y la luz por 45 € («de 90 €»), con un total de 555 €, lo mismo que la
+- **THEN** debajo salen «Alquiler» por 510 € y la luz por 45 € («de 90,00 €»), con un total de 555 €, lo mismo que la
   barra negra de octubre
 
 #### Scenario: Profesorado previsto con una parte ya pagada
@@ -270,7 +270,7 @@ Con otra temporada elegida no sale esta sección.
 - **WHEN** en noviembre una alumna tiene su cuota de 45 € pagada en parte (20 €) y otro alumno matriculado aún no tiene
   la suya emitida (40,50 €)
 - **THEN** las cuotas previstas de noviembre listan a la alumna por 25 € («pagada en parte») y al alumno por 40,50 €
-  («prevista»), y los ingresos de noviembre a la alumna por 20 € («de 45 €»)
+  («prevista»), y los ingresos de noviembre a la alumna por 20 € («de 45,00 €»)
 
 ### Requirement: Diagnóstico de datos
 Contabilidad MUST tener una pestaña «Diagnóstico» con lo que no cuadra en los datos del club, explicado y con su

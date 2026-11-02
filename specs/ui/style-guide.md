@@ -174,4 +174,6 @@ Cada bloque es un botón coloreado por nivel; el ancho mínimo es de 980px, con 
   La cabecera lleva el `ClubLogo` y una línea inferior `border-b-4 border-brand`.
 - Al imprimir (`window.print()`), las reglas `@media print` de `index.css` ocultan todo salvo `.receipt-sheet`.
   Los controles del diálogo llevan `print:hidden`.
-- Los importes se formatean siempre con `formatCents`, que omite los decimales cuando son cero («45 €», «40,50 €»).
+- Los importes se formatean siempre con `formatCents`:
+  punto para los miles (también con cuatro cifras), coma y siempre dos decimales
+  («45,00 €», «1.234,50 €», «−1.631,44 €»).
