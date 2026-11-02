@@ -17,7 +17,7 @@ Solo administración (ruta dentro de `/panel`). Las peticiones `/api/admin/billi
      Mientras llega se lee «Calculando…».
    - Los errores de la cotización (`beyond_season`, `nothing_to_pay`, `invalid_months`) se muestran como `Alert` dentro del diálogo,
      y «Guardar cobro» queda desactivado.
-   - Al guardar se refrescan cuotas, cobros y la ficha, aparece el toast «Cobro registrado · R-2026-0001 · 45 €»
+   - Al guardar se refrescan cuotas, cobros y la ficha, aparece el toast «Cobro registrado · R-2026-0001 · 45,00 €»
      y se abre el recibo.
 2b. **Editar una cuota desde la ficha.**
    - Si el importe nuevo es menor que lo que la cuota tiene cubierto, «Guardar» abre `ConfirmChangesDialog` con la

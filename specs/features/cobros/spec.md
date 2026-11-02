@@ -173,7 +173,7 @@ cobro y queda pagada en parte. Con «este y los siguientes» se corrige así cad
 #### Scenario: Bajar una cuota ya cobrada
 - **WHEN** la cuota de octubre de Alvaro es de 55 € y está cobrada con el recibo R-2026-0412, y administración la
   fija en 40 € confirmando «Cambiar la cantidad pagada»
-- **THEN** el recibo pasa a 40 € con la línea «Corrección: cuota de octubre 2026 de 55 € a 40 € (motivo)», la cuota
+- **THEN** el recibo pasa a 40 € con la línea «Corrección: cuota de octubre 2026 de 55,00 € a 40,00 € (motivo)», la cuota
   queda cobrada y el alumno sin saldo a favor; si se desmarca, el recibo sigue en 55 € y quedan 15 € a su favor
 Lo que se sube a mano a una cuota MUST cubrirse lo último: si el alumno ya la tenía cubierta, esa cuota queda
 «Pagada en parte» con la diferencia y los meses siguientes no cambian de estado. Al devolverla al importe calculado
@@ -192,7 +192,7 @@ el recibo (su importe menos el porcentaje) y apuntado ese porcentaje; sigue fija
 - **WHEN** un alumno pagó el curso entero (octubre a 32 € y el resto a 44 €) y administración fija octubre en 35 €
   desmarcando «Se pagó el importe nuevo»
 - **THEN** octubre queda «Pagada en parte» con 3 € pendientes y junio sigue «Cobrada»; si lo deja marcado, el recibo
-  que pagó octubre sube 3 € con la línea «Corrección: cuota de octubre 2026 de 32 € a 35 € (motivo)» y octubre sigue
+  que pagó octubre sube 3 € con la línea «Corrección: cuota de octubre 2026 de 32,00 € a 35,00 € (motivo)» y octubre sigue
   «Cobrada»
 
 #### Scenario: Pagar el euro que falta de una cuota subida a mano
@@ -297,6 +297,22 @@ Su número de recibo no se vuelve a usar.
 - **WHEN** superadministración intenta borrar un cobro sin indicar el motivo
 - **THEN** se rechaza y pide el motivo
 
+### Requirement: Formato de los importes
+Todo importe en euros que muestre la aplicación
+(pantallas, gráficas, recibos, facturas, avisos, mensajes y diagnósticos)
+MUST mostrarse con punto para los miles, también con cuatro cifras,
+coma para los decimales, siempre dos decimales
+y el signo menos tipográfico si es negativo.
+Los importes que se escriben en un campo no cambian de formato.
+
+#### Scenario: Importes grandes y redondos
+- **WHEN** la caja tiene 8.163 € y el banco 12.594,95 €
+- **THEN** se muestran como «8.163,00 €» y «12.594,95 €»
+
+#### Scenario: Importes pequeños y negativos
+- **WHEN** se muestra una cuota de 45 €, un saldo de 0 € o un margen de −1.631,44 €
+- **THEN** se muestran como «45,00 €», «0,00 €» y «−1.631,44 €»
+
 ### Requirement: Recibos y facturas
 Cada cobro MUST tener un recibo con número correlativo por temporada (R-2026-0001), imprimible,
 con alumno, quien paga, concepto, desglose, total y forma de pago.
@@ -305,7 +321,7 @@ datos fiscales del club y del cliente (nombre, NIF y dirección), y el IVA del 2
 
 #### Scenario: Emitir factura
 - **WHEN** administración emite la factura de un cobro de 45 €
-- **THEN** la factura muestra una base imponible de 37,19 €, un IVA de 7,81 € y un total de 45 €
+- **THEN** la factura muestra una base imponible de 37,19 €, un IVA de 7,81 € y un total de 45,00 €
 
 #### Scenario: Segunda factura
 - **WHEN** se intenta emitir otra factura del mismo cobro

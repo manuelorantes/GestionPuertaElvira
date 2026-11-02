@@ -87,7 +87,7 @@ Cuando una sección no tiene nada en el periodo MUST decirlo («No hay cobros ho
 
 #### Scenario: Los cobros de hoy con su suma
 - **WHEN** superadministración abre «Pagos» tras registrar hoy dos cobros de 30 € y 45 € y deshacer el segundo
-- **THEN** ve «Hoy» marcado, tres filas (+30 €, +45 € y −45 € señalada como deshecha) y al pie «2 cobros (1 deshecho) hoy · Total +30 €»
+- **THEN** ve «Hoy» marcado, tres filas (+30,00 €, +45,00 € y −45,00 € señalada como deshecha) y al pie «2 cobros (1 deshecho) hoy · Total +30,00 €»
 
 #### Scenario: Cambiar de periodo y de sección
 - **WHEN** en «Alumnos» elige «Esta semana» y pasa a «Asistencia y notas»
@@ -114,7 +114,7 @@ a la derecha MUST quedar un botón por cada sitio adonde ir (el cobro, las cuota
 
 #### Scenario: Registrar un cobro
 - **WHEN** superadministración abre el detalle de «Registrar cobro»
-- **THEN** ve «Cobro registrado» con «Alumno: Martina López Herrera» (enlace a su ficha), «Pago: 40 € · Efectivo»
+- **THEN** ve «Cobro registrado» con «Alumno: Martina López Herrera» (enlace a su ficha), «Pago: 40,00 € · Efectivo»
   y «Concepto: Octubre 2026», y a la derecha «Ir al cobro» e «Ir a las cuotas de octubre 2026»; no ve el recibo
   «R-2026-0401»
 

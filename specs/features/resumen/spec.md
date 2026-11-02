@@ -7,13 +7,13 @@ El resumen MUST mostrar:
 
 - el saldo del club: el acumulado del ejercicio hasta el mes en curso que enseña «Mes a mes» de
   [Contabilidad](../contabilidad/spec.md) (desde el saldo arrastrado), con el resultado de la temporada debajo
-  (p. ej. «+1240 € esta temporada»);
+  (p. ej. «+1.240,00 € esta temporada»);
 - lo pendiente de cobro de las cuotas del mes (y el material), las mismas cifras que «Cuotas» de ese mes en Cobros, con
   el plazo del día 5 y, aparte en la misma línea, lo que falta por cobrar de cuotas de socio de la temporada (p. ej.
-  «Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio»);
+  «Plazo hasta el 5 de octubre · y 2.750,00 € de cuotas de socio»);
 - el margen previsto del mes: las cuotas del mes en curso (cobradas y previstas) menos sus gastos fijos (anotados y
   previstos), las mismas cifras que el mes en curso de «Cuotas vs gastos fijos», con el detalle debajo
-  (p. ej. «3920 € de cuotas · 2100 € de gastos fijos»);
+  (p. ej. «3.920,00 € de cuotas · 2.100,00 € de gastos fijos»);
 - los socios activos (de alta hoy) y, debajo, cuántos más o menos hay que al empezar el mes:
   las altas menos las bajas (p. ej. «107» y «+6 este mes», o «-1 este mes»);
 - los socios en clases (de alta hoy y en al menos una clase) y, debajo, cuántos más o menos hay
@@ -23,8 +23,8 @@ Si la cifra no ha cambiado en el mes, debajo no se pone nada (nunca «+0 este me
 
 #### Scenario: Saldo y margen
 - **WHEN** el ejercicio arrastra 14.100 € y en lo que va de temporada han entrado 5.000 € y salido 3.760 €
-- **THEN** el saldo del club es «15.340 €» y debajo pone «+1240 € esta temporada»; si en octubre hay 3.920 € de cuotas
-  cobradas o previstas y 2.100 € de gastos fijos, el margen previsto de octubre es «+1820 €»
+- **THEN** el saldo del club es «15.340,00 €» y debajo pone «+1.240,00 € esta temporada»; si en octubre hay 3.920 € de cuotas
+  cobradas o previstas y 2.100 € de gastos fijos, el margen previsto de octubre es «+1.820,00 €»
 
 ### Requirement: Mes a mes
 El resumen MUST mostrar dos gráficos de barras de ingresos y gastos de la temporada en curso, de septiembre a agosto,
@@ -51,8 +51,8 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
   [gastos esperados](../contabilidad/spec.md#requirement-gastos-esperados) de categorías del mes que siguen
   pendientes, también en los meses pasados, hasta que se pagan o se marcan «No hay este mes».
 Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cuánto dinero equivale, p. ej. «Ingresos de
-octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «Gastos previstos de noviembre 2026:
-1200 €».
+octubre 2026: 4.120,00 €», «Cuotas previstas de noviembre 2026: 1.340,00 €» o «Gastos previstos de noviembre 2026:
+1.200,00 €».
 
 Al pinchar una parte de una barra de «Cuotas vs gastos fijos» (ingresos, cuotas previstas, gastos o gastos previstos de
 un mes) MUST abrirse Contabilidad, en [«Mes a mes y cierre»](../contabilidad/spec.md#requirement-cuotas-vs-gastos-fijos),
