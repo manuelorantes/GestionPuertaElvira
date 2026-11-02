@@ -1,5 +1,5 @@
 import type { SessionRow } from '../../src/application/payroll/mod.ts';
-import { assertEquals, assertRejects } from '@std/assert';
+import { assert, assertEquals, assertRejects } from '@std/assert';
 
 import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
@@ -315,7 +315,7 @@ Deno.test('PaySettlement should freeze the settlement, lock its sessions and res
 });
 
 Deno.test('PendingPayroll should keep owing the unpaid settlements of each month until they are paid', async () => {
-  const { lucia, propose, pay, list } = setUp();
+  const { lucia, carlos, propose, pay, list } = setUp();
   await propose('2026-10');
   const owed = async () =>
     Object.fromEntries(
@@ -329,6 +329,16 @@ Deno.test('PendingPayroll should keep owing the unpaid settlements of each month
   // Pagada la de Lucía, ya está en el libro: solo queda la de Carlos.
   await pay().execute(lucia, '2026-10', '2026-11-02');
   assertEquals(await owed(), { '2026-09': 0, '2026-10': 10800 });
+  // De quién es lo que se debe: la liquidación sin pagar de cada profesor.
+  const byTeacher = await new PendingPayroll(list()).byTeacher(
+    YearMonth.fromString('2026-10'),
+    YearMonth.fromString('2026-10'),
+  );
+  assertEquals(
+    byTeacher.get('2026-10')?.map((t) => ({ teacherId: t.teacherId, cents: t.cents })),
+    [{ teacherId: carlos, cents: 10800 }],
+  );
+  assert(byTeacher.get('2026-10')?.[0]?.teacherName);
 });
 
 Deno.test('PayAllSettlements should pay every pending settlement of the month', async () => {
@@ -522,7 +532,7 @@ Deno.test('Substitutions should cover club duty shifts too, alone or with all th
 });
 
 Deno.test('ExpectedPayroll should cost the expected hours of each month at the current rates', async () => {
-  const { fx, duties } = setUp();
+  const { fx, duties, lucia, carlos } = setUp();
   await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
   // Octubre: Lucía 7 h a 16 € y Carlos 4 × 1,5 h a 18 €; noviembre: 9 h de Lucía y 4 martes de Carlos.
   const costs = await new ExpectedPayroll(fx, duties, fx, fx).between(
@@ -530,6 +540,20 @@ Deno.test('ExpectedPayroll should cost the expected hours of each month at the c
     YearMonth.fromString('2026-11'),
   );
   assertEquals([...costs], [['2026-10', 11200 + 10800], ['2026-11', 14400 + 10800]]);
+  // Lo de cada profesor, con sus horas: lo que suma la cifra del mes.
+  const october = (await new ExpectedPayroll(fx, duties, fx, fx).byTeacher(
+    YearMonth.fromString('2026-10'),
+    YearMonth.fromString('2026-10'),
+  )).get('2026-10') ?? [];
+  assertEquals(
+    october.map((t) => ({ teacherId: t.teacherId, minutes: t.minutes, cents: t.cents }))
+      .sort((a, b) => b.cents - a.cents),
+    [
+      { teacherId: lucia, minutes: 7 * 60, cents: 11200 },
+      { teacherId: carlos, minutes: 6 * 60, cents: 10800 },
+    ],
+  );
+  assert(october.every((t) => t.teacherName.length > 0));
   // En verano no hay clases.
   assertEquals(
     [

@@ -360,3 +360,151 @@ Deno.test('dashboard chart should count in each month what its fee has covered, 
     );
   });
 });
+
+Deno.test({
+  name:
+    'fees vs fixed detail should list what makes each part of each month and add up to the chart',
+  ignore: outsideSeason,
+  async fn() {
+    await resetDatabase();
+    await createUser('junta@club.es');
+    const client = new ApiClient();
+    await client.logIn('junta@club.es');
+    const teacher = await newTeacher(client);
+    const group = await newGroup(client, teacher, { capacity: 4 });
+    const student = ((await client.json('POST', '/api/admin/students', {
+      fullName: 'Martina López Herrera',
+      birthDate: '2014-03-12',
+      guardians: [{ name: 'Rocío Herrera', phone: '612481930' }],
+      imageConsent: true,
+      groupIds: [group],
+    })).body as { id: string }).id;
+    assertEquals(
+      (await client.json('POST', '/api/admin/billing/payments', {
+        studentId: student,
+        kind: 'monthly',
+        months: 1,
+        method: 'cash',
+        date: today,
+      })).status,
+      201,
+    );
+    const month = today.slice(0, 7);
+    const following = YearMonth.fromString(month).next().toString();
+    // La luz pagada hoy, repartida entre este mes (10 €) y el siguiente (20 €).
+    assertEquals(
+      (await client.json('POST', '/api/admin/accounting/entries', {
+        date: today,
+        kind: 'expense',
+        concept: 'Luz',
+        category: 'electricity',
+        method: 'transfer',
+        amount: '30',
+        shares: [
+          { period: month, amountCents: 1000 },
+          { period: following, amountCents: 2000 },
+        ],
+      })).status,
+      201,
+    );
+    // La limpieza, esperada cada mes y aún sin pagar.
+    assertEquals(
+      (await client.json('POST', '/api/admin/accounting/expected', {
+        concept: 'Limpieza del local',
+        category: 'cleaning',
+        amount: '120',
+      })).status,
+      201,
+    );
+
+    type Item = {
+      concept: string;
+      detail: string;
+      date: string | null;
+      amountCents: number;
+      totalCents: number | null;
+    };
+    type Part = 'income' | 'expected' | 'expense' | 'expectedExpense';
+    type Month = {
+      month: string;
+      incomeCents: number;
+      expectedCents: number;
+      expenseCents: number;
+      expectedExpenseCents: number;
+      parts: Record<Part, Item[]>;
+    };
+    const response = await client.get('/api/admin/dashboard/fees-vs-fixed');
+    assertEquals(response.status, 200);
+    const detail = response.body as { month: string; months: Month[] };
+    assertEquals(detail.month, month);
+    assertEquals(detail.months.length, 12);
+
+    // Cada parte de cada mes suma lo mismo que la barra del resumen.
+    const chart = ((await client.get('/api/admin/dashboard')).body as {
+      monthChart: Omit<Month, 'parts'>[];
+    }).monthChart;
+    const sum = (items: Item[]) => items.reduce((total, i) => total + i.amountCents, 0);
+    for (const m of detail.months) {
+      const bar = chart.find((b) => b.month === m.month);
+      assertEquals(
+        {
+          month: m.month,
+          incomeCents: sum(m.parts.income),
+          expectedCents: sum(m.parts.expected),
+          expenseCents: sum(m.parts.expense),
+          expectedExpenseCents: sum(m.parts.expectedExpense),
+        },
+        bar,
+      );
+      assertEquals(m.incomeCents, bar?.incomeCents);
+      assertEquals(m.expectedExpenseCents, bar?.expectedExpenseCents);
+    }
+
+    const current = detail.months.find((m) => m.month === month)!;
+    // Ingresos: la cuota cobrada de la alumna.
+    assertEquals(current.parts.income, [{
+      concept: 'Martina López Herrera',
+      detail: 'Cuota del mes',
+      date: null,
+      amountCents: 4500,
+      totalCents: null,
+    }]);
+    // Gastos: la parte de la luz de este mes, de un apunte de 30 €.
+    assertEquals(current.parts.expense, [{
+      concept: 'Luz',
+      detail: 'Electricidad',
+      date: today,
+      amountCents: 1000,
+      totalCents: 3000,
+    }]);
+    // Gastos previstos: la profesora según el horario (con sus horas) y la limpieza sin pagar.
+    const teacherLine = current.parts.expectedExpense.find((i) => i.concept === 'Lucía Moreno Gil');
+    assert(teacherLine && teacherLine.amountCents > 0, 'la profesora tiene clases este mes');
+    assert(teacherLine.detail.startsWith('Previsto según el horario'), teacherLine.detail);
+    assertEquals(
+      current.parts.expectedExpense.find((i) => i.concept === 'Limpieza del local'),
+      {
+        concept: 'Limpieza del local',
+        detail: 'Limpieza · gasto esperado',
+        date: null,
+        amountCents: 12000,
+        totalCents: null,
+      },
+    );
+    // Cuotas previstas del mes que viene: la de la alumna matriculada, aún sin emitir.
+    if (Season.teachingSeason(YearMonth.fromString(following)) !== null) {
+      const next = detail.months.find((m) => m.month === following)!;
+      assertEquals(next.parts.expected.map((i) => [i.concept, i.amountCents]), [
+        ['Martina López Herrera', 4500],
+      ]);
+    }
+  },
+});
+
+Deno.test('fees vs fixed detail should be reserved to administrators', async () => {
+  await resetDatabase();
+  await createUser('profe@club.es', 'teacher');
+  const client = new ApiClient();
+  await client.logIn('profe@club.es');
+  assertError(await client.get('/api/admin/dashboard/fees-vs-fixed'), 403, 'forbidden');
+});

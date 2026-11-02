@@ -839,6 +839,21 @@ export class Profitability {
  * Lo que costará el profesorado cada mes según el horario: las horas esperadas de cada profesor (sus clases y turnos
  * salvo festivos, sin sustituciones ni solapes) a su tarifa de hoy. Lo que usa el resumen para los meses que vienen.
  */
+/** Lo que cuesta (o se debe a) un profesor un mes. */
+export interface TeacherCost {
+  teacherId: string;
+  teacherName: string;
+  /** Las horas previstas, en minutos (0 en lo que se debe de una liquidación). */
+  minutes: number;
+  cents: number;
+}
+
+function totals(byMonth: Map<string, TeacherCost[]>): Map<string, number> {
+  return new Map(
+    [...byMonth].map(([month, costs]) => [month, costs.reduce((total, c) => total + c.cents, 0)]),
+  );
+}
+
 export class ExpectedPayroll {
   constructor(
     private readonly schedule: ScheduleDirectory,
@@ -849,18 +864,29 @@ export class ExpectedPayroll {
 
   /** Céntimos por mes («AAAA-MM»), de `first` a `last`; 0 en julio y agosto. */
   async between(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
+    return totals(await this.byTeacher(first, last));
+  }
+
+  /** Lo de cada profesor con clases o actividades cada mes, de `first` a `last` (nadie en julio y agosto). */
+  async byTeacher(first: YearMonth, last: YearMonth): Promise<Map<string, TeacherCost[]>> {
     const groups = await this.schedule.groups();
     const duties = await this.duties.all();
-    const rates = new Map((await this.teachers.all()).map((t) => [t.id, t.rate]));
+    const teachers = new Map((await this.teachers.all()).map((t) => [t.id, t]));
     const holidays = await this.holidays.holidaysBetween(first.firstDay(), last.lastDay());
     const hours = new ExpectedHours();
-    const result = new Map<string, number>();
+    const result = new Map<string, TeacherCost[]>();
     for (let month = first; !last.isBefore(month); month = month.next()) {
-      let cents = 0;
+      const costs: TeacherCost[] = [];
       for (const [teacher, minutes] of hours.ofMonth(month, groups, duties, holidays)) {
-        cents += rates.get(teacher)?.times(minutes / 60).cents ?? 0;
+        const known = teachers.get(teacher);
+        costs.push({
+          teacherId: teacher,
+          teacherName: known?.name ?? '',
+          minutes,
+          cents: known?.rate.times(minutes / 60).cents ?? 0,
+        });
       }
-      result.set(month.toString(), cents);
+      result.set(month.toString(), costs);
     }
     return result;
   }
@@ -875,12 +901,24 @@ export class PendingPayroll {
 
   /** Céntimos por mes («AAAA-MM»), de `first` a `last`. */
   async between(first: YearMonth, last: YearMonth): Promise<Map<string, number>> {
-    const result = new Map<string, number>();
+    return totals(await this.byTeacher(first, last));
+  }
+
+  /** Lo que se debe a cada profesor con una liquidación sin pagar cada mes, de `first` a `last`. */
+  async byTeacher(first: YearMonth, last: YearMonth): Promise<Map<string, TeacherCost[]>> {
+    const result = new Map<string, TeacherCost[]>();
     for (let month = first; !last.isBefore(month); month = month.next()) {
-      const pending = (await this.settlements.execute(month.toString()))
-        .filter((s) => s.status === 'pending')
-        .reduce((total, s) => total + Math.max(0, s.toPayCents), 0);
-      result.set(month.toString(), pending);
+      result.set(
+        month.toString(),
+        (await this.settlements.execute(month.toString()))
+          .filter((s) => s.status === 'pending' && s.toPayCents > 0)
+          .map((s) => ({
+            teacherId: s.teacherId,
+            teacherName: s.teacherName,
+            minutes: 0,
+            cents: s.toPayCents,
+          })),
+      );
     }
     return result;
   }
