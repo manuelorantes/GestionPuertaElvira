@@ -1,10 +1,20 @@
 import { formatCents, monthLabel, reminderText, shiftMonth, whatsappLink } from './money';
 
 describe('billing formatting', () => {
-  it('formats cents as euros in Spanish style', () => {
-    expect(formatCents(4500)).toBe('45 €');
-    expect(formatCents(123450)).toBe('1234,50 €');
-    expect(formatCents(-1125)).toBe('−11,25 €');
+  it.each([
+    [0, '0,00 €'],
+    [4500, '45,00 €'],
+    [4050, '40,50 €'],
+    [7, '0,07 €'],
+    [100000, '1.000,00 €'],
+    [123450, '1.234,50 €'],
+    [816300, '8.163,00 €'],
+    [1259495, '12.594,95 €'],
+    [123456700, '1.234.567,00 €'],
+    [-1125, '−11,25 €'],
+    [-163144, '−1.631,44 €'],
+  ])('formats %i cents as %s, with thousands and two decimals', (cents, text) => {
+    expect(formatCents(cents)).toBe(text);
   });
 
   it('labels and shifts months across years', () => {

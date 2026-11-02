@@ -18,7 +18,7 @@ test('should show the profitability of each teacher', async ({ page }) => {
   await openTeachers(page);
 
   await expect(page.getByRole('table', { name: /Rentabilidad de/ })).toBeVisible();
-  await expect(page.getByRole('row', { name: /Javier Ortega Sánchez/ })).toContainText('20 €/h');
+  await expect(page.getByRole('row', { name: /Javier Ortega Sánchez/ })).toContainText('20,00 €/h');
 });
 
 test('should record extra hours for an activity', async ({ page }) => {
@@ -30,7 +30,7 @@ test('should record extra hours for an activity', async ({ page }) => {
   await dialog.getByLabel('Clase').selectOption('other');
   await dialog.getByLabel('Actividad').fill('Torneo escolar de prueba');
   await dialog.getByRole('button', { name: 'Más horas' }).click();
-  await expect(dialog.getByText('Coste a 15 €/h: 22,50 €')).toBeVisible();
+  await expect(dialog.getByText('Coste a 15,00 €/h: 22,50 €')).toBeVisible();
   await dialog.getByRole('button', { name: 'Guardar horas' }).click();
 
   await expect(page.getByRole('cell', { name: 'Torneo escolar de prueba' })).toBeVisible();

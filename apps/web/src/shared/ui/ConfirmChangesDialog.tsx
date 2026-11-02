@@ -17,7 +17,7 @@ interface ConfirmChangesDialogProps {
   onConfirm: () => void;
 }
 
-/** «¿Guardar estos cambios?»: la lista de lo que cambia («Importe: 45 € → 40 €») antes de guardarlo. */
+/** «¿Guardar estos cambios?»: la lista de lo que cambia («Importe: 45,00 € → 40,00 €») antes de guardarlo. */
 export function ConfirmChangesDialog({
   changes,
   warning = null,

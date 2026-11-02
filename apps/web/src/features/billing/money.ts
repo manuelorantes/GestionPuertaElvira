@@ -1,15 +1,5 @@
 import { fiscalYearOf } from '@/features/accounting/categories';
 
-const euros = (digits: number) =>
-  new Intl.NumberFormat('es-ES', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  });
-const WHOLE = euros(0);
-const DECIMAL = euros(2);
-
 const MONTHS = [
   'enero',
   'febrero',
@@ -25,12 +15,15 @@ const MONTHS = [
   'diciembre',
 ];
 
-/** 4500 → «45 €»; 4050 → «40,50 €»; −1125 → «−11,25 €» (signo menos tipográfico). */
+/**
+ * 4500 → «45,00 €»; 123450 → «1.234,50 €»; −1125 → «−11,25 €» (signo menos tipográfico).
+ * Agrupa los miles a mano: `Intl` en español no agrupa los números de cuatro cifras.
+ */
 export function formatCents(cents: number): string {
-  return (cents % 100 === 0 ? WHOLE : DECIMAL)
-    .format(cents / 100)
-    .replace(/\s/g, ' ')
-    .replace('-', '−');
+  const absolute = Math.round(Math.abs(cents));
+  const whole = String(Math.trunc(absolute / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const fraction = String(absolute % 100).padStart(2, '0');
+  return `${cents < 0 ? '−' : ''}${whole},${fraction} €`;
 }
 
 function parts(month: string): [number, number] {

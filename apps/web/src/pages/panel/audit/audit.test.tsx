@@ -133,7 +133,7 @@ describe('Historial', () => {
       'href',
       '/panel/alumnos/s1',
     );
-    expect(value('Pago')).toHaveTextContent('45 € · Efectivo');
+    expect(value('Pago')).toHaveTextContent('45,00 € · Efectivo');
     expect(value('Concepto')).toHaveTextContent('Octubre 2026');
     expect(within(summary).queryByText(/R-2026-0027/)).not.toBeInTheDocument();
     expect(screen.queryByText('Recibo')).not.toBeInTheDocument();
@@ -527,12 +527,12 @@ describe('Historial', () => {
     expect(rows).toHaveLength(3);
     expect(rows[0]).toHaveTextContent('R-2026-0028');
     expect(rows[0]).toHaveTextContent('Deshacer: Registrar cobro');
-    expect(rows[0]).toHaveTextContent('−30 €');
+    expect(rows[0]).toHaveTextContent('−30,00 €');
     expect(rows[1]).toHaveTextContent('Transferencia');
-    expect(rows[1]).toHaveTextContent('+30 €');
+    expect(rows[1]).toHaveTextContent('+30,00 €');
     expect(rows[2]).toHaveTextContent('Efectivo');
     expect(rows[2]).toHaveTextContent('Lucía Moreno Gil');
-    expect(rows[2]).toHaveTextContent('+45 €');
+    expect(rows[2]).toHaveTextContent('+45,00 €');
     // El alumno se abre encima del historial, sin irse a Alumnos.
     expect(within(table).getByRole('link', { name: 'Martina López Herrera' })).toHaveAttribute(
       'href',
@@ -545,7 +545,7 @@ describe('Historial', () => {
     // El cobro deshecho ya no existe: no hay recibo al que ir.
     expect(within(table).getAllByRole('link', { name: /Ir al cobro/ })).toHaveLength(2);
     expect(screen.getByText('2 cobros (1 deshecho) hoy')).toBeInTheDocument();
-    expect(screen.getByText('Total +45 €')).toBeInTheDocument();
+    expect(screen.getByText('Total +45,00 €')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Deshacer/ })).not.toBeInTheDocument();
   });
 

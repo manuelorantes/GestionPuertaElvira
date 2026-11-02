@@ -369,7 +369,7 @@ function Amount({ charge }: { charge: Charge }) {
   );
 }
 
-/** «Faltan 10 €» bajo una cuota pagada en parte. */
+/** «Faltan 10,00 €» bajo una cuota pagada en parte. */
 function Missing({ charge }: { charge: Charge }) {
   return (
     <span className="text-[12px] text-ink-muted">

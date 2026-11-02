@@ -308,7 +308,7 @@ describe('Cobros y cuotas', () => {
       expect.stringMatching(/[?&]ficha=s1$/),
     );
     expect(within(table).getByRole('row', { name: /Hugo/ })).toHaveTextContent('Cobrada');
-    expect(screen.getByText('1 de 2 cuotas cobradas · 55 € de 95,50 €')).toBeInTheDocument();
+    expect(screen.getByText('1 de 2 cuotas cobradas · 55,00 € de 95,50 €')).toBeInTheDocument();
     expect(screen.getByText('1 vencida')).toBeInTheDocument();
   });
 

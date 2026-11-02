@@ -98,7 +98,7 @@ describe('Material deportivo', () => {
     expect(within(martina).getByText('Reservado')).toBeInTheDocument();
     expect(within(martina).getByRole('button', { name: 'Pasar a pedido' })).toBeInTheDocument();
     expect(hugo).toHaveTextContent('2 × Chándal · Talla 12 · Nombre a estampar: Hugo');
-    expect(hugo).toHaveTextContent('Faltan 70 €');
+    expect(hugo).toHaveTextContent('Faltan 70,00 €');
     expect(within(hugo).getByText('Entregado 09/10/2026')).toBeInTheDocument();
     expect(within(hugo).getByRole('button', { name: 'Cobrar' })).toBeInTheDocument();
     // Con algo cobrado ya no se cambia el precio; entregado, ya no se corrige.
@@ -157,8 +157,8 @@ describe('Material deportivo', () => {
 
     // Los precios se añaden al listado (el del producto por la cantidad cuando aún no lo tiene).
     await userEvent.click(within(dialog).getByRole('switch', { name: 'Con precios' }));
-    expect(within(poloTable).getByRole('row', { name: /Hugo/ })).toHaveTextContent('50 €');
-    expect(within(poloTable).getByText('Total polo').closest('tr')).toHaveTextContent('50 €');
+    expect(within(poloTable).getByRole('row', { name: /Hugo/ })).toHaveTextContent('50,00 €');
+    expect(within(poloTable).getByText('Total polo').closest('tr')).toHaveTextContent('50,00 €');
 
     // Se elige qué productos listar.
     await userEvent.click(
@@ -354,7 +354,7 @@ describe('Material deportivo', () => {
     await userEvent.type(within(dialog).getByLabelText('Coste del lote entero (€)'), '600');
     await userEvent.type(within(dialog).getByLabelText('Talla 8'), '5');
     await userEvent.type(within(dialog).getByLabelText('Talla 10'), '15');
-    expect(within(dialog).getByText('20 unidades · 30 € cada una')).toBeInTheDocument();
+    expect(within(dialog).getByText('20 unidades · 30,00 € cada una')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar compra' }));
     await waitFor(() =>
       expect(bodyOf(spy, 'POST', '/api/admin/equipment/purchases')).toMatchObject({
@@ -458,9 +458,9 @@ describe('Material deportivo', () => {
 
     const table = await screen.findByRole('table', { name: 'Margen por producto' });
     expect(within(table).getByRole('row', { name: /Chándal/ })).toHaveTextContent(
-      'Chándal20600 €30 €10450 €400 €15 €150 €',
+      'Chándal20600,00 €30,00 €10450,00 €400,00 €15,00 €150,00 €',
     );
-    expect(screen.getByText('Margen de lo vendido').parentElement).toHaveTextContent('150 €');
+    expect(screen.getByText('Margen de lo vendido').parentElement).toHaveTextContent('150,00 €');
   });
 
   it('sorts the margins from the headers, with what cannot be calculated first', async () => {

@@ -19,7 +19,7 @@ const FINDINGS = [
     ruleTitle: 'Cuota distinta de la tarifa',
     severity: 'money',
     entity: { kind: 'student', id: 's1', label: 'Paula Gómez Ruiz' },
-    explanation: 'La cuota de octubre 2026 es de 36 €. Le corresponden 49,50 €.',
+    explanation: 'La cuota de octubre 2026 es de 36,00 €. Le corresponden 49,50 €.',
     proposal: 'Ajustar la cuota de octubre 2026 a 49,50 €.',
     hasFix: true,
     status: 'open',
@@ -48,7 +48,7 @@ const FINDINGS = [
     rule: 'generic_category',
     ruleTitle: 'Gasto en una categoría genérica que tiene la suya',
     severity: 'money',
-    entity: { kind: 'entry', id: 'e1', label: 'Limpieza del local · 150 €' },
+    entity: { kind: 'entry', id: 'e1', label: 'Limpieza del local · 150,00 €' },
     explanation: '«Limpieza del local» está en «Otros gastos».',
     proposal: 'Cambiar la categoría a «Limpieza».',
     hasFix: true,
@@ -101,10 +101,9 @@ describe('Diagnóstico', () => {
       expect.stringContaining('s1'),
     );
     // El apunte lleva a su fila en Movimientos (la página busca el mes y el tipo).
-    expect(within(money).getByRole('link', { name: 'Limpieza del local · 150 €' })).toHaveAttribute(
-      'href',
-      '/panel/contabilidad?pestana=movimientos&movimiento=e1',
-    );
+    expect(
+      within(money).getByRole('link', { name: 'Limpieza del local · 150,00 €' }),
+    ).toHaveAttribute('href', '/panel/contabilidad?pestana=movimientos&movimiento=e1');
     expect(within(money).getByText(/Le corresponden 49,50 €/)).toBeInTheDocument();
     expect(within(money).getByText(/Ajustar la cuota/)).toBeInTheDocument();
     const club = screen.getByRole('region', { name: /Datos del club/ });

@@ -166,18 +166,18 @@ describe('Contabilidad', () => {
 
     const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
     expect(within(table).getByRole('row', { name: /Subvención municipal/ })).toHaveTextContent(
-      '+600 €',
+      '+600,00 €',
     );
     const rent = within(table).getByRole('row', { name: /Alquiler octubre/ });
-    expect(rent).toHaveTextContent('−950 €');
+    expect(rent).toHaveTextContent('−950,00 €');
     // Pagado en octubre, pero es de septiembre.
     expect(rent).toHaveTextContent('Corresponde a septiembre 2026');
     expect(
-      screen.getByText('Ingresos 645 € · Gastos 1366 € · Resultado −721 €'),
+      screen.getByText('Ingresos 645,00 € · Gastos 1.366,00 € · Resultado −721,00 €'),
     ).toBeInTheDocument();
     const byCategory = screen.getByRole('region', { name: 'Gastos de octubre 2026' });
     expect(within(byCategory).getByText('Alquiler')).toBeInTheDocument();
-    expect(within(byCategory).getByText('1366 €')).toBeInTheDocument();
+    expect(within(byCategory).getByText('1.366,00 €')).toBeInTheDocument();
   });
 
   it('filters the movements by income or payments, and income by payment method', async () => {
@@ -199,7 +199,7 @@ describe('Contabilidad', () => {
       within(table).queryByRole('row', { name: /Subvención municipal/ }),
     ).not.toBeInTheDocument();
     expect(within(table).getByRole('row', { name: /Alquiler octubre/ })).toBeInTheDocument();
-    expect(screen.getByText('1 movimiento · −950 €')).toBeInTheDocument();
+    expect(screen.getByText('1 movimiento · −950,00 €')).toBeInTheDocument();
 
     await user.click(within(kind).getByRole('button', { name: 'Ingresos' }));
     const method = screen.getByRole('group', { name: 'Forma de pago' });
@@ -209,7 +209,7 @@ describe('Contabilidad', () => {
     expect(
       within(table).queryByRole('row', { name: /Subvención municipal/ }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('1 movimiento · +45 €')).toBeInTheDocument();
+    expect(screen.getByText('1 movimiento · +45,00 €')).toBeInTheDocument();
 
     await user.click(within(method).getByRole('button', { name: 'Tarjeta' }));
     expect(await screen.findByText('No hay ingresos con tarjeta este mes.')).toBeInTheDocument();
@@ -363,7 +363,7 @@ describe('Contabilidad', () => {
 
     // Antes de guardar, lo que cambia y qué no cambia fuera de contabilidad.
     const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
-    expect(within(confirm).getByText('Importe: 45 € → 40 €')).toBeVisible();
+    expect(within(confirm).getByText('Importe: 45,00 € → 40,00 €')).toBeVisible();
     expect(within(confirm).getByText('Forma de pago: Efectivo → Transferencia')).toBeVisible();
     expect(within(confirm).getByText(/El recibo y las cuotas del alumno no cambian/)).toBeVisible();
     await userEvent.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
@@ -441,7 +441,7 @@ describe('Contabilidad', () => {
     await userEvent.clear(firstAmount);
     await userEvent.type(firstAmount, '50');
     expect(
-      within(dialog).getByText('El reparto suma 250 € y el importe es 300 €.'),
+      within(dialog).getByText('El reparto suma 250,00 € y el importe es 300,00 €.'),
     ).toBeInTheDocument();
     const save = within(dialog).getByRole('button', { name: 'Guardar movimiento' });
     expect(save).toBeDisabled();
@@ -546,7 +546,7 @@ describe('Contabilidad', () => {
     renderApp('/panel/contabilidad?mes=2026-10');
 
     const card = await screen.findByRole('region', { name: 'Gastos esperados de octubre 2026' });
-    expect(within(card).getByText('Falta por pagar').nextSibling).toHaveTextContent('1070 €');
+    expect(within(card).getByText('Falta por pagar').nextSibling).toHaveTextContent('1.070,00 €');
     await userEvent.click(within(card).getByRole('button', { name: 'Pagar Limpieza' }));
     const dialog = await screen.findByRole('dialog', { name: 'Pagar Limpieza' });
     const amount = within(dialog).getByLabelText('Importe pagado (€)');
@@ -566,7 +566,7 @@ describe('Contabilidad', () => {
     });
 
     await userEvent.click(within(card).getByRole('button', { name: 'No hay Alquiler este mes' }));
-    expect(await within(card).findByText(/se esperaban 120 €/)).toBeInTheDocument();
+    expect(await within(card).findByText(/se esperaban 120,00 €/)).toBeInTheDocument();
     expect(within(card).getByRole('button', { name: 'Volver a esperar Alquiler' })).toBeVisible();
   });
 
@@ -873,7 +873,7 @@ describe('Contabilidad', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
 
     const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
-    expect(confirm).toHaveTextContent('Importe: 950 € → 900 €');
+    expect(confirm).toHaveTextContent('Importe: 950,00 € → 900,00 €');
     expect(confirm).toHaveTextContent('Forma de pago: Transferencia → Efectivo');
     expect(confirm).toHaveTextContent('Fecha de pago: 01/10/2026 → 03/10/2026');
     await userEvent.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
@@ -935,7 +935,7 @@ describe('Contabilidad', () => {
       'Saldo del club',
     );
     expect(screen.getByText('13.014,96 €').parentElement).toHaveTextContent('Saldo en el banco');
-    expect(screen.getByText('1250 €').parentElement).toHaveTextContent('Saldo en caja');
+    expect(screen.getByText('1.250,00 €').parentElement).toHaveTextContent('Saldo en caja');
 
     await userEvent.click(screen.getByRole('tab', { name: 'Traspasos' }));
     const table = await screen.findByRole('table', { name: 'Traspasos entre caja y banco' });
@@ -943,10 +943,10 @@ describe('Contabilidad', () => {
     expect(rows[0]).toHaveTextContent('20/10/2026');
     expect(rows[0]).toHaveTextContent('Caja → Banco');
     expect(rows[0]).toHaveTextContent('Ingreso del efectivo de septiembre');
-    expect(rows[0]).toHaveTextContent('500 €');
+    expect(rows[0]).toHaveTextContent('500,00 €');
     // Ordenable desde las cabeceras: por importe, de menor a mayor.
     await userEvent.click(within(table).getByRole('button', { name: /Ordenar por importe/ }));
-    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('100 €');
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('100,00 €');
 
     await userEvent.click(screen.getByRole('button', { name: 'Traspasar dinero' }));
     const dialog = await screen.findByRole('dialog', { name: 'Traspasar dinero' });
@@ -988,14 +988,16 @@ describe('Contabilidad', () => {
     renderApp('/panel/contabilidad?pestana=cierre&temporada=2026');
 
     const table = await screen.findByRole('table', { name: 'Temporada 2026/27 mes a mes' });
-    expect(within(table).getByRole('row', { name: /Saldo inicial/ })).toHaveTextContent('1200 €');
-    expect(within(table).getByRole('row', { name: /Octubre/ })).toHaveTextContent('−721 €');
+    expect(within(table).getByRole('row', { name: /Saldo inicial/ })).toHaveTextContent(
+      '1.200,00 €',
+    );
+    expect(within(table).getByRole('row', { name: /Octubre/ })).toHaveTextContent('−721,00 €');
     expect(within(table).getByRole('columnheader', { name: 'Saldo' })).toBeInTheDocument();
     // Todo va por fecha: lo que pasa a la siguiente es el resultado, sin una segunda cifra.
     const closing = screen.getByRole('region', { name: 'Cierre de temporada 2026/27' });
     expect(closing).not.toHaveTextContent('Movido en caja y banco');
     expect(closing).toHaveTextContent('cuando se movió el dinero');
-    expect(closing).toHaveTextContent('el resultado (−721 €) pasa como saldo inicial');
+    expect(closing).toHaveTextContent('el resultado (−721,00 €) pasa como saldo inicial');
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar temporada' }));
     await userEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cerrar temporada' }),

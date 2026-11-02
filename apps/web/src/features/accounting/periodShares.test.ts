@@ -33,7 +33,7 @@ describe('period shares', () => {
     expect(
       resolveChoice({ ...many, amounts: { '2026-10': '50', '2026-11': '30' } }, '2027-01', 9000)
         .problem,
-    ).toBe('El reparto suma 80 € y el importe es 90 €.');
+    ).toBe('El reparto suma 80,00 € y el importe es 90,00 €.');
     expect(resolveChoice({ ...many, months: ['2026-10'] }, '2027-01', 9000).problem).toBe(
       'Elige al menos dos meses.',
     );
@@ -72,6 +72,8 @@ describe('period shares', () => {
         { period: '2026-12', amountCents: 1 },
       ]),
     ).toBe('diciembre 2026, enero 2027');
-    expect(sharesDetail(shares.slice(0, 2))).toBe('Octubre 2026 (100 €), noviembre 2026 (100 €)');
+    expect(sharesDetail(shares.slice(0, 2))).toBe(
+      'Octubre 2026 (100,00 €), noviembre 2026 (100,00 €)',
+    );
   });
 });
