@@ -13,6 +13,7 @@ StudentsPage (/panel/alumnos)
 │   ├── SearchField: icono lupa, placeholder «Buscar por nombre»
 │   ├── Chips de filtro: Activos (por defecto) · Socios sin clases · De baja
 │   ├── Enlaces: «Datos pendientes (N)» (/panel/alumnos/pendientes) · «Importar hoja»
+│   ├── Aviso (solo si hay alguno): «N socios provisionales por completar» → /panel/alumnos/provisionales
 │   └── Recuento: «N de M mostrados»
 ├── StudentsTable (escritorio) / StudentCards (móvil)
 │   ├── Cabecera (escritorio): Alumno | Grupos | Estado
@@ -31,7 +32,11 @@ StudentsPage (/panel/alumnos)
 │   ├── Sección «Contacto»: Tutor 1 + Teléfono · Tutor 2 (opcional) + Teléfono · Teléfono del alumno
 │   ├── (solo alta) Sección «Familia directa en el club»: select opcional
 │   ├── Sección «Club»: (solo alta) Grupo (select) + «Añadir otro grupo» · interruptor Federado + Nº de licencia · interruptor Autorización de imagen
+│   ├── (solo alta) Interruptor «Socio provisional» (ayuda: «Ha pagado la cuota de socio, pero falta su hoja de inscripción. Recibe número de socio al pasarlo a socio.»); activado, oculta el horario y la familia directa
 │   └── Pie: Cancelar | «Dar de alta» o «Guardar cambios»
+├── ProvisionalMembersPage (/panel/alumnos/provisionales): enlace «Alumnos», «N socios provisionales» | «Socios provisionales», tarjeta con una fila por socio (avatar, nombre, «Alta el dd/mm/aaaa»), que abre su ficha; vacía: «No hay socios provisionales.»
+├── Ficha de un socio provisional: badge «Provisional» en lugar del número y del estado; acciones «Editar» y «Pasar a socio» (sin «Dar de baja», grupos ni familia directa); aviso «Socio provisional: falta su hoja de inscripción. Pásalo a socio cuando la tengas.»
+├── ConfirmDialog «Pasar a socio»: «<Nombre> recibirá el siguiente número de socio y aparecerá en la lista de alumnos.», Cancelar | «Pasar a socio»
 ├── WithdrawDialog: «Dar de baja a <nombre>», DateField «Fecha de baja» (por defecto hoy), texto «Desde ese día deja de ocupar plaza en sus grupos.», Cancelar | «Dar de baja»
 ├── GroupPickerDialog: «Añadir grupo» o «Mover de <grupo>», con un select de grupos (nombre · horario · ocupación N/M), Cancelar | Confirmar
 ├── SiblingPickerDialog: «Añadir familia directa», con un select de alumnos activos

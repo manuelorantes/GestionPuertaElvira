@@ -21,7 +21,10 @@
 7. **Hermanos:** «Añadir hermano» → elegir → se vinculan los dos.
    La papelera pide confirmación («Quitar de la familia directa») y, al confirmar, desvincula con el aviso
    «Familiar desvinculado»; «Abrir» navega a la ficha del hermano.
-8. **Desde Clases:** pulsar un bloque o «Alumnos» en la tabla abre `ClassGroupPanel`,
+8. **Socio provisional:** en «Nuevo alumno», activar «Socio provisional» → «Dar de alta» → aviso «<Nombre> dado de alta como socio provisional» y se abre su ficha, donde se le cobra la cuota de socio.
+   El aviso de Alumnos lleva a `/panel/alumnos/provisionales`; pulsar uno abre su ficha (`/panel/alumnos/:id`).
+   «Pasar a socio» → confirmación → aviso «<Nombre> ya es socio»; la ficha pasa a la de un alumno normal, con su número de socio.
+9. **Desde Clases:** pulsar un bloque o «Alumnos» en la tabla abre `ClassGroupPanel`,
    donde se puede inscribir a un alumno o abrir la ficha de uno inscrito.
 
 ## 2. Interaction & Micro-interactions
