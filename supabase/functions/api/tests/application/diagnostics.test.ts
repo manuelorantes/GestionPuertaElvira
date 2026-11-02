@@ -30,7 +30,7 @@ class SpyExecutor implements FixExecutor {
   }
 }
 
-/** Paula paga 36 € con una tarifa de 49,50 € (regla 1) y su nombre está en minúsculas (regla 9). */
+/** Paula paga 36,00 € con una tarifa de 49,50 € (regla 1) y su nombre está en minúsculas (regla 9). */
 function paulaFacts(): Facts {
   const paula = student({
     id: 'paula',

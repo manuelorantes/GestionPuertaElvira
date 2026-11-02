@@ -64,7 +64,7 @@ async function fixture() {
     birthDate: '1965-04-02',
     guardians: [{ name: 'Antonio', phone: '611223344' }],
   });
-  // Importada de la hoja con un importe que no es su tarifa (2 h: 45 €).
+  // Importada de la hoja con un importe que no es su tarifa (2 h: 45,00 €).
   await db()`UPDATE billing_charge SET amount_cents = 3600
     WHERE student_id = ${ana} AND kind = 'monthly' AND period = ${month.toString()}`;
   const entry = async (concept: string, category: string, amount: string) =>

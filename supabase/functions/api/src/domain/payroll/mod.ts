@@ -340,7 +340,9 @@ export class Advance {
     readonly paidOn: LocalDate,
     readonly note: string | null,
   ) {
-    if (amount.cents <= 0) throw new InvalidValue('amount', 'El anticipo debe ser mayor que 0 €.');
+    if (amount.cents <= 0) {
+      throw new InvalidValue('amount', 'El anticipo debe ser mayor que 0,00 €.');
+    }
     if (note !== null && note.length > 200) {
       throw new InvalidValue('note', 'La nota no puede pasar de 200 caracteres.');
     }

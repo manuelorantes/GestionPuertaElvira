@@ -58,12 +58,25 @@ Deno.test('Money should apply percentages rounding half up to cents', () => {
   assertEquals(Money.cents(16500).percent(75).cents, 12375);
 });
 
-Deno.test('Money should format in spanish style', () => {
-  assertEquals(Money.cents(123450).format(), '1.234,50 €');
-  assertEquals(Money.euros(45).format(), '45 €');
-  assertEquals(Money.cents(-1125).format(), '−11,25 €');
-  assertEquals(Money.cents(123456700).format(), '1.234.567 €');
-});
+for (
+  const [cents, text] of [
+    [0, '0,00 €'],
+    [4500, '45,00 €'],
+    [4050, '40,50 €'],
+    [7, '0,07 €'],
+    [100000, '1.000,00 €'],
+    [123450, '1.234,50 €'],
+    [816300, '8.163,00 €'],
+    [1259495, '12.594,95 €'],
+    [123456700, '1.234.567,00 €'],
+    [-1125, '−11,25 €'],
+    [-163144, '−1.631,44 €'],
+  ] as const
+) {
+  Deno.test(`Money should format ${cents} cents as ${text}, with thousands and two decimals`, () => {
+    assertEquals(Money.cents(cents).format(), text);
+  });
+}
 
 Deno.test('Money should parse decimal strings', () => {
   assertEquals(Money.fromDecimal('30,50').cents, 3050);

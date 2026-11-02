@@ -16,7 +16,7 @@ import {
 } from '../../src/application/billing/mod.ts';
 import { BillingFixture } from '../support/billing.ts';
 
-/** Irene: 2 h con familia (45 € − 10 % = 40,50 €), importada con 32,40 € al mes (40,50 € − 20 %). */
+/** Irene: 2 h con familia (45,00 € − 10 % = 40,50 €), importada con 32,40 € al mes (40,50 € − 20 %). */
 function setUp() {
   const fx = new BillingFixture('2026-10-11T10:00:00+02:00');
   const irene = fx.student({ name: 'Irene Fernández Aguilera', regularHours: 2, siblings: true });

@@ -110,11 +110,11 @@ export class Money {
     return this.cents === other.cents;
   }
 
+  /** 4500 → «45,00 €»; 123450 → «1.234,50 €»; −1125 → «−11,25 €» (signo menos tipográfico). */
   format(): string {
     const absolute = Math.abs(this.cents);
-    const decimals = absolute % 100 === 0 ? 0 : 2;
-    const [whole = '0', fraction = ''] = (absolute / 100).toFixed(decimals).split('.');
-    const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-    return `${this.cents < 0 ? '−' : ''}${grouped}${fraction ? `,${fraction}` : ''} €`;
+    const whole = String(Math.trunc(absolute / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    const fraction = String(absolute % 100).padStart(2, '0');
+    return `${this.cents < 0 ? '−' : ''}${whole},${fraction} €`;
   }
 }
