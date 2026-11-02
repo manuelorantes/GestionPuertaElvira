@@ -60,6 +60,16 @@ export function fetchDashboard(): Promise<Dashboard> {
 }
 
 /** Una línea de lo que suma una parte de una barra de «Cuotas vs gastos fijos». */
+/** Adónde lleva una línea del detalle de «Cuotas vs gastos fijos». */
+export type FeesVsFixedLink =
+  | { kind: 'receipt'; paymentId: string }
+  | { kind: 'fee'; studentId: string; month: string }
+  /** `month`: el de la fecha del movimiento, donde sale en Movimientos. */
+  | { kind: 'movement'; sourceId: string; month: string }
+  | { kind: 'teacher'; teacherId: string; month: string }
+  | { kind: 'expected'; expenseId: string; month: string }
+  | { kind: 'ledger'; month: string };
+
 export interface FeesVsFixedItem {
   concept: string;
   detail: string;
@@ -68,6 +78,7 @@ export interface FeesVsFixedItem {
   amountCents: number;
   /** El importe entero, si la línea es solo una parte. */
   totalCents: number | null;
+  link: FeesVsFixedLink;
 }
 
 export interface FeesVsFixedMonth extends MonthFeeBars {

@@ -28,6 +28,7 @@ const DETAIL = {
                 date: null,
                 amountCents: 4500,
                 totalCents: null,
+                link: { kind: 'receipt', paymentId: 'p-irene' },
               },
               {
                 concept: 'Martina López Herrera',
@@ -35,6 +36,7 @@ const DETAIL = {
                 date: null,
                 amountCents: 2000,
                 totalCents: 4500,
+                link: { kind: 'fee', studentId: 's-martina', month: '2026-10' },
               },
             ],
             expected: [
@@ -44,6 +46,7 @@ const DETAIL = {
                 date: null,
                 amountCents: 2500,
                 totalCents: 4500,
+                link: { kind: 'fee', studentId: 's-martina', month: '2026-10' },
               },
             ],
             expense: [
@@ -53,6 +56,7 @@ const DETAIL = {
                 date: '2026-10-05',
                 amountCents: 51000,
                 totalCents: null,
+                link: { kind: 'movement', sourceId: 'inv-alquiler', month: '2026-10' },
               },
               {
                 concept: 'Luz',
@@ -60,6 +64,7 @@ const DETAIL = {
                 date: '2026-10-08',
                 amountCents: 4500,
                 totalCents: 9000,
+                link: { kind: 'movement', sourceId: 'e-luz', month: '2026-10' },
               },
             ],
             expectedExpense: [
@@ -69,6 +74,7 @@ const DETAIL = {
                 date: null,
                 amountCents: 30000,
                 totalCents: null,
+                link: { kind: 'teacher', teacherId: 't-lucia', month: '2026-10' },
               },
               {
                 concept: 'Carlos Ruiz Pardo',
@@ -76,6 +82,7 @@ const DETAIL = {
                 date: null,
                 amountCents: 20000,
                 totalCents: null,
+                link: { kind: 'teacher', teacherId: 't-carlos', month: '2026-10' },
               },
               {
                 concept: 'Profesorado ya en el libro',
@@ -83,18 +90,40 @@ const DETAIL = {
                 date: null,
                 amountCents: -15000,
                 totalCents: null,
+                link: { kind: 'ledger', month: '2026-10' },
               },
             ],
           },
         }
-      : {
-          month,
-          incomeCents: 0,
-          expectedCents: 0,
-          expenseCents: 0,
-          expectedExpenseCents: 0,
-          parts: empty,
-        },
+      : month === '2026-11'
+        ? {
+            month,
+            incomeCents: 0,
+            expectedCents: 0,
+            expenseCents: 0,
+            expectedExpenseCents: 12000,
+            parts: {
+              ...empty,
+              expectedExpense: [
+                {
+                  concept: 'Limpieza del local',
+                  detail: 'Limpieza · gasto esperado',
+                  date: null,
+                  amountCents: 12000,
+                  totalCents: null,
+                  link: { kind: 'expected', expenseId: 'x-limpieza', month: '2026-11' },
+                },
+              ],
+            },
+          }
+        : {
+            month,
+            incomeCents: 0,
+            expectedCents: 0,
+            expenseCents: 0,
+            expectedExpenseCents: 0,
+            parts: empty,
+          },
   ),
 };
 
@@ -183,6 +212,157 @@ describe('Cuotas vs gastos fijos', () => {
     // La tabla mes a mes se ordena desde sus cabeceras.
     await userEvent.click(within(table).getByRole('button', { name: /Ordenar por resultado/ }));
     expect(within(table).getAllByRole('row')[1]).toHaveTextContent('Octubre 2026');
+  });
+
+  it('links every line of the detail to where it is shown', async () => {
+    api();
+    renderApp('/panel/contabilidad?pestana=cierre&mes=2026-10&parte=ingresos');
+
+    const link = async (part: string, name: string) =>
+      within(await screen.findByRole('region', { name: part })).getByRole('link', { name });
+    expect(
+      await link('Ingresos de octubre 2026', 'Irene Moreno Salas: ver el recibo'),
+    ).toHaveAttribute('href', '/panel/cobros?recibo=p-irene');
+    expect(
+      await link(
+        'Ingresos de octubre 2026',
+        'Martina López Herrera: ver su cuota de octubre 2026 en su ficha',
+      ),
+    ).toHaveAttribute('href', '/panel/alumnos/s-martina?cuota=2026-10');
+
+    const figures = screen.getByRole('table', { name: 'Cuotas vs gastos fijos mes a mes' });
+    const choose = (name: string) => userEvent.click(within(figures).getByRole('button', { name }));
+    await choose('Cuotas previstas de octubre 2026: 25,00 €');
+    expect(
+      await link(
+        'Cuotas previstas de octubre 2026',
+        'Martina López Herrera: ver su cuota de octubre 2026 en su ficha',
+      ),
+    ).toHaveAttribute('href', '/panel/alumnos/s-martina?cuota=2026-10');
+    await choose('Gastos de octubre 2026: 555,00 €');
+    expect(
+      await link('Gastos de octubre 2026', 'Luz: ver el movimiento en Movimientos'),
+    ).toHaveAttribute(
+      'href',
+      '/panel/contabilidad?pestana=movimientos&mes=2026-10&movimiento=e-luz',
+    );
+    await choose('Gastos previstos de octubre 2026: 350,00 €');
+    expect(
+      await link(
+        'Gastos previstos de octubre 2026',
+        'Lucía Moreno Gil: ver sus horas y su pago de octubre 2026',
+      ),
+    ).toHaveAttribute('href', '/panel/profesores/t-lucia?mes=2026-10');
+    expect(
+      await link(
+        'Gastos previstos de octubre 2026',
+        'Profesorado ya en el libro: ver los movimientos de octubre 2026',
+      ),
+    ).toHaveAttribute('href', '/panel/contabilidad?pestana=movimientos&mes=2026-10');
+    await choose('Gastos previstos de noviembre 2026: 120,00 €');
+    expect(
+      await link(
+        'Gastos previstos de noviembre 2026',
+        'Limpieza del local: ver en los gastos esperados de noviembre 2026',
+      ),
+    ).toHaveAttribute(
+      'href',
+      '/panel/contabilidad?pestana=movimientos&mes=2026-11&esperado=x-limpieza',
+    );
+  });
+
+  it('takes a movement of the detail to its row in Movimientos, spotlighted', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/dashboard/fees-vs-fixed': [200, DETAIL],
+      'GET /api/admin/accounting/ledger?month=2026-10': [
+        200,
+        {
+          month: '2026-10',
+          incomeCents: 0,
+          expenseCents: 9000,
+          expensesByCategory: [],
+          items: [
+            {
+              source: 'manual',
+              sourceId: 'e-luz',
+              date: '2026-10-08',
+              kind: 'expense',
+              concept: 'Luz',
+              category: 'electricity',
+              method: 'transfer',
+              amountCents: 9000,
+              categoryLabel: 'Electricidad',
+              methodLabel: 'Transferencia',
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad?pestana=cierre&mes=2026-10&parte=gastos');
+
+    const detail = await screen.findByRole('region', { name: 'Gastos de octubre 2026' });
+    await userEvent.click(
+      within(detail).getByRole('link', { name: 'Luz: ver el movimiento en Movimientos' }),
+    );
+
+    const table = await screen.findByRole('table', { name: 'Movimientos de octubre 2026' });
+    expect(within(table).getByRole('row', { name: /Luz/ })).toHaveClass('bg-surface-muted');
+  });
+
+  it('takes an expected expense of the detail to its line in the expected expenses of the month', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: ADMIN }],
+      'GET /api/admin/dashboard/fees-vs-fixed': [200, DETAIL],
+      'GET /api/admin/accounting/expected/month?month=2026-11': [
+        200,
+        {
+          items: [
+            {
+              expenseId: 'x-alquiler',
+              concept: 'Alquiler',
+              category: 'rent',
+              categoryLabel: 'Alquiler',
+              period: '2026-11',
+              expectedCents: 51000,
+              status: 'pending',
+              paidCents: null,
+              entryId: null,
+              paidOn: null,
+            },
+            {
+              expenseId: 'x-limpieza',
+              concept: 'Limpieza del local',
+              category: 'cleaning',
+              categoryLabel: 'Limpieza',
+              period: '2026-11',
+              expectedCents: 12000,
+              status: 'pending',
+              paidCents: null,
+              entryId: null,
+              paidOn: null,
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad?pestana=cierre&mes=2026-11&parte=gastos-previstos');
+
+    const detail = await screen.findByRole('region', {
+      name: 'Gastos previstos de noviembre 2026',
+    });
+    await userEvent.click(
+      within(detail).getByRole('link', {
+        name: 'Limpieza del local: ver en los gastos esperados de noviembre 2026',
+      }),
+    );
+
+    const card = await screen.findByRole('region', { name: 'Gastos esperados de noviembre 2026' });
+    expect(await within(card).findByText('Limpieza del local')).toBeInTheDocument();
+    expect(within(card).getByText('Limpieza del local').closest('li')).toHaveClass(
+      'bg-surface-muted',
+    );
+    expect(within(card).getByText('Alquiler').closest('li')).not.toHaveClass('bg-surface-muted');
   });
 
   it('opens the detail from the bars of the summary', async () => {

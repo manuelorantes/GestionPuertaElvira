@@ -8,6 +8,7 @@ import { updateAccount, type Account, type AccountCharge } from '@/features/bill
 import { useAccount, useBillingMutation, usePayments } from '@/features/billing/hooks';
 import { centsFromText, formatCents, monthLabel } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
+import { FEE_PARAM } from '@/features/students/links';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -15,6 +16,7 @@ import { AsteriskNote } from '@/shared/ui/AsteriskNote';
 import { Card } from '@/shared/ui/Card';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
 
 import { ChargeDialog } from './ChargeDialog';
 
@@ -22,7 +24,12 @@ function hoursLabel(hours: number): string {
   return `${String(Math.round(hours * 100) / 100).replace('.', ',')} h semanales`;
 }
 
-/** Tarjeta «Cuotas y cobros» de la ficha: lo que paga y por qué, puntos, cuota de socio e historial. */
+type Spotlight = ReturnType<typeof useSpotlight>;
+
+/**
+ * Tarjeta «Cuotas y cobros» de la ficha: lo que paga y por qué, puntos, cuota de socio e historial. Un enlace a una
+ * cuota (`?cuota=AAAA-MM`) baja hasta ella y la resalta; si ese mes no tiene cuota, baja hasta la tarjeta.
+ */
 export function StudentBillingCard({
   studentId,
   title,
@@ -34,12 +41,27 @@ export function StudentBillingCard({
   const payments = usePayments(studentId);
   const [dialog, setDialog] = useState<BillingDialog>(null);
   const canManage = useCanManageClub();
+  const spotlight = useSpotlight(FEE_PARAM);
+  const withoutFee =
+    spotlight.id !== null &&
+    account.data !== undefined &&
+    !account.data.charges.some((c) => c.period === spotlight.id);
 
   return (
-    <Card className="p-4">
+    <Card
+      className="p-4"
+      role="region"
+      aria-label="Cuotas y cobros"
+      ref={withoutFee ? spotlight.attach : undefined}
+    >
       {title('Cuotas y cobros')}
       {account.data ? (
-        <AccountSummary key={studentId} studentId={studentId} account={account.data} />
+        <AccountSummary
+          key={studentId}
+          studentId={studentId}
+          account={account.data}
+          spotlight={spotlight}
+        />
       ) : (
         <p className="text-sm text-ink-muted">
           {account.isError ? 'No se han podido cargar los datos de cobro.' : 'Cargando…'}
@@ -96,7 +118,15 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-function AccountSummary({ studentId, account }: { studentId: string; account: Account }) {
+function AccountSummary({
+  studentId,
+  account,
+  spotlight,
+}: {
+  studentId: string;
+  account: Account;
+  spotlight: Spotlight;
+}) {
   const [rate, setRate] = useState(account.privateRate ?? '');
   const save = useBillingMutation(() =>
     updateAccount(studentId, {
@@ -157,7 +187,7 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
           </Button>
         </div>
       )}
-      <SeasonCharges studentId={studentId} account={account} />
+      <SeasonCharges studentId={studentId} account={account} spotlight={spotlight} />
       <ClubTotals account={account} />
       <div className="mt-2 flex items-center justify-between gap-3 border-t border-line-soft pt-3 text-sm">
         <span>
@@ -266,7 +296,15 @@ function discountsLabel(charge: AccountCharge, account: Account): string | null 
 }
 
 /** Cuotas de la temporada: importe, si está fijada a mano, lo que falta y la acción de editarla. */
-function SeasonCharges({ studentId, account }: { studentId: string; account: Account }) {
+function SeasonCharges({
+  studentId,
+  account,
+  spotlight,
+}: {
+  studentId: string;
+  account: Account;
+  spotlight: Spotlight;
+}) {
   const [editing, setEditing] = useState<AccountCharge | null>(null);
   const canManage = useCanManageClub();
   const toast = useToast();
@@ -294,8 +332,13 @@ function SeasonCharges({ studentId, account }: { studentId: string; account: Acc
         {account.charges.map((charge) => {
           const state = chargeState(charge);
           const month = monthLabel(charge.period);
+          const linked = charge.period === spotlight.id;
           return (
-            <li key={charge.id} className="flex items-center gap-2 py-1 text-sm">
+            <li
+              key={charge.id}
+              ref={linked ? spotlight.attach : undefined}
+              className={`flex items-center gap-2 py-1 text-sm ${linked ? `rounded-sm ${SPOTLIGHT_CLASS}` : ''}`}
+            >
               <span className="w-28 shrink-0">{month}</span>
               <span className="flex-1">
                 <span
