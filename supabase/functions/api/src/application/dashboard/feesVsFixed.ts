@@ -29,6 +29,18 @@ export interface PendingPayroll {
   byTeacher(first: YearMonth, last: YearMonth): Promise<Map<string, TeacherCostView[]>>;
 }
 
+/**
+ * Adónde lleva una línea del detalle: el recibo que pagó la cuota, la cuota en la ficha del alumno, el movimiento (en el
+ * mes de su fecha), la ficha del profesor en ese mes, el gasto esperado de ese mes o los movimientos del mes.
+ */
+export type FeesVsFixedLink =
+  | { kind: 'receipt'; paymentId: string }
+  | { kind: 'fee'; studentId: string; month: string }
+  | { kind: 'movement'; sourceId: string; month: string }
+  | { kind: 'teacher'; teacherId: string; month: string }
+  | { kind: 'expected'; expenseId: string; month: string }
+  | { kind: 'ledger'; month: string };
+
 /** Una línea de lo que suma una parte de una barra. */
 export interface FeesVsFixedItem {
   concept: string;
@@ -39,6 +51,7 @@ export interface FeesVsFixedItem {
   amountCents: number;
   /** El importe entero, si la línea es solo una parte (un apunte repartido, una cuota pagada en parte). */
   totalCents: number | null;
+  link: FeesVsFixedLink;
 }
 
 export type FeesVsFixedPart = 'income' | 'expected' | 'expense' | 'expectedExpense';
@@ -111,6 +124,7 @@ export class FeesVsFixed {
           date: null,
           amountCents: view.expectedCents,
           totalCents: null,
+          link: { kind: 'expected', expenseId: view.expenseId, month: view.period },
         },
       ]);
     }
@@ -123,6 +137,7 @@ export class FeesVsFixed {
       }]),
     );
     if (categories.includes('fees')) {
+      const receipts = feeReceipts(lines);
       for (const [month, part] of parts) {
         const fees = (await this.charges.execute(month, 'monthly')).items
           .filter((charge) => charge.kind === 'monthly');
@@ -130,13 +145,19 @@ export class FeesVsFixed {
           const covered = Math.min(fee.coveredCents, fee.amountCents);
           const missing = Math.max(0, fee.amountCents - fee.coveredCents);
           const whole = covered > 0 && missing > 0 ? fee.amountCents : null;
+          const inStudentPage: FeesVsFixedLink = { kind: 'fee', studentId: fee.studentId, month };
           if (covered > 0) {
+            const paidBy = new Set(receipts.get(`${fee.studentId}/${month}`));
+            if (fee.paymentId !== null) paidBy.add(fee.paymentId);
             part.income.push({
               concept: fee.studentName,
               detail: 'Cuota del mes',
               date: null,
               amountCents: covered,
               totalCents: whole,
+              link: paidBy.size === 1
+                ? { kind: 'receipt', paymentId: [...paidBy][0]! }
+                : inStudentPage,
             });
           }
           if (missing > 0) {
@@ -146,6 +167,7 @@ export class FeesVsFixed {
               date: null,
               amountCents: missing,
               totalCents: whole,
+              link: inStudentPage,
             });
           }
         }
@@ -162,6 +184,7 @@ export class FeesVsFixed {
           date: line.date,
           amountCents: share.amountCents,
           totalCents: share.amountCents === line.amountCents ? null : line.amountCents,
+          link: { kind: 'movement', sourceId: line.sourceId, month: line.date.slice(0, 7) },
         };
         if (line.kind === 'income') part.income.push(item);
         else {
@@ -182,6 +205,7 @@ export class FeesVsFixed {
           date: null,
           amountCents: t.cents,
           totalCents: null,
+          link: { kind: 'teacher', teacherId: t.teacherId, month: m },
         }));
       // Lo del profesorado ya en el libro no se prevé otra vez (como mucho, todo lo previsto).
       const booked = Math.min(part.teachers, planned);
@@ -192,6 +216,7 @@ export class FeesVsFixed {
           date: null,
           amountCents: -booked,
           totalCents: null,
+          link: { kind: 'ledger', month: m },
         });
       }
       for (const t of owed.get(m) ?? []) {
@@ -201,6 +226,7 @@ export class FeesVsFixed {
           date: null,
           amountCents: t.cents,
           totalCents: null,
+          link: { kind: 'teacher', teacherId: t.teacherId, month: m },
         });
       }
       expectedExpense.push(...(pendingExpected.get(m) ?? []));
@@ -220,6 +246,22 @@ export class FeesVsFixed {
       };
     });
   }
+}
+
+/**
+ * Los recibos de cuotas de cada alumno que reparten algo a cada mes («alumno/AAAA-MM» → recibos): si una cuota la pagó
+ * uno solo, se enlaza a él.
+ */
+function feeReceipts(lines: LedgerLine[]): Map<string, Set<string>> {
+  const receipts = new Map<string, Set<string>>();
+  for (const line of lines) {
+    if (line.source !== 'payment' || line.category !== 'fees' || line.studentId === null) continue;
+    for (const share of line.shares) {
+      const key = `${line.studentId}/${share.period}`;
+      receipts.set(key, (receipts.get(key) ?? new Set()).add(line.sourceId));
+    }
+  }
+  return receipts;
 }
 
 /** La temporada en curso de «Cuotas vs gastos fijos», con lo que suma cada parte de cada mes. */
