@@ -30,6 +30,7 @@ import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
+import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 
@@ -124,14 +125,21 @@ function sortHeaders<K extends string>(keys: K[], header: (key: K) => ReactNode)
   ));
 }
 
+type Spotlight = ReturnType<typeof useSpotlight>;
+
 /**
  * Ficha de un profesor: saldo (lo que le debemos o lo pagado de más), mes a mes de la temporada, clases dadas (con su
- * calendario), sus clases con su ocupación, alumnos, pagos recibidos (con anticipos), sustituciones y turnos.
+ * calendario), sus clases con su ocupación, alumnos, pagos recibidos (con anticipos), sustituciones y turnos. Un enlace
+ * a un mes (`?mes=AAAA-MM`) abre las clases de ese mes y resalta su fila del mes a mes (o, sin fila, baja a las clases).
  */
 export function TeacherPage() {
   const { id = '' } = useParams();
   const report = useTeacherReport(id);
   const [advancing, setAdvancing] = useState(false);
+  const spotlight = useSpotlight('mes');
+  const [linkedMonth] = useState(() =>
+    /^\d{4}-\d{2}$/.test(spotlight.id ?? '') ? spotlight.id : null,
+  );
 
   if (report.isPending) {
     return <main className="px-4 py-8 text-ink-muted md:px-8">Cargando profesor…</main>;
@@ -145,6 +153,7 @@ export function TeacherPage() {
     );
   }
   const data = report.data;
+  const withRow = data.months.some((m) => m.month === spotlight.id);
   return (
     <main className="mx-auto flex max-w-[1280px] flex-col gap-6 px-4 py-6 md:px-8 md:py-8">
       <div>
@@ -160,8 +169,12 @@ export function TeacherPage() {
         />
       </div>
       <Summary data={data} />
-      <MonthsTable data={data} />
-      <SessionsSection teacherId={data.teacher.id} />
+      <MonthsTable data={data} spotlight={spotlight} />
+      <SessionsSection
+        teacherId={data.teacher.id}
+        initialMonth={linkedMonth ?? currentMonth()}
+        sectionRef={spotlight.id !== null && !withRow ? spotlight.attach : undefined}
+      />
       <GroupsSection groups={data.groups} />
       <StudentsSection students={data.students} />
       <PaymentsSection teacherId={data.teacher.id} payments={data.payments} />
@@ -185,9 +198,17 @@ function BackLink() {
   );
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  children,
+  sectionRef,
+}: {
+  title: string;
+  children: ReactNode;
+  sectionRef?: ((element: HTMLElement | null) => void) | undefined;
+}) {
   return (
-    <section aria-label={title}>
+    <section aria-label={title} ref={sectionRef}>
       <Card className="overflow-x-auto">
         <h2 className="border-b border-line px-5 py-4 font-display text-xl font-semibold tracking-[0.04em] uppercase">
           {title}
@@ -244,7 +265,7 @@ function Summary({ data }: { data: TeacherReport }) {
   );
 }
 
-function MonthsTable({ data }: { data: TeacherReport }) {
+function MonthsTable({ data, spotlight }: { data: TeacherReport; spotlight: Spotlight }) {
   return (
     <Section title="Mes a mes">
       {data.months.length === 0 ? (
@@ -272,7 +293,11 @@ function MonthsTable({ data }: { data: TeacherReport }) {
           </thead>
           <tbody>
             {data.months.map((m) => (
-              <tr key={m.month} className="border-b border-line-soft last:border-b-0">
+              <tr
+                key={m.month}
+                ref={m.month === spotlight.id ? spotlight.attach : undefined}
+                className={`border-b border-line-soft last:border-b-0 ${m.month === spotlight.id ? SPOTLIGHT_CLASS : ''}`}
+              >
                 <td className={`${TD} font-medium`}>{monthLabel(m.month)}</td>
                 <td className={TD}>{hoursLabel(m.minutes)}</td>
                 <td className={TD}>{formatCents(m.amountCents)}</td>
@@ -308,15 +333,23 @@ function MonthsTable({ data }: { data: TeacherReport }) {
   );
 }
 
-function SessionsSection({ teacherId }: { teacherId: string }) {
-  const [month, setMonth] = useState(currentMonth());
+function SessionsSection({
+  teacherId,
+  initialMonth,
+  sectionRef,
+}: {
+  teacherId: string;
+  initialMonth: string;
+  sectionRef?: ((element: HTMLElement | null) => void) | undefined;
+}) {
+  const [month, setMonth] = useState(initialMonth);
   const sessions = useSessions(month, teacherId);
   // De lo más reciente a lo más antiguo, salvo que se elija otra columna.
   const { header, apply } = useTableSort(SESSION_COLUMNS, { key: 'date', descending: true });
   const items = sessions.data?.items ?? [];
   const total = items.reduce((sum, s) => sum + s.minutes, 0);
   return (
-    <Section title="Clases dadas">
+    <Section title="Clases dadas" sectionRef={sectionRef}>
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4">
         <SeasonMonths
           month={month}

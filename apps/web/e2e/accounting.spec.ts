@@ -60,6 +60,25 @@ test('should show the season month by month', async ({ page }) => {
   await expect(page.getByRole('region', { name: /^Gastos de / })).toBeVisible();
 });
 
+test('should take a line of the fees vs fixed detail to where it is shown', async ({ page }) => {
+  const month = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Madrid' })
+    .format(new Date())
+    .slice(0, 7);
+  await openAccounting(page, `?pestana=cierre&mes=${month}&parte=gastos`);
+
+  // El alquiler pagado este mes lleva a su fila en Movimientos, resaltada.
+  await page
+    .getByRole('region', { name: /^Gastos de / })
+    .getByRole('link', { name: /^Propietario del local.*: ver el movimiento en Movimientos$/ })
+    .click();
+  await expect(page).toHaveURL(/pestana=movimientos/);
+  const row = page.getByRole('table', { name: /Movimientos de/ }).getByRole('row', {
+    name: /Propietario del local/,
+  });
+  await expect(row).toBeVisible();
+  await expect(row).toHaveClass(/bg-surface-muted/);
+});
+
 test('should split an invoice between the months it applies to', async ({ page }) => {
   // Con una factura: un apunte manual se cruzaría con el test del historial, que mira el último.
   await openAccounting(page, '?pestana=facturas');

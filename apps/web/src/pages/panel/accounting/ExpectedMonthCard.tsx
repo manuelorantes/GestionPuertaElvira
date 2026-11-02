@@ -10,16 +10,21 @@ import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
 import { useToast } from '@/shared/ui/Toast';
+import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
 
 import { PayExpectedDialog } from './PayExpectedDialog';
 
-/** «Gastos esperados de <mes>»: lo que falta por pagar, lo pagado y lo que no hay este mes. */
+/**
+ * «Gastos esperados de <mes>»: lo que falta por pagar, lo pagado y lo que no hay este mes. Un enlace a uno
+ * (`?esperado=<id>`) baja hasta él y lo resalta.
+ */
 export function ExpectedMonthCard({ month }: { month: string }) {
   const expected = useExpectedMonth(month);
   const [paying, setPaying] = useState<ExpectedMonth | null>(null);
   const skip = useAccountingMutation(skipExpected);
   const restore = useAccountingMutation(restoreExpected);
   const toast = useToast();
+  const spotlight = useSpotlight('esperado');
   const items = expected.data ?? [];
   if (items.length === 0) return null;
   const label = monthLabel(month).toLowerCase();
@@ -38,7 +43,11 @@ export function ExpectedMonthCard({ month }: { month: string }) {
         )}
         <ul className="flex flex-col divide-y divide-line-soft">
           {items.map((item) => (
-            <li key={item.expenseId} className="flex flex-col gap-2 py-2.5 text-sm">
+            <li
+              key={item.expenseId}
+              ref={item.expenseId === spotlight.id ? spotlight.attach : undefined}
+              className={`flex flex-col gap-2 py-2.5 text-sm ${item.expenseId === spotlight.id ? SPOTLIGHT_CLASS : ''}`}
+            >
               <div className="flex items-baseline justify-between gap-2">
                 <span className="font-medium">{item.concept}</span>
                 <span className={item.status === 'pending' ? 'text-ink-muted' : 'font-semibold'}>

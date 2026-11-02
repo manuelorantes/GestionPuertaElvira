@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
+import { Link } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { fiscalYearLabel, fiscalYearOf } from '@/features/accounting/categories';
@@ -9,6 +10,7 @@ import {
   type FeesVsFixedMonth,
   fetchFeesVsFixed,
 } from '@/features/dashboard/api';
+import { feesVsFixedHref, feesVsFixedLinkLabel } from '@/features/dashboard/feesVsFixedLinks';
 import { formatDate } from '@/features/students/format';
 import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
@@ -181,7 +183,7 @@ export function FeesVsFixedSection({
   );
 }
 
-/** De qué sale una parte de un mes: sus líneas, que suman lo mismo que la barra. */
+/** De qué sale una parte de un mes: sus líneas, que suman lo mismo que la barra; cada una lleva a donde se ve. */
 function PartDetail({ month, kind }: { month: FeesVsFixedMonth; kind: BarKind }) {
   const items = useTableSort(ITEM_COLUMNS, { key: 'amount', descending: true });
   const lines = month.parts[kind];
@@ -209,8 +211,20 @@ function PartDetail({ month, kind }: { month: FeesVsFixedMonth; kind: BarKind })
             </thead>
             <tbody>
               {items.apply(lines).map((item, index) => (
-                <tr key={`${item.concept}-${index}`} className="border-b border-line-soft">
-                  <td className="px-4 py-2.5 font-medium">{item.concept}</td>
+                // La fila entera es el enlace: el del concepto la cubre.
+                <tr
+                  key={`${item.concept}-${index}`}
+                  className="relative border-b border-line-soft hover:bg-surface-muted"
+                >
+                  <td className="px-4 py-2.5 font-medium">
+                    <Link
+                      to={feesVsFixedHref(item.link)}
+                      aria-label={feesVsFixedLinkLabel(item)}
+                      className="decoration-1 underline-offset-2 after:absolute after:inset-0 hover:underline"
+                    >
+                      {item.concept}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2.5 text-ink-soft">{item.detail}</td>
                   <td className="px-4 py-2.5 whitespace-nowrap text-ink-soft">
                     {item.date ? formatDate(item.date) : '—'}
