@@ -734,7 +734,10 @@ export class SpecialDiscount {
       this.amount = null;
     } else {
       if (value.cents <= 0) {
-        throw new InvalidValue('specialDiscount', 'El descuento especial debe ser mayor que 0 €.');
+        throw new InvalidValue(
+          'specialDiscount',
+          'El descuento especial debe ser mayor que 0,00 €.',
+        );
       }
       this.percent = null;
       this.amount = value;

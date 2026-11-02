@@ -449,9 +449,7 @@ export class ChooseFirstMonthFee {
     if (choice.amount.cents <= 0 || choice.amount.cents >= charge.amount.cents) {
       throw new InvalidValue(
         'firstMonth',
-        `La parte del mes debe ser de más de 0 € y menos que la cuota (${
-          charge.amount.cents / 100
-        } €).`,
+        `La parte del mes debe ser de más de 0,00 € y menos que la cuota (${charge.amount.format()}).`,
       );
     }
     const day = `${String(joined.day).padStart(2, '0')}/${String(joined.month).padStart(2, '0')}`;

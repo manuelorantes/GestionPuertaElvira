@@ -1,4 +1,4 @@
-import { InvalidValue, LocalDate, YearMonth } from '../../domain/common/mod.ts';
+import { InvalidValue, LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
 import { FiscalYear, type Transfer, Treasury } from '../../domain/accounting/mod.ts';
 import {
   type BankMovement,
@@ -174,10 +174,7 @@ const transferItem = (t: Transfer): AppItem => ({
 
 const keyOf = (t: MatchTarget) => `${t.source}:${t.sourceId}`;
 const sum = (items: readonly AppItem[]) => items.reduce((total, i) => total + i.amountCents, 0);
-const euros = (cents: number) =>
-  `${
-    (cents / 100).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  } €`;
+const euros = (cents: number) => Money.cents(cents).format();
 const methodLabel = (method: string) =>
   ({ cash: 'efectivo', transfer: 'transferencia', card: 'tarjeta' } as Record<string, string>)[
     method

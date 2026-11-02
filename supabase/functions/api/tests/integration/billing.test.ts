@@ -367,7 +367,7 @@ Deno.test({
     });
     assertEquals(paid.status, 201, JSON.stringify(paid.body));
 
-    // Pagó 3 meses a 45 € con un 10 % (40,50 €). Pasa a 3 h (55 €): las cuotas se recalculan aunque estén cobradas,
+    // Pagó 3 meses a 45,00 € con un 10 % (40,50 €). Pasa a 3 h (55,00 €): las cuotas se recalculan aunque estén cobradas,
     // conservando el 10 % (49,50 €).
     const friday = await newGroup(fx.client, fx.teacher, {
       name: 'Viernes',
@@ -390,7 +390,7 @@ Deno.test({
     assertEquals(rows[0]?.amountCents, includesThisMonth ? 4950 : 4050);
     assertEquals(
       rows.slice(1).map((r) => [r.amountCents, r.pendingCents]),
-      // Lo que falta (9 € por mes recalculado) queda en el último: el reparto cubre primero los más antiguos.
+      // Lo que falta (9,00 € por mes recalculado) queda en el último: el reparto cubre primero los más antiguos.
       [[4950, 0], [4950, includesThisMonth ? 2700 : 1800]],
     );
 
@@ -612,7 +612,7 @@ Deno.test({
     assertEquals(paid.status, 201, JSON.stringify(paid.body));
     assertEquals(await account(), [[month, 'paid', 4500, 0], [next, 'paid', 4500, 0]]);
 
-    // Se sube a mano el mes pagado: faltan 5 € en ese mes, no en el siguiente.
+    // Se sube a mano el mes pagado: faltan 5,00 € en ese mes, no en el siguiente.
     await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}/charges/${month}`, {
       amountCents: 5000,
       reason: 'Empieza dos días tarde',
@@ -652,7 +652,7 @@ Deno.test({
     });
     assertEquals(paid.status, 201, JSON.stringify(paid.body));
 
-    // El recibo: (50 + 45 + 45) € − 10 % = 126 €. Las cuotas tienen que sumar lo mismo: 45 + 40,50 + 40,50.
+    // El recibo: (50 + 45 + 45) € − 10 % = 126,00 €. Las cuotas tienen que sumar lo mismo: 45 + 40,50 + 40,50.
     const account = body<{
       balanceCents: number;
       charges: {
@@ -787,7 +787,7 @@ Deno.test({
 
 Deno.test({
   name:
-    'billing should let only superadministration delete a payment with a reason, and keep a 0 € receipt out of the ledger',
+    'billing should let only superadministration delete a payment with a reason, and keep a 0,00 € receipt out of the ledger',
   ignore: outsideSeason,
   async fn() {
     const fx = await fixture();
@@ -809,7 +809,7 @@ Deno.test({
       return body<{ items: { sourceId: string }[] }>(response).items.map((i) => i.sourceId);
     };
 
-    // Un recibo corregido a 0 € no rompe el mes: simplemente no sale en el libro.
+    // Un recibo corregido a 0,00 € no rompe el mes: simplemente no sale en el libro.
     const zero = await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/amount`, {
       amountCents: 0,
       reason: 'Prueba',

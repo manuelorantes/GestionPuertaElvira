@@ -241,7 +241,7 @@ export class PeriodShares {
       throw new InvalidValue('shares', 'No se puede repetir un mes en el reparto.');
     }
     if (sorted.some((p) => p.amount.cents <= 0)) {
-      throw new InvalidValue('shares', 'Cada mes del reparto tiene que llevar más de 0 €.');
+      throw new InvalidValue('shares', 'Cada mes del reparto tiene que llevar más de 0,00 €.');
     }
     const total = sorted.reduce((sum, p) => sum.plus(p.amount), Money.zero());
     if (!total.equals(amount)) {

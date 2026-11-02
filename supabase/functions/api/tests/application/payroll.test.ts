@@ -280,7 +280,7 @@ Deno.test('ListSettlements should list pending settlements with the current rate
   assertEquals(settlements[1]?.status, 'pending');
   assertEquals(settlements[1]?.minutes, 480);
   assertEquals(settlements[1]?.amountCents, 12800);
-  assertEquals(settlements[0]?.amountCents, 10800, '4 martes × 1,5 h × 18 €');
+  assertEquals(settlements[0]?.amountCents, 10800, '4 martes × 1,5 h × 18,00 €');
 });
 
 Deno.test('PaySettlement should freeze the settlement, lock its sessions and respect closed seasons', async () => {
@@ -324,7 +324,7 @@ Deno.test('PendingPayroll should keep owing the unpaid settlements of each month
         YearMonth.fromString('2026-10'),
       ),
     );
-  // Octubre: Lucía 8 h a 16 € y Carlos 4 × 1,5 h a 18 €; septiembre, nada apuntado.
+  // Octubre: Lucía 8 h a 16,00 € y Carlos 4 × 1,5 h a 18,00 €; septiembre, nada apuntado.
   assertEquals(await owed(), { '2026-09': 0, '2026-10': 12800 + 10800 });
   // Pagada la de Lucía, ya está en el libro: solo queda la de Carlos.
   await pay().execute(lucia, '2026-10', '2026-11-02');
@@ -422,7 +422,7 @@ Deno.test('SubstituteTeacher should give all the classes of a teacher on those d
 Deno.test('Profitability should compare the expected hours of the month with the monthly fees of their students', async () => {
   const { fx, lucia, carlos, duties } = setUp();
   await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
-  // Lucía: lunes y miércoles 1 h (7 clases con el festivo) a 16 €/h; Carlos: martes 1,5 h (4 clases) a 18 €/h.
+  // Lucía: lunes y miércoles 1 h (7 clases con el festivo) a 16,00 €/h; Carlos: martes 1,5 h (4 clases) a 18,00 €/h.
   const load = {
     classLoad: () =>
       Promise.resolve({
@@ -534,7 +534,7 @@ Deno.test('Substitutions should cover club duty shifts too, alone or with all th
 Deno.test('ExpectedPayroll should cost the expected hours of each month at the current rates', async () => {
   const { fx, duties, lucia, carlos } = setUp();
   await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
-  // Octubre: Lucía 7 h a 16 € y Carlos 4 × 1,5 h a 18 €; noviembre: 9 h de Lucía y 4 martes de Carlos.
+  // Octubre: Lucía 7 h a 16,00 € y Carlos 4 × 1,5 h a 18,00 €; noviembre: 9 h de Lucía y 4 martes de Carlos.
   const costs = await new ExpectedPayroll(fx, duties, fx, fx).between(
     YearMonth.fromString('2026-10'),
     YearMonth.fromString('2026-11'),
@@ -604,7 +604,7 @@ Deno.test('Profitability should use the hours actually recorded in a month alrea
 
 Deno.test('Advances should be discounted from the settlement of their month and count as paid ahead before it', async () => {
   const { fx, carlos, list } = setUp();
-  // Carlos: martes de octubre 1,5 h a 18 €/h (4 martes: 108 €). Se le adelantaron 90 € el 30 de septiembre.
+  // Carlos: martes de octubre 1,5 h a 18,00 €/h (4 martes: 108,00 €). Se le adelantaron 90,00 € el 30 de septiembre.
   await fx.recordMonth('2026-10');
   const record = new RecordAdvance(fx, fx, fx, fx);
   const id = await record.execute({
@@ -662,7 +662,7 @@ Deno.test('TeacherReport should gather the months, payments and balance of a tea
   const { fx, carlos, duties, list } = setUp();
   await fx.recordMonth('2026-09');
   await fx.recordMonth('2026-10');
-  // Septiembre pagado; octubre pendiente con 90 € adelantados; 50 € adelantados para noviembre.
+  // Septiembre pagado; octubre pendiente con 90,00 € adelantados; 50,00 € adelantados para noviembre.
   await new PaySettlement(fx, fx, fx, fx, fx.transactions, fx.locks).execute(
     carlos,
     '2026-09',
@@ -715,7 +715,7 @@ Deno.test('TeacherReport should gather the months, payments and balance of a tea
     ['2026-09', 450, 13500, 'paid'],
     ['2026-10', 360, 1800, 'pending'],
   ]);
-  // Le debemos 18 € de octubre, pero ya tiene 50 € de noviembre: 32 € pagados de más.
+  // Le debemos 18,00 € de octubre, pero ya tiene 50,00 € de noviembre: 32,00 € pagados de más.
   assertEquals(report.balanceCents, 1800 - 5000);
   assertEquals(report.payments.map((p) => [p.date, p.kind, p.month, p.amountCents]), [
     ['2026-10-20', 'advance', '2026-11', 5000],

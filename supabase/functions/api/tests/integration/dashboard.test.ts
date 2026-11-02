@@ -45,7 +45,7 @@ Deno.test({
       })).status,
       201,
     );
-    // La luz pagada hoy, repartida entre el mes anterior (10 €) y el siguiente (20 €): gasto de hoy en caja y de esos
+    // La luz pagada hoy, repartida entre el mes anterior (10,00 €) y el siguiente (20,00 €): gasto de hoy en caja y de esos
     // meses en lo que corresponde a cada mes.
     const previousMonth = YearMonth.fromString(today.slice(0, 7)).previous().toString();
     const followingMonth = YearMonth.fromString(today.slice(0, 7)).next().toString();
@@ -115,7 +115,7 @@ Deno.test({
     const response = await client.get('/api/admin/dashboard');
     assertEquals(response.status, 200);
     const summary = response.body as Record<string, unknown>;
-    // El saldo: sin ejercicios cerrados, lo cobrado (45 €) menos lo gastado (20 € + 30 €).
+    // El saldo: sin ejercicios cerrados, lo cobrado (45,00 €) menos lo gastado (20,00 € + 30,00 €).
     assertEquals(summary.balanceCents, -500);
     assertEquals(summary.seasonResultCents, -500);
     // Las cifras del mes son solo sus cuotas; las cuotas de socio pendientes (una por socio, también la de quien se ha dado de baja) van aparte.
@@ -293,7 +293,7 @@ Deno.test({
       date: today,
     });
     assertEquals(paid.status, 201, JSON.stringify(paid.body));
-    // 3 × 45 € con un 10 % = 121,50 €: 40,50 € en cada uno de los tres meses.
+    // 3 × 45,00 € con un 10 % = 121,50 €: 40,50 € en cada uno de los tres meses.
     const chart = ((await client.get('/api/admin/dashboard')).body as {
       monthChart: { month: string; incomeCents: number; expectedCents: number }[];
     }).monthChart;
@@ -305,7 +305,7 @@ Deno.test({
       expected.push(chart.find((m) => m.month === month.toString())?.expectedCents ?? -1);
     }
     assertEquals(shares, [4050, 4050, 4050]);
-    // Los meses pagados por adelantado no se prevén; el siguiente, si es lectivo, sí (45 € con la tarifa de hoy).
+    // Los meses pagados por adelantado no se prevén; el siguiente, si es lectivo, sí (45,00 € con la tarifa de hoy).
     assertEquals(expected, [0, 0, 0]);
     if (Season.teachingSeason(month) !== null) {
       assertEquals(chart.find((m) => m.month === month.toString())?.expectedCents, 4500);
@@ -335,11 +335,11 @@ Deno.test('dashboard chart should count in each month what its fee has covered, 
       assertEquals(paid.status, 201, JSON.stringify(paid.body));
       return (paid.body as { id: string }).id;
     };
-    // 3 × 45 € con un 10 % = 121,50 € (40,50 € al mes), pero lo pagó en dos veces: 81 € a cuenta y luego el resto.
+    // 3 × 45,00 € con un 10 % = 121,50 € (40,50 € al mes), pero lo pagó en dos veces: 81,00 € a cuenta y luego el resto.
     const first = await pay();
     const lowered = await client.json('PUT', `/api/admin/billing/payments/${first}/amount`, {
       amountCents: 8100,
-      reason: 'Pagó 81 € a cuenta',
+      reason: 'Pagó 81,00 € a cuenta',
     });
     assertEquals(lowered.status, 204, JSON.stringify(lowered.body));
     const rest = await client.json('POST', '/api/admin/billing/payments', {
@@ -391,7 +391,7 @@ Deno.test({
     );
     const month = today.slice(0, 7);
     const following = YearMonth.fromString(month).next().toString();
-    // La luz pagada hoy, repartida entre este mes (10 €) y el siguiente (20 €).
+    // La luz pagada hoy, repartida entre este mes (10,00 €) y el siguiente (20,00 €).
     assertEquals(
       (await client.json('POST', '/api/admin/accounting/entries', {
         date: today,
@@ -469,7 +469,7 @@ Deno.test({
       amountCents: 4500,
       totalCents: null,
     }]);
-    // Gastos: la parte de la luz de este mes, de un apunte de 30 €.
+    // Gastos: la parte de la luz de este mes, de un apunte de 30,00 €.
     assertEquals(current.parts.expense, [{
       concept: 'Luz',
       detail: 'Electricidad',

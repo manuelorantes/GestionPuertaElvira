@@ -139,7 +139,7 @@ Deno.test('ChooseFirstMonthFee should only accept a choice for a late join of th
   assertEquals((await monthly(fx, id, '2026-11'))?.amount.cents, 4500);
 });
 
-Deno.test('ChooseFirstMonthFee should refuse a part that is not less than the fee or not above 0 €', async () => {
+Deno.test('ChooseFirstMonthFee should refuse a part that is not less than the fee or not above 0,00 €', async () => {
   const fx = new BillingFixture(LATE);
   const id = fx.student();
   await generate(fx, '2026-11');
