@@ -233,7 +233,9 @@ ordenable desde sus cabeceras en ambos sentidos.
 Las cifras MUST ser las mismas que las de la gráfica del resumen.
 
 Al pinchar una parte de una barra o una cifra de la tabla,
-debajo MUST listarse de qué sale ese importe, solo para verlo,
+debajo MUST listarse de qué sale ese importe, solo para verlo
+(al pinchar en el hueco de la gráfica, fuera de las barras, se deja de elegir y el detalle se quita;
+pinchar en el resto de la página no cambia nada),
 en una tabla ordenable (Concepto, Detalle, Fecha e Importe) con su total,
 que MUST coincidir siempre con la cifra pinchada:
 
@@ -271,6 +273,11 @@ Con otra temporada elegida no sale esta sección.
   la suya emitida (40,50 €)
 - **THEN** las cuotas previstas de noviembre listan a la alumna por 25 € («pagada en parte») y al alumno por 40,50 €
   («prevista»), y los ingresos de noviembre a la alumna por 20 € («de 45,00 €»)
+
+#### Scenario: Dejar de elegir una parte
+- **WHEN** con los gastos previstos de enero elegidos, administración pincha en el hueco blanco de la gráfica, fuera de
+  las barras
+- **THEN** ninguna parte queda elegida y el detalle de debajo se quita; pinchar fuera de la gráfica no lo cambia
 
 ### Requirement: Diagnóstico de datos
 Contabilidad MUST tener una pestaña «Diagnóstico» con lo que no cuadra en los datos del club, explicado y con su
