@@ -419,7 +419,7 @@ Deno.test('EditMovement should edit entries and invoices, and correct payments o
 
 Deno.test('TreasuryBalances should tell what the club has in the bank and in cash, as of today', async () => {
   const { fx, treasury } = setUp();
-  // Arrastrado: 600 € de resultado, de los que 100 € quedaron en caja.
+  // Arrastrado: 600,00 € de resultado, de los que 100,00 € quedaron en caja.
   await fx.saveClosing(
     SeasonClosing.close(
       new FiscalYear(2025),
@@ -429,7 +429,7 @@ Deno.test('TreasuryBalances should tell what the club has in the bank and in cas
       LocalDate.fromString('2026-09-01'),
     ),
   );
-  // Hoy es el 25 de octubre de 2026: lo de este mes cuenta (45 € en efectivo, 416 € por transferencia).
+  // Hoy es el 25 de octubre de 2026: lo de este mes cuenta (45,00 € en efectivo, 416,00 € por transferencia).
   fx.clock.advanceSeconds(-315 * 24 * 3600);
   await new RecordTransfer(fx, fx).execute({
     date: '2026-10-20',
@@ -522,7 +522,7 @@ Deno.test('transfers should respect closed seasons and reject the same account t
 
 Deno.test('CloseSeason should freeze what the season moved in cash', async () => {
   const { fx, close } = setUp();
-  // 45 € en efectivo cobrados en octubre de 2026 y 120 € sacados del banco: 165 € más en caja.
+  // 45,00 € en efectivo cobrados en octubre de 2026 y 120,00 € sacados del banco: 165,00 € más en caja.
   await new RecordTransfer(fx, fx).execute({
     date: '2027-03-01',
     from: 'bank',

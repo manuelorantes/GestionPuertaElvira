@@ -41,7 +41,7 @@ Deno.test('fee_mismatch should flag a current or future charge that differs from
   const [octubre] = found;
   assertEquals(octubre?.entity, { kind: 'student', id: 'paula', label: 'Paula Gómez Ruiz' });
   assertEquals(octubre?.data, { month: '2026-10', amountCents: 3600, expectedCents: 4950 });
-  assertStringIncludes(octubre?.explanation ?? '', '36 €');
+  assertStringIncludes(octubre?.explanation ?? '', '36,00 €');
   assertStringIncludes(octubre?.explanation ?? '', '49,50 €');
   assertStringIncludes(octubre?.explanation ?? '', '3 h');
   assertStringIncludes(octubre?.explanation ?? '', 'familiar');
@@ -54,7 +54,7 @@ Deno.test('fee_mismatch should keep the prepayment discount noted in the charge 
   const facts = factsWith({
     students: [irene, baja],
     charges: [
-      // 45 € con 10 % familiar y 20 % de temporada sumados: 31,50 €; estaba a 33 € (importe equivocado).
+      // 45,00 € con 10 % familiar y 20 % de temporada sumados: 31,50 €; estaba a 33,00 € (importe equivocado).
       charge({
         studentId: 'irene',
         period: '2026-12',
@@ -96,7 +96,7 @@ Deno.test('fee_mismatch should propose noting the prepayment discount that an im
   });
   const facts = factsWith({
     students: [mario],
-    // Pagó la temporada: 45 € − 10 % familiar − 20 % de temporada = 31,50 €, sin el 20 % apuntado.
+    // Pagó la temporada: 45,00 € − 10 % familiar − 20 % de temporada = 31,50 €, sin el 20 % apuntado.
     charges: SEASON_MONTHS.map((period) =>
       charge({ studentId: 'mario', period, amountCents: 3150, coveredCents: 3150, status: 'paid' })
     ),
@@ -116,7 +116,7 @@ Deno.test('fee_mismatch should propose noting the prepayment discount that an im
 
 Deno.test('fee_mismatch should not take a wrong amount for a prepayment when too few months share it', () => {
   const ana = student({ id: 'ana', tierCents: 4500, feeCents: 4500 });
-  // 36 € sobre 45 € sería un 20 %, pero el de temporada pide nueve meses y solo hay dos.
+  // 36,00 € sobre 45,00 € sería un 20 %, pero el de temporada pide nueve meses y solo hay dos.
   const facts = factsWith({
     students: [ana],
     charges: ['2026-10', '2026-11'].map((period) =>
@@ -142,7 +142,7 @@ Deno.test('fee_mismatch should mention the private lessons when the fee includes
     charges: [charge({ studentId: 'clara', amountCents: 18000 })],
   });
   const [found] = ofRule(facts, 'fee_mismatch');
-  assertStringIncludes(found?.explanation ?? '', 'clases particulares por 360 € al mes');
+  assertStringIncludes(found?.explanation ?? '', 'clases particulares por 360,00 € al mes');
   assertEquals(found?.data, { month: '2026-10', amountCents: 18000, expectedCents: 36000 });
 });
 
@@ -305,7 +305,7 @@ Deno.test('chained_discounts should flag charges where family and prepayment dis
   const facts = factsWith({
     students: [irene, additive],
     charges: [
-      // 45 € − 10 % = 40,50 €; − 20 % = 32,40 € (en cadena) en vez de 45 € − 30 % = 31,50 €.
+      // 45,00 € − 10 % = 40,50 €; − 20 % = 32,40 € (en cadena) en vez de 45,00 € − 30 % = 31,50 €.
       charge({
         studentId: 'irene',
         period: '2026-09',
@@ -393,7 +393,7 @@ Deno.test('student_overpaid should flag a student whose receipts exceed what the
   assertEquals(found[0]?.entity, { kind: 'student', id: 'pedro', label: 'Pedro Santos Parra' });
   assertEquals(found[0]?.data, { paidCents: 6350, coveredCents: 6300 });
   assertStringIncludes(found[0]?.explanation ?? '', 'Sus 2 recibos suman 63,50 €');
-  assertStringIncludes(found[0]?.explanation ?? '', 'cubiertos 63 €');
+  assertStringIncludes(found[0]?.explanation ?? '', 'cubiertos 63,00 €');
   assertStringIncludes(found[0]?.explanation ?? '', '0,50 € de más');
   assertStringIncludes(found[0]?.proposal ?? '', 'saldo a favor');
   assertEquals(found[0]?.fix, null);

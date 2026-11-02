@@ -215,7 +215,11 @@ Deno.test('QuotePayment should fill gaps, charge pending months at their stored 
   const second = other.student({ regularHours: 2 });
   await generate(other, '2026-10');
   other.changeHours(second, 3);
-  assertEquals((await quote(other, second, 1)).quote.total.cents, 4500, 'octubre se generó a 45 €');
+  assertEquals(
+    (await quote(other, second, 1)).quote.total.cents,
+    4500,
+    'octubre se generó a 45,00 €',
+  );
   assertEquals(
     (await quote(other, second, 2)).quote.gross.cents,
     4500 + 5500,
@@ -436,7 +440,7 @@ const account = (fx: BillingFixture, id: string) =>
   new GetStudentAccount(fx, fx, quotes(fx), fx.clock, fx, fx).execute(id);
 
 Deno.test('RecalculateCharges should reprice from this month until the 10th, keep manual ones and leave the difference pending', async () => {
-  // 2 de octubre: entra octubre. Pagó septiembre, octubre y noviembre a 35 € (1 h) con un 10 %: 31,50 € cada uno.
+  // 2 de octubre: entra octubre. Pagó septiembre, octubre y noviembre a 35,00 € (1 h) con un 10 %: 31,50 € cada uno.
   const fx = new BillingFixture();
   const id = fx.student({ regularHours: 1 });
   await generate(fx, '2026-09');
@@ -455,7 +459,7 @@ Deno.test('RecalculateCharges should reprice from this month until the 10th, kee
 
   // Lo que falta se cobra solo: noviembre por la diferencia.
   const rest = await quote(fx, id, 1);
-  // 55 € con el mismo 10 % (49,50 €) menos lo que ya cubría: 36 €, sin descontar otra vez.
+  // 55,00 € con el mismo 10 % (49,50 €) menos lo que ya cubría: 36,00 €, sin descontar otra vez.
   assertEquals(rest.periods.map((p) => p.toString()), ['2026-11']);
   assertEquals(rest.quote.total.cents, 3600);
   await register(fx, id, 1);
@@ -477,7 +481,7 @@ Deno.test('RecalculateCharges should reprice from this month until the 10th, kee
 });
 
 Deno.test('AdjustCharge should move what was charged between months without touching the payments', async () => {
-  // Septiembre se cobró a 45 € cuando debían ser 22,50 €, y octubre a 22,50 € para compensar.
+  // Septiembre se cobró a 45,00 € cuando debían ser 22,50 €, y octubre a 22,50 € para compensar.
   const fx = new BillingFixture();
   const id = fx.student({ regularHours: 2 });
   await generate(fx, '2026-09');
@@ -516,7 +520,7 @@ Deno.test('AdjustCharge should move what was charged between months without touc
 });
 
 Deno.test('RecalculateCharges should keep the prepayment discount of imported charges, deduced from the previous fee', async () => {
-  // Importado de la hoja: octubre y noviembre a 36 € (40 € con un 10 % por pagar tres meses), sin el porcentaje apuntado.
+  // Importado de la hoja: octubre y noviembre a 36,00 € (40,00 € con un 10 % por pagar tres meses), sin el porcentaje apuntado.
   const fx = new BillingFixture();
   const id = fx.student({ regularHours: 1.5 });
   const importer = new ImportPayment(fx, fx, fx, fx);
@@ -614,7 +618,7 @@ Deno.test('AdjustCharge should take the difference off the payment that covered 
   assertEquals(payment?.credit.cents, 4000);
   assertEquals(
     payment?.lines.at(-1)?.label,
-    'Corrección: cuota de octubre 2026 de 40 € a 35 € (Entró el día 8)',
+    'Corrección: cuota de octubre 2026 de 40,00 € a 35,00 € (Entró el día 8)',
   );
   assertEquals(payment?.lines.at(-1)?.amount.cents, -500);
   const view = await account(fx, id);
@@ -639,7 +643,7 @@ Deno.test('AdjustCharge should raise the payment that covered a paid charge when
   const paymentId = await register(fx, id, 1);
   await new AdjustCharge(fx, fx).execute(id, '2026-10', 2000, 'Media', 'one');
 
-  // Septiembre se apuntó a 45 € pero se pagaron 50 €: el recibo sube y la cuota sigue cobrada.
+  // Septiembre se apuntó a 45,00 € pero se pagaron 50,00 €: el recibo sube y la cuota sigue cobrada.
   await new AdjustCharge(fx, fx).execute(
     id,
     '2026-09',
@@ -652,7 +656,7 @@ Deno.test('AdjustCharge should raise the payment that covered a paid charge when
   assertEquals([payment?.total.cents, payment?.credit.cents], [5000, 5000]);
   assertEquals(
     payment?.lines.at(-1)?.label,
-    'Corrección: cuota de septiembre 2026 de 45 € a 50 € (Se cobró la matrícula)',
+    'Corrección: cuota de septiembre 2026 de 45,00 € a 50,00 € (Se cobró la matrícula)',
   );
   assertEquals(payment?.lines.at(-1)?.amount.cents, 500);
   assertEquals(
@@ -672,7 +676,7 @@ Deno.test('Paying what was raised by hand should cover that charge, not the next
   await generate(fx, '2026-09');
   await generate(fx, '2026-10');
   const september = await register(fx, id, 1);
-  // A septiembre le falta 1 € (subido a mano) y a octubre 20 €.
+  // A septiembre le falta 1,00 € (subido a mano) y a octubre 20,00 €.
   await new AdjustCharge(fx, fx).execute(id, '2026-09', 4600, 'Un euro más', 'one');
   await new AdjustCharge(fx, fx).execute(id, '2026-10', 2000, 'Media', 'one');
   const pending = async () => (await account(fx, id)).charges.map((c) => c.pendingCents);

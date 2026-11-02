@@ -23,7 +23,7 @@ function finding(
     rule: 'fee_mismatch',
     entity: student,
     data: { month: '2026-10', amountCents: 3600, expectedCents: 4950 },
-    explanation: 'La cuota de octubre es de 36 € y la tarifa de hoy es de 49,50 €.',
+    explanation: 'La cuota de octubre es de 36,00 € y la tarifa de hoy es de 49,50 €.',
     proposal: 'Ajustar la cuota a 49,50 €.',
     fix,
   }, at);

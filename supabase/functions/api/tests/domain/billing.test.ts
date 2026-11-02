@@ -51,8 +51,8 @@ Deno.test('FeeCalculator should add private lessons by monthly hours and rate, c
     new FeeProfile(0, [new PrivateLesson('Particular · viernes', 1.5, Money.euros(35))], false),
     1,
   );
-  assertEquals(q.total.cents, 21000, '1,5 h × 4 semanas × 35 €');
-  assertEquals(q.lines[0]?.label, 'Particular · viernes · 6 h/mes × 35 €');
+  assertEquals(q.total.cents, 21000, '1,5 h × 4 semanas × 35,00 €');
+  assertEquals(q.lines[0]?.label, 'Particular · viernes · 6 h/mes × 35,00 €');
   assertEquals(
     quote(new FeeProfile(2, [new PrivateLesson('Particular', 1, Money.euros(30))], false), 1).total
       .cents,
@@ -263,7 +263,7 @@ Deno.test('Charge should keep its prepayment discount when it is repriced', () =
   charge.applyPrepayment(10);
   assertEquals([charge.amount.cents, charge.discountPercent()], [3600, 10]);
   charge.reprice(Money.euros(55));
-  assertEquals(charge.amount.cents, 4950, '55 € con el mismo 10 %');
+  assertEquals(charge.amount.cents, 4950, '55,00 € con el mismo 10 %');
   charge.applyPrepayment(20);
   assertEquals(charge.discountPercent(), 10, 'el descuento ya fijado no se acumula');
   charge.setDiscount(0, Money.euros(55));
@@ -281,7 +281,7 @@ Deno.test('Charge should take the prepayment discount off an amount set by hand,
   );
   charge.adjust(Money.euros(55), 'Su hermana no viene este año');
   charge.applyPrepayment(15);
-  assertEquals([charge.amount.cents, charge.discountPercent()], [4675, 15], '55 € − 15 %');
+  assertEquals([charge.amount.cents, charge.discountPercent()], [4675, 15], '55,00 € − 15 %');
   assertEquals([charge.isManual(), charge.note()], [true, 'Su hermana no viene este año']);
   assertEquals(charge.raisedByHand().cents, 468, 'lo subido a mano también lleva el descuento');
   charge.applyPrepayment(15);
@@ -297,7 +297,7 @@ Deno.test('allocateCredit should cover the oldest charges first and keep what is
       YearMonth.fromString(period),
       Money.euros(euros),
     );
-  // Cambio de tarifa a mitad de un trimestre: 40, 55, 55 con 120 € cubiertos.
+  // Cambio de tarifa a mitad de un trimestre: 40, 55, 55 con 120,00 € cubiertos.
   const sep = charge('2026-09', 40);
   const oct = charge('2026-10', 55);
   const nov = charge('2026-11', 55);
@@ -309,14 +309,14 @@ Deno.test('allocateCredit should cover the oldest charges first and keep what is
   assertEquals(result.balance.cents, 0);
   assertEquals(result.pendingTotal.cents, 3000);
 
-  // Septiembre cobrado de más y octubre de menos: 50 + 25 € cubren 25 + 50 €.
+  // Septiembre cobrado de más y octubre de menos: 50 + 25,00 € cubren 25 + 50,00 €.
   const fixed = allocateCredit([charge('2026-09', 25), charge('2026-10', 50)], Money.euros(75));
   assertEquals([fixed.pendingTotal.cents, fixed.balance.cents], [0, 0]);
 
   const extra = allocateCredit([charge('2026-09', 25)], Money.euros(40));
   assertEquals(extra.balance.cents, 1500, 'saldo a favor');
 
-  // Octubre subido a mano de 32 a 35 € con el curso ya pagado (32 + 44 cubiertos): los 3 € faltan en octubre.
+  // Octubre subido a mano de 32 a 35,00 € con el curso ya pagado (32 + 44 cubiertos): los 3,00 € faltan en octubre.
   const raised = charge('2026-10', 32);
   raised.adjust(Money.euros(35), 'Empieza dos días tarde');
   const next = charge('2026-11', 44);
@@ -428,7 +428,7 @@ Deno.test('Payment should number documents per season and issue one invoice with
 });
 
 Deno.test('FeeCalculator should redeem points on a single month and take fixed special discounts', () => {
-  // 2 h semanales = 45 €/mes; 3 meses con 10 % de pago adelantado = 121,50 €; 5 puntos = 5 % de UN mes = 2,25 €.
+  // 2 h semanales = 45,00 €/mes; 3 meses con 10 % de pago adelantado = 121,50 €; 5 puntos = 5 % de UN mes = 2,25 €.
   const withPoints = quote(new FeeProfile(2, [], false), 3, null, new PointsRedemption(5));
   assertEquals(withPoints.total.cents, 12150 - 225);
   assertEquals(withPoints.lines.at(-1)?.label, 'Canje de 5 puntos (5 % de un mes) −2,25 €');
@@ -447,9 +447,9 @@ Deno.test('FeeCalculator should redeem points on a single month and take fixed s
     new SpecialDiscount(Money.cents(1000), 'Beca'),
   );
   assertEquals(fixed.total.cents, 3500);
-  assertEquals(fixed.lines.at(-1)?.label, 'Beca −10 €');
+  assertEquals(fixed.lines.at(-1)?.label, 'Beca −10,00 €');
 
-  // Nunca por debajo de 0 €.
+  // Nunca por debajo de 0,00 €.
   const huge = quote(
     new FeeProfile(1, [], false),
     1,
@@ -486,7 +486,7 @@ Deno.test('FeeCalculator should redeem points on a single month and take fixed s
 });
 
 Deno.test('Charge should add the prepayment discount to the family one over the base fee', () => {
-  // Base de 40 €, 10 % familiar: cuota de 36 €. Con un 20 % por todo el año, 40 € − 30 % = 28 € (no 36 € − 20 %).
+  // Base de 40,00 €, 10 % familiar: cuota de 36,00 €. Con un 20 % por todo el año, 40,00 € − 30 % = 28,00 € (no 36,00 € − 20 %).
   const fee = Money.cents(3600);
   const paid = Charge.create(
     ChargeId.generate(),
@@ -522,7 +522,7 @@ Deno.test('Charge should add the prepayment discount to the family one over the 
 });
 
 Deno.test('Charge should not take a discount applied over the family one for a prepayment', () => {
-  // 45 € con 10 % familiar = 40,50 €; la hoja aplicó el 20 % de temporada encima (32,40 €) en vez de sumarlo
+  // 45,00 € con 10 % familiar = 40,50 €; la hoja aplicó el 20 % de temporada encima (32,40 €) en vez de sumarlo
   // (31,50 €). No es un descuento válido: lo señala y corrige el diagnóstico.
   const imported = Charge.create(
     ChargeId.generate(),
@@ -571,7 +571,7 @@ Deno.test('Charge should cancel only what is pending when part of it is paid, an
   const today = LocalDate.fromString('2026-11-03');
   const charge = monthly('2026-10', 40);
   charge.cancel(Money.cents(1500), today);
-  // Queda una cuota cobrada de 15 € y se cancelan los 25 € pendientes.
+  // Queda una cuota cobrada de 15,00 € y se cancelan los 25,00 € pendientes.
   assertEquals([charge.amount.cents, charge.fullAmount().cents, charge.cancelledAmount().cents], [
     1500,
     4000,

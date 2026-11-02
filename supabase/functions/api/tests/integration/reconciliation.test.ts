@@ -21,7 +21,7 @@ interface View {
   items: Item[];
 }
 
-// Un extracto con 1.000 € de partida, del más reciente al más antiguo, como lo da el banco.
+// Un extracto con 1.000,00 € de partida, del más reciente al más antiguo, como lo da el banco.
 const MOVEMENTS = [
   {
     operationDate: '2025-10-20',

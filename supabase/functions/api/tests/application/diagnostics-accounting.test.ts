@@ -59,7 +59,7 @@ Deno.test('generic_category should move entries and invoices from a generic cate
   });
   assertStringIncludes(found[0]?.explanation ?? '', 'Limpieza');
   assertStringIncludes(found[0]?.explanation ?? '', 'Otros gastos');
-  assertEquals(found[0]?.entity.label, 'Limpieza, Mª Ángeles · 150 €');
+  assertEquals(found[0]?.entity.label, 'Limpieza, Mª Ángeles · 150,00 €');
 });
 
 Deno.test('generic_category should not propose a category the club does not have', () => {
@@ -173,6 +173,6 @@ Deno.test('expected_unpaid should tell the expected expenses of past months stil
     ['club', 'x1/2026-09', 'Limpieza · septiembre 2026', null],
   ]);
   assertEquals(found[0]?.data, { expenseId: 'x1', period: '2026-09' });
-  assertStringIncludes(found[0]?.explanation ?? '', '120 €');
+  assertStringIncludes(found[0]?.explanation ?? '', '120,00 €');
   assertStringIncludes(found[0]?.proposal ?? '', 'No hay este mes');
 });

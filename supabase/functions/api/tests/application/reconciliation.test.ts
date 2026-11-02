@@ -62,7 +62,7 @@ const expense = (id: string, date: string, method: string, amountCents: number):
   concept: `Gasto · ${id}`,
 });
 
-/** Un extracto que empieza con 1.000 € en el banco. */
+/** Un extracto que empieza con 1.000,00 € en el banco. */
 function statement(...rows: [string, string, number][]): BankMovement[] {
   let balance = 100_000;
   return rows.map(([date, concept, amountCents]) => {
