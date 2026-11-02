@@ -784,3 +784,107 @@ Deno.test({
     assertEquals(await account(), 500);
   },
 });
+
+Deno.test({
+  name:
+    'billing should let only superadministration delete a payment with a reason, and keep a 0 € receipt out of the ledger',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const registered = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'membership',
+      method: 'transfer',
+      date: today,
+    });
+    assertEquals(registered.status, 201, JSON.stringify(registered.body));
+    const payment = body<{ id: string }>(registered).id;
+    const receipt = body<{ receiptNumber: string }>(
+      await fx.client.get(`/api/admin/billing/payments/${payment}`),
+    ).receiptNumber;
+    const month = today.slice(0, 7);
+    const ledger = async (client: ApiClient) => {
+      const response = await client.get(`/api/admin/accounting/ledger?month=${month}`);
+      assertEquals(response.status, 200, JSON.stringify(response.body));
+      return body<{ items: { sourceId: string }[] }>(response).items.map((i) => i.sourceId);
+    };
+
+    // Un recibo corregido a 0 € no rompe el mes: simplemente no sale en el libro.
+    const zero = await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/amount`, {
+      amountCents: 0,
+      reason: 'Prueba',
+    });
+    assertEquals(zero.status, 204, JSON.stringify(zero.body));
+    assertEquals((await ledger(fx.client)).includes(payment), false);
+    await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/amount`, {
+      amountCents: 5000,
+      reason: 'Vuelve a su importe',
+    });
+    assertEquals((await ledger(fx.client)).includes(payment), true);
+    await db()`INSERT INTO accounting_bank_match (movement_key, operation_date, amount_cents, concept, targets)
+      VALUES ('k1', ${today}, 5000, 'Transferencia', ${
+      db().json([{ source: 'payment', sourceId: payment }])
+    })`;
+
+    // Administración no puede borrar cobros.
+    assertError(
+      await fx.client.json('DELETE', `/api/admin/billing/payments/${payment}`, { reason: 'Error' }),
+      403,
+      'forbidden',
+    );
+    await createUser('super@club.es', 'superadministrator');
+    const superadmin = new ApiClient();
+    await superadmin.logIn('super@club.es');
+    assertError(
+      await superadmin.json('DELETE', `/api/admin/billing/payments/${payment}`, {}),
+      422,
+      'unprocessable',
+    );
+
+    const deleted = await superadmin.json('DELETE', `/api/admin/billing/payments/${payment}`, {
+      reason: 'Anotado dos veces',
+    });
+    assertEquals(deleted.status, 200, JSON.stringify(deleted.body));
+    assertEquals(body<{ receiptNumber: string }>(deleted).receiptNumber, receipt);
+    assertError(await fx.client.get(`/api/admin/billing/payments/${payment}`), 404, 'not_found');
+    assertEquals((await ledger(fx.client)).includes(payment), false);
+    assertEquals(
+      (await db()`SELECT 1 FROM accounting_bank_match WHERE movement_key = 'k1'`).length,
+      0,
+    );
+    const account = body<{ membershipPaid: boolean }>(
+      await fx.client.get(`/api/admin/billing/accounts/${fx.student}`),
+    );
+    assertEquals(account.membershipPaid, false);
+    const history = body<{ items: { label: string }[] }>(
+      await superadmin.get('/api/admin/audit/actions'),
+    ).items;
+    assertEquals(history[0]?.label, `Borrar cobro ${receipt} (Anotado dos veces)`);
+
+    // Con factura, no se borra.
+    const again = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'membership',
+      method: 'cash',
+      date: today,
+    });
+    const invoiced = body<{ id: string }>(again).id;
+    const invoice = await fx.client.json(
+      'POST',
+      `/api/admin/billing/payments/${invoiced}/invoice`,
+      {
+        name: 'Rocío Herrera',
+        taxId: '12345678Z',
+        address: 'Calle Elvira 1, Granada',
+      },
+    );
+    assertEquals(invoice.status, 204, JSON.stringify(invoice.body));
+    assertError(
+      await superadmin.json('DELETE', `/api/admin/billing/payments/${invoiced}`, {
+        reason: 'Error',
+      }),
+      409,
+      'payment_invoiced',
+    );
+  },
+});

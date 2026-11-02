@@ -6,6 +6,7 @@ import {
   ChargeId,
   InvalidPaymentRequest,
   InvoiceAlreadyIssued,
+  InvoicedPaymentCannotBeDeleted,
   PaymentId,
   StudentRef,
 } from '../../src/domain/billing/mod.ts';
@@ -14,12 +15,14 @@ import {
   CancelCharge,
   ChargeNotFound,
   CorrectPaymentAmount,
+  DeletePayment,
   GenerateMonthlyCharges,
   GetStudentAccount,
   ImportPayment,
   IssueInvoice,
   MarkReminded,
   NoteChargeDiscount,
+  PaymentNotFound,
   type PaymentQuote,
   pendingCharges,
   QuotePayment,
@@ -712,4 +715,52 @@ Deno.test('AdjustCharge should correct each covered month of «this and the foll
   await generate(fx, '2026-10');
   await new AdjustCharge(fx, fx).execute(other, '2026-10', 2000, 'Media', 'one', 'correct_payment');
   assertEquals((await account(fx, other)).charges.map((c) => c.amountCents), [2000]);
+});
+
+Deno.test('DeletePayment should uncover what it paid, give back its points and refuse invoiced or closed payments', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ siblings: false });
+  fx.givePoints(id, '2026-10', 5);
+  await generate(fx, '2026-10');
+  const paymentId = await new RegisterPayment(
+    quotes(fx),
+    fx,
+    fx,
+    fx,
+    fx.transactions,
+    fx,
+    fx.locks,
+    fx,
+  )
+    .execute({
+      studentId: id,
+      kind: 'monthly',
+      months: 1,
+      method: 'cash',
+      date: '2026-10-02',
+      specialPercent: null,
+      specialAmountCents: null,
+      specialConcept: null,
+      redeemPoints: 5,
+    });
+  assertEquals((await account(fx, id)).charges[0]?.pendingCents, 0);
+  const deletion = new DeletePayment(fx, fx, fx);
+
+  await assertRejects(() => deletion.execute(paymentId, ' '), InvalidValue, 'motivo');
+  const deleted = await deletion.execute(paymentId, 'Anotado dos veces');
+
+  assertEquals(deleted.receiptNumber, 'R-2026-0001');
+  assertEquals(await fx.payment(PaymentId.fromString(paymentId)), null);
+  assert(((await account(fx, id)).charges[0]?.pendingCents ?? 0) > 0);
+  assertEquals(await fx.available(id, YearMonth.fromString('2026-10')), 5);
+  await assertRejects(() => deletion.execute(paymentId, 'Otra vez'), PaymentNotFound);
+
+  const invoiced = await register(fx, id, 1);
+  await new IssueInvoice(fx, fx, fx.transactions, fx.clock, fx.locks)
+    .execute(invoiced, 'Rocío Herrera', '12345678Z', 'Calle Elvira 1, Granada');
+  await assertRejects(() => deletion.execute(invoiced, 'Error'), InvoicedPaymentCannotBeDeleted);
+
+  const closed = await register(fx, id, 1);
+  fx.closedDates = ['2026-10-02'];
+  await assertRejects(() => deletion.execute(closed, 'Error'), PeriodClosed);
 });

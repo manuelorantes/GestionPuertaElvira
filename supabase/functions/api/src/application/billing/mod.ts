@@ -114,6 +114,8 @@ export interface PointsWallet {
     payment: string,
     note: string,
   ): Promise<void>;
+  /** Devuelve los puntos canjeados en un cobro que se borra. */
+  refund(student: string, payment: string): Promise<void>;
 }
 
 export interface PaymentRepository {
@@ -121,6 +123,8 @@ export interface PaymentRepository {
   /** Los cobros de ese tipo del alumno, del más reciente al más antiguo. */
   paymentsFor(student: StudentRef, kind: ChargeKind): Promise<Payment[]>;
   savePayment(payment: Payment): Promise<void>;
+  /** Borra el cobro y lo que solo tenía sentido con él (su enlace en las cuotas, su corrección y su conciliación). */
+  deletePayment(id: PaymentId): Promise<void>;
 }
 
 /** Contador correlativo sin huecos por tipo de documento y temporada; se llama dentro de una transacción. */
@@ -1114,6 +1118,28 @@ export class CorrectPaymentAmount {
       await this.charges.saveCharge(charge);
       left = left.minus(paid);
     }
+  }
+}
+
+/**
+ * Borra un cobro anotado por error: sus cuotas se reparten de nuevo con los demás cobros del alumno y los puntos
+ * canjeados vuelven. Su número de recibo no se reutiliza.
+ */
+export class DeletePayment {
+  constructor(
+    private readonly payments: PaymentRepository,
+    private readonly closed: ClosedPeriods,
+    private readonly points: PointsWallet,
+  ) {}
+
+  async execute(paymentId: string, reason: string): Promise<{ receiptNumber: string }> {
+    const payment = await this.payments.payment(PaymentId.fromString(paymentId));
+    if (payment === null) throw new PaymentNotFound();
+    payment.assertDeletable(reason);
+    await PeriodClosed.guard(this.closed, payment.paidOn);
+    await this.points.refund(payment.student.value, payment.id.value);
+    await this.payments.deletePayment(payment.id);
+    return { receiptNumber: payment.receipt.toString() };
   }
 }
 
