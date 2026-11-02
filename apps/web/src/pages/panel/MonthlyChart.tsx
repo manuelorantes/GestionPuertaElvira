@@ -15,6 +15,8 @@ interface MonthlyChartProps {
   onSelect?: ((month: string, kind: BarKind) => void) | undefined;
   /** La parte elegida, resaltada. */
   selected?: { month: string; kind: BarKind } | null;
+  /** Al pinchar en el hueco de la gráfica (fuera de las barras), se deja de elegir. */
+  onClear?: (() => void) | undefined;
   /** Alto de la gráfica (por defecto, `h-60`). */
   className?: string;
 }
@@ -59,6 +61,7 @@ export function MonthlyChart({
   id: chartId,
   onSelect,
   selected = null,
+  onClear,
   className = 'h-60',
 }: MonthlyChartProps) {
   // La barra señalada (al pasar el ratón o al tocarla) muestra su importe.
@@ -121,6 +124,9 @@ export function MonthlyChart({
       role={onSelect ? 'group' : 'img'}
       aria-label={`${label}. ${description}`}
       className={`flex gap-3 ${className}`}
+      onClick={(event) => {
+        if (onClear && !(event.target as Element).closest('button')) onClear();
+      }}
     >
       <div
         aria-hidden

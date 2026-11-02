@@ -130,6 +130,29 @@ describe('Cuotas vs gastos fijos', () => {
     ).toHaveLength(2);
   });
 
+  it('stops choosing when the empty part of the chart is clicked, and only there', async () => {
+    api();
+    renderApp('/panel/contabilidad?pestana=cierre&mes=2026-10&parte=gastos');
+
+    const detail = await screen.findByRole('region', { name: 'Gastos de octubre 2026' });
+    // Fuera de la gráfica no cambia nada.
+    await userEvent.click(screen.getByRole('table', { name: 'Cuotas vs gastos fijos mes a mes' }));
+    await userEvent.click(detail);
+    expect(screen.getByRole('region', { name: 'Gastos de octubre 2026' })).toBeInTheDocument();
+    // En el hueco de la gráfica, fuera de las barras, se deja de elegir.
+    const chart = screen.getByRole('group', {
+      name: /Cuotas vs gastos fijos, de septiembre a agosto/,
+    });
+    await userEvent.click(chart);
+    expect(
+      screen.queryByRole('region', { name: 'Gastos de octubre 2026' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Pincha una barra o una cifra para ver de qué sale.'),
+    ).toBeInTheDocument();
+    expect(within(chart).queryByRole('button', { pressed: true })).not.toBeInTheDocument();
+  });
+
   it('changes the detail when another part or figure is chosen, and sorts the table', async () => {
     api();
     renderApp('/panel/contabilidad?pestana=cierre');
