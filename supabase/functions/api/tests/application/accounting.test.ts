@@ -169,10 +169,10 @@ Deno.test('FiscalYearSummary should summarise the year month by month with the o
       october?.resultCents,
       october?.accumulatedCents,
     ],
-    ['2026-10', 4500, 0, 4500, 60000 - 37100],
-    'la liquidación de septiembre cuenta en septiembre',
+    ['2026-10', 4500, 41600, -37100, 60000 - 37100],
+    'la liquidación de septiembre cuenta en octubre, cuando se pagó',
   );
-  assertEquals(summary.months[0]?.expenseCents, 41600);
+  assertEquals(summary.months[0]?.expenseCents, 0);
   assertEquals(summary.resultCents, -38100);
   assertEquals(summary.canClose, true);
   assertEquals(summary.closedOn, null);
@@ -535,7 +535,7 @@ Deno.test('CloseSeason should freeze what the season moved in cash', async () =>
   assertEquals(closing?.bankResult().cents, -41600 - 12000);
 });
 
-Deno.test('FiscalYearSummary should count each movement in the months it applies to, keeping the balance by payment date', async () => {
+Deno.test('FiscalYearSummary should count each movement by its date, like the balance', async () => {
   const { fx } = setUp();
   // El IVA del cuarto trimestre se paga el 20 de enero y corresponde a octubre, noviembre y diciembre.
   await new RecordEntry(fx, fx, fx).execute({
@@ -551,7 +551,7 @@ Deno.test('FiscalYearSummary should count each movement in the months it applies
       { period: '2026-12', amountCents: 10000 },
     ],
   });
-  // Un cobro de tres meses cuenta un tercio en cada uno.
+  // Un cobro de tres meses entra entero el día que se cobra.
   fx.external.push({
     source: 'payment',
     sourceId: 'p3',
@@ -577,15 +577,18 @@ Deno.test('FiscalYearSummary should count each movement in the months it applies
       month(m)?.incomeCents,
       month(m)?.expenseCents,
     ]),
-    [[4500, 10000], [4050, 10000], [4050, 10000], [4050, 0]],
+    [[4500, 41600], [12150, 0], [0, 0], [0, 30000]],
   );
-  // El saldo sigue al dinero: el IVA sale en enero y el cobro entra entero en noviembre.
+  // Todo sigue al dinero: el IVA sale entero en enero y el cobro entra entero en noviembre.
   assertEquals(
     ['2026-10', '2026-11', '2026-12', '2027-01'].map((m) => month(m)?.accumulatedCents),
     [-37100, -37100 + 12150, -37100 + 12150, -37100 + 12150 - 30000],
   );
   assertEquals(summary.resultCents, 4500 + 12150 - 41600 - 30000);
-  assertEquals(summary.cashResultCents, 4500 + 12150 - 41600 - 30000);
+  assertEquals(
+    summary.months.reduce((balance, row) => balance + row.resultCents, summary.openingCents),
+    summary.months.at(-1)?.accumulatedCents,
+  );
 });
 
 Deno.test('a movement cannot apply to the months of a closed season, and the closing keeps what was paid', async () => {
