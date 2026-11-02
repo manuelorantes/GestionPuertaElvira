@@ -61,7 +61,11 @@ Se reutilizan `Dialog`, `Button`, `TextField`, `Select`, `Switch`, `ToggleButton
 
 ## Conditional Rendering Strategy
 
-- Condiciones con nombre: `isMinor`, `needsOwnPhone`, `isEdit` e `isWithdrawn`.
+- Condiciones con nombre: `isMinor`, `needsOwnPhone`, `isEdit`, `isWithdrawn`, `isProvisional` y `canEnrol`
+  (de alta, no provisional y con permiso: grupos y familia directa).
+- Socio provisional: en el alta, el estado `provisional` del diálogo oculta horario, primer mes y familia directa;
+  la lista sale de `?filter=provisional` (`useProvisionalMembers`), que alimenta el aviso de Alumnos y
+  `ProvisionalMembersPage`; «Pasar a socio» llama a `POST /api/admin/students/:id/confirmation`.
 - El diálogo activo de la ficha es un mapa por `kind`.
 
 ## Anti-Cleanup Checklist

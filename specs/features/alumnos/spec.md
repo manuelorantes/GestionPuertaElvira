@@ -5,7 +5,8 @@ y sus inscripciones en grupos.
 Solo administración puede verlos y gestionarlos.
 
 ### Requirement: Número de socio
-Cada alumno MUST tener un número de socio único que se le asigna al darlo de alta, en orden creciente.
+Cada alumno MUST tener un número de socio único que se le asigna al darlo de alta, en orden creciente
+(a un socio provisional, al pasarlo a socio; ver «Socio provisional»).
 Un número MUST NOT volver a darse a otro alumno, aunque el suyo se dé de baja o se borre: la baja
 conserva su número y los altas siguientes continúan la numeración.
 Administración MAY repartir de otra forma los números que ya tienen unos alumnos (para cuadrar con el
@@ -160,6 +161,46 @@ Como máximo hay dos tutores. La ficha de cada alumno MUST indicar también qué
 #### Scenario: Datos completos
 - **WHEN** administración completa los datos que faltaban
 - **THEN** el alumno desaparece de «Datos pendientes»
+
+### Requirement: Socio provisional
+Administración MUST poder dar de alta a alguien como **socio provisional**:
+ha pagado la cuota de socio (o la va a pagar),
+pero el club todavía no tiene su hoja de inscripción para darlo de alta del todo.
+En el alta, la opción «Socio provisional» MUST ofrecerse junto a la de socio con clases o sin clases.
+Como en cualquier alta, solo el nombre es obligatorio;
+un socio provisional MUST NOT tener grupos ni familia directa.
+
+Un socio provisional:
+- MUST NOT tener número de socio: se le da al pasarlo a socio, el siguiente de la numeración;
+- es socio a efectos de cobros: su cuota de socio se cobra como la de cualquiera
+  y lo cobrado entra en la contabilidad como siempre;
+- MUST NOT aparecer en la lista de alumnos (en ningún filtro), en «Datos pendientes», en el recuento de alumnos
+  ni en las listas de asistencia y de puntos;
+- MUST NOT poder inscribirse en grupos, vincularse como familia directa, darse de baja ni volver a darse de alta
+  mientras sea provisional.
+
+Si hay socios provisionales, Alumnos MUST mostrar un aviso con cuántos hay
+(«1 socio provisional por completar», «N socios provisionales por completar»)
+que lleva a «Socios provisionales»: la lista de todos ellos, con su nombre y su fecha de alta,
+desde la que se abre la ficha de cada uno.
+En su ficha MUST poder editarse sus datos y MUST haber una acción «Pasar a socio»,
+con confirmación, que no exige ningún dato: lo decide administración (cuando tiene la hoja rellena).
+Al pasarlo a socio, recibe el siguiente número de socio, conserva su fecha de alta y su historial de cobros,
+y desde entonces es un alumno como los demás (aparece en la lista, en «Datos pendientes» si le falta algo,
+y ya se puede inscribir en grupos).
+
+#### Scenario: Cuota cobrada sin hoja de inscripción
+- **WHEN** administración da de alta a «Álvaro Tejero Gilabert» como socio provisional y le cobra la cuota de socio
+- **THEN** el cobro aparece en la contabilidad, Álvaro no sale en la lista de alumnos ni tiene número de socio,
+  y Alumnos avisa de «1 socio provisional por completar»
+
+#### Scenario: Pasar a socio
+- **WHEN** el último número de socio dado es el 120 y administración pasa a socio a un socio provisional
+- **THEN** recibe el número 121, aparece en la lista de alumnos y desaparece de «Socios provisionales»
+
+#### Scenario: Sin grupos mientras es provisional
+- **WHEN** administración intenta inscribir en un grupo a un socio provisional
+- **THEN** se rechaza con el aviso de que primero hay que pasarlo a socio
 
 ### Requirement: Edición
 Administración MUST poder modificar los datos personales de un alumno, con las mismas reglas que en el alta, y su última
