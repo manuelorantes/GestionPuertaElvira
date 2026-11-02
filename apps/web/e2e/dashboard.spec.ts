@@ -13,7 +13,7 @@ test('should summarise the club with real figures', async ({ page }) => {
   await expect(page.getByText('Saldo del club')).toBeVisible();
   await expect(page.getByText(/^Margen previsto de /)).toBeVisible();
   await expect(page.getByRole('img', { name: /Lo que entra y sale cada mes/ })).toBeVisible();
-  await expect(page.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toBeVisible();
+  await expect(page.getByRole('group', { name: /Cuotas vs gastos fijos/ })).toBeVisible();
   await expect(page.getByText('Ocupación de clases')).toBeVisible();
   if (month !== 9) {
     await expect(page.getByRole('region', { name: 'Recibos vencidos' })).toContainText(

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowDownLeft, ArrowUpRight, MessageCircle } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 
 import { usePanelRole } from '@/features/auth/panelView';
 import { useSession } from '@/features/auth/useSession';
@@ -17,7 +17,7 @@ import { Card } from '@/shared/ui/Card';
 import { Kpi } from '@/shared/ui/Kpi';
 
 import { MonthlyChart } from './MonthlyChart';
-import { BAR_STYLE, type BarKind, type ChartMonth } from './chartBars';
+import { BAR_STYLE, type BarKind, type ChartMonth, feesVsFixedHref } from './chartBars';
 import { MissedRollCalls } from './attendance/MissedRollCalls';
 import { TeacherHomePage } from './teacher/TeacherHomePage';
 
@@ -49,6 +49,7 @@ function monthMargin(data: Dashboard): { fees: number; fixed: number } {
 
 function Summary({ data }: { data: Dashboard }) {
   const [dialog, setDialog] = useState<BillingDialog>(null);
+  const navigate = useNavigate();
   const month = monthName(data.month);
   const margin = monthMargin(data);
 
@@ -102,6 +103,7 @@ function Summary({ data }: { data: Dashboard }) {
             months={data.monthChart}
             current={data.month}
             expected
+            onSelect={(month, kind) => void navigate(feesVsFixedHref(month, kind))}
           />
         </div>
         <Card className="flex flex-col gap-4 p-6">
@@ -244,6 +246,7 @@ function ChartCard({
   months,
   current,
   expected = false,
+  onSelect,
 }: {
   title: string;
   label: string;
@@ -251,6 +254,7 @@ function ChartCard({
   months: ChartMonth[];
   current: string;
   expected?: boolean;
+  onSelect?: (month: string, kind: BarKind) => void;
 }) {
   const kinds: BarKind[] = expected
     ? ['income', 'expected', 'expense', 'expectedExpense']
@@ -269,7 +273,7 @@ function ChartCard({
           <span className="text-ink-muted">{monthLabel(current)} en curso</span>
         </div>
       </div>
-      <MonthlyChart months={months} current={current} label={label} id={id} />
+      <MonthlyChart months={months} current={current} label={label} id={id} onSelect={onSelect} />
     </Card>
   );
 }

@@ -11,6 +11,12 @@ interface MonthlyChartProps {
   label: string;
   /** Prefijo de las barras (para distinguir dos gráficas en la misma página). */
   id: string;
+  /** Con él, cada parte de barra es un botón que la elige. */
+  onSelect?: ((month: string, kind: BarKind) => void) | undefined;
+  /** La parte elegida, resaltada. */
+  selected?: { month: string; kind: BarKind } | null;
+  /** Alto de la gráfica (por defecto, `h-60`). */
+  className?: string;
 }
 
 /** Escala redonda para el eje: 1, 2 o 5 × 10ⁿ euros por división, en 4 divisiones. */
@@ -46,7 +52,15 @@ function describe(m: ChartMonth): string {
  * Barras de ingresos y gastos por mes (sin dependencias de gráficos); lo previsto, apilado sobre lo real: las cuotas
  * sobre los ingresos y los gastos previstos (profesorado y gastos esperados sin pagar) sobre los gastos.
  */
-export function MonthlyChart({ months, current, label, id: chartId }: MonthlyChartProps) {
+export function MonthlyChart({
+  months,
+  current,
+  label,
+  id: chartId,
+  onSelect,
+  selected = null,
+  className = 'h-60',
+}: MonthlyChartProps) {
   // La barra señalada (al pasar el ratón o al tocarla) muestra su importe.
   const [pointed, setPointed] = useState<string | null>(null);
   const max = axisMax(
@@ -60,32 +74,54 @@ export function MonthlyChart({ months, current, label, id: chartId }: MonthlyCha
   const ticks = [4, 3, 2, 1, 0].map((i) => (max * i) / 4);
   const description = months.map(describe).join('; ');
 
-  /** Un tramo de barra: su alto lo reparte la columna (`grow`) y al señalarlo muestra su importe. */
+  /**
+   * Un tramo de barra: su alto lo reparte la columna (`grow`) y al señalarlo muestra su importe. Con `onSelect`, es un
+   * botón que lo elige.
+   */
   function segment(m: ChartMonth, index: number, kind: BarKind, cents: number, rounded: boolean) {
     const id = `${m.month}-${kind}`;
-    return (
-      <div
-        key={kind}
-        data-testid={`${chartId}-${id}`}
-        className={`relative w-full ${rounded ? 'rounded-t-[3px]' : ''} ${BAR_STYLE[kind].color}`}
-        style={{ flexGrow: cents, flexBasis: 0 }}
-        onPointerEnter={() => setPointed(id)}
-        onPointerLeave={() => setPointed((p) => (p === id ? null : p))}
-        onClick={() => setPointed((p) => (p === id ? null : id))}
+    const text = `${BAR_STYLE[kind].label} de ${monthLabel(m.month).toLowerCase()}: ${formatCents(cents)}`;
+    const chosen = selected?.month === m.month && selected.kind === kind;
+    const props = {
+      'data-testid': `${chartId}-${id}`,
+      className: `relative block w-full ${rounded ? 'rounded-t-[3px]' : ''} ${BAR_STYLE[kind].color} ${chosen ? 'ring-2 ring-brand-strong ring-offset-1 ring-offset-paper' : ''} ${onSelect ? 'cursor-pointer focus-visible:ring-2 focus-visible:ring-brand-strong focus-visible:outline-none' : ''}`,
+      style: { flexGrow: cents, flexBasis: 0 },
+      onPointerEnter: () => setPointed(id),
+      onPointerLeave: () => setPointed((p) => (p === id ? null : p)),
+    };
+    const tooltip = pointed === id && (
+      <span
+        className={`pointer-events-none absolute bottom-full z-10 mb-1.5 whitespace-nowrap ${tooltipSide(index, months.length)} rounded-sm bg-ink-strong px-2 py-1 text-xs font-medium text-paper shadow-overlay`}
       >
-        {pointed === id && (
-          <span
-            className={`pointer-events-none absolute bottom-full z-10 mb-1.5 whitespace-nowrap ${tooltipSide(index, months.length)} rounded-sm bg-ink-strong px-2 py-1 text-xs font-medium text-paper shadow-overlay`}
-          >
-            {`${BAR_STYLE[kind].label} de ${monthLabel(m.month).toLowerCase()}: ${formatCents(cents)}`}
-          </span>
-        )}
+        {text}
+      </span>
+    );
+    if (onSelect && cents !== 0)
+      return (
+        <button
+          key={kind}
+          type="button"
+          aria-label={text}
+          aria-pressed={chosen}
+          {...props}
+          onClick={() => onSelect(m.month, kind)}
+        >
+          {tooltip}
+        </button>
+      );
+    return (
+      <div key={kind} {...props} onClick={() => setPointed((p) => (p === id ? null : id))}>
+        {tooltip}
       </div>
     );
   }
 
   return (
-    <div role="img" aria-label={`${label}. ${description}`} className="flex h-60 gap-3">
+    <div
+      role={onSelect ? 'group' : 'img'}
+      aria-label={`${label}. ${description}`}
+      className={`flex gap-3 ${className}`}
+    >
       <div
         aria-hidden
         className="flex min-w-11 flex-col justify-between pb-7 text-right text-xs text-ink-muted"
@@ -96,7 +132,10 @@ export function MonthlyChart({ months, current, label, id: chartId }: MonthlyCha
           </span>
         ))}
       </div>
-      <div aria-hidden className="flex flex-1 items-stretch gap-1 border-l border-line sm:gap-2">
+      <div
+        aria-hidden={!onSelect}
+        className="flex flex-1 items-stretch gap-1 border-l border-line sm:gap-2"
+      >
         {months.map((m, index) => {
           const expected = m.expectedCents ?? 0;
           const expectedExpense = m.expectedExpenseCents ?? 0;
@@ -126,6 +165,7 @@ export function MonthlyChart({ months, current, label, id: chartId }: MonthlyCha
                 </div>
               </div>
               <span
+                aria-hidden
                 className={`h-7 truncate pt-1.5 text-center text-xs ${m.month === current ? 'font-semibold text-brand-strong' : 'text-ink-muted'}`}
               >
                 {monthName(m.month).slice(0, 3)}
