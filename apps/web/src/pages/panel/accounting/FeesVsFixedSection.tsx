@@ -68,9 +68,12 @@ const CELL = 'px-4 py-2.5 text-right whitespace-nowrap';
 export function FeesVsFixedSection({
   selected,
   onSelect,
+  onClear,
 }: {
   selected: { month: string; kind: BarKind } | null;
   onSelect: (month: string, kind: BarKind) => void;
+  /** Deja de elegir (al pinchar en el hueco de la gráfica). */
+  onClear: () => void;
 }) {
   const query = useQuery({ queryKey: ['dashboard', 'fees-vs-fixed'], queryFn: fetchFeesVsFixed });
   const months = useTableSort(MONTH_COLUMNS, { key: 'month' });
@@ -115,6 +118,7 @@ export function FeesVsFixedSection({
               className="h-80"
               onSelect={onSelect}
               selected={selected}
+              onClear={onClear}
             />
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
