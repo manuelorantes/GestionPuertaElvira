@@ -48,7 +48,10 @@ BillingPage (/panel/cobros)
 │   ├── Hoja imprimible: logo + «Club Ajedrez Puerta Elvira» + «Recibo R-2026-0001 · 3 oct 2026» + NIF del club;
 │   │   Alumno · Pagado por · Concepto; líneas; Total; «Forma de pago: Transferencia»
 │   ├── Si tiene factura: bloque «Factura F-2026-0001» con cliente, NIF, dirección, base imponible, IVA 21 % y total
-│   └── Pie: Cerrar | «Emitir factura» (si no la tiene) | «Imprimir» (icono printer)
+│   ├── Pie: Cerrar | «Borrar» y «Editar» (solo superadministración) | «Emitir factura» (si no la tiene) | «Imprimir» (icono printer)
+│   ├── EditPaymentDialog («Editar el cobro <recibo>»): Fecha · Forma de pago · Importe (€) · Motivo (obligatorio si cambia el importe); Cancelar | Guardar
+│   │   └── Paso de confirmación: «¿Guardar estos cambios?» con «Campo: antes → después»; Volver | Confirmar
+│   └── Confirmación «¿Borrar el cobro <recibo>?»: texto de lo que pasa (las cuotas que cubría vuelven a quedar pendientes) · Motivo (obligatorio); Cancelar | «Borrar cobro» (peligro)
 ├── InvoiceDialog («Emitir factura»): Nombre o razón social · NIF · Dirección; texto «IVA del 21 % incluido en el precio»; Cancelar | «Emitir factura»
 └── WhatsAppDialog («Aviso por WhatsApp»): «Para <tutor> · <teléfono>», textarea «Mensaje» (prerrellenado), nota; Cancelar | «Abrir WhatsApp»
 

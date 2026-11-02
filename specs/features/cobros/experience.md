@@ -30,6 +30,11 @@ Solo administración (ruta dentro de `/panel`). Las peticiones `/api/admin/billi
    - «Emitir factura» abre `InvoiceDialog`.
    - Al emitirla, el recibo se recarga con el bloque de factura y aparece el toast «Factura F-… emitida».
    - Si la factura ya existía (`invoice_already_issued`), se muestra el mensaje del servidor.
+   - «Editar» (superadministración): al guardar se confirma lo que cambia; cada campo cambiado se guarda con su
+     petición (fecha, forma de pago, importe con su motivo), el recibo se recarga y aparece el toast «Cobro corregido».
+   - «Borrar» (superadministración, sin factura): pide el motivo; al confirmar se cierra el recibo, se refrescan
+     cuotas, cobros, ficha y contabilidad, y aparece el toast «Cobro R-… borrado».
+     Si el cobro tiene factura, el botón no sale y el servidor lo rechaza (`payment_invoiced`).
 4. **WhatsApp.**
    - El mensaje se prerrellena: «Hola <nombre del tutor>, te escribimos del Club Ajedrez Puerta Elvira.
      Nos consta pendiente la cuota de <mes> de <nombre del alumno> (<importe>). Puedes pagarla por transferencia
