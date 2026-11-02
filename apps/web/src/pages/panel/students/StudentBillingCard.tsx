@@ -6,7 +6,7 @@ import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { updateAccount, type Account, type AccountCharge } from '@/features/billing/api';
 import { useAccount, useBillingMutation, usePayments } from '@/features/billing/hooks';
-import { formatCents, monthLabel } from '@/features/billing/money';
+import { centsFromText, formatCents, monthLabel } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
 import { Alert } from '@/shared/ui/Alert';
@@ -128,7 +128,9 @@ function AccountSummary({ studentId, account }: { studentId: string; account: Ac
       </Row>
       {account.hasPrivateLessons && !canManage && (
         <Row label="Precio por hora de particulares">
-          {account.privateRate ? `${account.privateRate.replace('.', ',')} €` : 'El del profesor'}
+          {account.privateRate
+            ? formatCents(centsFromText(account.privateRate) ?? 0)
+            : 'El del profesor'}
         </Row>
       )}
       {account.hasPrivateLessons && canManage && (

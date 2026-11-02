@@ -46,7 +46,7 @@ test('should sell a product to a student: product, purchase, order, payment and 
   const order = page.getByRole('dialog', { name: 'Apuntar pedido' });
   await order.getByRole('combobox', { name: 'Alumno' }).fill('Mateo Cano');
   await order.getByRole('option', { name: 'Mateo Cano Robles' }).click();
-  await order.getByLabel('Producto').selectOption({ label: `${name} · 30 €` });
+  await order.getByLabel('Producto').selectOption({ label: `${name} · 30,00 €` });
   await order.getByLabel('Talla').selectOption('S');
   await order.getByRole('switch', { name: /Ya con precio/ }).click();
   await order.getByRole('button', { name: 'Apuntar pedido' }).click();
@@ -90,5 +90,5 @@ test('should sell a product to a student: product, purchase, order, payment and 
     page
       .getByRole('table', { name: 'Margen por producto' })
       .getByRole('row', { name: new RegExp(name) }),
-  ).toContainText('10 €');
+  ).toContainText('10,00 €');
 });

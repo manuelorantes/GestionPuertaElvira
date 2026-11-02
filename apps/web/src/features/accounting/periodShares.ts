@@ -84,7 +84,7 @@ export function resolveChoice(
     : equalShares(totalCents, months);
   const sum = shares.reduce((total, s) => total + Math.max(0, s.amountCents), 0);
   let problem: string | null = null;
-  if (shares.some((s) => s.amountCents <= 0)) problem = 'Cada mes tiene que llevar más de 0 €.';
+  if (shares.some((s) => s.amountCents <= 0)) problem = 'Cada mes tiene que llevar más de 0,00 €.';
   else if (sum !== totalCents) {
     problem = `El reparto suma ${formatCents(sum)} y el importe es ${formatCents(totalCents)}.`;
   }
@@ -107,7 +107,7 @@ export function sharesLabel(shares: Share[]): string {
     .join(', ');
 }
 
-/** Para la lista de cambios: «Octubre 2026» o «Octubre 2026 (100 €), noviembre 2026 (200 €)». */
+/** Para la lista de cambios: «Octubre 2026» o «Octubre 2026 (100,00 €), noviembre 2026 (200,00 €)». */
 export function sharesDetail(shares: Share[]): string {
   const text =
     shares.length === 1

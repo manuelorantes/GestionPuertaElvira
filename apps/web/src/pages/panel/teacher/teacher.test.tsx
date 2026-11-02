@@ -469,15 +469,15 @@ describe('Mis pagos', () => {
     renderApp('/panel/mis-pagos');
 
     const season = await screen.findByRole('region', { name: 'Temporada' });
-    expect(season).toHaveTextContent('Te debemos85 €');
-    expect(season).toHaveTextContent('Cobrado275 €');
+    expect(season).toHaveTextContent('Te debemos85,00 €');
+    expect(season).toHaveTextContent('Cobrado275,00 €');
     expect(season).toHaveTextContent('Horas24 h');
     const months = screen.getByRole('region', { name: 'Mes a mes' });
     const [first, second] = within(months).getAllByRole('heading');
     expect(first).toHaveTextContent('Octubre 2026');
     expect(second).toHaveTextContent('Septiembre 2026');
     expect(months).toHaveTextContent('Pagada el 30/09/2026');
-    expect(months).toHaveTextContent('Anticipos−50 €');
+    expect(months).toHaveTextContent('Anticipos−50,00 €');
   });
 });
 

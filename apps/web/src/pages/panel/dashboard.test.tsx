@@ -108,16 +108,18 @@ describe('Resumen', () => {
 
     // El saldo del club y el resultado de la temporada, de Contabilidad.
     expect(await screen.findByText('Saldo del club')).toBeInTheDocument();
-    expect(screen.getByText('15.340 €')).toBeInTheDocument();
-    expect(screen.getByText('+1240 € esta temporada')).toBeInTheDocument();
-    expect(screen.getByText('2460 €')).toBeInTheDocument();
-    // El margen previsto del mes: cuotas (3920 €) menos gastos fijos anotados (900 €) y gastos previstos (1200 €).
+    expect(screen.getByText('15.340,00 €')).toBeInTheDocument();
+    expect(screen.getByText('+1.240,00 € esta temporada')).toBeInTheDocument();
+    expect(screen.getByText('2.460,00 €')).toBeInTheDocument();
+    // El margen previsto del mes: cuotas (3.920,00 €) menos gastos fijos anotados (900,00 €) y gastos previstos (1.200,00 €).
     expect(screen.getByText('Margen previsto de octubre')).toBeInTheDocument();
-    expect(screen.getByText('+1820 €')).toBeInTheDocument();
-    expect(screen.getByText('3920 € de cuotas · 2100 € de gastos fijos')).toBeInTheDocument();
+    expect(screen.getByText('+1.820,00 €')).toBeInTheDocument();
+    expect(
+      screen.getByText('3.920,00 € de cuotas · 2.100,00 € de gastos fijos'),
+    ).toBeInTheDocument();
     // Las cuotas de socio pendientes, aparte de las del mes.
     expect(
-      screen.getByText('Plazo hasta el 5 de octubre · y 2750 € de cuotas de socio'),
+      screen.getByText('Plazo hasta el 5 de octubre · y 2.750,00 € de cuotas de socio'),
     ).toBeInTheDocument();
     // Socios activos y socios en clases, cada uno con lo que ha cambiado en el mes.
     expect(screen.getByText('Socios activos')).toBeInTheDocument();
@@ -129,37 +131,39 @@ describe('Resumen', () => {
     // Dos gráficas: lo que entra y sale cada mes, y cuotas vs gastos fijos (lo que corresponde a cada mes).
     expect(
       screen.getByRole('img', { name: /Lo que entra y sale cada mes, por fecha/ }),
-    ).toHaveAccessibleName(expect.stringContaining('octubre 2026: ingresos 4120 €, gastos 1180 €'));
+    ).toHaveAccessibleName(
+      expect.stringContaining('octubre 2026: ingresos 4.120,00 €, gastos 1.180,00 €'),
+    );
     expect(screen.getByRole('group', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
-      expect.stringContaining('octubre 2026: ingresos 3920 €, gastos 900 €'),
+      expect.stringContaining('octubre 2026: ingresos 3.920,00 €, gastos 900,00 €'),
     );
     // Las cuotas previstas, solo en la segunda gráfica y solo en los meses que las tienen.
     expect(screen.getByRole('group', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining(
-        'septiembre 2026: ingresos 4800 €, gastos 900 €, cuotas previstas 1340 €',
+        'septiembre 2026: ingresos 4.800,00 €, gastos 900,00 €, cuotas previstas 1.340,00 €',
       ),
     );
     expect(screen.getByText('Cuotas previstas')).toBeInTheDocument();
     expect(screen.queryByTestId('caja-2026-09-expected')).not.toBeInTheDocument();
     await userEvent.hover(screen.getByTestId('mes-2026-09-expected'));
-    expect(screen.getByText('Cuotas previstas de septiembre 2026: 1340 €')).toBeVisible();
+    expect(screen.getByText('Cuotas previstas de septiembre 2026: 1.340,00 €')).toBeVisible();
     // Los gastos previstos (aquí, el profesorado según el horario), en gris sobre los gastos.
     expect(screen.getByRole('group', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining(
-        'septiembre 2026: ingresos 4800 €, gastos 900 €, cuotas previstas 1340 €, gastos previstos 1200 €',
+        'septiembre 2026: ingresos 4.800,00 €, gastos 900,00 €, cuotas previstas 1.340,00 €, gastos previstos 1.200,00 €',
       ),
     );
     expect(screen.getByText('Gastos previstos')).toBeInTheDocument();
     expect(screen.queryByTestId('caja-2026-10-expectedExpense')).not.toBeInTheDocument();
     await userEvent.hover(screen.getByTestId('mes-2026-10-expectedExpense'));
-    expect(screen.getByText('Gastos previstos de octubre 2026: 1200 €')).toBeVisible();
+    expect(screen.getByText('Gastos previstos de octubre 2026: 1.200,00 €')).toBeVisible();
     await userEvent.hover(screen.getByTestId('caja-2026-10-income'));
-    expect(screen.getByText('Ingresos de octubre 2026: 4120 €')).toBeVisible();
+    expect(screen.getByText('Ingresos de octubre 2026: 4.120,00 €')).toBeVisible();
     await userEvent.hover(screen.getByTestId('caja-2026-10-expense'));
-    expect(screen.getByText('Gastos de octubre 2026: 1180 €')).toBeVisible();
-    expect(screen.queryByText('Ingresos de octubre 2026: 4120 €')).not.toBeInTheDocument();
+    expect(screen.getByText('Gastos de octubre 2026: 1.180,00 €')).toBeVisible();
+    expect(screen.queryByText('Ingresos de octubre 2026: 4.120,00 €')).not.toBeInTheDocument();
     await userEvent.hover(screen.getByTestId('mes-2026-10-expense'));
-    expect(screen.getByText('Gastos de octubre 2026: 900 €')).toBeVisible();
+    expect(screen.getByText('Gastos de octubre 2026: 900,00 €')).toBeVisible();
     expect(screen.getByText('86 %')).toBeInTheDocument();
     expect(screen.getByText('3 grupos completos')).toBeInTheDocument();
     expect(screen.getByText('Adultos II')).toBeInTheDocument();
@@ -168,9 +172,9 @@ describe('Resumen', () => {
       'href',
       '/panel?ficha=s1',
     );
-    expect(within(overdue).getByText(/Cuota de septiembre · 45 €/)).toBeInTheDocument();
+    expect(within(overdue).getByText(/Cuota de septiembre · 45,00 €/)).toBeInTheDocument();
     const latest = screen.getByRole('region', { name: 'Últimos movimientos' });
-    expect(within(latest).getByText('+45 €')).toBeInTheDocument();
+    expect(within(latest).getByText('+45,00 €')).toBeInTheDocument();
     expect(within(latest).getByRole('link', { name: 'Sofía Ramírez Vílchez' })).toHaveAttribute(
       'href',
       '/panel?ficha=s9',

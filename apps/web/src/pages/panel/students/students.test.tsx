@@ -455,7 +455,7 @@ describe('Alumnos', () => {
     expect(within(history).getByText('40,50 €')).toBeInTheDocument();
     expect(screen.getByText('2 h semanales')).toBeInTheDocument();
     expect(screen.getByText('Sí, por familia directa')).toBeInTheDocument();
-    expect(screen.getByText('Pendiente · 50 €')).toBeInTheDocument();
+    expect(screen.getByText('Pendiente · 50,00 €')).toBeInTheDocument();
     expect(screen.queryByLabelText('Forma de pago preferida')).not.toBeInTheDocument();
     expect(screen.queryByRole('switch', { name: 'Socio del club' })).not.toBeInTheDocument();
     // Los puntos solo se ven (se gestionan en la sección Puntos).
@@ -537,10 +537,10 @@ describe('Alumnos', () => {
         .map((r) => r.textContent),
     ).toEqual([
       'ConceptoCobradoPendiente',
-      'Cuotas90 €45 €',
-      'Cuota de socio50 €—',
-      'Material deportivo0 €45 €',
-      'Total140 €90 €',
+      'Cuotas90,00 €45,00 €',
+      'Cuota de socio50,00 €—',
+      'Material deportivo0,00 €45,00 €',
+      'Total140,00 €90,00 €',
     ]);
     const material = await screen.findByRole('list', { name: 'Pedidos de material del alumno' });
     expect(material).toHaveTextContent('Chándal · Talla 10');
@@ -611,10 +611,10 @@ describe('Alumnos', () => {
     renderApp('/panel/alumnos/s1');
 
     const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
-    expect(within(season).getByText('Faltan 30 €')).toBeInTheDocument();
+    expect(within(season).getByText('Faltan 30,00 €')).toBeInTheDocument();
     // La cuota de socio, con las del mes.
     const membership = within(season).getByText('Cuota de socio').closest('li');
-    expect(membership).toHaveTextContent('50 €');
+    expect(membership).toHaveTextContent('50,00 €');
     expect(membership).toHaveTextContent('Cobrada');
     expect(within(season).getByText('Fijada a mano · Cambio de tarifa')).toBeInTheDocument();
     expect(within(season).getByText('−10 % familia · −10 % pago adelantado')).toBeInTheDocument();
@@ -693,13 +693,13 @@ describe('Alumnos', () => {
 
     // Segundo paso: la diferencia se quita del recibo, salvo que se desmarque.
     const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
-    expect(confirm).toHaveTextContent('Importe: 55 € → 40 €');
+    expect(confirm).toHaveTextContent('Importe: 55,00 € → 40,00 €');
     const box = within(confirm).getByRole('checkbox', { name: /Cambiar la cantidad pagada/ });
     expect(box).toBeChecked();
-    expect(confirm).toHaveTextContent('pasa a tener 15 € menos');
+    expect(confirm).toHaveTextContent('pasa a tener 15,00 € menos');
     await user.click(box);
     expect(confirm).toHaveTextContent(
-      'La diferencia (15 €) se quedará como saldo a favor del alumno.',
+      'La diferencia (15,00 €) se quedará como saldo a favor del alumno.',
     );
     await user.click(box);
     await user.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
@@ -768,12 +768,12 @@ describe('Alumnos', () => {
 
     // Segundo paso: se pagó el importe nuevo y el recibo sube, salvo que se desmarque.
     const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
-    expect(confirm).toHaveTextContent('Importe: 55 € → 60 €');
+    expect(confirm).toHaveTextContent('Importe: 55,00 € → 60,00 €');
     const box = within(confirm).getByRole('checkbox', { name: /Se pagó el importe nuevo/ });
     expect(box).toBeChecked();
-    expect(confirm).toHaveTextContent('pasa a tener 5 € más');
+    expect(confirm).toHaveTextContent('pasa a tener 5,00 € más');
     await user.click(box);
-    expect(confirm).toHaveTextContent('Faltarán 5 € por pagar de esta cuota.');
+    expect(confirm).toHaveTextContent('Faltarán 5,00 € por pagar de esta cuota.');
     await user.click(box);
     await user.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
 

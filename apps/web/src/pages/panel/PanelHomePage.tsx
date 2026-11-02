@@ -27,7 +27,7 @@ function Title({ children }: { children: string }) {
   );
 }
 
-/** Con signo: «+1240 €» o «−500 €». */
+/** Con signo: «+1.240,00 €» o «−500,00 €». */
 function formatSigned(cents: number): string {
   return `${cents > 0 ? '+' : ''}${formatCents(cents)}`;
 }

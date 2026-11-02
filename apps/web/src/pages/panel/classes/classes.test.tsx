@@ -328,7 +328,7 @@ describe('Clases', () => {
     const fetchSpy = api({ 'PUT /api/admin/teachers/t1': [204] });
     renderApp('/panel/profesores?pestana=equipo');
 
-    expect(await screen.findByText('16 €/h')).toBeInTheDocument();
+    expect(await screen.findByText('16,00 €/h')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Editar Lucía Moreno Gil' }));
     const rate = screen.getByLabelText('Tarifa por hora (€)');
     await user.clear(rate);

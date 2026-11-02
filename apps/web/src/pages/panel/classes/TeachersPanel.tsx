@@ -2,6 +2,7 @@ import { Pencil } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
+import { centsFromText, formatCents } from '@/features/billing/money';
 import type { Teacher } from '@/features/classes/api';
 import { useCreateTeacher, useUpdateTeacher } from '@/features/classes/hooks';
 import { Alert } from '@/shared/ui/Alert';
@@ -97,7 +98,9 @@ function TeacherRow({ teacher }: { teacher: Teacher }) {
       <span className="flex-1">
         <TeacherLink id={teacher.id} name={teacher.fullName} />
       </span>
-      <span className="text-sm text-ink-soft">{rateLabel(teacher.hourlyRate)} €/h</span>
+      <span className="text-sm text-ink-soft">
+        {formatCents(centsFromText(teacher.hourlyRate) ?? 0)}/h
+      </span>
       <span className="text-sm text-ink-muted">
         {teacher.groupCount} {teacher.groupCount === 1 ? 'grupo' : 'grupos'}
       </span>

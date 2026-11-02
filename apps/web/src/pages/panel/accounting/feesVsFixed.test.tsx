@@ -120,13 +120,13 @@ describe('Cuotas vs gastos fijos', () => {
     const detail = await screen.findByRole('region', { name: 'Gastos de octubre 2026' });
     const rows = within(detail).getAllByRole('row');
     // De mayor a menor importe, y el total, el mismo que la barra negra.
-    expect(rows[1]).toHaveTextContent('AlquilerAlquiler05/10/2026510 €');
+    expect(rows[1]).toHaveTextContent('AlquilerAlquiler05/10/2026510,00 €');
     expect(rows[2]).toHaveTextContent('Luz');
-    expect(rows[2]).toHaveTextContent('45 €de 90 €');
-    expect(rows.at(-1)).toHaveTextContent('Total555 €');
+    expect(rows[2]).toHaveTextContent('45,00 €de 90,00 €');
+    expect(rows.at(-1)).toHaveTextContent('Total555,00 €');
     // Elegida en la gráfica y en la tabla.
     expect(
-      screen.getAllByRole('button', { name: 'Gastos de octubre 2026: 555 €', pressed: true }),
+      screen.getAllByRole('button', { name: 'Gastos de octubre 2026: 555,00 €', pressed: true }),
     ).toHaveLength(2);
   });
 
@@ -140,19 +140,19 @@ describe('Cuotas vs gastos fijos', () => {
     const table = screen.getByRole('table', { name: 'Cuotas vs gastos fijos mes a mes' });
     // La cifra de la tabla: los gastos previstos, con lo del profesorado ya en el libro descontado.
     await userEvent.click(
-      within(table).getByRole('button', { name: 'Gastos previstos de octubre 2026: 350 €' }),
+      within(table).getByRole('button', { name: 'Gastos previstos de octubre 2026: 350,00 €' }),
     );
     const planned = screen.getByRole('region', { name: 'Gastos previstos de octubre 2026' });
     expect(planned).toHaveTextContent('Lucía Moreno Gil');
     expect(planned).toHaveTextContent('Profesorado ya en el libro');
-    expect(planned).toHaveTextContent('−150 €');
-    expect(within(planned).getAllByRole('row').at(-1)).toHaveTextContent('Total350 €');
+    expect(planned).toHaveTextContent('−150,00 €');
+    expect(within(planned).getAllByRole('row').at(-1)).toHaveTextContent('Total350,00 €');
     // La parte de una barra: las cuotas previstas.
     const chart = screen.getByRole('group', {
       name: /Cuotas vs gastos fijos, de septiembre a agosto/,
     });
     await userEvent.click(
-      within(chart).getByRole('button', { name: 'Cuotas previstas de octubre 2026: 25 €' }),
+      within(chart).getByRole('button', { name: 'Cuotas previstas de octubre 2026: 25,00 €' }),
     );
     expect(
       screen.getByRole('region', { name: 'Cuotas previstas de octubre 2026' }),
@@ -201,13 +201,13 @@ describe('Cuotas vs gastos fijos', () => {
 
     const chart = await screen.findByRole('group', { name: /Cuotas vs gastos fijos/ });
     await userEvent.click(
-      within(chart).getByRole('button', { name: 'Gastos de octubre 2026: 555 €' }),
+      within(chart).getByRole('button', { name: 'Gastos de octubre 2026: 555,00 €' }),
     );
     expect(
       await screen.findByRole('tab', { name: 'Mes a mes y cierre', selected: true }),
     ).toBeInTheDocument();
     expect(await screen.findByRole('region', { name: 'Gastos de octubre 2026' })).toHaveTextContent(
-      'Total555 €',
+      'Total555,00 €',
     );
   });
 });
