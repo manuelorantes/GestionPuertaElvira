@@ -71,7 +71,8 @@ con el importe de un mes y su descuento familiar, salvo que ya la tenga pagada p
 Las cuotas de un alumno MUST crearse al momento al darlo de alta, inscribirlo o cambiar sus datos de cobro; las del
 mes nuevo, la noche del día 1, con la tarea de cada noche, que además crea cualquier cuota que falte. Consultar las
 cuotas o el resumen no crea nada.
-Toda persona que se da de alta (o vuelve a darse de alta), con clases o sin ellas, MUST quedar como socia.
+Toda persona que se da de alta (o vuelve a darse de alta), con clases o sin ellas, MUST quedar como socia;
+también un [socio provisional](../alumnos/spec.md), que debe y paga su cuota de socio como los demás.
 Los socios MUST tener una cuota de socio por temporada (50 € por defecto, sin descuentos salvo el especial).
 Si al darse de baja se canceló su cuota de socio y vuelve a darse de alta en la misma temporada,
 esa cuota MUST volver a deberse (lo que se hubiera cobrado de ella sigue contando).
