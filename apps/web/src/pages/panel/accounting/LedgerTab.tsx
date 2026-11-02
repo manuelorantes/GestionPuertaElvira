@@ -345,7 +345,6 @@ export function LedgerTab({
       <div className="flex flex-wrap items-start gap-6">
         <Card className="min-w-0 flex-[2_1_560px]">{renderTable()}</Card>
         <div className="flex min-w-0 flex-[1_1_280px] flex-col gap-6">
-          <ExpectedMonthCard month={month} />
           <Card className="flex min-w-0 flex-col gap-3.5 p-6">
             <section aria-label={`Gastos de ${label}`} className="flex flex-col gap-3.5">
               <h2 className="font-display text-xl font-semibold tracking-[0.04em] uppercase">
@@ -374,6 +373,7 @@ export function LedgerTab({
               </div>
             </section>
           </Card>
+          <ExpectedMonthCard month={month} />
         </div>
       </div>
       {adding && <EntryDialog onClose={() => setAdding(false)} />}

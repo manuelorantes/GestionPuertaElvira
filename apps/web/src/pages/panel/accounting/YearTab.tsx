@@ -1,5 +1,5 @@
 import { Archive, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { closeSeason } from '@/features/accounting/api';
@@ -23,9 +23,12 @@ function resultClass(cents: number): string {
 export function YearTab({
   startYear,
   onChange,
+  children,
 }: {
   startYear: number;
   onChange: (year: number) => void;
+  /** Debajo de la tabla y el cierre (en la temporada en curso, «Cuotas vs gastos fijos»). */
+  children?: ReactNode;
 }) {
   const year = useFiscalYear(startYear);
   const [confirming, setConfirming] = useState(false);
@@ -185,6 +188,7 @@ export function YearTab({
           </section>
         </div>
       )}
+      {children}
       {confirming && (
         <ConfirmDialog
           title={`¿Cerrar la temporada ${label}?`}

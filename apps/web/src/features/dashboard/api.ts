@@ -58,3 +58,23 @@ export interface Dashboard {
 export function fetchDashboard(): Promise<Dashboard> {
   return apiGet('/api/admin/dashboard');
 }
+
+/** Una línea de lo que suma una parte de una barra de «Cuotas vs gastos fijos». */
+export interface FeesVsFixedItem {
+  concept: string;
+  detail: string;
+  date: string | null;
+  /** Lo que suma a la barra (negativo en lo que la descuenta). */
+  amountCents: number;
+  /** El importe entero, si la línea es solo una parte. */
+  totalCents: number | null;
+}
+
+export interface FeesVsFixedMonth extends MonthFeeBars {
+  parts: Record<'income' | 'expected' | 'expense' | 'expectedExpense', FeesVsFixedItem[]>;
+}
+
+/** La temporada en curso de «Cuotas vs gastos fijos», con lo que suma cada parte de cada mes. */
+export function fetchFeesVsFixed(): Promise<{ month: string; months: FeesVsFixedMonth[] }> {
+  return apiGet('/api/admin/dashboard/fees-vs-fixed');
+}
