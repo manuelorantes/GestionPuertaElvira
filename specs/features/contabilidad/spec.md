@@ -127,8 +127,9 @@ Los movimientos que no corresponden solo al mes de su fecha MUST indicarlo («Co
 #### Scenario: IVA trimestral
 - **WHEN** administración anota el 20 de enero de 2027 el IVA, 300 €, y elige «Varios meses…» con octubre, noviembre
   y diciembre de 2026
-- **THEN** el movimiento sale en enero con «Corresponde a octubre, noviembre y diciembre 2026» y en «Mes a mes» suma
-  100 € a los gastos de cada uno de esos meses; el saldo de enero baja 300 €
+- **THEN** el movimiento sale en enero con «Corresponde a octubre, noviembre y diciembre 2026»;
+  en «Mes a mes» suma 300 € a los gastos de enero, cuando se pagó, y el saldo de enero baja 300 €;
+  en «Cuotas vs gastos fijos» suma 100 € a los gastos de cada uno de esos tres meses
 
 ### Requirement: Categorías del club
 En «Ajustes», administración MUST poder añadir categorías propias de ingresos o de gastos, renombrarlas y quitarlas
@@ -208,13 +209,15 @@ No se puede editar una factura de una temporada cerrada ni moverla a una.
 - **THEN** no ve el botón de editar en ninguna fila
 
 ### Requirement: Mes a mes y cierre
-El sistema MUST mostrar los 12 meses del ejercicio con ingresos, gastos y resultado, contando cada movimiento en los
-[meses a los que corresponde](#requirement-meses-a-los-que-corresponde), y el saldo del club al acabar cada mes, que
-va por la fecha de los movimientos (cuando se movió el dinero), y el total.
+El sistema MUST mostrar los 12 meses del ejercicio con ingresos, gastos, resultado y el saldo del club al acabar cada
+mes, y el total.
+Todo MUST ir por la fecha de los movimientos (cuando se movió el dinero), no por los
+[meses a los que corresponden](#requirement-meses-a-los-que-corresponde):
+así cada mes cuadra con los totales de Movimientos de ese mes y con la gráfica «Ingresos y gastos de cada mes» del
+resumen, y el saldo de cada mes es el del mes anterior más su resultado.
+El reparto por meses se ve en [«Cuotas vs gastos fijos»](#requirement-cuotas-vs-gastos-fijos).
 Un ejercicio MUST poder cerrarse a partir de su último mes (agosto), en orden y una sola vez.
-El cierre MUST arrastrar lo movido de verdad en el ejercicio (por fecha), no el resultado por meses: así el saldo del
-club sigue siendo la suma del banco y la caja. Si no coinciden, la tarjeta de cierre MUST mostrar los dos
-(«Movido en caja y banco»).
+El cierre MUST arrastrar lo movido en el ejercicio: así el saldo del club sigue siendo la suma del banco y la caja.
 
 #### Scenario: Cerrar la temporada
 - **WHEN** administración confirma el cierre
