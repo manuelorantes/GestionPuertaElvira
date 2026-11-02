@@ -75,13 +75,19 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
   const groups = useGroups();
   // En el alta, desde cuándo; al editar, su última alta (los grupos que empezaban ese día se mueven con ella).
   const [joinedOn, setJoinedOn] = useState(detail?.joinedOn ?? todayIso());
+  // Socio provisional (solo en el alta): sin horario ni familia hasta que se le pase a socio.
+  const [provisional, setProvisional] = useState(false);
   // En un alta a final de mes, qué paga de ese mes.
   const [firstMonth, setFirstMonth] = useState<FirstMonthValue>(FULL_FIRST_MONTH);
-  const firstMonthChoice = firstMonthPayload(firstMonth, joinedOn, schedule.length > 0);
-  const enrolments: Registration['enrolments'] = (resolution.data?.enrolments ?? []).map((e) => ({
-    groupId: e.groupId,
-    attendance: e.groupId in overrides ? (overrides[e.groupId] ?? null) : e.attendance,
-  }));
+  const firstMonthChoice = provisional
+    ? null
+    : firstMonthPayload(firstMonth, joinedOn, schedule.length > 0);
+  const enrolments: Registration['enrolments'] = provisional
+    ? []
+    : (resolution.data?.enrolments ?? []).map((e) => ({
+        groupId: e.groupId,
+        attendance: e.groupId in overrides ? (overrides[e.groupId] ?? null) : e.attendance,
+      }));
   const register = useStudentMutation(
     ({ values, confirm }: { values: StudentFormValues; confirm: boolean }) =>
       registerStudent(
@@ -90,6 +96,7 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
           joinedOn,
           ...(firstMonthChoice &&
             firstMonthChoice !== 'invalid' && { firstMonth: firstMonthChoice }),
+          ...(provisional && { provisional: true, siblingIds: [] }),
         },
         confirm,
       ),
@@ -108,7 +115,9 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
     }
     await overCapacity.run(async (confirm) => {
       const id = await register.mutateAsync({ values, confirm });
-      toast(`${values.fullName.trim()} dado de alta`);
+      toast(
+        `${values.fullName.trim()} dado de alta${provisional ? ' como socio provisional' : ''}`,
+      );
       onSaved(id);
     });
   });
@@ -116,6 +125,7 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
   const title = form.isEdit ? 'Editar alumno' : 'Nuevo alumno';
   // Con horario, hay que esperar a saber los grupos y que no quede nada sin clase, sin aula o sin resolver.
   const scheduleReady =
+    provisional ||
     schedule.length === 0 ||
     (resolution.data !== undefined &&
       !resolution.isFetching &&
@@ -234,7 +244,7 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                 error={fieldErrors.ownPhone}
               />
             </Section>
-            {!form.isEdit && (
+            {!form.isEdit && !provisional && (
               <Section title="Familia directa en el club">
                 <Select
                   label="Familia directa en el club (opcional)"
@@ -252,6 +262,19 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
             )}
             <Section title="Club">
               {!form.isEdit && (
+                <div>
+                  <Switch
+                    label="Socio provisional"
+                    checked={provisional}
+                    onChange={setProvisional}
+                  />
+                  <p className="mt-1 text-[13px] text-ink-muted">
+                    Ha pagado la cuota de socio, pero falta su hoja de inscripción. Recibe número de
+                    socio al pasarlo a socio.
+                  </p>
+                </div>
+              )}
+              {!form.isEdit && !provisional && (
                 <ScheduleEditor
                   blocks={schedule}
                   onChange={setSchedule}
@@ -261,7 +284,7 @@ export function StudentDialog({ detail, onClose, onSaved }: StudentDialogProps) 
                   onEditAttendance={setEditingAttendance}
                 />
               )}
-              {!form.isEdit && (
+              {!form.isEdit && !provisional && (
                 <FirstMonthFeeField
                   joinedOn={joinedOn}
                   hasClasses={schedule.length > 0}

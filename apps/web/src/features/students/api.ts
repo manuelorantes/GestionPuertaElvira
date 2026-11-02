@@ -3,20 +3,23 @@ import { apiGet, apiSend } from '@/shared/api/client';
 
 import type { FirstMonthPayload } from './firstMonth';
 
-/** `no_classes`: socios activos sin ningún grupo. */
-export type StudentFilter = 'all' | 'active' | 'withdrawn' | 'siblings' | 'no_classes';
+/** `no_classes`: socios activos sin ningún grupo; `provisional`: socios provisionales (ningún otro filtro los incluye). */
+export type StudentFilter =
+  'all' | 'active' | 'withdrawn' | 'siblings' | 'no_classes' | 'provisional';
 
 /** Datos esperados que pueden faltar en un alumno (ver Datos pendientes). */
 export type MissingDatum = 'birth_date' | 'guardian' | 'guardian_phone' | 'phone' | 'email';
 
 export interface StudentSummary {
   id: string;
-  /** Número de socio: único, en orden de alta y nunca reutilizado. */
+  /** Número de socio: único, en orden de alta y nunca reutilizado (los socios provisionales no tienen). */
   memberNumber: number;
   fullName: string;
   /** null si no consta la fecha de nacimiento. */
   age: number | null;
   status: 'active' | 'withdrawn';
+  /** Su última alta. */
+  joinedOn: string;
   /** Su última baja (pasada o futura), o null si no tiene. */
   withdrawnOn: string | null;
   groups: { id: string; name: string; slotLabel: string }[];
@@ -30,7 +33,10 @@ interface Guardian {
 
 export interface StudentDetail {
   id: string;
-  memberNumber: number;
+  /** null si es socio provisional. */
+  memberNumber: number | null;
+  /** Socio provisional: falta su hoja de inscripción; recibe número al pasarlo a socio. */
+  provisional: boolean;
   fullName: string;
   birthDate: string | null;
   age: number | null;
@@ -91,6 +97,8 @@ export interface Registration extends StudentPayload {
   joinedOn?: string;
   /** En un alta del día 16 en adelante, qué se cobra de ese mes (por defecto, entero). */
   firstMonth?: FirstMonthPayload;
+  /** Socio provisional: sin grupos ni familia directa hasta que se le pase a socio. */
+  provisional?: boolean;
 }
 
 export async function fetchStudents(
@@ -134,6 +142,17 @@ export async function registerStudent(
       confirmOverCapacity,
     })
   ).id;
+}
+
+/** Socios provisionales, por nombre. */
+export async function fetchProvisionalMembers(): Promise<StudentSummary[]> {
+  return (await apiGet<{ items: StudentSummary[] }>('/api/admin/students?filter=provisional'))
+    .items;
+}
+
+/** Pasa a socio a un socio provisional: recibe el siguiente número de socio. */
+export function confirmProvisionalMember(id: string): Promise<void> {
+  return apiSend('POST', `/api/admin/students/${id}/confirmation`, {});
 }
 
 export function updateStudent(id: string, payload: StudentPayload): Promise<void> {

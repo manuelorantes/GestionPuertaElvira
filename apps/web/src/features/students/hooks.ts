@@ -29,6 +29,14 @@ export function usePendingData(enabled = true) {
   });
 }
 
+export function useProvisionalMembers(enabled = true) {
+  return useQuery({
+    queryKey: ['students', 'provisional'],
+    queryFn: api.fetchProvisionalMembers,
+    enabled,
+  });
+}
+
 export function useStudent(id: string | undefined) {
   return useQuery({
     queryKey: ['student', id],

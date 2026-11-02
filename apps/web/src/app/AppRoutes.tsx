@@ -26,6 +26,7 @@ import { TeacherPayPage } from '@/pages/panel/teacher/TeacherPayPage';
 import { TeacherGroupPage } from '@/pages/panel/teacher/TeacherGroupPage';
 import { TeacherGroupsPage } from '@/pages/panel/teacher/TeacherGroupsPage';
 import { PendingDataPage } from '@/pages/panel/students/PendingDataPage';
+import { ProvisionalMembersPage } from '@/pages/panel/students/ProvisionalMembersPage';
 
 export function AppRoutes() {
   return (
@@ -58,6 +59,7 @@ export function AppRoutes() {
             <Route path="puntos" element={<PointsPage />} />
             <Route path="importar" element={<ImportPage />} />
             <Route path="alumnos/pendientes" element={<PendingDataPage />} />
+            <Route path="alumnos/provisionales" element={<ProvisionalMembersPage />} />
             <Route path="clases/lista/:groupId/:date" element={<StaffRollCallPage />} />
           </Route>
         </Route>
