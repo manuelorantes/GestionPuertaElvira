@@ -151,7 +151,6 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
         incomeCents: 64500,
         expenseCents: 136600,
         resultCents: -72100,
-        cashResultCents: -70000,
         canClose: true,
         closedOn: null,
       },
@@ -992,9 +991,11 @@ describe('Contabilidad', () => {
     expect(within(table).getByRole('row', { name: /Saldo inicial/ })).toHaveTextContent('1200 €');
     expect(within(table).getByRole('row', { name: /Octubre/ })).toHaveTextContent('−721 €');
     expect(within(table).getByRole('columnheader', { name: 'Saldo' })).toBeInTheDocument();
-    // Lo que pasa a la siguiente es lo movido de verdad, aunque el resultado por meses sea otro.
+    // Todo va por fecha: lo que pasa a la siguiente es el resultado, sin una segunda cifra.
     const closing = screen.getByRole('region', { name: 'Cierre de temporada 2026/27' });
-    expect(closing).toHaveTextContent('Movido en caja y banco−700 €');
+    expect(closing).not.toHaveTextContent('Movido en caja y banco');
+    expect(closing).toHaveTextContent('cuando se movió el dinero');
+    expect(closing).toHaveTextContent('el resultado (−721 €) pasa como saldo inicial');
     await userEvent.click(screen.getByRole('button', { name: 'Cerrar temporada' }));
     await userEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cerrar temporada' }),
