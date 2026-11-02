@@ -7,6 +7,7 @@ import {
   Plus,
   UserMinus,
   Trash2,
+  UserCheck,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -51,6 +52,7 @@ import { StudentLink } from './StudentLink';
 
 type Action =
   | { kind: 'edit' }
+  | { kind: 'confirm' }
   | { kind: 'withdraw' }
   | { kind: 'rejoin' }
   | { kind: 'addGroup' }
@@ -146,6 +148,10 @@ export function StudentSheet({
 
   const s = student.data;
   const isWithdrawn = s.status === 'withdrawn';
+  /** Socio provisional: sin número, grupos ni familia hasta que se le pasa a socio. */
+  const isProvisional = s.provisional;
+  /** Se le pueden cambiar grupos y familia: de alta y no provisional. */
+  const canEnrol = !isWithdrawn && !isProvisional && canManage;
   /** Se ha dado de alta más de una vez: sus fechas son las últimas y se ve el historial. */
   const rejoined = s.membership.length > 1;
   const done = (message: string) => {
@@ -198,10 +204,12 @@ export function StudentSheet({
               {s.fullName}
             </h2>
             <p className="text-sm text-ink-muted">
-              <span className="font-semibold text-ink">Socio nº {s.memberNumber}</span>
+              <span className="font-semibold text-ink">
+                {isProvisional ? 'Socio provisional' : `Socio nº ${s.memberNumber}`}
+              </span>
               {' · '}
               {s.age === null ? 'Edad sin indicar' : `${s.age} años`}
-              {s.groups[0] ? ` · ${s.groups[0].name}` : ' · Socio sin clases'}
+              {s.groups[0] ? ` · ${s.groups[0].name}` : isProvisional ? '' : ' · Socio sin clases'}
             </p>
             {s.missingData.length > 0 && (
               <p className="mt-1 text-[13px] font-medium text-warning-fg">
@@ -209,13 +217,17 @@ export function StudentSheet({
               </p>
             )}
             <div className="mt-2">
-              <Badge tone={isWithdrawn ? 'neutral' : s.withdrawnOn ? 'warning' : 'success'}>
-                {isWithdrawn
-                  ? 'De baja'
-                  : s.withdrawnOn
-                    ? `Baja el ${formatDate(s.withdrawnOn)}`
-                    : 'Activo'}
-              </Badge>
+              {isProvisional ? (
+                <Badge tone="warning">Provisional</Badge>
+              ) : (
+                <Badge tone={isWithdrawn ? 'neutral' : s.withdrawnOn ? 'warning' : 'success'}>
+                  {isWithdrawn
+                    ? 'De baja'
+                    : s.withdrawnOn
+                      ? `Baja el ${formatDate(s.withdrawnOn)}`
+                      : 'Activo'}
+                </Badge>
+              )}
             </div>
           </div>
           <button
@@ -233,7 +245,13 @@ export function StudentSheet({
               <Pencil aria-hidden size={16} />
               Editar
             </Button>
-            {!s.withdrawnOn && (
+            {isProvisional && (
+              <Button onClick={() => ask({ kind: 'confirm' })}>
+                <UserCheck aria-hidden size={16} />
+                Pasar a socio
+              </Button>
+            )}
+            {!s.withdrawnOn && !isProvisional && (
               <Button variant="secondary" onClick={() => setAction({ kind: 'withdraw' })}>
                 <UserMinus aria-hidden size={16} />
                 Dar de baja
@@ -250,9 +268,20 @@ export function StudentSheet({
       </div>
       <div className="flex flex-col gap-4 p-6">
         {error && <Alert>{error}</Alert>}
+        {isProvisional && (
+          <Alert tone="warning">
+            Socio provisional: falta su hoja de inscripción. Pásalo a socio cuando la tengas.
+          </Alert>
+        )}
         <Card className="p-4">
           <CardTitle>Grupos</CardTitle>
-          {s.groups.length === 0 && <p className="text-sm text-ink-muted">Sin grupos activos.</p>}
+          {s.groups.length === 0 && (
+            <p className="text-sm text-ink-muted">
+              {isProvisional
+                ? 'Sin grupos: podrá inscribirse cuando pase a socio.'
+                : 'Sin grupos activos.'}
+            </p>
+          )}
           <ul className="flex flex-col divide-y divide-line">
             {s.groups.map((g) => (
               <li key={g.id} className="flex items-center gap-2 py-2">
@@ -328,7 +357,7 @@ export function StudentSheet({
               </li>
             ))}
           </ul>
-          {!isWithdrawn && canManage && (
+          {canEnrol && (
             <Button
               variant="ghost"
               className="mt-2"
@@ -420,7 +449,7 @@ export function StudentSheet({
               )}
             </div>
           ))}
-          {canManage && (
+          {canManage && !isProvisional && (
             <Button variant="ghost" className="mt-2" onClick={() => setAction({ kind: 'sibling' })}>
               <Plus aria-hidden size={16} />
               Añadir familia directa
@@ -553,6 +582,19 @@ export function StudentSheet({
             mutate
               .mutateAsync(() => api.linkSibling(s.id, siblingId))
               .then(() => done('Familiar vinculado'))
+          }
+        />
+      )}
+      {action?.kind === 'confirm' && (
+        <ConfirmDialog
+          title="Pasar a socio"
+          message={`${s.fullName} recibirá el siguiente número de socio y aparecerá en la lista de alumnos.`}
+          confirmLabel="Pasar a socio"
+          busy={mutate.isPending}
+          error={actionError}
+          onCancel={cancelAction}
+          onConfirm={() =>
+            confirmWork(() => api.confirmProvisionalMember(s.id), `${s.fullName} ya es socio`)
           }
         />
       )}
