@@ -7,12 +7,14 @@ import { useEntry } from '@/features/accounting/hooks';
 import { ledgerFilterFrom, withLedgerFilter } from '@/features/accounting/ledgerFilter';
 import { useSession } from '@/features/auth/useSession';
 import { currentMonth } from '@/features/billing/money';
+import { barKindFromSlug, BAR_SLUG } from '@/pages/panel/chartBars';
 import { Alert } from '@/shared/ui/Alert';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
 
 import { BalanceCards } from './BalanceCards';
 import { DiagnosticsTab } from './DiagnosticsTab';
+import { FeesVsFixedSection } from './FeesVsFixedSection';
 import { InvoiceDialog } from './InvoiceDialog';
 import { InvoicesTab } from './InvoicesTab';
 import { LedgerTab } from './LedgerTab';
@@ -83,10 +85,24 @@ export function AccountingPage() {
     if (tab === 'ajustes') return <MonthlyCategoriesTab />;
     if (tab === 'diagnostico') return <DiagnosticsTab />;
     if (tab === 'conciliacion') return <ReconciliationTab />;
-    if (tab === 'cierre')
+    if (tab === 'cierre') {
+      const kind = barKindFromSlug(searchParams.get('parte'));
       return (
-        <YearTab startYear={season} onChange={(year) => setParam('temporada', String(year))} />
+        <YearTab startYear={season} onChange={(year) => setParam('temporada', String(year))}>
+          {season === fiscalYearOf(currentMonth()) && (
+            <FeesVsFixedSection
+              selected={kind && searchParams.has('mes') ? { month, kind } : null}
+              onSelect={(m, k) => {
+                const next = new URLSearchParams(searchParams);
+                next.set('mes', m);
+                next.set('parte', BAR_SLUG[k]);
+                setSearchParams(next, { replace: true });
+              }}
+            />
+          )}
+        </YearTab>
       );
+    }
     if (movement.locating) return <p className="text-ink-muted">Buscando el movimiento…</p>;
     return (
       <div className="flex flex-col gap-4">

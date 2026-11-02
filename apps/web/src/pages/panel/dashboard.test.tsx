@@ -130,11 +130,11 @@ describe('Resumen', () => {
     expect(
       screen.getByRole('img', { name: /Lo que entra y sale cada mes, por fecha/ }),
     ).toHaveAccessibleName(expect.stringContaining('octubre 2026: ingresos 4120 €, gastos 1180 €'));
-    expect(screen.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
+    expect(screen.getByRole('group', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining('octubre 2026: ingresos 3920 €, gastos 900 €'),
     );
     // Las cuotas previstas, solo en la segunda gráfica y solo en los meses que las tienen.
-    expect(screen.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
+    expect(screen.getByRole('group', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining(
         'septiembre 2026: ingresos 4800 €, gastos 900 €, cuotas previstas 1340 €',
       ),
@@ -144,7 +144,7 @@ describe('Resumen', () => {
     await userEvent.hover(screen.getByTestId('mes-2026-09-expected'));
     expect(screen.getByText('Cuotas previstas de septiembre 2026: 1340 €')).toBeVisible();
     // Los gastos previstos (aquí, el profesorado según el horario), en gris sobre los gastos.
-    expect(screen.getByRole('img', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
+    expect(screen.getByRole('group', { name: /Cuotas vs gastos fijos/ })).toHaveAccessibleName(
       expect.stringContaining(
         'septiembre 2026: ingresos 4800 €, gastos 900 €, cuotas previstas 1340 €, gastos previstos 1200 €',
       ),
