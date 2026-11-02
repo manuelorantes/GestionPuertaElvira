@@ -54,6 +54,16 @@ Al pasar el ratón por una barra (o al tocarla en el móvil) MUST mostrarse a cu
 octubre 2026: 4120 €», «Cuotas previstas de noviembre 2026: 1340 €» o «Gastos previstos de noviembre 2026:
 1200 €».
 
+Al pinchar una parte de una barra de «Cuotas vs gastos fijos» (ingresos, cuotas previstas, gastos o gastos previstos de
+un mes) MUST abrirse Contabilidad, en [«Mes a mes y cierre»](../contabilidad/spec.md#requirement-cuotas-vs-gastos-fijos),
+con ese mes y esa parte elegidos y su detalle debajo.
+Cada parte es un botón con su nombre, su mes y su importe para los lectores de pantalla.
+
+#### Scenario: De la barra al detalle
+- **WHEN** administración pincha la parte negra de octubre en «Cuotas vs gastos fijos»
+- **THEN** se abre Contabilidad en «Mes a mes y cierre» con «Gastos de octubre» elegido y la lista de los movimientos
+  que suman esa cifra
+
 #### Scenario: Un pago trimestral
 - **WHEN** un alumno paga en octubre tres meses por 121,50 €
 - **THEN** «Ingresos y gastos de cada mes» suma 121,50 € a octubre y «Cuotas vs gastos fijos» suma 40,50 € a
