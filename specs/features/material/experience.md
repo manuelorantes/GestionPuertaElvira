@@ -7,7 +7,7 @@
 - Los formularios validan antes de enviar (falta el alumno, el producto, una opción de lista, un precio válido…) y, si
   la API rechaza (p. ej. no queda stock de esa talla, opción en uso, precio con algo cobrado), el diálogo se queda abierto
   con el mensaje.
-- Cada acción correcta muestra un aviso breve («Reserva apuntada», «Cobro de 45 € generado», «Entregado», «Vuelve a
+- Cada acción correcta muestra un aviso breve («Reserva apuntada», «Cobro de 45,00 € generado», «Entregado», «Vuelve a
   estar reservado»…) y refresca los datos del club (cuotas, ficha, stock, margen).
 - Sin productos, «Productos» invita a crear el primero; sin compras ni pedidos, «Stock y compras» lo explica.
 - Al editar un producto, cambiar el texto de una opción la renombra (sus pedidos la siguen) y quitarla deja sus
