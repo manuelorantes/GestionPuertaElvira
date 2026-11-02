@@ -1,6 +1,7 @@
 import { assert, assertEquals } from '@std/assert';
 
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
+import type { FeesVsFixedLink } from '../../src/application/dashboard/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
 import { ApiClient, assertError, atTime, createUser, resetDatabase } from '../support/http.ts';
 
@@ -379,43 +380,38 @@ Deno.test({
       imageConsent: true,
       groupIds: [group],
     })).body as { id: string }).id;
-    assertEquals(
-      (await client.json('POST', '/api/admin/billing/payments', {
-        studentId: student,
-        kind: 'monthly',
-        months: 1,
-        method: 'cash',
-        date: today,
-      })).status,
-      201,
-    );
+    const paid = await client.json('POST', '/api/admin/billing/payments', {
+      studentId: student,
+      kind: 'monthly',
+      months: 1,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(paid.status, 201);
+    const receipt = (paid.body as { id: string }).id;
     const month = today.slice(0, 7);
     const following = YearMonth.fromString(month).next().toString();
     // La luz pagada hoy, repartida entre este mes (10,00 €) y el siguiente (20,00 €).
-    assertEquals(
-      (await client.json('POST', '/api/admin/accounting/entries', {
-        date: today,
-        kind: 'expense',
-        concept: 'Luz',
-        category: 'electricity',
-        method: 'transfer',
-        amount: '30',
-        shares: [
-          { period: month, amountCents: 1000 },
-          { period: following, amountCents: 2000 },
-        ],
-      })).status,
-      201,
-    );
+    const light = await client.json('POST', '/api/admin/accounting/entries', {
+      date: today,
+      kind: 'expense',
+      concept: 'Luz',
+      category: 'electricity',
+      method: 'transfer',
+      amount: '30',
+      shares: [
+        { period: month, amountCents: 1000 },
+        { period: following, amountCents: 2000 },
+      ],
+    });
+    assertEquals(light.status, 201);
     // La limpieza, esperada cada mes y aún sin pagar.
-    assertEquals(
-      (await client.json('POST', '/api/admin/accounting/expected', {
-        concept: 'Limpieza del local',
-        category: 'cleaning',
-        amount: '120',
-      })).status,
-      201,
-    );
+    const cleaning = await client.json('POST', '/api/admin/accounting/expected', {
+      concept: 'Limpieza del local',
+      category: 'cleaning',
+      amount: '120',
+    });
+    assertEquals(cleaning.status, 201);
 
     type Item = {
       concept: string;
@@ -423,6 +419,7 @@ Deno.test({
       date: string | null;
       amountCents: number;
       totalCents: number | null;
+      link: FeesVsFixedLink;
     };
     type Part = 'income' | 'expected' | 'expense' | 'expectedExpense';
     type Month = {
@@ -458,6 +455,13 @@ Deno.test({
       );
       assertEquals(m.incomeCents, bar?.incomeCents);
       assertEquals(m.expectedExpenseCents, bar?.expectedExpenseCents);
+      // Cada línea lleva adónde se ve.
+      for (const item of Object.values(m.parts).flat()) {
+        assert(
+          ['receipt', 'fee', 'movement', 'teacher', 'expected', 'ledger'].includes(item.link?.kind),
+          `${m.month} · ${item.concept} sin enlace`,
+        );
+      }
     }
 
     const current = detail.months.find((m) => m.month === month)!;
@@ -468,6 +472,7 @@ Deno.test({
       date: null,
       amountCents: 4500,
       totalCents: null,
+      link: { kind: 'receipt', paymentId: receipt },
     }]);
     // Gastos: la parte de la luz de este mes, de un apunte de 30,00 €.
     assertEquals(current.parts.expense, [{
@@ -476,11 +481,13 @@ Deno.test({
       date: today,
       amountCents: 1000,
       totalCents: 3000,
+      link: { kind: 'movement', sourceId: (light.body as { id: string }).id, month },
     }]);
     // Gastos previstos: la profesora según el horario (con sus horas) y la limpieza sin pagar.
     const teacherLine = current.parts.expectedExpense.find((i) => i.concept === 'Lucía Moreno Gil');
     assert(teacherLine && teacherLine.amountCents > 0, 'la profesora tiene clases este mes');
     assert(teacherLine.detail.startsWith('Previsto según el horario'), teacherLine.detail);
+    assertEquals(teacherLine.link, { kind: 'teacher', teacherId: teacher, month });
     assertEquals(
       current.parts.expectedExpense.find((i) => i.concept === 'Limpieza del local'),
       {
@@ -489,13 +496,14 @@ Deno.test({
         date: null,
         amountCents: 12000,
         totalCents: null,
+        link: { kind: 'expected', expenseId: (cleaning.body as { id: string }).id, month },
       },
     );
     // Cuotas previstas del mes que viene: la de la alumna matriculada, aún sin emitir.
     if (Season.teachingSeason(YearMonth.fromString(following)) !== null) {
       const next = detail.months.find((m) => m.month === following)!;
-      assertEquals(next.parts.expected.map((i) => [i.concept, i.amountCents]), [
-        ['Martina López Herrera', 4500],
+      assertEquals(next.parts.expected.map((i) => [i.concept, i.amountCents, i.link]), [
+        ['Martina López Herrera', 4500, { kind: 'fee', studentId: student, month: following }],
       ]);
     }
   },
