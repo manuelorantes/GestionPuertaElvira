@@ -250,18 +250,52 @@ De una cuota pagada en parte se cobra solo lo que falta.
 - **THEN** el cobro se rechaza indicando cuántos meses quedan
 
 ### Requirement: Corregir un cobro
-Administración MUST poder corregir de un cobro ya registrado:
+Superadministración MUST poder corregir desde el propio recibo un cobro ya registrado:
 
 - la forma de pago (efectivo, datáfono o transferencia);
 - la fecha, dentro de la temporada de su recibo y nunca futura;
 - el importe, indicando el motivo, que queda como línea «Corrección: <motivo>» del recibo con la diferencia.
 
-El número de recibo y los meses cobrados no cambian. El recibo y Contabilidad muestran los datos corregidos y
-cada cambio queda en el historial.
+Antes de guardar se confirma lo que cambia.
+El número de recibo y los meses cobrados no cambian.
+El recibo y Contabilidad muestran los datos corregidos y cada cambio queda en el historial.
+Un recibo que se queda en 0 € no sale en Contabilidad y no impide ver el mes.
 
 #### Scenario: Anotado como transferencia y pagado en efectivo
-- **WHEN** administración cambia a «Efectivo» un cobro registrado como transferencia
+- **WHEN** superadministración cambia a «Efectivo» un cobro registrado como transferencia
 - **THEN** el recibo y el movimiento de Contabilidad pasan a «Efectivo» con el mismo importe
+
+#### Scenario: Recibo corregido a 0 €
+- **WHEN** superadministración corrige a 0 € un recibo de 1 € de octubre
+- **THEN** Contabilidad de octubre se sigue viendo y ese recibo no sale en el libro
+
+### Requirement: Borrar un cobro
+Superadministración MUST poder borrar desde el propio recibo un cobro anotado por error, indicando el motivo.
+Un cobro con factura MUST NOT poder borrarse.
+
+Al borrarlo:
+
+- lo que cubría deja de estar cubierto y las cuotas del alumno se reparten de nuevo con sus otros cobros,
+  así que los meses que pagaba vuelven a quedar pendientes (o a cubrirse con el saldo a favor que haya);
+- deja de salir en Contabilidad y en la conciliación con el banco
+  (el movimiento del banco con el que se había casado vuelve a quedar por conciliar);
+- los puntos canjeados en él vuelven al alumno;
+- queda en el historial con su número de recibo, el alumno, el importe y el motivo.
+
+Su número de recibo no se vuelve a usar.
+
+#### Scenario: Borrar un cobro duplicado
+- **WHEN** superadministración borra el recibo R-2026-0280 de 55 € de septiembre con el motivo «lo pagó el padre de Hugo»
+- **THEN** el recibo deja de existir, septiembre vuelve a quedar pendiente si no lo cubre otro cobro,
+  y el historial muestra «Borrar cobro R-2026-0280 (lo pagó el padre de Hugo)»
+
+#### Scenario: Cobro con factura
+- **WHEN** superadministración intenta borrar un cobro que tiene la factura F-2026-0003
+- **THEN** se rechaza porque tiene factura y el cobro no cambia
+
+#### Scenario: Sin motivo
+- **WHEN** superadministración intenta borrar un cobro sin indicar el motivo
+- **THEN** se rechaza y pide el motivo
 
 ### Requirement: Recibos y facturas
 Cada cobro MUST tener un recibo con número correlativo por temporada (R-2026-0001), imprimible,
