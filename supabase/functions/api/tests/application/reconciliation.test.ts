@@ -270,3 +270,93 @@ Deno.test('ReconcileStatement should match several months of an expense paid at 
   assertEquals(item.proposal!.items.map((i) => i.sourceId).sort(), ['r10', 'r8', 'r9']);
   assertEquals(item.proposal!.changes, []);
 });
+
+const income = (id: string, date: string, method: string, amountCents: number): LedgerLine => ({
+  ...payment(id, date, method, amountCents),
+  source: 'manual',
+  category: 'material_sales',
+  studentId: null,
+  concept: `Venta · ${id}`,
+});
+
+Deno.test('ReconcileStatement should count card income entries in a card settlement', async () => {
+  const { reconcile } = setUp([
+    payment('p1', '2026-09-08', 'card', 4000),
+    income('i1', '2026-09-08', 'card', 1500),
+  ]);
+  const item =
+    (await reconcile(statement(['2026-09-09', 'Liquidacion Efectuada El 08/09/2026', 5500])))
+      .items[0]!;
+  assertEquals(item.status, 'matched');
+  assertEquals(item.matched.map((i) => i.sourceId), ['i1', 'p1']);
+});
+
+Deno.test('ReconcileStatement should match a transfer with the payment of its payer before one of the same amount', async () => {
+  const { reconcile } = setUp([
+    payment('pedro1', '2026-09-03', 'transfer', 5000, 'pedro'),
+    payment('ana1', '2026-10-05', 'transfer', 5000),
+  ]);
+  const view = await reconcile(statement(
+    ['2026-10-05', 'Transferencia De Pedro Sanz, Concepto Socio', 5000],
+    ['2026-10-06', 'Transferencia De Rosa Ruiz Duran, Concepto Ana', 5000],
+  ));
+  assertEquals(view.items[1]!.status, 'matched');
+  assertEquals(view.items[1]!.matched.map((m) => m.sourceId), ['ana1']);
+  // El de Pedro tiene otra fecha: se sugiere corregirla en vez de quitarle el suyo a Ana.
+  assertEquals(view.items[0]!.status, 'suggested');
+  assertEquals(view.items[0]!.proposal!.items.map((i) => i.sourceId), ['pedro1']);
+});
+
+Deno.test('ReconcileStatement should match several transfers of the same payer that together pay the payments', async () => {
+  const { reconcile } = setUp(
+    Array.from({ length: 18 }, (_, i) => payment(`p${i}`, '2026-10-06', 'transfer', 3850)),
+  );
+  const view = await reconcile(statement(
+    ['2026-10-06', 'Transferencia Inmediata De Rosa Ruiz Duran, Concepto Ana Gil Cuotas', 64800],
+    ['2026-10-07', 'Transferencia Inmediata De Rosa Ruiz Duran, Concepto Ana Gil Resto', 4500],
+  ));
+  assertEquals(view.items.map((i) => i.status), ['matched', 'matched']);
+  assertEquals(view.items[0]!.matched.length, 18);
+  assertEquals(view.items[1]!.matched.length, 18);
+});
+
+Deno.test('ReconcileStatement should match a transfer with its payments minus an expense that names the student', async () => {
+  const { reconcile } = setUp([
+    payment('p1', '2026-09-07', 'transfer', 5000, 'pedro'),
+    payment('p2', '2026-09-07', 'transfer', 44000, 'pedro'),
+    {
+      ...expense('e1', '2026-09-07', 'transfer', 11920),
+      concept: 'Gasolina y comida del equipo · Pedro Sanz (descontado de su pago)',
+    },
+  ]);
+  const item = (await reconcile(
+    statement(['2026-09-07', 'Transferencia De Pedro Sanz, Concepto Curso', 37080]),
+  ))
+    .items[0]!;
+  assertEquals(item.status, 'matched');
+  assertEquals(item.matched.map((i) => i.sourceId).sort(), ['e1', 'p1', 'p2']);
+});
+
+Deno.test('ReconcileStatement should match a payment with several bank expenses of those days that add up to it', async () => {
+  const { reconcile } = setUp([
+    expense('e1', '2026-10-20', 'transfer', 19000),
+    expense('e2', '2026-10-20', 'transfer', 9500),
+    expense('e3', '2026-10-20', 'transfer', 15920),
+  ]);
+  const view = await reconcile(statement(
+    ['2026-10-20', 'Domiciliacion Impuesto: 2.026 Abonare A.e.a.t', -15920],
+    ['2026-10-20', 'Domiciliacion Impuesto: 2.026 Irpf', -28500],
+  ));
+  assertEquals(view.items.map((i) => i.status), ['matched', 'matched']);
+  assertEquals(view.items[1]!.matched.map((i) => i.sourceId).sort(), ['e1', 'e2']);
+});
+
+Deno.test('ReconcileStatement should not match several expenses when more than one combination adds up', async () => {
+  const { reconcile } = setUp([
+    expense('e1', '2026-10-20', 'transfer', 10000),
+    expense('e2', '2026-10-20', 'transfer', 10000),
+    expense('e3', '2026-10-20', 'transfer', 10000),
+  ]);
+  const item = (await reconcile(statement(['2026-10-20', 'Recibo Varios', -20000]))).items[0]!;
+  assertEquals(item.status === 'matched', false);
+});

@@ -130,6 +130,9 @@ const BANK_METHODS = new Set(['transfer', 'card']);
 /** Cuántos días puede separarse un apunte de la app de su movimiento en el banco. */
 const CLOSE_DAYS = { transfer: 3, expense: 31, cash: 5, search: 45 };
 const MAX_CANDIDATES = 40;
+/** Cuántos gastos se miran como mucho para combinarlos, y cuántos descuentos para restarlos de un pago. */
+const MAX_COMBINED = 12;
+const MAX_DEDUCTIONS = 4;
 
 /** Categoría de un gasto o ingreso nuevo cuando no hay ninguna recordada para su contraparte. */
 function guessCategory(m: BankMovement): string {
@@ -290,14 +293,27 @@ class Matcher {
       const stored = this.storedByKey.get(movementKey(m));
       if (stored) results.set(index, this.storedMatch(m, stored));
     });
+    // Primero lo que casa con nombre: un cobro de otra familia con el mismo importe no debe quitarle el suyo a nadie.
+    for (const namedOnly of [true, false]) {
+      movements.forEach((m, index) => {
+        if (results.has(index)) return;
+        const exact = this.exact(m, namedOnly);
+        if (exact) {
+          this.take(exact);
+          results.set(index, this.result(m, 'matched', 'Cuadra con la app.', { matched: exact }));
+        }
+      });
+    }
+    // Luego las combinaciones: varios gastos pagados de una vez o cobros menos lo que se descontó.
     movements.forEach((m, index) => {
       if (results.has(index)) return;
-      const exact = this.exact(m);
-      if (exact) {
-        this.take(exact);
-        results.set(index, this.result(m, 'matched', 'Cuadra con la app.', { matched: exact }));
+      const combined = this.combined(m);
+      if (combined) {
+        this.take(combined);
+        results.set(index, this.result(m, 'matched', 'Cuadra con la app.', { matched: combined }));
       }
     });
+    this.samePayerGroups(movements, results);
     // Las liquidaciones, al final: sus combinaciones no deben quitar a una transferencia el cobro con su nombre.
     const order = movements.map((m, index) => ({ m, index }))
       .sort((a, b) =>
@@ -357,13 +373,29 @@ class Matcher {
     return Math.abs(daysBetween(i.date, date)) <= days;
   }
 
-  /** Cobros con tarjeta del día de una liquidación. */
+  /** Lo cobrado con tarjeta el día de una liquidación: cobros y apuntes de ingreso (una venta de libros…). */
   private cardsOf(day: string): AppItem[] {
-    return this.payments.filter((p) => this.free(p) && p.method === 'card' && p.date === day);
+    return this.items.filter((i) =>
+      this.free(i) && i.kind === 'income' && i.method === 'card' && i.date === day
+    );
+  }
+
+  /** Cobros por transferencia cercanos a una fecha cuyo nombre aparece en el concepto del banco. */
+  private namedTransfers(concepts: readonly BankMovement[], date: string): AppItem[] {
+    return this.payments.filter((p) =>
+      this.free(p) && p.method === 'transfer' && this.near(p, date, CLOSE_DAYS.transfer) &&
+      concepts.some((m) => this.score(m, p) >= 2)
+    );
+  }
+
+  /** La única combinación de `pool` que suma `amount`, si la hay. */
+  private only(pool: readonly AppItem[], amount: number): AppItem[] | null {
+    const combos = subsetsSumming(pool.map((i) => i.amountCents), amount);
+    return combos.length === 1 ? combos[0]!.map((index) => pool[index]!) : null;
   }
 
   /** Lo que cuadra sin tocar nada: mismo importe, fecha cercana y forma de pago del banco. */
-  private exact(m: BankMovement): AppItem[] | null {
+  private exact(m: BankMovement, namedOnly = false): AppItem[] | null {
     const amount = Math.abs(m.amountCents);
     const kind = movementKind(m);
     if (kind === 'card_settlement') {
@@ -383,7 +415,9 @@ class Matcher {
         this.free(i) && i.kind === 'income' && i.method === 'transfer' &&
         this.near(i, m.operationDate, CLOSE_DAYS.transfer)
       );
-      const single = close.filter((i) => i.amountCents === amount)
+      const single = close.filter((i) =>
+        i.amountCents === amount && (!namedOnly || this.score(m, i) >= 2)
+      )
         .sort((a, b) =>
           this.score(m, b) - this.score(m, a) ||
           Math.abs(daysBetween(a.date, m.operationDate)) -
@@ -395,6 +429,7 @@ class Matcher {
       const combos = subsetsSumming(family.map((i) => i.amountCents), amount);
       return combos.length === 1 ? combos[0]!.map((index) => family[index]!) : null;
     }
+    if (namedOnly) return null;
     const expense =
       this.items.filter((i) =>
         this.free(i) && i.kind === 'expense' && BANK_METHODS.has(i.method) &&
@@ -405,6 +440,87 @@ class Matcher {
         Math.abs(daysBetween(b.date, m.operationDate))
       )[0];
     return expense ? [expense] : null;
+  }
+
+  /**
+   * Lo que cuadra combinando, con una sola combinación posible: varios gastos en el banco de esos días que suman el
+   * pago, o los cobros de quien transfiere menos los gastos que lo nombran (lo que el club pagó por él y se descontó).
+   */
+  private combined(m: BankMovement): AppItem[] | null {
+    const kind = movementKind(m);
+    if (kind === 'expense') {
+      const pool = this.items.filter((i) =>
+        this.free(i) && i.kind === 'expense' && BANK_METHODS.has(i.method) &&
+        this.near(i, m.operationDate, CLOSE_DAYS.transfer)
+      ).slice(0, MAX_COMBINED);
+      const chosen = this.only(pool, -m.amountCents);
+      return chosen && chosen.length > 1 ? chosen : null;
+    }
+    if (kind !== 'income') return null;
+    const family = this.namedTransfers([m], m.operationDate);
+    if (family.length === 0) return null;
+    const names = [...new Set(family.flatMap((p) => this.namesOf(p)))];
+    const deductions = this.items.filter((i) =>
+      this.free(i) && i.kind === 'expense' && BANK_METHODS.has(i.method) &&
+      this.near(i, m.operationDate, CLOSE_DAYS.transfer) &&
+      names.some((n) => nameScore(i.concept, n) >= 2)
+    ).slice(0, MAX_DEDUCTIONS);
+    const found: AppItem[][] = [];
+    for (let mask = 1; mask < 1 << deductions.length && found.length < 2; mask++) {
+      const taken = deductions.filter((_, bit) => mask & (1 << bit));
+      const combos = subsetsSumming(
+        family.map((p) => p.amountCents),
+        m.amountCents + sum(taken),
+      );
+      for (const combo of combos) found.push([...combo.map((index) => family[index]!), ...taken]);
+    }
+    return found.length === 1 ? found[0]! : null;
+  }
+
+  /**
+   * Varias transferencias de la misma persona en pocos días que juntas pagan cobros de su familia (un pago y luego «el
+   * resto»): cuadran juntas, cada una con todos esos cobros.
+   */
+  private samePayerGroups(
+    movements: readonly BankMovement[],
+    results: Map<number, ReconciliationItem>,
+  ): void {
+    const open = movements.map((m, index) => ({ m, index }))
+      .filter(({ m, index }) => !results.has(index) && movementKind(m) === 'income');
+    const groups = new Map<string, { m: BankMovement; index: number }[]>();
+    for (const entry of open) {
+      const who = counterparty(entry.m.concept);
+      groups.set(who, [...(groups.get(who) ?? []), entry]);
+    }
+    for (const group of groups.values()) {
+      const dates = group.map(({ m }) => m.operationDate).sort();
+      if (
+        group.length < 2 ||
+        Math.abs(daysBetween(dates[0]!, dates[dates.length - 1]!)) > CLOSE_DAYS.transfer
+      ) continue;
+      const concepts = group.map(({ m }) => m);
+      const pool = this.namedTransfers(concepts, dates[0]!).filter((p) =>
+        this.near(p, dates[dates.length - 1]!, CLOSE_DAYS.transfer)
+      );
+      const chosen = this.only(pool, group.reduce((total, { m }) => total + m.amountCents, 0));
+      if (!chosen) continue;
+      this.take(chosen);
+      for (const { m, index } of group) {
+        results.set(
+          index,
+          this.result(
+            m,
+            'matched',
+            `Cuadra junto con ${
+              group.length - 1 === 1
+                ? 'otra transferencia'
+                : `otras ${group.length - 1} transferencias`
+            } de la misma persona.`,
+            { matched: chosen },
+          ),
+        );
+      }
+    }
   }
 
   private suggest(m: BankMovement): ReconciliationItem {
