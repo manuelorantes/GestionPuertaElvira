@@ -162,8 +162,16 @@ describe('Profesorado', () => {
     expect(within(lucia).getByText('Más rentable')).toBeInTheDocument();
     // Los totales, al pie de la tabla y cada uno bajo su columna.
     const totals = within(table).getByRole('row', { name: /Totales del mes/ });
-    // 14 h; 236 € de coste (16,86 €/h de media); 650 € de ingresos; 414 € de margen (29,57 €/h); 16 de 24 plazas.
-    for (const text of ['14 h', '16,86 €/h', '236 €', '650 €', '414 €', '29,57 €', '67 %']) {
+    // 14 h; 236,00 € de coste (16,86 €/h de media); 650,00 € de ingresos; 414,00 € de margen (29,57 €/h); 16 de 24 plazas.
+    for (const text of [
+      '14 h',
+      '16,86 €/h',
+      '236,00 €',
+      '650,00 €',
+      '414,00 €',
+      '29,57 €',
+      '67 %',
+    ]) {
       expect(within(totals).getByText(text)).toBeInTheDocument();
     }
     expect(within(totals).getByText('ganancia')).toBeInTheDocument();
@@ -174,14 +182,14 @@ describe('Profesorado', () => {
     ).toEqual([
       'total14 h',
       'media16,86 €/h',
-      'en profesores236 €',
+      'en profesores236,00 €',
       'sin repetir15*',
-      'total650 €',
-      'total414 €',
+      'total650,00 €',
+      'total414,00 €',
       'ganancia29,57 €',
       'media67 %',
     ]);
-    expect(within(lucia).getByText('322 €')).toBeInTheDocument();
+    expect(within(lucia).getByText('322,00 €')).toBeInTheDocument();
     expect(within(lucia).getByText('83 %')).toBeInTheDocument();
 
     // Alumnos: los de cada profesor en su fila; en el total, sin repetir a quien va con los dos.
@@ -225,7 +233,7 @@ describe('Profesorado', () => {
     await userEvent.selectOptions(within(dialog).getByLabelText('Clase'), 'other');
     await userEvent.type(within(dialog).getByLabelText('Actividad'), 'Torneo escolar');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Más horas' }));
-    expect(within(dialog).getByText('Coste a 16 €/h: 24 €')).toBeInTheDocument();
+    expect(within(dialog).getByText('Coste a 16,00 €/h: 24,00 €')).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Guardar horas' }));
 
     expect(await screen.findByText('Horas registradas')).toBeInTheDocument();
@@ -345,14 +353,14 @@ describe('Profesorado', () => {
 
     const table = await screen.findByRole('table', { name: 'Sesiones de septiembre 2026' });
     const friday = within(table).getByRole('row', { name: /Viernes 1,5 h/ });
-    expect(friday).toHaveTextContent('24 €');
+    expect(friday).toHaveTextContent('24,00 €');
     await userEvent.click(within(friday).getByRole('button', { name: 'Por qué cuenta 1,5 h' }));
     const note = await screen.findByRole('dialog', { name: 'Por qué cuenta 1,5 h' });
     expect(note).toHaveTextContent(/Eran 3 h, pero se pisa con Viernes 17:00/);
     // La celda de horas no parte líneas; la nota, sí (que no se salga de la pantalla).
     expect(note).toHaveClass('whitespace-normal');
     // El total, con lo que cuenta: 3 h, no 4,5.
-    expect(screen.getByText('2 sesiones · 3 h · 48 €')).toBeInTheDocument();
+    expect(screen.getByText('2 sesiones · 3 h · 48,00 €')).toBeInTheDocument();
   });
 
   it('marks a holiday from the substitutions tab (not the timesheet), removing its sessions', async () => {
@@ -651,10 +659,10 @@ describe('Profesorado', () => {
     renderApp('/panel/profesores/t1');
 
     expect(await screen.findByRole('heading', { name: 'Lucía Moreno Gil' })).toBeInTheDocument();
-    expect(screen.getByText('Le debemos').parentElement).toHaveTextContent('70 €');
+    expect(screen.getByText('Le debemos').parentElement).toHaveTextContent('70,00 €');
     expect(screen.getByText('Ocupación de sus clases').parentElement).toHaveTextContent('50 %');
     const months = screen.getByRole('table', { name: 'Mes a mes de Lucía Moreno Gil' });
-    expect(within(months).getByRole('row', { name: /Octubre 2026/ })).toHaveTextContent('−90 €');
+    expect(within(months).getByRole('row', { name: /Octubre 2026/ })).toHaveTextContent('−90,00 €');
     expect(await screen.findByText('(Sustitución) Martes y jueves 17:00')).toBeInTheDocument();
     const classes = screen.getByRole('table', { name: 'Clases asignadas' });
     expect(within(classes).getByRole('row', { name: /Iniciación A/ })).toHaveTextContent('7 / 10');
@@ -909,7 +917,7 @@ describe('Profesorado', () => {
     renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
 
     const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
-    expect(screen.getByText('236 €')).toBeInTheDocument();
+    expect(screen.getByText('236,00 €')).toBeInTheDocument();
     expect(within(table).getByRole('row', { name: /Carlos/ })).toHaveTextContent(
       'Pagada el 02/10/2026',
     );

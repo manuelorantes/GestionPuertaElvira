@@ -16,7 +16,9 @@ test('should list the movements of the month with the rent paid', async ({ page 
   await openAccounting(page);
 
   const table = page.getByRole('table', { name: /Movimientos de/ });
-  await expect(table.getByRole('row', { name: /Propietario del local/ })).toContainText('−950 €');
+  await expect(table.getByRole('row', { name: /Propietario del local/ })).toContainText(
+    '−950,00 €',
+  );
   await expect(page.getByRole('region', { name: /Gastos de/ }).getByText('Alquiler')).toBeVisible();
 });
 
@@ -81,7 +83,7 @@ test('should split an invoice between the months it applies to', async ({ page }
   const row = page.getByRole('table', { name: /Movimientos de/ }).getByRole('row', {
     name: /IVA de prueba repartido/,
   });
-  await expect(row).toContainText('−90 €');
+  await expect(row).toContainText('−90,00 €');
   await expect(row).toContainText('Corresponde a');
 });
 
@@ -102,7 +104,7 @@ test('should pay an expected expense for another amount than expected', async ({
     page
       .getByRole('table', { name: 'Gastos esperados' })
       .getByRole('row', { name: new RegExp(concept) }),
-  ).toContainText('120 €');
+  ).toContainText('120,00 €');
 
   await page.getByRole('tab', { name: 'Movimientos' }).click();
   const card = page.getByRole('region', { name: /Gastos esperados de/ });
@@ -113,7 +115,7 @@ test('should pay an expected expense for another amount than expected', async ({
   await pay.getByRole('button', { name: 'Pagar' }).click();
   await expect(page.getByText(new RegExp(`${concept} de .* pagado`))).toBeVisible();
 
-  await expect(card.getByText('se esperaban 120 €')).toBeVisible();
+  await expect(card.getByText('se esperaban 120,00 €')).toBeVisible();
   const row = page.getByRole('table', { name: /Movimientos de/ }).getByRole('row', {
     name: new RegExp(concept),
   });

@@ -32,15 +32,15 @@ describe('HomePage', () => {
     const prices = await screen.findByRole('region', { name: 'Precios y descuentos 2026/27' });
     const fees = within(prices).getByRole('list', { name: 'Cuotas de clases' });
     expect(within(fees).getByRole('listitem', { name: /3 horas semanales/ })).toHaveTextContent(
-      '55 €',
+      '55,00 €',
     );
     expect(
       within(fees).getByRole('listitem', { name: /1 hora y media semanal/ }),
-    ).toHaveTextContent('40 €');
-    expect(within(prices).getByText('50 €')).toBeInTheDocument();
+    ).toHaveTextContent('40,00 €');
+    expect(within(prices).getByText('50,00 €')).toBeInTheDocument();
     expect(within(prices).getAllByText('10 %')).toHaveLength(2);
     expect(within(prices).getByText('20 %')).toBeInTheDocument();
-    expect(within(prices).getByText(/Clases particulares: 30 € la hora/)).toBeInTheDocument();
+    expect(within(prices).getByText(/Clases particulares: 30,00 € la hora/)).toBeInTheDocument();
     expect(within(prices).getByText('5 puntos = 5 %')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Ver precios 2026/27' }));

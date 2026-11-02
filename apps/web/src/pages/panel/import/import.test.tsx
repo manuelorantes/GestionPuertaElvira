@@ -185,7 +185,7 @@ describe('Importar hoja', () => {
     const { hector, julio, lookalike } = await review();
 
     expect(hector).toHaveTextContent('Encontrado: Héctor Pérez Ratkovsky');
-    expect(hector).toHaveTextContent('2 meses (sep, oct) · 110 €');
+    expect(hector).toHaveTextContent('2 meses (sep, oct) · 110,00 €');
     expect(within(hector).getByRole('button', { name: 'Vincular a un alumno' })).toHaveAttribute(
       'aria-pressed',
       'true',

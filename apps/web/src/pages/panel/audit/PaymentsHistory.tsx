@@ -17,7 +17,7 @@ import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 const ROW_ACTION =
   'flex size-9 cursor-pointer items-center justify-center rounded-sm text-ink-soft hover:bg-surface-muted';
 
-/** «+45 €» para un cobro registrado, «−45 €» para uno deshecho. */
+/** «+45,00 €» para un cobro registrado, «−45,00 €» para uno deshecho. */
 function signed(cents: number): string {
   return `${cents < 0 ? '−' : '+'}${formatCents(Math.abs(cents))}`;
 }

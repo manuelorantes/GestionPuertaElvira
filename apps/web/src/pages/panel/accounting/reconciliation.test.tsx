@@ -73,7 +73,7 @@ const VIEW = {
     item(1, {
       kind: 'card_settlement',
       status: 'pending',
-      note: 'Faltan 90 € con tarjeta el 10/09/2026: varios cobros completan la cifra, elígelos.',
+      note: 'Faltan 90,00 € con tarjeta el 10/09/2026: varios cobros completan la cifra, elígelos.',
       candidates: [payment('p1', 4000), payment('p2', 5000), payment('p3', 9000)],
     }),
   ],
@@ -161,7 +161,7 @@ describe('bank reconciliation', () => {
     ) as HTMLElement;
     const match = within(settlement).getByRole('button', { name: 'Casar con lo elegido' });
     await userEvent.click(within(settlement).getByRole('checkbox', { name: /Cuota · p1/ }));
-    expect(settlement).toHaveTextContent('Elegido: 40 € de 90 €');
+    expect(settlement).toHaveTextContent('Elegido: 40,00 € de 90,00 €');
     expect(match).toBeDisabled();
     await userEvent.click(within(settlement).getByRole('checkbox', { name: /Cuota · p2/ }));
     await userEvent.click(match);

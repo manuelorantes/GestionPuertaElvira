@@ -229,7 +229,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Un objeto guardado como JSON: una línea de cobro («1,5 h semanales · 1 mes: 40 €»), un tutor, o sus pares. */
+/** Un objeto guardado como JSON: una línea de cobro («1,5 h semanales · 1 mes: 40,00 €»), un tutor, o sus pares. */
 function objectText(value: Record<string, unknown>): string {
   if (typeof value.label === 'string' && typeof value.amountCents === 'number') {
     const minutes = typeof value.minutes === 'number' ? ` (${duration(value.minutes)})` : '';
