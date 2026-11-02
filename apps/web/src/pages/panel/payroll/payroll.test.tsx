@@ -1,7 +1,7 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-import { currentMonth, monthLabel } from '@/features/billing/money';
+import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
 import { todayIso } from '@/features/students/format';
 import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
@@ -804,6 +804,96 @@ describe('Profesorado', () => {
     expect(legend).toHaveTextContent('Festivo');
     // Sin clases en fin de semana, el calendario va de lunes a viernes.
     expect(within(calendar).queryByRole('columnheader', { name: 'Sáb' })).not.toBeInTheDocument();
+  });
+
+  it('opens the month of a link: its classes and its row of the month by month, spotlighted', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const report = (months: unknown[]) => ({
+      teacher: { id: 't1', name: 'Lucía Moreno Gil', rateCents: 1600, active: true },
+      season: 2026,
+      months,
+      balanceCents: 0,
+      payments: [],
+      groups: [],
+      occupancy: { occupied: 0, capacity: 0 },
+      students: [],
+      substitutions: [],
+      duties: [],
+    });
+    const month = (m: string) => ({
+      month: m,
+      minutes: 600,
+      amountCents: 16000,
+      advancesCents: 0,
+      toPayCents: 16000,
+      status: 'pending',
+      paidOn: null,
+      incomeCents: 0,
+      marginCents: 0,
+    });
+    api({
+      'GET /api/admin/payroll/teachers/t1/report': [
+        200,
+        report([month('2026-09'), month('2026-10')]),
+      ],
+      'GET /api/admin/payroll/sessions?month=2026-09&teacherId=t1': [
+        200,
+        { items: [session({ label: 'Clase de septiembre', date: '2026-09-14' })] },
+      ],
+    });
+    renderApp('/panel/profesores/t1?mes=2026-09');
+
+    const months = await screen.findByRole('table', { name: 'Mes a mes de Lucía Moreno Gil' });
+    const september = within(months).getByRole('row', { name: /Septiembre 2026/ });
+    expect(september).toHaveClass('bg-surface-muted');
+    expect(within(months).getByRole('row', { name: /Octubre 2026/ })).not.toHaveClass(
+      'bg-surface-muted',
+    );
+    expect(await screen.findByText('Clase de septiembre')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(3000));
+    await waitFor(() => expect(september).not.toHaveClass('bg-surface-muted'));
+    vi.useRealTimers();
+  });
+
+  it('scrolls to the classes of a month of a link that has no row yet', async () => {
+    const scrolled: Element[] = [];
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (
+      this: Element,
+    ) {
+      scrolled.push(this);
+    });
+    const next = shiftMonth(currentMonth(), 2);
+    const fetch = api({
+      'GET /api/admin/payroll/teachers/t1/report': [
+        200,
+        {
+          teacher: { id: 't1', name: 'Lucía Moreno Gil', rateCents: 1600, active: true },
+          season: 2026,
+          months: [],
+          balanceCents: 0,
+          payments: [],
+          groups: [],
+          occupancy: { occupied: 0, capacity: 0 },
+          students: [],
+          substitutions: [],
+          duties: [],
+        },
+      ],
+      [`GET /api/admin/payroll/sessions?month=${next}&teacherId=t1`]: [
+        200,
+        { items: [], upcoming: [], holidays: [] },
+      ],
+    });
+    renderApp(`/panel/profesores/t1?mes=${next}`);
+
+    const classes = await screen.findByRole('region', { name: 'Clases dadas' });
+    await waitFor(() => expect(scrolled).toContain(classes));
+    expect(
+      fetch.mock.calls.some(
+        ([u]) => u === `/api/admin/payroll/sessions?month=${next}&teacherId=t1`,
+      ),
+    ).toBe(true);
+    scroll.mockRestore();
   });
 
   it('links each teacher name to their page', async () => {

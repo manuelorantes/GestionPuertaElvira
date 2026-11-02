@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
@@ -638,6 +638,105 @@ describe('Alumnos', () => {
         scope: 'rest',
       }),
     );
+  });
+
+  it('scrolls to the fee of a link and spotlights it for three seconds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const scrolled: Element[] = [];
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (
+      this: Element,
+    ) {
+      scrolled.push(this);
+    });
+    const charge = (period: string) => ({
+      id: `c${period}`,
+      period,
+      amountCents: 5500,
+      coveredCents: 0,
+      pendingCents: 5500,
+      status: 'overdue',
+      manual: false,
+      note: null,
+      discountPercent: 0,
+    });
+    api({
+      'GET /api/admin/billing/accounts/s1': [
+        200,
+        {
+          preferredPlan: 'monthly',
+          member: false,
+          privateRate: null,
+          points: 0,
+          suggestedMonths: 1,
+          remainingMonths: 9,
+          weeklyHours: 3,
+          monthlyFeeCents: 5500,
+          familyDiscount: false,
+          familyPercent: 0,
+          hasPrivateLessons: false,
+          membershipPaid: true,
+          membershipFeeCents: 5000,
+          membershipCharge: null,
+          charges: [charge('2026-10'), charge('2026-11')],
+          balanceCents: 0,
+          materialCharges: [],
+          totals: [],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos/s1?cuota=2026-11');
+
+    const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
+    const november = within(season).getByText('Noviembre 2026').closest('li');
+    expect(november).toHaveClass('bg-surface-muted');
+    expect(within(season).getByText('Octubre 2026').closest('li')).not.toHaveClass(
+      'bg-surface-muted',
+    );
+    expect(scrolled).toContain(november);
+
+    act(() => vi.advanceTimersByTime(3000));
+    await waitFor(() => expect(november).not.toHaveClass('bg-surface-muted'));
+    scroll.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it('scrolls to the fees of the student when the month of a link has no fee yet', async () => {
+    const scrolled: Element[] = [];
+    const scroll = vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(function (
+      this: Element,
+    ) {
+      scrolled.push(this);
+    });
+    api({
+      'GET /api/admin/billing/accounts/s1': [
+        200,
+        {
+          preferredPlan: 'monthly',
+          member: false,
+          privateRate: null,
+          points: 0,
+          suggestedMonths: 1,
+          remainingMonths: 9,
+          weeklyHours: 3,
+          monthlyFeeCents: 5500,
+          familyDiscount: false,
+          familyPercent: 0,
+          hasPrivateLessons: false,
+          membershipPaid: true,
+          membershipFeeCents: 5000,
+          membershipCharge: null,
+          charges: [],
+          balanceCents: 0,
+          materialCharges: [],
+          totals: [],
+        },
+      ],
+    });
+    renderApp('/panel/alumnos/s1?cuota=2027-01');
+
+    const card = await screen.findByRole('region', { name: 'Cuotas y cobros' });
+    await waitFor(() => expect(scrolled).toContain(card));
+    scroll.mockRestore();
   });
 
   it('asks what to do with the difference when a covered charge is lowered, correcting the receipt by default', async () => {
