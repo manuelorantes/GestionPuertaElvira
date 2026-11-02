@@ -149,7 +149,7 @@ No MAY ser de la categoría Profesores: lo del profesorado ya se prevé con su h
 La tabla se ordena desde sus cabeceras (Concepto, Categoría, Importe, Meses),
 y cada gasto esperado se edita o se quita; quitarlo no quita los apuntes con que se pagó.
 
-En Movimientos, junto a «Gastos de <mes>», la tarjeta **«Gastos esperados de <mes>»** MUST mostrar los del mes,
+En Movimientos, debajo de «Gastos de <mes>», la tarjeta **«Gastos esperados de <mes>»** MUST mostrar los del mes,
 cada uno en uno de tres estados, y abajo lo que falta por pagar:
 - **pendiente**, con «Pagar» y «No hay este mes»;
 - **pagado**, con lo que costó, la fecha y, si no coincide, lo que se esperaba;
@@ -219,6 +219,55 @@ club sigue siendo la suma del banco y la caja. Si no coinciden, la tarjeta de ci
 #### Scenario: Cerrar la temporada
 - **WHEN** administración confirma el cierre
 - **THEN** se guardan los ingresos, los gastos y el resultado movidos en el ejercicio, y lo movido en caja; nada con fecha del ejercicio se puede crear, cambiar ni borrar (apuntes, facturas, cobros, liquidaciones, traspasos), ni hacer que corresponda a sus meses, y ese resultado pasa como saldo inicial del siguiente, repartido entre banco y caja
+
+### Requirement: Cuotas vs gastos fijos
+En «Mes a mes y cierre», con la temporada en curso elegida,
+el sistema MUST mostrar la gráfica [«Cuotas vs gastos fijos»](../resumen/spec.md#requirement-mes-a-mes) en grande,
+de septiembre a agosto,
+y debajo una tabla con una fila por mes y las columnas Ingresos, Cuotas previstas, Gastos, Gastos previstos y Resultado
+(ingresos y cuotas previstas menos gastos y gastos previstos),
+ordenable desde sus cabeceras en ambos sentidos.
+Las cifras MUST ser las mismas que las de la gráfica del resumen.
+
+Al pinchar una parte de una barra o una cifra de la tabla,
+debajo MUST listarse de qué sale ese importe, solo para verlo,
+en una tabla ordenable (Concepto, Detalle, Fecha e Importe) con su total,
+que MUST coincidir siempre con la cifra pinchada:
+
+- **Ingresos**: cada alumno con lo cobrado de su cuota de ese mes
+  (y, si no la tiene entera, de cuánto era),
+  y cada movimiento de las categorías del mes de ingresos con la parte que corresponde a ese mes.
+- **Cuotas previstas**: cada alumno con lo que le falta de su cuota de ese mes y su estado
+  (pendiente, vencida, pagada en parte o prevista, si aún no se ha emitido).
+- **Gastos**: cada movimiento de las categorías del mes de gastos que corresponde a ese mes,
+  con su categoría, su fecha y la parte de ese mes
+  (y el importe entero si está repartido entre varios meses).
+- **Gastos previstos**: lo previsto de cada profesor según el horario (con sus horas),
+  menos, en una línea aparte, lo del profesorado que ya está en el libro ese mes;
+  lo que se debe a cada profesor de sus liquidaciones sin pagar en los meses pasados;
+  y cada gasto esperado pendiente con su categoría.
+
+El mes y la parte elegidos MUST quedar en la dirección (`?pestana=cierre&mes=<AAAA-MM>&parte=<parte>`),
+para poder llegar desde el resumen o enlazarlos.
+Con otra temporada elegida no sale esta sección.
+
+#### Scenario: Qué hay en los gastos de octubre
+- **WHEN** en octubre se han pagado el alquiler (510 €) y una factura de luz de 90 € repartida entre septiembre y
+  octubre, y administración pincha los gastos de octubre
+- **THEN** debajo salen «Alquiler» por 510 € y la luz por 45 € («de 90 €»), con un total de 555 €, lo mismo que la
+  barra negra de octubre
+
+#### Scenario: Profesorado previsto con una parte ya pagada
+- **WHEN** en el mes en curso el horario prevé 300 € de una profesora y 200 € de otro, y ya hay 150 € de profesorado
+  en el libro ese mes
+- **THEN** los gastos previstos del mes listan 300 € y 200 € con sus horas y una línea «Profesorado ya en el libro»
+  de −150 €, con un total de 350 €, lo mismo que la parte gris
+
+#### Scenario: Cuotas que faltan por cobrar
+- **WHEN** en noviembre una alumna tiene su cuota de 45 € pagada en parte (20 €) y otro alumno matriculado aún no tiene
+  la suya emitida (40,50 €)
+- **THEN** las cuotas previstas de noviembre listan a la alumna por 25 € («pagada en parte») y al alumno por 40,50 €
+  («prevista»), y los ingresos de noviembre a la alumna por 20 € («de 45 €»)
 
 ### Requirement: Diagnóstico de datos
 Contabilidad MUST tener una pestaña «Diagnóstico» con lo que no cuadra en los datos del club, explicado y con su
