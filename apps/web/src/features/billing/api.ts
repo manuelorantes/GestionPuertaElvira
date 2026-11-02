@@ -206,6 +206,29 @@ export function issueInvoice(
   return apiSend('POST', `${BASE}/payments/${id}/invoice`, customer);
 }
 
+/** Corrige la fecha de un cobro (dentro de la temporada de su recibo y nunca futura). */
+export function changePaymentDate(id: string, date: string): Promise<void> {
+  return apiSend('PUT', `${BASE}/payments/${id}/date`, { date });
+}
+
+export function changePaymentMethod(id: string, method: PaymentMethod): Promise<void> {
+  return apiSend('PUT', `${BASE}/payments/${id}/method`, { method });
+}
+
+/** Corrige el importe: el recibo gana la línea «Corrección: <motivo>» con la diferencia. */
+export function correctPaymentAmount(
+  id: string,
+  amountCents: number,
+  reason: string,
+): Promise<void> {
+  return apiSend('PUT', `${BASE}/payments/${id}/amount`, { amountCents, reason });
+}
+
+/** Borra un cobro anotado por error (solo superadministración). */
+export function deletePayment(id: string, reason: string): Promise<{ receiptNumber: string }> {
+  return apiSend('DELETE', `${BASE}/payments/${id}`, { reason });
+}
+
 /** Cuota cancelada (entera o solo lo pendiente), en «Cuotas canceladas». */
 export interface CancelledCharge {
   id: string;
