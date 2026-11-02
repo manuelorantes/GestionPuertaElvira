@@ -239,16 +239,26 @@ el saldo del banco según la app y la diferencia.
 Cada movimiento del extracto MUST salir como **cuadra** (con lo que le corresponde en la app)
 o con una **sugerencia** que superadministración acepta una por una:
 - **Liquidación del datáfono** («Liquidación efectuada el DD/MM/AAAA»): es lo cobrado con tarjeta ese día.
-  Cuadra si los cobros con tarjeta de ese día suman su importe.
+  Cuadra si lo cobrado con tarjeta ese día (cobros de alumnos y apuntes manuales de ingreso, como una venta de libros)
+  suma su importe.
   Si falta dinero, sugiere pasar a tarjeta y a ese día los cobros que completan la cifra entre los que no están en el
   banco (cobros con otra forma de pago o en otra fecha que no casan con ninguna transferencia); si hay varias
   combinaciones posibles, se eligen los cobros a mano, con el total elegido a la vista, hasta que coincide.
   Si sobra, lo dice.
 - **Transferencia recibida**: cuadra con el cobro, o los cobros de un mismo alumno o familia, por transferencia que
-  suman su importe con fecha cercana. Si casan por importe y nombre (del alumno, del tutor o de quien paga) pero con
+  suman su importe con fecha cercana; un cobro cuyo nombre aparece en el concepto se casa antes que otro que solo
+  coincide en el importe.
+  También cuadra, con una sola combinación posible:
+  - junto con otras transferencias de la misma persona en pocos días, si entre todas suman esos cobros;
+  - con esos cobros menos un gasto del banco con fecha cercana que nombra al alumno
+    (lo que el club pagó por él y se descontó de lo que tenía que pagar).
+
+  Si casan por importe y nombre (del alumno, del tutor o de quien paga) pero con
   otra fecha u otra forma de pago, sugiere corregir la fecha y la forma de pago de esos cobros;
   si no hay ninguno, sugiere apuntar un ingreso con su concepto y categoría, o elegir a mano los cobros a los que corresponde.
-- **Pago o recibo**: cuadra con el gasto del mismo importe en el banco con fecha cercana (del mismo mes o del siguiente).
+- **Pago o recibo**: cuadra con el gasto del mismo importe en el banco con fecha cercana (del mismo mes o del siguiente),
+  o con varios gastos en el banco de esos días que suman su importe, si solo hay una combinación posible
+  (meses de alquiler o impuestos pagados de una vez).
   Si el que casa está en efectivo, sugiere pasarlo al banco;
   si no hay ninguno, sugiere apuntar el gasto con su fecha, un concepto sacado del extracto y una categoría propuesta.
 - **Sacar efectivo o ingresarlo**: cuadra con el traspaso entre caja y banco del mismo importe y fecha cercana;
@@ -266,6 +276,26 @@ La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse 
 - **WHEN** el extracto trae «Liquidación efectuada el 24/09/2026» por 648 € y ese día hay en la app dos cobros con
   tarjeta de 158 € y 490 €
 - **THEN** el movimiento sale como «cuadra» con esos dos cobros
+
+#### Scenario: Liquidación con una venta apuntada a mano
+- **WHEN** el extracto trae la liquidación del 08/09/2026 por 55 € y ese día hay en la app un cobro con tarjeta de
+  40 € y un apunte de ingreso con tarjeta de 15 € por la venta de un libro
+- **THEN** el movimiento sale como «cuadra» con los dos
+
+#### Scenario: Una familia que paga en dos transferencias
+- **WHEN** el extracto trae dos transferencias de Rosa Ruiz Durán, de 648 € el 06/10 y de 45 € el 07/10,
+  y en la app sus dos hijos tienen 18 cobros de 38,50 € por transferencia del 06/10
+- **THEN** las dos transferencias salen como «cuadra» con esos 18 cobros
+
+#### Scenario: Un pago con un gasto descontado
+- **WHEN** el extracto trae una transferencia de Pedro Sanz de 370,80 € el 07/09
+  y en la app ese día hay cobros suyos por 490 € y un gasto de 119,20 € por transferencia que lo nombra
+- **THEN** el movimiento sale como «cuadra» con esos cobros y ese gasto
+
+#### Scenario: Varios recibos pagados de una vez
+- **WHEN** el extracto trae un pago de 285 € el 20/10 y ese día hay en la app dos gastos en el banco de 190 € y 95 €
+  (y ninguna otra combinación suma 285 €)
+- **THEN** el movimiento sale como «cuadra» con los dos gastos
 
 #### Scenario: Cobros con tarjeta apuntados como transferencia
 - **WHEN** el extracto trae la liquidación del 10/09/2026 por 90 € y en la app no hay cobros con tarjeta ese día,
