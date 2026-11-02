@@ -46,6 +46,7 @@ export class AuditLabels {
     'PUT /api/admin/billing/payments/:id/date': 'Cambiar la fecha de un cobro',
     'PUT /api/admin/billing/payments/:id/amount': 'Cambiar el importe de un cobro',
     'PUT /api/admin/billing/payments/:id/method': 'Cambiar la forma de pago de un cobro',
+    'DELETE /api/admin/billing/payments/:id': 'Borrar cobro',
     'PUT /api/admin/billing/accounts/:id': 'Cambiar datos de cobro del alumno',
     'PUT /api/admin/points/fridays/:date/students/:id': 'Marcar asistencia de un viernes',
     'PUT /api/teacher/fridays/:dutyId/:date/students/:studentId': 'Marcar asistencia de un viernes',
@@ -259,6 +260,11 @@ export async function startAuditAction(
     signature(user)
   }, true),
     set_config('audit.label', ${action.label}, true), set_config('audit.category', ${action.category}, true)`;
+}
+
+/** Precisa el nombre de la acción en curso con lo que solo se sabe dentro de la petición (p. ej. el motivo). */
+export async function renameAuditAction(tx: Sql, label: string): Promise<void> {
+  await tx`SELECT set_config('audit.label', ${[...label].slice(0, 160).join('')}, true)`;
 }
 
 /** Los eventos de seguridad van al log y, además, al historial como acciones sin cambios de datos. */

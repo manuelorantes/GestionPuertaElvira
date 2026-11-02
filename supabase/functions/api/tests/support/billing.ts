@@ -106,11 +106,22 @@ export class BillingFixture
     return Promise.resolve(this.points.get(`${student}|${month.toString()}`) ?? 0);
   }
 
-  redeem(student: string, date: LocalDate, points: number): Promise<void> {
+  /** Lo canjeado en cada cobro, para devolverlo si se borra. */
+  readonly redemptions = new Map<string, { key: string; points: number }>();
+
+  redeem(student: string, date: LocalDate, points: number, payment: string): Promise<void> {
     const key = `${student}|${YearMonth.of(date).toString()}`;
     const left = (this.points.get(key) ?? 0) - points;
     if (left < 0) throw new Error('Sin puntos suficientes');
     this.points.set(key, left);
+    this.redemptions.set(payment, { key, points });
+    return Promise.resolve();
+  }
+
+  refund(_student: string, payment: string): Promise<void> {
+    const spent = this.redemptions.get(payment);
+    if (spent) this.points.set(spent.key, (this.points.get(spent.key) ?? 0) + spent.points);
+    this.redemptions.delete(payment);
     return Promise.resolve();
   }
 
@@ -206,6 +217,11 @@ export class BillingFixture
 
   savePayment(payment: Payment): Promise<void> {
     this.payments.set(payment.id.value, payment);
+    return Promise.resolve();
+  }
+
+  deletePayment(id: PaymentId): Promise<void> {
+    this.payments.delete(id.value);
     return Promise.resolve();
   }
 

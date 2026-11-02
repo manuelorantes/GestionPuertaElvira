@@ -13,6 +13,7 @@ import {
   InvalidPaymentRequest,
   InvoiceAlreadyIssued,
   InvoiceCustomer,
+  InvoicedPaymentCannotBeDeleted,
   monthsWithin,
   Payment,
   PaymentId,
@@ -371,6 +372,20 @@ Deno.test('Payment should move its date within its season and correct its amount
   assert(p.lines.reduce((sum, l) => sum.plus(l.amount), Money.zero()).equals(p.total));
   assertThrows(() => p.correctTotal(Money.cents(-1), 'x'), InvalidValue);
   assertThrows(() => p.correctTotal(Money.cents(3000), '  '), InvalidValue);
+});
+
+Deno.test('Payment should only be deleted with a reason and while it has no invoice', () => {
+  const p = payment(Money.cents(5500));
+  assertThrows(() => p.assertDeletable('  '), InvalidValue, 'motivo');
+  p.assertDeletable('Lo pagó el padre');
+
+  p.issueInvoice(
+    DocumentNumber.invoice(2026, 1),
+    new InvoiceCustomer('Rocío Herrera', '12345678Z', 'Calle Elvira 1, Granada'),
+    21,
+    LocalDate.fromString('2026-10-03'),
+  );
+  assertThrows(() => p.assertDeletable('Lo pagó el padre'), InvoicedPaymentCannotBeDeleted);
 });
 
 Deno.test('Payment should number documents per season and issue one invoice with VAT included in the price', () => {

@@ -1,5 +1,10 @@
 import { InvalidValue, LocalDate, Season, YearMonth } from '../../domain/common/mod.ts';
-import { paymentMethodFromName, paymentMethodLabel, StudentRef } from '../../domain/billing/mod.ts';
+import {
+  PaymentId,
+  paymentMethodFromName,
+  paymentMethodLabel,
+  StudentRef,
+} from '../../domain/billing/mod.ts';
 import {
   AdjustCharge,
   BillingStudentNotFound,
@@ -7,6 +12,7 @@ import {
   ChangePaymentMethod,
   CorrectPaymentAmount,
   decimal,
+  DeletePayment,
   GenerateMonthlyCharges,
   GetStudentAccount,
   IssueInvoice,
@@ -28,6 +34,7 @@ import {
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { recalculatingFees } from './recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
+import { renameAuditAction } from '../audit/mod.ts';
 import { JsonBody } from '../http/json-body.ts';
 import {
   SqlBillingQuery,
@@ -124,6 +131,7 @@ export function registerBillingRoutes(api: ApiApp): void {
     ChargeNotFound: [404, 'not_found'],
     BillingStudentNotFound: [404, 'not_found'],
     InvoiceAlreadyIssued: [409, 'invoice_already_issued'],
+    InvoicedPaymentCannotBeDeleted: [409, 'payment_invoiced'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT', path: string) => ({
     method,
@@ -249,6 +257,29 @@ export function registerBillingRoutes(api: ApiApp): void {
       );
     return c.body(null, 204);
   });
+
+  // Borrar un cobro anotado por error: solo superadministración, con motivo, que queda en el nombre de la acción.
+  api.defineRoute(
+    { method: 'DELETE', path: '/api/admin/billing/payments/:id', access: 'superadmin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      const reason = body.requiredString('reason');
+      const payments = new SqlPaymentRepository(scope.tx);
+      const existing = await payments.payment(PaymentId.fromString(param(c, 'id')));
+      if (existing !== null) {
+        await renameAuditAction(
+          scope.tx,
+          `Borrar cobro ${existing.receipt.toString()} (${reason.trim()})`,
+        );
+      }
+      const deleted = await new DeletePayment(
+        payments,
+        new SqlClosedPeriods(scope.tx),
+        new PointsWalletService(new SqlPointMovementRepository(scope.tx)),
+      ).execute(param(c, 'id'), reason);
+      return c.json(deleted);
+    },
+  );
 
   api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/method'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
