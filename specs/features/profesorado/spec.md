@@ -210,6 +210,13 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
 Las clases dadas, las clases asignadas, los alumnos y los pagos recibidos MUST poder ordenarse desde las cabeceras por
 cualquiera de sus columnas, en ambos sentidos; por defecto, las clases dadas y los pagos de lo más reciente a lo más
 antiguo, las clases asignadas por horario y los alumnos por nombre.
+Un enlace a un mes de la ficha (`?mes=<AAAA-MM>`) MUST mostrar las clases dadas y previstas de ese mes
+y resaltar tres segundos su fila de mes a mes;
+si el mes aún no tiene fila, MUST bajar hasta las clases dadas.
+
+#### Scenario: Llegar a un mes de la ficha
+- **WHEN** administración sigue un enlace a la ficha de una profesora en enero, un mes que aún no ha llegado
+- **THEN** ve las clases previstas de enero en el calendario, con la vista en las clases dadas
 
 #### Scenario: Calendario de clases dadas
 - **WHEN** un miércoles un profesor da 2 h de sus clases y 1,5 h sustituyendo a otro, y el jueves le sustituyen
