@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { currentMonth } from '@/features/billing/money';
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
 const charge = (overrides: Record<string, unknown>) => ({
   id: 'c1',
@@ -180,6 +180,118 @@ describe('Cobros y cuotas', () => {
 
     const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
     expect(await within(receipt).findByText(/R-2026-0002/)).toBeInTheDocument();
+  });
+
+  it('lets only superadministration edit and delete a receipt', async () => {
+    api({ 'GET /api/admin/billing/payments/p9': [200, RECEIPT] });
+    renderApp('/panel/cobros?pestana=registro&recibo=p9');
+    const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
+    await within(receipt).findByText(/R-2026-0002/);
+    expect(within(receipt).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+    expect(within(receipt).queryByRole('button', { name: 'Borrar' })).not.toBeInTheDocument();
+  });
+
+  it('corrects the method and amount of a receipt after confirming what changes', async () => {
+    const fetch = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/billing/payments/p9': [200, RECEIPT],
+      'PUT /api/admin/billing/payments/p9/method': [204],
+      'PUT /api/admin/billing/payments/p9/amount': [204],
+    });
+    renderApp('/panel/cobros?pestana=registro&recibo=p9');
+    const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
+    await userEvent.click(await within(receipt).findByRole('button', { name: 'Editar' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Editar el cobro R-2026-0002' });
+    await userEvent.selectOptions(within(dialog).getByLabelText('Forma de pago'), 'card');
+    const amount = within(dialog).getByLabelText('Importe (€)');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '41,50');
+    const save = within(dialog).getByRole('button', { name: 'Guardar' });
+    expect(save).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText('Motivo'), 'Faltaba un euro y medio');
+    await userEvent.click(save);
+
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
+    expect(within(confirm).getByText('Forma de pago: Efectivo → Datáfono')).toBeInTheDocument();
+    expect(within(confirm).getByText('Importe: 40,50 € → 41,50 €')).toBeInTheDocument();
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/admin/billing/payments/p9/amount',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ amountCents: 4150, reason: 'Faltaba un euro y medio' }),
+        }),
+      ),
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/admin/billing/payments/p9/method',
+      expect.objectContaining({ method: 'PUT', body: JSON.stringify({ method: 'card' }) }),
+    );
+    expect(fetch).not.toHaveBeenCalledWith(
+      '/api/admin/billing/payments/p9/date',
+      expect.anything(),
+    );
+    expect(await screen.findByText('Cobro corregido')).toBeInTheDocument();
+  });
+
+  it('deletes a receipt with a reason', async () => {
+    const fetch = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/billing/payments/p9': [200, RECEIPT],
+      'DELETE /api/admin/billing/payments/p9': [200, { receiptNumber: 'R-2026-0002' }],
+    });
+    renderApp('/panel/cobros?pestana=registro&recibo=p9');
+    const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
+    await userEvent.click(await within(receipt).findByRole('button', { name: 'Borrar' }));
+
+    const dialog = await screen.findByRole('dialog', { name: '¿Borrar el cobro R-2026-0002?' });
+    const confirm = within(dialog).getByRole('button', { name: 'Borrar cobro' });
+    expect(confirm).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText('Motivo'), 'Anotado dos veces');
+    await userEvent.click(confirm);
+
+    expect(await screen.findByText('Cobro R-2026-0002 borrado')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/admin/billing/payments/p9',
+      expect.objectContaining({
+        method: 'DELETE',
+        body: JSON.stringify({ reason: 'Anotado dos veces' }),
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: /Borrar el cobro/ })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('does not offer to delete an invoiced receipt', async () => {
+    api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/billing/payments/p9': [
+        200,
+        {
+          ...RECEIPT,
+          invoiceNumber: 'F-2026-0001',
+          invoice: {
+            number: 'F-2026-0001',
+            issuedOn: '2026-10-03',
+            customerName: 'Rocío Herrera',
+            customerTaxId: '12345678Z',
+            customerAddress: 'Calle Elvira 1',
+            vatPercent: 21,
+            baseCents: 3347,
+            vatCents: 703,
+            totalCents: 4050,
+          },
+        },
+      ],
+    });
+    renderApp('/panel/cobros?pestana=registro&recibo=p9');
+    const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
+    expect(await within(receipt).findByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    expect(within(receipt).queryByRole('button', { name: 'Borrar' })).not.toBeInTheDocument();
   });
 
   it('lists the charges of the month with their status and progress', async () => {

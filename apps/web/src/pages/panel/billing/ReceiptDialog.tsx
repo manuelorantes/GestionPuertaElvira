@@ -2,6 +2,7 @@ import { FileText, Printer } from 'lucide-react';
 import { useState } from 'react';
 
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
+import { useSession } from '@/features/auth/useSession';
 import { usePayment } from '@/features/billing/hooks';
 import { formatCents } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
@@ -9,6 +10,8 @@ import { Button } from '@/shared/ui/Button';
 import { ClubLogo } from '@/shared/ui/ClubLogo';
 import { Dialog } from '@/shared/ui/Dialog';
 
+import { DeletePaymentDialog } from './DeletePaymentDialog';
+import { EditPaymentDialog } from './EditPaymentDialog';
 import { InvoiceDialog } from './InvoiceDialog';
 import { StudentLink } from '@/pages/panel/students/StudentLink';
 import type { ReactNode } from 'react';
@@ -25,8 +28,18 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
 export function ReceiptDialog({ paymentId, onClose }: { paymentId: string; onClose: () => void }) {
   const payment = usePayment(paymentId);
   const [invoicing, setInvoicing] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const canManage = useCanManageClub();
+  // Corregir y borrar un cobro desde su recibo es solo de superadministración.
+  const canCorrect = useSession().data?.role === 'superadministrator';
   const p = payment.data;
+
+  if (editing && p) return <EditPaymentDialog payment={p} onClose={() => setEditing(false)} />;
+  if (deleting && p)
+    return (
+      <DeletePaymentDialog payment={p} onCancel={() => setDeleting(false)} onDeleted={onClose} />
+    );
 
   if (invoicing && p)
     return (
@@ -113,6 +126,16 @@ export function ReceiptDialog({ paymentId, onClose }: { paymentId: string; onClo
         <Button variant="secondary" onClick={onClose}>
           Cerrar
         </Button>
+        {p && canCorrect && !p.invoice && (
+          <Button variant="secondary" onClick={() => setDeleting(true)}>
+            Borrar
+          </Button>
+        )}
+        {p && canCorrect && (
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            Editar
+          </Button>
+        )}
         {p && !p.invoice && canManage && (
           <Button variant="secondary" onClick={() => setInvoicing(true)}>
             Emitir factura
