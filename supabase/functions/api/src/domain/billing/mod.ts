@@ -54,6 +54,13 @@ export function monthsWithin(plan: PreferredPlan, remaining: number): number {
   return Math.max(1, Math.min(remaining, wanted));
 }
 
+export class InvoicedPaymentCannotBeDeleted extends Error {
+  constructor() {
+    super('Este cobro tiene factura: no se puede borrar.');
+    this.name = 'InvoicedPaymentCannotBeDeleted';
+  }
+}
+
 export class InvoiceAlreadyIssued extends Error {
   constructor() {
     super('Este cobro ya tiene factura.');
@@ -1079,6 +1086,14 @@ export class Payment {
     ];
     this.amount = total;
     this.covering = this.covering.plus(difference);
+  }
+
+  /** Un cobro anotado por error se borra con un motivo, salvo que ya tenga factura. */
+  assertDeletable(reason: string): void {
+    if (reason.trim() === '') {
+      throw new InvalidValue('reason', 'Indica el motivo para borrar el cobro.');
+    }
+    if (this.issued !== null) throw new InvoicedPaymentCannotBeDeleted();
   }
 
   /** Corrige cómo se cobró (p. ej. se anotó como transferencia y fue en efectivo); el importe no cambia. */

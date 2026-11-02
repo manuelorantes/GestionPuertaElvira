@@ -446,7 +446,8 @@ export class SqlLedgerQuery implements LedgerQuery {
              p.student_id::text AS student_id, to_char(p.paid_on, 'YYYY-MM') AS period,
              NULL::jsonb AS shares, CASE WHEN p.kind = 'monthly' THEN p.periods::jsonb END AS paid_periods
         FROM billing_payment p JOIN students_student s ON s.id = p.student_id
-       WHERE p.paid_on BETWEEN ${from} AND ${to}
+       -- Un recibo corregido a 0 € no es un movimiento (y no tiene nada que repartir por meses).
+       WHERE p.paid_on BETWEEN ${from} AND ${to} AND p.total_cents > 0
       UNION ALL
       SELECT 'settlement', st.teacher_id::text || '/' || st.month, st.paid_on::text, 'expense',
              'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', 'transfer',

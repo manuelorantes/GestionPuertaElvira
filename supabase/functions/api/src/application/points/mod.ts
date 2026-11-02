@@ -184,6 +184,12 @@ export class PointsWalletService {
     PointMovement.assertCanApply(await this.movements.forStudent(student), movement);
     await this.movements.add(movement);
   }
+
+  /** Devuelve los puntos canjeados en un cobro (cuando el cobro se borra). */
+  async refund(student: string, payment: string): Promise<void> {
+    const spent = await this.movements.find(student, 'redemption', payment);
+    if (spent !== null) await this.movements.remove(spent.id);
+  }
 }
 
 // ---- Lecturas ---------------------------------------------------------------------------------

@@ -138,4 +138,9 @@ Deno.test('a payment should redeem points of its month only', async () => {
   );
   await wallet.redeem('s1', LocalDate.fromString('2026-09-28'), 4, 'p0', 'Canje');
   assertEquals(await wallet.available('s1', YearMonth.fromString('2026-09')), 0);
+
+  // Si el cobro se borra, los puntos vuelven (y devolver los de un cobro sin canje no hace nada).
+  await wallet.refund('s1', 'p0');
+  await wallet.refund('s1', 'sin-canje');
+  assertEquals(await wallet.available('s1', YearMonth.fromString('2026-09')), 4);
 });

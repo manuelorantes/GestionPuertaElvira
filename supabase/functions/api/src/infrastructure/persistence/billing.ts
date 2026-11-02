@@ -383,6 +383,17 @@ export class SqlPaymentRepository implements PaymentRepository {
         concept = EXCLUDED.concept, periods = EXCLUDED.periods, lines = EXCLUDED.lines, total_cents = EXCLUDED.total_cents, credit_cents = EXCLUDED.credit_cents,
         invoice_number = EXCLUDED.invoice_number, invoice = EXCLUDED.invoice`;
   }
+
+  async deletePayment(id: PaymentId): Promise<void> {
+    // El movimiento del banco casado con él vuelve a quedar por conciliar, y su corrección en contabilidad sobra.
+    await this.sql`DELETE FROM accounting_bank_match
+      WHERE EXISTS (SELECT 1 FROM jsonb_array_elements(targets::jsonb) t
+                     WHERE t ->> 'source' = 'payment' AND t ->> 'sourceId' = ${id.value})`;
+    await this
+      .sql`DELETE FROM accounting_correction WHERE source = 'payment' AND source_id = ${id.value}`;
+    await this.sql`UPDATE billing_charge SET paid_by = NULL WHERE paid_by = ${id.value}`;
+    await this.sql`DELETE FROM billing_payment WHERE id = ${id.value}`;
+  }
 }
 
 /**
