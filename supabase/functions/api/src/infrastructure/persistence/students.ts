@@ -95,6 +95,7 @@ function toStudent(row: Row): Student {
       joinedOn: LocalDate.fromString(p.joined),
       withdrawnOn: LocalDate.fromString(p.withdrawn),
     })),
+    row.bool('provisional'),
   );
 }
 
@@ -136,7 +137,14 @@ export class SqlStudentRepository implements StudentRepository {
       joined_on: student.joinedOn.toString(),
       withdrawn_on: student.withdrawnOn()?.toString() ?? null,
       sibling_ids: student.siblings().map((s) => s.value),
+      provisional: student.isProvisional(),
     };
+    // Al pasar a socio, primero el número: un alumno que no es provisional siempre tiene uno.
+    if (!student.isProvisional()) {
+      await this.sql`UPDATE students_student
+        SET member_number = nextval('public.students_member_number_seq')
+        WHERE id = ${record.id} AND member_number IS NULL`;
+    }
     // Primero UPDATE: un INSERT … ON CONFLICT evaluaría el DEFAULT del número de socio y gastaría uno.
     const updated = await this.sql`UPDATE students_student SET ${
       this.sql(
@@ -153,9 +161,14 @@ export class SqlStudentRepository implements StudentRepository {
         'joined_on',
         'withdrawn_on',
         'sibling_ids',
+        'provisional',
       )
     } WHERE id = ${record.id}`;
-    if (updated.count === 0) await this.sql`INSERT INTO students_student ${this.sql(record)}`;
+    if (updated.count === 0) {
+      // Un socio provisional no recibe número de socio hasta que se le pasa a socio.
+      const inserted = student.isProvisional() ? { ...record, member_number: null } : record;
+      await this.sql`INSERT INTO students_student ${this.sql(inserted)}`;
+    }
     // Los periodos cerrados no cambian: solo se añaden al volver a darse de alta.
     for (const period of student.membership().slice(0, -1)) {
       await this.sql`INSERT INTO students_past_membership (student_id, joined_on, withdrawn_on)
@@ -175,7 +188,13 @@ export class SqlMemberNumbers implements MemberNumbers {
     if (studentIds.length === 0) return new Map();
     const rows = await this.sql`SELECT id, member_number FROM students_student
       WHERE id::text IN ${this.sql(studentIds)}`;
-    return new Map(Row.all(rows).map((r) => [r.string('id'), r.int('member_number')]));
+    // Un socio provisional no tiene número que intercambiar.
+    return new Map(
+      Row.all(rows).flatMap((r) => {
+        const number = r.nullableInt('member_number');
+        return number === null ? [] : [[r.string('id'), number] as const];
+      }),
+    );
   }
 
   async assign(changes: Map<string, number>): Promise<void> {
@@ -202,13 +221,17 @@ export class SqlStudentQuery implements StudentQuery {
   ): Promise<StudentSummary[]> {
     const day = on.toString();
     const byFilter = {
-      all: this.sql``,
-      active: this.sql`AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${day})`,
-      withdrawn: this.sql`AND s.withdrawn_on IS NOT NULL AND s.withdrawn_on <= ${day}`,
-      siblings: this.sql`AND s.sibling_ids::jsonb <> '[]'::jsonb`,
-      no_classes: this.sql`AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${day})
+      all: this.sql`AND NOT s.provisional`,
+      active: this
+        .sql`AND NOT s.provisional AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${day})`,
+      withdrawn: this
+        .sql`AND NOT s.provisional AND s.withdrawn_on IS NOT NULL AND s.withdrawn_on <= ${day}`,
+      siblings: this.sql`AND NOT s.provisional AND s.sibling_ids::jsonb <> '[]'::jsonb`,
+      no_classes: this
+        .sql`AND NOT s.provisional AND (s.withdrawn_on IS NULL OR s.withdrawn_on > ${day})
         AND NOT EXISTS (SELECT 1 FROM classes_enrolment e WHERE e.student_id = s.id
           AND e.enrolled_on <= ${day} AND (e.ends_on IS NULL OR e.ends_on > ${day}))`,
+      provisional: this.sql`AND s.provisional`,
     }[filter];
     const term = search?.trim() ?? '';
     // Un número busca también por número de socio («12» o «#12»).
@@ -226,7 +249,7 @@ export class SqlStudentQuery implements StudentQuery {
     const groupsByStudent = await this.activeGroupsByStudent(on);
     return Row.all(rows).map((row) => ({
       id: row.string('id'),
-      memberNumber: row.int('member_number'),
+      memberNumber: row.nullableInt('member_number'),
       fullName: row.string('full_name'),
       age: age(row, on),
       status: status(row.nullableString('withdrawn_on'), on),
@@ -243,7 +266,8 @@ export class SqlStudentQuery implements StudentQuery {
   }
 
   async total(): Promise<number> {
-    const rows = await this.sql`SELECT COUNT(*) AS total FROM students_student`;
+    const rows = await this
+      .sql`SELECT COUNT(*) AS total FROM students_student WHERE NOT provisional`;
     return rows[0] ? new Row(rows[0]).int('total') : 0;
   }
 
@@ -261,7 +285,8 @@ export class SqlStudentQuery implements StudentQuery {
     );
     return {
       id,
-      memberNumber: row.int('member_number'),
+      memberNumber: row.nullableInt('member_number'),
+      provisional: row.bool('provisional'),
       fullName: row.string('full_name'),
       birthDate: row.nullableString('birth_date'),
       age: age(row, on),

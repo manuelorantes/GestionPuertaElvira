@@ -88,6 +88,7 @@ export class AuditLabels {
     'PUT /api/admin/students/:id': 'Editar alumno',
     'POST /api/admin/students/:id/withdrawal': 'Dar de baja alumno',
     'POST /api/admin/students/:id/rejoin': 'Dar de alta de nuevo a un alumno',
+    'POST /api/admin/students/:id/confirmation': 'Pasar a socio a un socio provisional',
     'PUT /api/admin/students/:id/joined-on': 'Cambiar la fecha de alta de un alumno',
     'POST /api/admin/students/:id/siblings': 'Vincular familia directa',
     'DELETE /api/admin/students/:id/siblings/:siblingId': 'Desvincular familia directa',

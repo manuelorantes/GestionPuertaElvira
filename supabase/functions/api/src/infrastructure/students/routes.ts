@@ -11,6 +11,7 @@ import {
 } from '../../application/classes/mod.ts';
 import {
   ChangeJoinDate,
+  ConfirmProvisionalMember,
   type EnrolmentRequest,
   type Enrolments,
   FamilyLeftAlone,
@@ -250,6 +251,7 @@ export function registerStudentRoutes(api: ApiApp): void {
               body.stringList('siblingIds'),
               body.bool('confirmOverCapacity'),
               joinedOn,
+              body.bool('provisional'),
             ),
         );
         // Su cuota de este mes, al momento (y, en un alta a final de mes, lo que se decidió cobrar de ella).
@@ -268,6 +270,15 @@ export function registerStudentRoutes(api: ApiApp): void {
         param(c, 'id'),
         studentInput(await JsonBody.from(c.req.raw)),
       );
+      return c.body(null, 204);
+    },
+  );
+
+  // Pasar a socio a un socio provisional: recibe el siguiente número de socio.
+  api.defineRoute(
+    { method: 'POST', path: '/api/admin/students/:id/confirmation', access: 'admin' },
+    async (c, scope) => {
+      await new ConfirmProvisionalMember(students(scope)).execute(param(c, 'id'));
       return c.body(null, 204);
     },
   );
@@ -401,6 +412,8 @@ export function registerStudentRoutes(api: ApiApp): void {
         clock,
         new StudentsJoinDates(scope.tx),
       );
+      // Un socio provisional no va a clase hasta que se le pasa a socio.
+      (await students(scope).find(StudentId.fromString(param(c, 'id'))))?.assertNotProvisional();
       // `from`: desde qué día está en el grupo (por defecto hoy).
       const from = body.optionalString('from');
       await recalculatingFees(api, scope, [param(c, 'id')], () =>

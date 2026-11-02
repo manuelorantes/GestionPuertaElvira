@@ -133,6 +133,8 @@ export interface MembershipPeriod {
 /**
  * Alumno del club: datos personales, contacto, hermanos y sus periodos de alta. Puede darse de baja y volver a darse de
  * alta varias veces; el último periodo es el actual (su última alta y su última baja).
+ * Un socio provisional ha pagado (o pagará) la cuota de socio pero falta su hoja de inscripción: no tiene número de socio
+ * ni grupos ni familia, y no se da de baja hasta que se le pasa a socio.
  */
 export class Student {
   private constructor(
@@ -143,6 +145,7 @@ export class Student {
     private siblingIds: Map<string, StudentId>,
     /** Periodos anteriores, ya cerrados, del más antiguo al más reciente. */
     private past: MembershipPeriod[] = [],
+    private provisional = false,
   ) {}
 
   /** Su última alta (la del periodo actual). */
@@ -155,9 +158,10 @@ export class Student {
     details: StudentDetails,
     today: LocalDate,
     joinedOn?: LocalDate,
+    provisional = false,
   ): Student {
     new ContactPolicy().assertAcceptable(details, today);
-    return new Student(id, details, joinedOn ?? today, null, new Map());
+    return new Student(id, details, joinedOn ?? today, null, new Map(), [], provisional);
   }
 
   static restore(
@@ -167,6 +171,7 @@ export class Student {
     withdrawnOn: LocalDate | null,
     siblings: readonly StudentId[],
     past: readonly MembershipPeriod[] = [],
+    provisional = false,
   ): Student {
     return new Student(
       id,
@@ -175,7 +180,28 @@ export class Student {
       withdrawnOn,
       new Map(siblings.map((s) => [s.value, s])),
       [...past],
+      provisional,
     );
+  }
+
+  isProvisional(): boolean {
+    return this.provisional;
+  }
+
+  /** Pasa a socio: desde ahora es un alumno como los demás (el número de socio lo da la persistencia). */
+  confirm(): void {
+    if (!this.provisional) throw new InvalidValue('id', 'El alumno ya es socio.');
+    this.provisional = false;
+  }
+
+  /** Lo que solo puede hacerse con un socio (inscribirlo en grupos, vincularlo, darlo de baja…). */
+  assertNotProvisional(): void {
+    if (this.provisional) {
+      throw new InvalidValue(
+        'id',
+        `${this.current.fullName.value} es socio provisional: pásalo a socio antes.`,
+      );
+    }
   }
 
   updateDetails(details: StudentDetails, today: LocalDate): void {
@@ -184,6 +210,7 @@ export class Student {
   }
 
   withdraw(on: LocalDate, today: LocalDate): void {
+    this.assertNotProvisional();
     if (on.isBefore(this.joinedOn)) {
       throw new InvalidValue('date', 'La baja no puede ser anterior al alta en el club.');
     }
@@ -195,6 +222,7 @@ export class Student {
 
   /** Vuelve a darse de alta tras su baja (ya llegada), desde ese día y hasta hoy; el periodo anterior queda guardado. */
   rejoin(on: LocalDate, today: LocalDate): void {
+    this.assertNotProvisional();
     if (this.withdrawn === null || today.isBefore(this.withdrawn)) {
       throw new InvalidValue('date', 'El alumno sigue de alta en el club.');
     }
@@ -239,6 +267,7 @@ export class Student {
   }
 
   addSibling(sibling: StudentId): void {
+    this.assertNotProvisional();
     if (sibling.equals(this.id)) {
       throw new InvalidValue('siblingId', 'Un alumno no puede ser familia directa de sí mismo.');
     }
