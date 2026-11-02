@@ -349,6 +349,14 @@ Los meses a cobrar (1, 3, 6 o resto de temporada) se eligen en cada cobro; no ha
 
 También MUST mostrar su historial de cobros, con acceso a cada recibo.
 
+Un enlace a una cuota del mes de la ficha (`?cuota=<AAAA-MM>`) MUST bajar hasta ella en «Cuotas de la temporada»
+y resaltarla con un fondo algo más oscuro durante tres segundos;
+si ese mes aún no tiene cuota, MUST bajar hasta «Cuotas y cobros».
+
+#### Scenario: Llegar a una cuota de la ficha
+- **WHEN** administración sigue un enlace a la cuota de noviembre de un alumno
+- **THEN** ve su ficha con la cuota de noviembre a la vista y resaltada tres segundos
+
 ### Requirement: Tarifas y ajustes
 Administración MUST poder cambiar los tramos, la cuota de socio, los descuentos, el precio por hora de las particulares
 (por defecto y por profesor) y los datos fiscales del club.

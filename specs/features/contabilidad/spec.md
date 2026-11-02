@@ -252,6 +252,19 @@ que MUST coincidir siempre con la cifra pinchada:
   lo que se debe a cada profesor de sus liquidaciones sin pagar en los meses pasados;
   y cada gasto esperado pendiente con su categoría.
 
+Cada línea del detalle MUST ser un enlace al sitio donde se ve,
+con un nombre que diga adónde lleva:
+
+- la cuota cobrada de un alumno, a su recibo, si la pagó un solo recibo;
+  si la pagaron varios (o no se sabe cuál), a su ficha, con la cuota de ese mes resaltada;
+- la cuota que le falta a un alumno, a su ficha, con la cuota de ese mes resaltada
+  (si aún no se ha emitido, a «Cuotas y cobros» de su ficha);
+- un movimiento, a su fila en Movimientos, en el mes de su fecha, resaltada;
+- un profesor, previsto según el horario o con su liquidación sin pagar,
+  a su ficha en ese mes, con las horas de ese mes y lo que se le paga;
+- un gasto esperado, a su línea en «Gastos esperados de <mes>» de los movimientos de ese mes, resaltada;
+- «Profesorado ya en el libro», a los movimientos de ese mes.
+
 El mes y la parte elegidos MUST quedar en la dirección (`?pestana=cierre&mes=<AAAA-MM>&parte=<parte>`),
 para poder llegar desde el resumen o enlazarlos.
 Con otra temporada elegida no sale esta sección.
@@ -273,6 +286,18 @@ Con otra temporada elegida no sale esta sección.
   la suya emitida (40,50 €)
 - **THEN** las cuotas previstas de noviembre listan a la alumna por 25 € («pagada en parte») y al alumno por 40,50 €
   («prevista»), y los ingresos de noviembre a la alumna por 20 € («de 45,00 €»)
+
+#### Scenario: Del detalle al recibo
+- **WHEN** en los ingresos de octubre administración pulsa a una alumna cuya cuota de octubre pagó un solo recibo
+- **THEN** se abre ese recibo en Cobros
+
+#### Scenario: Del detalle a la cuota que falta
+- **WHEN** en las cuotas previstas de noviembre administración pulsa a un alumno con la cuota vencida
+- **THEN** se abre su ficha, que baja hasta su cuota de noviembre y la resalta tres segundos
+
+#### Scenario: Del detalle a las horas de un profesor
+- **WHEN** en los gastos previstos del mes en curso administración pulsa a una profesora prevista según el horario
+- **THEN** se abre su ficha con las clases dadas y previstas de ese mes y su fila de mes a mes resaltada
 
 #### Scenario: Dejar de elegir una parte
 - **WHEN** con los gastos previstos de enero elegidos, administración pincha en el hueco blanco de la gráfica, fuera de
