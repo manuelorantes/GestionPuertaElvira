@@ -63,9 +63,8 @@ export interface FiscalYear {
   }[];
   incomeCents: number;
   expenseCents: number;
+  /** Por fecha, como todo lo demás: es lo que el cierre pasa a la siguiente temporada. */
   resultCents: number;
-  /** Lo que entró y salió de verdad: lo que el cierre pasa a la siguiente temporada. */
-  cashResultCents: number;
   canClose: boolean;
   closedOn: string | null;
 }

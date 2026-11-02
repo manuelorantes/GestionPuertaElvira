@@ -156,18 +156,11 @@ export function YearTab({
                 <span>Resultado</span>
                 <span>{formatCents(y.resultCents)}</span>
               </div>
-              {y.cashResultCents !== y.resultCents && (
-                <div className="flex justify-between">
-                  <span className="text-line-strong">Movido en caja y banco</span>
-                  <span>{formatCents(y.cashResultCents)}</span>
-                </div>
-              )}
             </div>
             <p className="text-[13px] text-line-strong">
-              Ingresos, gastos y resultado cuentan cada movimiento en los meses a los que
-              corresponde; el saldo, cuando se movió el dinero. Al cerrar, los movimientos de
-              septiembre {startYear} a agosto {startYear + 1} quedan bloqueados y lo movido en caja
-              y banco ({formatCents(y.cashResultCents)}) pasa como saldo inicial a{' '}
+              Todo cuenta cuando se movió el dinero. Al cerrar, los movimientos de septiembre{' '}
+              {startYear} a agosto {startYear + 1} quedan bloqueados y el resultado (
+              {formatCents(y.resultCents)}) pasa como saldo inicial a{' '}
               {fiscalYearLabel(startYear + 1)}.
             </p>
             {y.canClose && (
@@ -192,7 +185,7 @@ export function YearTab({
       {confirming && (
         <ConfirmDialog
           title={`¿Cerrar la temporada ${label}?`}
-          message={`Los movimientos de septiembre ${startYear} a agosto ${startYear + 1} quedarán bloqueados. Lo movido en caja y banco, ${formatCents(y?.cashResultCents ?? 0)}, pasará como saldo inicial de ${fiscalYearLabel(startYear + 1)}.`}
+          message={`Los movimientos de septiembre ${startYear} a agosto ${startYear + 1} quedarán bloqueados. El resultado, ${formatCents(y?.resultCents ?? 0)}, pasará como saldo inicial de ${fiscalYearLabel(startYear + 1)}.`}
           confirmLabel="Cerrar temporada"
           busy={close.isPending}
           onCancel={() => setConfirming(false)}
