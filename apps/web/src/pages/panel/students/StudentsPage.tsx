@@ -1,11 +1,11 @@
-import { ClipboardList, FileSpreadsheet, Search, UserPlus } from 'lucide-react';
+import { ChevronRight, ClipboardList, FileSpreadsheet, Search, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, Outlet, useNavigate, useSearchParams } from 'react-router';
 
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { useSession } from '@/features/auth/useSession';
 import type { StudentFilter } from '@/features/students/api';
-import { usePendingData, useStudents } from '@/features/students/hooks';
+import { usePendingData, useProvisionalMembers, useStudents } from '@/features/students/hooks';
 import { sortFrom, sortParam, sortStudents, toggleSort } from '@/features/students/sorting';
 import { useDebouncedValue } from '@/shared/useDebouncedValue';
 import { Card } from '@/shared/ui/Card';
@@ -33,6 +33,7 @@ export function StudentsPage() {
   const students = useStudents(current.filter, debouncedSearch);
   const canManage = useCanManageClub();
   const pendingCount = usePendingData(canManage).data?.items.length ?? 0;
+  const provisionalCount = useProvisionalMembers(canManage).data?.length ?? 0;
   const canImport = useSession().data?.role === 'superadministrator';
   const items = students.data?.items ?? [];
   const total = students.data?.total ?? 0;
@@ -82,6 +83,19 @@ export function StudentsPage() {
           },
         })}
       />
+      {canManage && provisionalCount > 0 && (
+        <Link
+          to="/panel/alumnos/provisionales"
+          className="mb-4 flex items-center gap-2 rounded-sm bg-warning-bg px-4 py-3 text-sm font-semibold text-warning-fg hover:opacity-90"
+        >
+          <span className="flex-1">
+            {provisionalCount === 1
+              ? '1 socio provisional por completar'
+              : `${provisionalCount} socios provisionales por completar`}
+          </span>
+          <ChevronRight aria-hidden size={18} />
+        </Link>
+      )}
       <Card>
         <div className="flex flex-col gap-3 border-b border-line p-4 lg:flex-row lg:items-center">
           <label className="flex h-11 w-full shrink-0 items-center gap-2 rounded-sm border border-line-strong bg-surface px-3 focus-within:border-brand lg:w-auto lg:flex-1">
