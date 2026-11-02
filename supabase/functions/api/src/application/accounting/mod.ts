@@ -92,15 +92,6 @@ function totalsByMonth(lines: LedgerLine[]): Map<string, [number, number]> {
   );
 }
 
-/** Ingresos y gastos de cada mes («AAAA-MM») por los meses a los que corresponde cada movimiento. */
-function attributedByMonth(lines: LedgerLine[]): Map<string, [number, number]> {
-  return addUp(
-    lines.flatMap((l) =>
-      l.shares.map((s) => ({ month: s.period, kind: l.kind, cents: s.amountCents }))
-    ),
-  );
-}
-
 function addUp(
   parts: { month: string; kind: string; cents: number }[],
 ): Map<string, [number, number]> {
@@ -113,27 +104,6 @@ function addUp(
     );
   }
   return totals;
-}
-
-/**
- * Los movimientos que corresponden (en parte o del todo) a algún mes entre `first` y `last`: se pagan como mucho un año
- * antes o después (ver `PeriodShares.MAX_DISTANCE_MONTHS`).
- */
-export async function linesAttributedTo(
-  ledger: LedgerQuery,
-  first: YearMonth,
-  last: YearMonth,
-): Promise<LedgerLine[]> {
-  let from = first;
-  let to = last;
-  for (let i = 0; i < PeriodShares.MAX_DISTANCE_MONTHS; i++) {
-    from = from.previous();
-    to = to.next();
-  }
-  const [low, high] = [first.toString(), last.toString()];
-  return (await ledger.linesBetween(from, to)).filter((l) =>
-    l.shares.some((s) => s.period >= low && s.period <= high)
-  );
 }
 
 /** Lo que se envía como reparto por meses: cada mes con sus céntimos. */
@@ -803,8 +773,8 @@ export interface FiscalYearView {
   label: string;
   openingCents: number;
   /**
-   * Ingresos, gastos y resultado de cada mes por los meses a los que corresponde cada movimiento; `accumulatedCents` es
-   * el saldo del club al acabar el mes (lo arrastrado más lo que se ha movido de verdad hasta entonces).
+   * Ingresos, gastos y resultado de cada mes por la fecha de los movimientos; `accumulatedCents` es el saldo del club al
+   * acabar el mes (lo arrastrado más lo movido hasta entonces).
    */
   months: {
     month: string;
@@ -815,19 +785,13 @@ export interface FiscalYearView {
   }[];
   incomeCents: number;
   expenseCents: number;
+  /** Lo que entró y salió en el ejercicio, por fecha: es lo que el cierre arrastra al siguiente. */
   resultCents: number;
-  /** Lo que entró y salió de verdad en el ejercicio (por fecha): es lo que el cierre arrastra al siguiente. */
-  cashIncomeCents: number;
-  cashExpenseCents: number;
-  cashResultCents: number;
   canClose: boolean;
   closedOn: string | null;
 }
 
-/**
- * El ejercicio mes a mes: ingresos, gastos y resultado de lo que corresponde a cada mes, y el saldo desde lo arrastrado
- * por lo que se movió de verdad.
- */
+/** El ejercicio mes a mes, por la fecha de los movimientos (cuando se movió el dinero), con el saldo desde lo arrastrado. */
 export class FiscalYearSummary {
   constructor(
     private readonly ledger: LedgerQuery,
@@ -845,22 +809,14 @@ export class FiscalYearSummary {
     let accumulated = opening;
     let income = 0;
     let expenses = 0;
-    let cashIncome = 0;
-    let cashExpenses = 0;
     const paid = totalsByMonth(
       await this.ledger.linesBetween(year.firstMonth(), year.lastMonth()),
     );
-    const byMonth = attributedByMonth(
-      await linesAttributedTo(this.ledger, year.firstMonth(), year.lastMonth()),
-    );
     for (const month of year.months()) {
-      const [monthIncome, monthExpenses] = byMonth.get(month.toString()) ?? [0, 0];
-      const [paidIn, paidOut] = paid.get(month.toString()) ?? [0, 0];
-      accumulated += paidIn - paidOut;
+      const [monthIncome, monthExpenses] = paid.get(month.toString()) ?? [0, 0];
+      accumulated += monthIncome - monthExpenses;
       income += monthIncome;
       expenses += monthExpenses;
-      cashIncome += paidIn;
-      cashExpenses += paidOut;
       months.push({
         month: month.toString(),
         incomeCents: monthIncome,
@@ -879,9 +835,6 @@ export class FiscalYearSummary {
       incomeCents: income,
       expenseCents: expenses,
       resultCents: income - expenses,
-      cashIncomeCents: cashIncome,
-      cashExpenseCents: cashExpenses,
-      cashResultCents: cashIncome - cashExpenses,
       canClose: closing === null && !current.isBefore(year.lastMonth()),
       closedOn: closing?.closedOn.toString() ?? null,
     };
@@ -925,8 +878,8 @@ export class CloseSeason {
     await this.closings.saveClosing(
       SeasonClosing.close(
         year,
-        Money.cents(view.cashIncomeCents),
-        Money.cents(view.cashExpenseCents),
+        Money.cents(view.incomeCents),
+        Money.cents(view.expenseCents),
         await this.treasury.yearCash(year),
         LocalDate.fromInstant(this.clock.now()),
       ),

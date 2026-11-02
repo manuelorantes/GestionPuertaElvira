@@ -515,7 +515,7 @@ Deno.test('accounting should tell the bank and cash balances and move money betw
   });
 });
 
-Deno.test('accounting splits a movement between the months it applies to, for the year month by month', async () => {
+Deno.test('accounting keeps the months a movement applies to, while the year month by month goes by date', async () => {
   const client = await admin();
   const shares = [
     { period: '2025-10', amountCents: 10000 },
@@ -566,15 +566,15 @@ Deno.test('accounting splits a movement between the months it applies to, for th
   const year = body<{
     months: { month: string; expenseCents: number; accumulatedCents: number }[];
     resultCents: number;
-    cashResultCents: number;
   }>(await client.get('/api/admin/accounting/years/2025'));
   const month = (m: string) => year.months.find((r) => r.month === m);
   assertEquals(
     ['2025-10', '2025-11', '2025-12', '2026-01'].map((m) => month(m)?.expenseCents),
-    [10000, 10000, 13000, 6000],
+    [0, 0, 0, 39000],
+    'todo en enero, cuando se pagó',
   );
-  assertEquals(month('2026-01')?.accumulatedCents, -39000, 'el saldo, por cuando se pagó');
-  assertEquals([year.resultCents, year.cashResultCents], [-39000, -39000]);
+  assertEquals(month('2026-01')?.accumulatedCents, -39000);
+  assertEquals(year.resultCents, -39000);
 
   assertError(
     await client.json('POST', '/api/admin/accounting/entries', {
