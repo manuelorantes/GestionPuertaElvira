@@ -46,8 +46,16 @@ test('should register a supplier invoice with its PDF and open the document', as
 test('should show the season month by month', async ({ page }) => {
   await openAccounting(page, '?pestana=cierre');
 
-  await expect(page.getByRole('table', { name: /mes a mes/ })).toBeVisible();
+  await expect(page.getByRole('table', { name: /^Temporada .* mes a mes$/ })).toBeVisible();
   await expect(page.getByRole('region', { name: /Cierre de temporada/ })).toContainText('Abierta');
+  // Cuotas vs gastos fijos de la temporada en curso: cada cifra lleva a de qué sale.
+  const figures = page.getByRole('table', { name: 'Cuotas vs gastos fijos mes a mes' });
+  await figures
+    .getByRole('button', { name: /^Gastos de / })
+    .first()
+    .click();
+  await expect(page).toHaveURL(/parte=gastos/);
+  await expect(page.getByRole('region', { name: /^Gastos de / })).toBeVisible();
 });
 
 test('should split an invoice between the months it applies to', async ({ page }) => {
