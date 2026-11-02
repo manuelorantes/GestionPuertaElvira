@@ -46,11 +46,20 @@ export interface Enrolments {
   moveStarts(student: StudentId, from: LocalDate, to: LocalDate): Promise<void>;
 }
 
-/** `no_classes`: socios activos sin ningún grupo (pagan la cuota de socio, se podrán inscribir más adelante). */
-export type StudentFilter = 'all' | 'active' | 'withdrawn' | 'siblings' | 'no_classes';
+/**
+ * `no_classes`: socios activos sin ningún grupo (pagan la cuota de socio, se podrán inscribir más adelante).
+ * `provisional`: socios provisionales, que ningún otro filtro incluye.
+ */
+export type StudentFilter =
+  | 'all'
+  | 'active'
+  | 'withdrawn'
+  | 'siblings'
+  | 'no_classes'
+  | 'provisional';
 
 export function studentFilterFrom(value: string): StudentFilter {
-  if (!['all', 'active', 'withdrawn', 'siblings', 'no_classes'].includes(value)) {
+  if (!['all', 'active', 'withdrawn', 'siblings', 'no_classes', 'provisional'].includes(value)) {
     throw new InvalidValue('filter', 'Filtro desconocido.');
   }
   return value as StudentFilter;
@@ -72,8 +81,8 @@ export interface StudentGroup {
 
 export interface StudentSummary {
   id: string;
-  /** Número de socio: único, en orden de alta y nunca reutilizado. */
-  memberNumber: number;
+  /** Número de socio: único, en orden de alta y nunca reutilizado; null si es socio provisional. */
+  memberNumber: number | null;
   fullName: string;
   /** null si no consta la fecha de nacimiento. */
   age: number | null;
@@ -89,7 +98,10 @@ export interface StudentSummary {
 
 export interface StudentDetail {
   id: string;
-  memberNumber: number;
+  /** null si es socio provisional. */
+  memberNumber: number | null;
+  /** Socio provisional: falta su hoja de inscripción (ver «Pasar a socio»). */
+  provisional: boolean;
   fullName: string;
   birthDate: string | null;
   age: number | null;
@@ -114,6 +126,7 @@ export interface StudentDetail {
 export interface StudentQuery {
   /** Ordenados por nombre. */
   list(filter: StudentFilter, search: string | null, on: LocalDate): Promise<StudentSummary[]>;
+  /** Alumnos que no son socios provisionales. */
   total(): Promise<number>;
   detail(id: string, on: LocalDate): Promise<StudentDetail | null>;
 }
@@ -237,6 +250,7 @@ export class RegisterStudent {
    * Alta del alumno, inscripción en sus grupos y vínculo con sus hermanos, todo o nada.
    * Toda persona que se da de alta es socia (con grupos o, sin ellos, como socio sin clases).
    * @param joinedOn fecha de alta; por defecto hoy (una importación puede traer altas anteriores)
+   * @param provisional socio provisional: sin grupos ni familia hasta que se le pase a socio
    */
   async execute(
     input: StudentInput,
@@ -244,13 +258,32 @@ export class RegisterStudent {
     siblingIds: string[],
     confirmOverCapacity: boolean,
     joinedOn?: string | null,
+    provisional = false,
   ): Promise<string> {
     const today = LocalDate.fromInstant(this.clock.now());
     const joined = joinedOn ? LocalDate.fromString(joinedOn) : today;
     if (today.isBefore(joined)) {
       throw new InvalidValue('joinedOn', 'La fecha de alta no puede ser futura.');
     }
-    const student = Student.register(StudentId.generate(), studentDetails(input), today, joined);
+    if (provisional && enrolments.length > 0) {
+      throw new InvalidValue(
+        'schedule',
+        'Un socio provisional no tiene grupos: pásalo a socio antes.',
+      );
+    }
+    if (provisional && siblingIds.length > 0) {
+      throw new InvalidValue(
+        'siblingIds',
+        'Un socio provisional no tiene familia directa: pásalo a socio antes.',
+      );
+    }
+    const student = Student.register(
+      StudentId.generate(),
+      studentDetails(input),
+      today,
+      joined,
+      provisional,
+    );
     return await this.transactions.run(async () => {
       await this.students.save(student);
       if (enrolments.length > 0) {
@@ -288,6 +321,17 @@ export class RenumberMembers {
     const current = await this.numbers.of([...wanted.keys()]);
     const renumbering = MemberRenumbering.of(current, wanted);
     await this.numbers.assign(renumbering.changes());
+  }
+}
+
+/** Pasa a socio a un socio provisional: recibe el siguiente número de socio y conserva su alta y sus cobros. */
+export class ConfirmProvisionalMember {
+  constructor(private readonly students: StudentRepository) {}
+
+  async execute(id: string): Promise<void> {
+    const student = await lookUp(this.students, id);
+    student.confirm();
+    await this.students.save(student);
   }
 }
 
@@ -443,7 +487,7 @@ export interface PendingStudent {
   missing: MissingDatum[];
 }
 
-/** Alumnos activos a los que les falta algún dato esperado, con qué falta. */
+/** Alumnos activos (no los socios provisionales) a los que les falta algún dato esperado, con qué falta. */
 export class ListPendingData {
   constructor(
     private readonly students: StudentRepository,
@@ -454,6 +498,7 @@ export class ListPendingData {
     const today = LocalDate.fromInstant(this.clock.now());
     const pending: PendingStudent[] = [];
     for (const student of await this.students.activeOn(today)) {
+      if (student.isProvisional()) continue;
       const missing = student.details().missingData(today);
       if (missing.length > 0) {
         pending.push({ id: student.id.value, fullName: student.details().fullName.value, missing });
