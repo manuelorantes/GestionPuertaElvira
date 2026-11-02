@@ -142,7 +142,7 @@ export class SqlDiagnosticsFacts implements FactsSource {
       await this
         .sql`SELECT id, member_number, full_name, birth_date::text AS birth_date, contact_email,
           guardians, own_phone, joined_on::text AS joined_on, withdrawn_on::text AS withdrawn_on, sibling_ids
-        FROM students_student ORDER BY search_name`,
+        FROM students_student WHERE NOT provisional ORDER BY search_name`,
     );
     const groupNames = new Map(
       (await new SqlClassQuery(this.sql).groups(today)).map((g) => [g.id, g.name]),

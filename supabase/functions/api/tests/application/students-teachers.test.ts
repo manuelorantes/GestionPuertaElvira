@@ -6,6 +6,7 @@ import { StudentId } from '../../src/domain/students/mod.ts';
 import { TeacherId } from '../../src/domain/teachers/mod.ts';
 import {
   ChangeJoinDate,
+  ConfirmProvisionalMember,
   FamilyLeftAlone,
   LinkSiblings,
   ListPendingData,
@@ -335,4 +336,44 @@ Deno.test('SimilarStudents should suggest the students sharing name and first su
   // Se preselecciona por la primera palabra para no recorrer todo el alumnado.
   assertEquals(asked, ['all Pablo']);
   assertEquals(await similar.execute('Pablo'), []);
+});
+
+Deno.test('RegisterStudent should register a provisional member with no groups or family, and ConfirmProvisionalMember confirm them', async () => {
+  const { repo, enrolments, transactions, clock, membership, input, register } = students();
+  const registerProvisional = (groupIds: string[], siblingIds: string[] = []) =>
+    new RegisterStudent(repo, enrolments, transactions, clock, membership).execute(
+      input({ fullName: 'Álvaro Provisional', birthDate: null, guardians: [] }),
+      groupIds.map((groupId) => ({ groupId, attendance: null })),
+      siblingIds,
+      false,
+      '2026-10-01',
+      true,
+    );
+  const id = await registerProvisional([]);
+  const student = await repo.find(StudentId.fromString(id));
+  assert(student?.isProvisional());
+  assertEquals(membership.members, [id], 'pays the membership fee like any member');
+  assertEquals(await new ListPendingData(repo, clock).execute(), [], 'not in pending data');
+
+  await assertRejects(() => registerProvisional(['g1']), InvalidValue, 'grupos');
+  const sibling = await register(['g1']);
+  await assertRejects(() => registerProvisional([], [sibling]), InvalidValue, 'familia');
+  await assertRejects(
+    () => new LinkSiblings(repo, transactions).execute(sibling, id),
+    InvalidValue,
+    'socio provisional',
+  );
+
+  await new ConfirmProvisionalMember(repo).execute(id);
+  assertFalse((await repo.find(StudentId.fromString(id)))?.isProvisional());
+  assertEquals(
+    (await new ListPendingData(repo, clock).execute()).map((p) => p.id),
+    [id],
+    'once a member, missing data is claimed',
+  );
+  await assertRejects(() => new ConfirmProvisionalMember(repo).execute(id), InvalidValue);
+  await assertRejects(
+    () => new ConfirmProvisionalMember(repo).execute(StudentId.generate().value),
+    StudentNotFound,
+  );
 });

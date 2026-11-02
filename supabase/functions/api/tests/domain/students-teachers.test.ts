@@ -220,3 +220,36 @@ Deno.test('shareNameAndFirstSurname should match the same name and first surname
   assertFalse(shareNameAndFirstSurname('Pablo', 'Pablo Gil'));
   assertFalse(shareNameAndFirstSurname('Pablo', 'Pablo'));
 });
+
+Deno.test('Student registered as provisional should become a member only when confirmed', () => {
+  const student = Student.register(
+    StudentId.generate(),
+    StudentFactory.details(),
+    today,
+    LocalDate.fromString('2026-10-01'),
+    true,
+  );
+  assert(student.isProvisional());
+  assert(student.joinedOn.equals(LocalDate.fromString('2026-10-01')));
+  student.confirm();
+  assertFalse(student.isProvisional());
+  assert(student.joinedOn.equals(LocalDate.fromString('2026-10-01')), 'keeps the join date');
+  assertThrows(() => student.confirm(), InvalidValue, 'ya es socio');
+});
+
+Deno.test('Student should refuse family, withdrawal and rejoining while provisional', () => {
+  const student = Student.register(
+    StudentId.generate(),
+    StudentFactory.details(),
+    today,
+    today,
+    true,
+  );
+  assertThrows(() => student.addSibling(StudentId.generate()), InvalidValue, 'socio provisional');
+  assertThrows(() => student.withdraw(today, today), InvalidValue, 'socio provisional');
+  assertThrows(() => student.assertNotProvisional(), InvalidValue, 'socio provisional');
+  student.confirm();
+  student.assertNotProvisional();
+  student.addSibling(StudentId.generate());
+  assertEquals(student.siblings().length, 1);
+});

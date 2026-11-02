@@ -49,6 +49,8 @@ Ref: identity_session.user_id > identity_user.id
 
 Table students_student {
   id uuid [pk, note: 'UUIDv7']
+  member_number integer [unique, note: 'número de socio: de la secuencia students_member_number_seq, nunca reutilizado; vacío solo en un socio provisional']
+  provisional boolean [not null, default: false, note: 'socio provisional: falta su hoja de inscripción; sin número de socio, grupos ni familia']
   full_name varchar(120) [not null]
   search_name varchar(120) [not null, note: 'nombre en minúsculas y sin tildes para la búsqueda']
   birth_date date [not null]

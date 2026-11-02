@@ -655,3 +655,102 @@ Deno.test({
     assertEquals(after[1], after[2]);
   },
 });
+
+Deno.test('a provisional member pays the membership fee but stays out of the lists until confirmed', async () => {
+  const fx = await fixture();
+  await register(fx, { fullName: 'Ana Uno' });
+  const created = await fx.client.json('POST', '/api/admin/students', {
+    fullName: 'Álvaro Tejero Gilabert',
+    provisional: true,
+    joinedOn: '2026-10-09',
+  });
+  assertEquals(created.status, 201, JSON.stringify(created.body));
+  const id = (created.body as { id: string }).id;
+
+  const detail = body<Record<string, unknown>>(await fx.client.get(`/api/admin/students/${id}`));
+  assertEquals([detail.provisional, detail.memberNumber, detail.joinedOn], [
+    true,
+    null,
+    '2026-10-09',
+  ]);
+  assertEquals(
+    body<{ member: boolean }>(await fx.client.get(`/api/admin/billing/accounts/${id}`)).member,
+    true,
+  );
+  const paid = await fx.client.json('POST', '/api/admin/billing/payments', {
+    studentId: id,
+    kind: 'membership',
+    method: 'transfer',
+    date: '2026-10-09',
+  });
+  assertEquals(paid.status, 201, JSON.stringify(paid.body));
+
+  const listed = async (filter: string) =>
+    items((await fx.client.get(`/api/admin/students?filter=${filter}`)).body).map((s) =>
+      s.fullName
+    );
+  for (const filter of ['all', 'active', 'no_classes', 'withdrawn', 'siblings']) {
+    assertEquals((await listed(filter)).includes('Álvaro Tejero Gilabert'), false, filter);
+  }
+  assertEquals(await listed('provisional'), ['Álvaro Tejero Gilabert']);
+  assertEquals(body<{ total: number }>(await fx.client.get('/api/admin/students')).total, 1);
+  assertEquals(
+    body<{ items: { id: string }[] }>(await fx.client.get('/api/admin/students/pending-data'))
+      .items.some((s) => s.id === id),
+    false,
+  );
+  const points = body<{ items: { id: string }[] }>(
+    await fx.client.get('/api/admin/points/students'),
+  );
+  assertEquals(points.items.some((s) => s.id === id), false);
+
+  // Mientras es provisional: ni grupos, ni familia, ni baja.
+  assertError(
+    await fx.client.json('POST', `/api/admin/students/${id}/enrolments`, { groupId: fx.groupA }),
+    422,
+    'unprocessable',
+  );
+  assertError(
+    await fx.client.json('POST', `/api/admin/students/${id}/withdrawal`, { date: '2099-09-01' }),
+    422,
+    'unprocessable',
+  );
+  assertError(
+    await fx.client.json('POST', '/api/admin/students', {
+      fullName: 'Con Grupo',
+      provisional: true,
+      groupIds: [fx.groupA],
+    }),
+    422,
+    'unprocessable',
+  );
+
+  // Se completa y pasa a socio: recibe el siguiente número y entra en la lista.
+  const edited = await fx.client.json('PUT', `/api/admin/students/${id}`, {
+    fullName: 'Álvaro Tejero Gilabert',
+    birthDate: '2015-02-01',
+    guardians: [{ name: 'Fernando Tejero Martos', phone: '612481930' }],
+  });
+  assertEquals(edited.status, 204, JSON.stringify(edited.body));
+  assertEquals(
+    body<{ provisional: boolean }>(await fx.client.get(`/api/admin/students/${id}`)).provisional,
+    true,
+    'editing keeps them provisional',
+  );
+  await register(fx, { fullName: 'Bruno Dos' });
+  const confirmed = await fx.client.json('POST', `/api/admin/students/${id}/confirmation`, {});
+  assertEquals(confirmed.status, 204, JSON.stringify(confirmed.body));
+  const after = body<Record<string, unknown>>(await fx.client.get(`/api/admin/students/${id}`));
+  assertEquals([after.provisional, after.memberNumber, after.joinedOn], [false, 3, '2026-10-09']);
+  assertEquals(await listed('provisional'), []);
+  assertEquals((await listed('active')).includes('Álvaro Tejero Gilabert'), true);
+  assertError(
+    await fx.client.json('POST', `/api/admin/students/${id}/confirmation`, {}),
+    422,
+    'unprocessable',
+  );
+  const enrolled = await fx.client.json('POST', `/api/admin/students/${id}/enrolments`, {
+    groupId: fx.groupA,
+  });
+  assertEquals(enrolled.status, 204, JSON.stringify(enrolled.body));
+});
