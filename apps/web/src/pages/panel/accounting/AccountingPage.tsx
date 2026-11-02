@@ -98,6 +98,12 @@ export function AccountingPage() {
                 next.set('parte', BAR_SLUG[k]);
                 setSearchParams(next, { replace: true });
               }}
+              onClear={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('mes');
+                next.delete('parte');
+                setSearchParams(next, { replace: true });
+              }}
             />
           )}
         </YearTab>
