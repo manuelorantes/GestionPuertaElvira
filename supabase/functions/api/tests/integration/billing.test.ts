@@ -841,17 +841,18 @@ Deno.test({
       'unprocessable',
     );
 
-    const deleted = await superadmin.json('DELETE', `/api/admin/billing/payments/${payment}`, {
-      reason: 'Anotado dos veces',
-    });
+    // Conciliado con el banco no se borra; tras deshacer la conciliación, sí.
+    const remove = () =>
+      superadmin.json('DELETE', `/api/admin/billing/payments/${payment}`, {
+        reason: 'Anotado dos veces',
+      });
+    assertError(await remove(), 409, 'reconciled_with_bank');
+    await db()`UPDATE accounting_bank_match SET targets = '[]'::jsonb WHERE movement_key = 'k1'`;
+    const deleted = await remove();
     assertEquals(deleted.status, 200, JSON.stringify(deleted.body));
     assertEquals(body<{ receiptNumber: string }>(deleted).receiptNumber, receipt);
     assertError(await fx.client.get(`/api/admin/billing/payments/${payment}`), 404, 'not_found');
     assertEquals((await ledger(fx.client)).includes(payment), false);
-    assertEquals(
-      (await db()`SELECT 1 FROM accounting_bank_match WHERE movement_key = 'k1'`).length,
-      0,
-    );
     const account = body<{ membershipPaid: boolean }>(
       await fx.client.get(`/api/admin/billing/accounts/${fx.student}`),
     );

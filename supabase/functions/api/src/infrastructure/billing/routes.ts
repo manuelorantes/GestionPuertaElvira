@@ -49,6 +49,7 @@ import {
 import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
 import { PointsWalletService } from '../../application/points/mod.ts';
 import { SqlPointMovementRepository } from '../persistence/points.ts';
+import { SqlReconciledItems } from '../persistence/reconciliation.ts';
 
 /** Casos de uso de cobros montados sobre la transacción de la petición. */
 export function billing(api: ApiApp, scope: RequestScope) {
@@ -240,7 +241,11 @@ export function registerBillingRoutes(api: ApiApp): void {
 
   api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/date'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
-    await new ReschedulePayment(new SqlPaymentRepository(scope.tx), api.deps.clock).execute(
+    await new ReschedulePayment(
+      new SqlPaymentRepository(scope.tx),
+      api.deps.clock,
+      new SqlReconciledItems(scope.tx),
+    ).execute(
       param(c, 'id'),
       body.requiredString('date'),
     );
@@ -249,7 +254,11 @@ export function registerBillingRoutes(api: ApiApp): void {
 
   api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/amount'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
-    await new CorrectPaymentAmount(new SqlPaymentRepository(scope.tx), billing(api, scope).charges)
+    await new CorrectPaymentAmount(
+      new SqlPaymentRepository(scope.tx),
+      billing(api, scope).charges,
+      new SqlReconciledItems(scope.tx),
+    )
       .execute(
         param(c, 'id'),
         body.requiredInt('amountCents'),
@@ -276,6 +285,7 @@ export function registerBillingRoutes(api: ApiApp): void {
         payments,
         new SqlClosedPeriods(scope.tx),
         new PointsWalletService(new SqlPointMovementRepository(scope.tx)),
+        new SqlReconciledItems(scope.tx),
       ).execute(param(c, 'id'), reason);
       return c.json(deleted);
     },
@@ -283,7 +293,10 @@ export function registerBillingRoutes(api: ApiApp): void {
 
   api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/method'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
-    await new ChangePaymentMethod(new SqlPaymentRepository(scope.tx)).execute(
+    await new ChangePaymentMethod(
+      new SqlPaymentRepository(scope.tx),
+      new SqlReconciledItems(scope.tx),
+    ).execute(
       param(c, 'id'),
       body.requiredString('method'),
     );

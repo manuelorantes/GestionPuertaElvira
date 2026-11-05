@@ -5,6 +5,7 @@ import type {
   Payer,
   PayerNames,
 } from '../../application/accounting/reconciliation.ts';
+import type { ReconciledItems } from '../../application/common/mod.ts';
 import { Row, type Sql } from './sql.ts';
 
 export class SqlBankMatchRepository implements BankMatchRepository {
@@ -83,4 +84,22 @@ function namesOf(r: Row): string[] {
     ? guardians.flatMap((g) => (typeof g?.name === 'string' && g.name ? [g.name as string] : []))
     : [];
   return [r.string('full_name'), ...names];
+}
+
+/** Lo casado con un movimiento del extracto del banco. */
+export class SqlReconciledItems implements ReconciledItems {
+  constructor(private readonly sql: Sql) {}
+
+  async isReconciled(source: string, sourceId: string): Promise<boolean> {
+    const rows = await this.sql`SELECT 1 FROM accounting_bank_match
+      WHERE targets::jsonb @> ${this.sql.json([{ source, sourceId }])}::jsonb LIMIT 1`;
+    return rows.length > 0;
+  }
+
+  /** Todo lo conciliado, como «source:sourceId». */
+  async keys(): Promise<Set<string>> {
+    const rows = await this.sql`SELECT t->>'source' AS source, t->>'sourceId' AS source_id
+      FROM accounting_bank_match, jsonb_array_elements(targets::jsonb) t`;
+    return new Set(Row.all(rows).map((r) => `${r.string('source')}:${r.string('source_id')}`));
+  }
 }

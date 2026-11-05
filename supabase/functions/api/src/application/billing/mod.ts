@@ -42,6 +42,8 @@ import {
   type ClosedPeriods,
   type Locks,
   PeriodClosed,
+  type ReconciledItems,
+  ReconciledWithBank,
   type TransactionRunner,
 } from '../common/mod.ts';
 
@@ -169,6 +171,8 @@ export interface PaymentSummary {
   method: string;
   totalCents: number;
   invoiceNumber: string | null;
+  /** Casado con un movimiento del extracto del banco: su forma de pago, fecha e importe ya no cambian. */
+  reconciled: boolean;
 }
 
 /** Todo lo que necesita el recibo (y la factura, si existe). */
@@ -1075,12 +1079,17 @@ export class ReschedulePayment {
   constructor(
     private readonly payments: PaymentRepository,
     private readonly clock: Clock,
+    private readonly reconciled: ReconciledItems,
   ) {}
 
   async execute(paymentId: string, date: string): Promise<void> {
     const payment = await this.payments.payment(PaymentId.fromString(paymentId));
     if (payment === null) throw new PaymentNotFound();
-    payment.reschedule(LocalDate.fromString(date), LocalDate.fromInstant(this.clock.now()));
+    const day = LocalDate.fromString(date);
+    if (day.toString() !== payment.paidOn.toString()) {
+      await ReconciledWithBank.guard(this.reconciled, 'payment', payment.id.value);
+    }
+    payment.reschedule(day, LocalDate.fromInstant(this.clock.now()));
     await this.payments.savePayment(payment);
   }
 }
@@ -1093,11 +1102,15 @@ export class CorrectPaymentAmount {
   constructor(
     private readonly payments: PaymentRepository,
     private readonly charges: ChargeRepository,
+    private readonly reconciled: ReconciledItems,
   ) {}
 
   async execute(paymentId: string, amountCents: number, reason: string): Promise<void> {
     const payment = await this.payments.payment(PaymentId.fromString(paymentId));
     if (payment === null) throw new PaymentNotFound();
+    if (amountCents !== payment.total.cents) {
+      await ReconciledWithBank.guard(this.reconciled, 'payment', payment.id.value);
+    }
     const before = payment.total;
     payment.correctTotal(Money.cents(amountCents), reason);
     await this.payments.savePayment(payment);
@@ -1128,12 +1141,14 @@ export class DeletePayment {
     private readonly payments: PaymentRepository,
     private readonly closed: ClosedPeriods,
     private readonly points: PointsWallet,
+    private readonly reconciled: ReconciledItems,
   ) {}
 
   async execute(paymentId: string, reason: string): Promise<{ receiptNumber: string }> {
     const payment = await this.payments.payment(PaymentId.fromString(paymentId));
     if (payment === null) throw new PaymentNotFound();
     payment.assertDeletable(reason);
+    await ReconciledWithBank.guard(this.reconciled, 'payment', payment.id.value);
     await PeriodClosed.guard(this.closed, payment.paidOn);
     await this.points.refund(payment.student.value, payment.id.value);
     await this.payments.deletePayment(payment.id);
@@ -1142,12 +1157,19 @@ export class DeletePayment {
 }
 
 export class ChangePaymentMethod {
-  constructor(private readonly payments: PaymentRepository) {}
+  constructor(
+    private readonly payments: PaymentRepository,
+    private readonly reconciled: ReconciledItems,
+  ) {}
 
   async execute(paymentId: string, method: string): Promise<void> {
     const payment = await this.payments.payment(PaymentId.fromString(paymentId));
     if (payment === null) throw new PaymentNotFound();
-    payment.changeMethod(paymentMethodFromName(method));
+    const next = paymentMethodFromName(method);
+    if (next !== payment.method) {
+      await ReconciledWithBank.guard(this.reconciled, 'payment', payment.id.value);
+    }
+    payment.changeMethod(next);
     await this.payments.savePayment(payment);
   }
 }

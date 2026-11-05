@@ -25,7 +25,11 @@ import {
   SqlTransferRepository,
 } from '../persistence/accounting.ts';
 import { SqlClosedPeriods, SqlPaymentRepository } from '../persistence/billing.ts';
-import { SqlBankMatchRepository, SqlPayerNames } from '../persistence/reconciliation.ts';
+import {
+  SqlBankMatchRepository,
+  SqlPayerNames,
+  SqlReconciledItems,
+} from '../persistence/reconciliation.ts';
 
 /** Un extracto de un mes tiene unas decenas de movimientos; más de esto no es un extracto. */
 const MAX_MOVEMENTS = 2000;
@@ -46,11 +50,12 @@ function actions(api: ApiApp, scope: RequestScope): ReconciliationActions {
   const accounting = new SqlAccountingRepository(scope.tx);
   const closed = new SqlClosedPeriods(scope.tx);
   const payments = new SqlPaymentRepository(scope.tx);
+  const reconciled = new SqlReconciledItems(scope.tx);
   const changePaymentMethod = (id: string, method: string) =>
-    new ChangePaymentMethod(payments).execute(id, method);
+    new ChangePaymentMethod(payments, reconciled).execute(id, method);
   return {
     reschedulePayment: (id, date) =>
-      new ReschedulePayment(payments, api.deps.clock).execute(id, date),
+      new ReschedulePayment(payments, api.deps.clock, reconciled).execute(id, date),
     changePaymentMethod,
     changeLineMethod: (line, method) =>
       new EditMovement(
@@ -61,6 +66,7 @@ function actions(api: ApiApp, scope: RequestScope): ReconciliationActions {
         new SqlLedgerQuery(scope.tx),
         accounting,
         { changePaymentMethod },
+        reconciled,
       ).execute({
         source: line.source,
         sourceId: line.sourceId,

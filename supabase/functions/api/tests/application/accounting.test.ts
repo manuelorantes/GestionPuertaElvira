@@ -30,7 +30,7 @@ import {
   TreasuryBalances,
   type UploadedDocument,
 } from '../../src/application/accounting/mod.ts';
-import { PeriodClosed } from '../../src/application/common/mod.ts';
+import { PeriodClosed, ReconciledWithBank } from '../../src/application/common/mod.ts';
 import { AccountingFixture } from '../support/accounting.ts';
 
 const bytes = (text: string) => new TextEncoder().encode(text);
@@ -228,7 +228,7 @@ Deno.test('DeleteEntry should only delete manual entries of open seasons', async
     method: 'card',
     amount: '10',
   });
-  await new DeleteEntry(fx, fx).execute(id);
+  await new DeleteEntry(fx, fx, fx).execute(id);
   assertEquals(fx.entries.size, 0);
 });
 
@@ -259,7 +259,7 @@ Deno.test('the club adds and renames its own categories, and removes them only w
 
 Deno.test('AmendInvoice should correct the whole invoice, its payment included, within open seasons', async () => {
   const { fx, registerInvoice } = setUp();
-  const amend = new AmendInvoice(fx, fx, fx);
+  const amend = new AmendInvoice(fx, fx, fx, fx);
   const invoice = await registerInvoice('2026-10-01', 'Alquiler', 'rent', '950');
   await new PayInvoice(fx, fx).execute(invoice, '2026-10-05', 'transfer');
   const input = {
@@ -324,7 +324,7 @@ Deno.test('AmendInvoice should correct the whole invoice, its payment included, 
 
 Deno.test('EditMovement should edit entries and invoices, and correct payments only in accounting', async () => {
   const { fx, registerInvoice } = setUp();
-  const edit = new EditMovement(fx, fx, fx, fx, fx, fx, fx);
+  const edit = new EditMovement(fx, fx, fx, fx, fx, fx, fx, fx);
   const line = async (source: string, id: string) =>
     (await new MonthLedger(fx, fx).execute('2026-10')).lines.find(
       (l) => l.source === source && l.sourceId === id,
@@ -495,7 +495,7 @@ Deno.test('transfers should respect closed seasons and reject the same account t
       LocalDate.fromString('2026-09-01'),
     ),
   );
-  await assertRejects(() => new DeleteTransfer(fx, fx).execute(id), PeriodClosed);
+  await assertRejects(() => new DeleteTransfer(fx, fx, fx).execute(id), PeriodClosed);
   await assertRejects(
     () =>
       new RecordTransfer(fx, fx).execute({
@@ -507,7 +507,7 @@ Deno.test('transfers should respect closed seasons and reject the same account t
     PeriodClosed,
   );
   await assertRejects(
-    () => new DeleteTransfer(fx, fx).execute('00000000-0000-7000-8000-000000000000'),
+    () => new DeleteTransfer(fx, fx, fx).execute('00000000-0000-7000-8000-000000000000'),
     TransferNotFound,
   );
   const open = await new RecordTransfer(fx, fx).execute({
@@ -516,7 +516,7 @@ Deno.test('transfers should respect closed seasons and reject the same account t
     to: 'cash',
     amount: '10',
   });
-  await new DeleteTransfer(fx, fx).execute(open);
+  await new DeleteTransfer(fx, fx, fx).execute(open);
   assertEquals((await new ListTransfers(fx).execute()).length, 1);
 });
 
@@ -655,7 +655,7 @@ Deno.test('entries, invoices and corrections keep the months they apply to', asy
   void registerInvoice;
 
   // Corregir en contabilidad un cobro de octubre para que cuente en septiembre y octubre.
-  await new EditMovement(fx, fx, fx, fx, fx, fx, fx).execute({
+  await new EditMovement(fx, fx, fx, fx, fx, fx, fx, fx).execute({
     source: 'payment',
     sourceId: 'p1',
     month: '2026-10',
@@ -675,7 +675,7 @@ Deno.test('entries, invoices and corrections keep the months they apply to', asy
   assertEquals(payment?.shares.map((s) => s.period), ['2026-09', '2026-10']);
   await assertRejects(
     () =>
-      new EditMovement(fx, fx, fx, fx, fx, fx, fx).execute({
+      new EditMovement(fx, fx, fx, fx, fx, fx, fx, fx).execute({
         source: 'payment',
         sourceId: 'p1',
         month: '2026-10',
@@ -688,4 +688,44 @@ Deno.test('entries, invoices and corrections keep the months they apply to', asy
       }),
     InvalidValue,
   );
+});
+
+Deno.test('a movement reconciled with the bank should keep its method and amount and not be deleted', async () => {
+  const { fx } = setUp();
+  const id = await new RecordEntry(fx, fx, fx).execute({
+    date: '2027-08-10',
+    kind: 'expense',
+    concept: 'Comisión banco',
+    category: 'other_expenses',
+    method: 'card',
+    amount: '10',
+  });
+  fx.reconciledKeys.add(`manual:${id}`);
+  const edit = (method: string, amount: string) =>
+    new EditMovement(fx, fx, fx, fx, fx, fx, fx, fx).execute({
+      source: 'manual',
+      sourceId: id,
+      month: '2027-08',
+      concept: 'Comisión de mantenimiento',
+      category: 'other_expenses',
+      method,
+      amount,
+      period: '2027-08',
+    });
+  await assertRejects(() => edit('cash', '10'), ReconciledWithBank);
+  await assertRejects(() => edit('card', '12'), ReconciledWithBank);
+  await assertRejects(() => new DeleteEntry(fx, fx, fx).execute(id), ReconciledWithBank);
+  // El concepto, la categoría y los meses sí se pueden cambiar.
+  await edit('card', '10');
+  assertEquals([...fx.entries.values()][0]?.concept, 'Comisión de mantenimiento');
+
+  const transfer = await new RecordTransfer(fx, fx).execute({
+    date: '2027-08-11',
+    from: 'bank',
+    to: 'cash',
+    amount: '200',
+    note: '',
+  });
+  fx.reconciledKeys.add(`transfer:${transfer}`);
+  await assertRejects(() => new DeleteTransfer(fx, fx, fx).execute(transfer), ReconciledWithBank);
 });

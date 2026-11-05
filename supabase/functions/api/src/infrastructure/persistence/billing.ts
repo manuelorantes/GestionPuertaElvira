@@ -451,8 +451,13 @@ function toSummary(row: Row): PaymentSummary {
     method: row.string('method'),
     totalCents: row.int('total_cents'),
     invoiceNumber: row.nullableString('invoice_number'),
+    reconciled: row.bool('reconciled'),
   };
 }
+
+/** Si el cobro está casado con un movimiento del extracto del banco. */
+const RECONCILED = `EXISTS (SELECT 1 FROM accounting_bank_match m WHERE m.targets::jsonb @>
+  jsonb_build_array(jsonb_build_object('source', 'payment', 'sourceId', p.id::text))) AS reconciled`;
 
 export class SqlBillingQuery implements BillingQuery {
   constructor(private readonly sql: Sql) {}
@@ -510,7 +515,8 @@ export class SqlBillingQuery implements BillingQuery {
 
   async payments(studentId: string | null): Promise<PaymentSummary[]> {
     const rows = await this
-      .sql`SELECT p.*, s.full_name FROM billing_payment p JOIN students_student s ON s.id = p.student_id
+      .sql`SELECT p.*, s.full_name, ${this.sql.unsafe(RECONCILED)}
+      FROM billing_payment p JOIN students_student s ON s.id = p.student_id
       WHERE (${studentId}::uuid IS NULL OR p.student_id = ${studentId}::uuid)
       ORDER BY p.paid_on DESC, p.receipt_number DESC`;
     return Row.all(rows).map(toSummary);
@@ -518,7 +524,7 @@ export class SqlBillingQuery implements BillingQuery {
 
   async payment(id: string): Promise<PaymentDetail | null> {
     const rows = await this.sql.unsafe(
-      `SELECT p.*, s.full_name, ${GUARDIAN} AS guardian_name FROM billing_payment p JOIN students_student s ON s.id = p.student_id WHERE p.id = $1`,
+      `SELECT p.*, s.full_name, ${GUARDIAN} AS guardian_name, ${RECONCILED} FROM billing_payment p JOIN students_student s ON s.id = p.student_id WHERE p.id = $1`,
       [id],
     );
     if (!rows[0]) return null;
