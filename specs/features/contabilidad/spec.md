@@ -336,6 +336,8 @@ y la conciliación MUST NOT cambiar la forma de pago de nada (como mucho, la fec
   (apuntados con otra fecha); si hay varias combinaciones posibles, se eligen a mano,
   con el total elegido a la vista, hasta que coincide.
   Si sobra, lo dice.
+  Lo cobrado con tarjeta ese día MUST salir marcado al elegir a mano, y poderse desmarcar
+  (lo que se cobró ese día pero el banco abonó en otra liquidación).
   También se puede repartir a mano con cuotas de cualquier alumno, cobradas con tarjeta el día de la liquidación,
   como una transferencia (con el mismo reparto de lo que no cuadra).
 - **Transferencia recibida**: cuadra con el cobro, o los cobros de un mismo alumno o familia, por transferencia que
@@ -358,8 +360,10 @@ y la conciliación MUST NOT cambiar la forma de pago de nada (como mucho, la fec
   con varios alumnos de la misma familia, las cuotas que suman el importe, si solo hay una combinación posible.
   Si no, sugiere apuntar un ingreso con su concepto y categoría.
   Una transferencia recibida MUST poderse **repartir a mano** entre cobros por transferencia ya apuntados
-  y cuotas de cualquier alumno activo (la que le toca, como desde Cobros), también de alumnos distintos,
-  hasta que todo junto suma su importe.
+  y lo que se cobra a cualquier alumno activo o socio provisional, también de alumnos distintos,
+  hasta que todo junto suma su importe. A cada alumno se le puede cobrar la cuota del mes que le toca (como desde
+  Cobros), su cuota de socio si la tiene pendiente y un pago a cuenta por el importe que se indique
+  (por defecto, lo que falta), que queda como saldo a favor.
   Si con cuotas elegidas no suma justo, MUST poderse aceptar tras confirmarlo: la diferencia se reparte a partes iguales
   entre esas cuotas (los céntimos que sobran, a las primeras) con una línea de corrección en cada recibo;
   lo pagado de más queda como saldo a favor de cada alumno y lo de menos, pendiente en su cuota («Pagada en parte»).
@@ -423,6 +427,12 @@ La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse 
 - **WHEN** el extracto trae la liquidación del 10/09/2026 por 90 € y en la app no hay cobros con tarjeta ese día,
   pero sí uno de 90 € con tarjeta del 03/09, y otro de 90 € en efectivo del 09/09
 - **THEN** se sugiere pasar el de tarjeta al 10/09 (el de efectivo no se ofrece); al aceptarlo, el movimiento cuadra
+
+#### Scenario: Un socio provisional que paga la cuota de socio y algo más
+- **WHEN** llega una transferencia de 80 € de Álvaro, socio provisional sin grupos, y superadministración le elige
+  su cuota de socio de 50 € y 30 € a cuenta
+- **THEN** se cobran su cuota de socio y un «Pago a cuenta» de 30 € por transferencia, el movimiento cuadra
+  y Álvaro queda socio con 30 € a su favor
 
 #### Scenario: Una transferencia que paga de más
 - **WHEN** llega una transferencia de 80 € de Luis Porras Wadley y superadministración elige las cuotas de noviembre
