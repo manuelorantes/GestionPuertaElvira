@@ -280,3 +280,48 @@ Deno.test('reconciliation should split a transfer by hand among fees and remembe
     assertEquals(next.proposal!.fees.map((f) => f.studentId).sort(), [ana, luis].sort());
   });
 });
+
+Deno.test('reconciliation should leave in favour of each student what a transfer paid over their fees', async () => {
+  await atTime('2026-11-05T10:00:00+01:00', async () => {
+    const { superadmin } = await clients();
+    const group = await newGroup(superadmin, await newTeacher(superadmin));
+    const student = async (fullName: string) =>
+      ((await superadmin.json('POST', '/api/admin/students', { fullName, groupIds: [group] }))
+        .body as { id: string }).id;
+    const [andres, luis] = [
+      await student('Andrés Porras Romero'),
+      await student('Luis Porras Wadley'),
+    ];
+    const feeOf = async (id: string) =>
+      ((await superadmin.get(
+        `/api/admin/accounting/reconciliation/fee?studentId=${id}&day=2026-11-03`,
+      )).body as { amountCents: number }).amountCents;
+    const fees = await feeOf(andres) + await feeOf(luis);
+    const movement = {
+      operationDate: '2026-11-03',
+      valueDate: '2026-11-03',
+      concept: 'Transferencia De Luis Porras Wadley, Concepto Mensualidad',
+      amountCents: fees + 1600,
+      balanceCents: 100_000 + fees + 1600,
+    };
+    const accept = (adjust: boolean) =>
+      superadmin.json('POST', '/api/admin/accounting/reconciliation/accept', {
+        movement,
+        items: [],
+        fees: [andres, luis],
+        adjust,
+      });
+    assertError(await accept(false), 422, 'unprocessable');
+    assertEquals((await accept(true)).status, 204);
+
+    for (const id of [andres, luis]) {
+      const account = (await superadmin.get(`/api/admin/billing/accounts/${id}`)).body as {
+        balanceCents: number;
+      };
+      assertEquals(account.balanceCents, 800);
+      const payments = (await superadmin.get(`/api/admin/billing/payments?studentId=${id}`))
+        .body as { items: { method: string; reconciled: boolean }[] };
+      assertEquals(payments.items.map((p) => [p.method, p.reconciled]), [['transfer', true]]);
+    }
+  });
+});

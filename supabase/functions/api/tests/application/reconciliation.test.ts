@@ -130,9 +130,13 @@ function setUp(lines: LedgerLine[]) {
           }
           : null,
       ),
-    register: (studentId, date) => {
-      calls.push(`cobro ${studentId} ${date}`);
+    register: (studentId, date, method) => {
+      calls.push(`cobro ${studentId} ${date}${method === 'card' ? ' tarjeta' : ''}`);
       return Promise.resolve(`payment-${studentId}`);
+    },
+    correct: (paymentId, totalCents, reason) => {
+      calls.push(`corrige ${paymentId} ${totalCents} ${reason}`);
+      return Promise.resolve();
     },
   };
   const reconcile = (movements: BankMovement[]) =>
@@ -173,6 +177,7 @@ Deno.test('ReconcileStatement should suggest moving to the bank day the card pay
     record: null,
     transfer: false,
     fees: [],
+    adjust: false,
   });
   assertEquals(calls, ['fecha p1 2026-09-10']);
   const again = (await reconcile(movements)).items[0]!;
@@ -225,6 +230,7 @@ Deno.test('ReconcileStatement should suggest recording an unknown receipt, remem
     record: { concept: 'Agua de octubre', category: 'utilities' },
     transfer: false,
     fees: [],
+    adjust: false,
   });
   assertEquals(calls, ['apunte expense 4376 utilities transfer']);
   assertEquals(memory.ruleMap.get('aguas del sur sa'), 'utilities');
@@ -252,6 +258,7 @@ Deno.test('ReconcileStatement should match bank expenses and never a cash one', 
         record: null,
         transfer: false,
         fees: [],
+        adjust: false,
       }),
     InvalidValue,
     'efectivo',
@@ -271,6 +278,7 @@ Deno.test('ReconcileStatement should suggest a transfer to cash for a withdrawal
     record: null,
     transfer: true,
     fees: [],
+    adjust: false,
   });
   assertEquals(calls, ['traspaso bank→cash 200000']);
 });
@@ -291,6 +299,7 @@ Deno.test('AcceptReconciliation should refuse choices that do not add up, are ta
       record: null,
       transfer: false,
       fees: [],
+      adjust: false,
     });
   await assertRejects(() => choose(['p2']), InvalidValue);
   await assertRejects(() => choose(['p3']), InvalidValue, 'tarjeta');
@@ -313,6 +322,7 @@ Deno.test('AcceptReconciliation should split a transfer between payments and new
     record: null,
     transfer: false,
     fees: ['pedro'],
+    adjust: false,
   });
   assertEquals(calls, ['cobro pedro 2026-10-02']);
   assertEquals(memory.saved.at(-1)!.targets, [
@@ -339,6 +349,7 @@ Deno.test('AcceptReconciliation should refuse fees that do not add up with the p
       record: null,
       transfer: false,
       fees,
+      adjust: false,
     });
   await assertRejects(() => choose(['ana']), InvalidValue, 'suma');
   await assertRejects(() => choose(['pedro']), InvalidValue, 'cuota');
@@ -502,6 +513,7 @@ Deno.test('ReconcileStatement should suggest charging the fee of a payer whose p
     record: null,
     transfer: false,
     fees: ['ana'],
+    adjust: false,
   });
   assertEquals(calls, ['cobro ana 2026-11-03']);
   assertEquals(memory.saved[0]!.targets, [{ source: 'payment', sourceId: 'payment-ana' }]);
@@ -523,9 +535,89 @@ Deno.test('AcceptReconciliation should refuse fees that do not add up to the mov
     (await reconcile(statement(['2026-11-03', 'Transferencia De Rosa Ruiz Duran', 9000])))
       .items[0]!.movement;
   await assertRejects(
-    () => accept.execute({ movement, items: [], record: null, transfer: false, fees: ['ana'] }),
+    () =>
+      accept.execute({
+        movement,
+        items: [],
+        record: null,
+        transfer: false,
+        fees: ['ana'],
+        adjust: false,
+      }),
     InvalidValue,
   );
+});
+
+Deno.test('AcceptReconciliation should split what was paid over the fees in favour of each student', async () => {
+  const { reconcile, accept, calls, feeCents } = setUp([]);
+  feeCents.set('ana', 3200).set('pedro', 3200);
+  const movement = (await reconcile(
+    statement(['2026-11-03', 'Transferencia De Luis Porras Wadley, Concepto Mensualidad', 8001]),
+  )).items[0]!.movement;
+  await accept.execute({
+    movement,
+    items: [],
+    record: null,
+    transfer: false,
+    fees: ['ana', 'pedro'],
+    adjust: true,
+  });
+  assertEquals(calls, [
+    'cobro ana 2026-11-03',
+    'corrige payment-ana 4001 pagado de más por transferencia el 03/11/2026, 8,01 € a su favor',
+    'cobro pedro 2026-11-03',
+    'corrige payment-pedro 4000 pagado de más por transferencia el 03/11/2026, 8,00 € a su favor',
+  ]);
+});
+
+Deno.test('AcceptReconciliation should leave pending what was paid under the fees', async () => {
+  const { reconcile, accept, calls, feeCents } = setUp([]);
+  feeCents.set('ana', 3200).set('pedro', 3200);
+  const [tiny, movement] = (await reconcile(statement(
+    ['2026-11-02', 'Transferencia De Luis Porras Wadley, Concepto Mensualidad', 1],
+    ['2026-11-03', 'Transferencia De Luis Porras Wadley, Concepto Mensualidad', 6000],
+  ))).items.map((i) => i.movement);
+  const choose = (m: BankMovement) =>
+    accept.execute({
+      movement: m!,
+      items: [],
+      record: null,
+      transfer: false,
+      fees: ['ana', 'pedro'],
+      adjust: true,
+    });
+  await assertRejects(() => choose(tiny!), InvalidValue, 'sin cobrar nada');
+  await choose(movement!);
+  assertEquals(calls.filter((c) => c.startsWith('corrige')), [
+    'corrige payment-ana 3000 pagado de menos por transferencia el 03/11/2026, faltan 2,00 €',
+    'corrige payment-pedro 3000 pagado de menos por transferencia el 03/11/2026, faltan 2,00 €',
+  ]);
+});
+
+Deno.test('AcceptReconciliation should charge a fee by card or record an income for a settlement', async () => {
+  const { reconcile, accept, calls } = setUp([]);
+  const items = (await reconcile(statement(
+    ['2026-11-02', 'Liquidacion Efectuada El 31/10/2026', 5500],
+    ['2026-11-04', 'Liquidacion Efectuada El 03/11/2026', 2300],
+  ))).items;
+  assertEquals(items.map((i) => i.day), ['2026-10-31', '2026-11-03']);
+  await accept.execute({
+    movement: items[0]!.movement,
+    items: [],
+    record: null,
+    transfer: false,
+    fees: ['ana'],
+    adjust: false,
+  });
+  await accept.execute({
+    movement: items[1]!.movement,
+    items: [],
+    record: { concept: 'Venta de libros', category: 'other_income' },
+    transfer: false,
+    fees: [],
+    adjust: false,
+  });
+  assertEquals(calls, ['cobro ana 2026-10-31 tarjeta', 'apunte income 2300 other_income card']);
 });
 
 Deno.test('ReleaseMatch should undo a match so it is chosen again and not matched on its own', async () => {
@@ -550,6 +642,7 @@ Deno.test('ReleaseMatch should undo a match so it is chosen again and not matche
     record: null,
     transfer: false,
     fees: [],
+    adjust: false,
   });
   assertEquals(memory.saved[0]!.targets, [{ source: 'payment', sourceId: 'p2' }]);
   assertEquals((await reconcile(movements)).items[0]!.matched.map((m) => m.sourceId), ['p2']);
