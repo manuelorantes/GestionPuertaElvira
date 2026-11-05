@@ -375,6 +375,17 @@ Table accounting_bank_rule {
   Note: 'Categoría elegida al conciliar, para proponerla la próxima vez'
 }
 
+Table accounting_bank_payer {
+  counterparty varchar(120) [not null, note: 'quien transfiere, sacado del concepto del banco']
+  student_id uuid [not null, ref: > students_student.id]
+  Note: 'Alumnos a los que paga cada remitente, recordados al conciliar sus transferencias'
+
+  indexes {
+    (counterparty, student_id) [pk]
+    student_id
+  }
+}
+
 Table accounting_expected_expense {
   id uuid [pk]
   concept varchar(120) [not null]
