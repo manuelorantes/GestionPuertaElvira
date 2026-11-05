@@ -43,7 +43,8 @@ El sistema MUST mostrar los movimientos del mes, del más reciente al más antig
 y los totales de ingresos, gastos y resultado. Los movimientos MUST salir de:
 
 - los cobros de Cobros (ingresos «Cuotas», «Cuota de socio» o «Venta de material»);
-- las liquidaciones pagadas al profesorado (gasto «Profesores», en la fecha de pago);
+- las liquidaciones pagadas al profesorado y sus anticipos (gasto «Profesores», en la fecha de pago y con la forma de
+  pago con que se pagaron; la liquidación, por lo que quedaba tras sus anticipos);
 - las facturas de proveedores pagadas (gasto de su categoría, en la fecha de pago);
 - los apuntes manuales.
 
