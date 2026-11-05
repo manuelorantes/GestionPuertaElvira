@@ -375,6 +375,16 @@ Table accounting_bank_rule {
   Note: 'Categoría elegida al conciliar, para proponerla la próxima vez'
 }
 
+Table accounting_bank_movement {
+  movement_key varchar(60) [pk, note: 'la misma huella que accounting_bank_match']
+  operation_date date [not null]
+  value_date date [not null]
+  concept varchar(300) [not null]
+  amount_cents integer [not null]
+  balance_cents integer [not null, note: 'saldo tras el movimiento']
+  Note: 'Movimientos de los extractos subidos a la conciliación; los que no están casados son lo del banco sin conciliar'
+}
+
 Table accounting_bank_payer {
   counterparty varchar(120) [not null, note: 'quien transfiere, sacado del concepto del banco']
   student_id uuid [not null, ref: > students_student.id]

@@ -1,4 +1,4 @@
-import { InvalidValue, LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
+import { type Clock, InvalidValue, LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
 import { FiscalYear, type Transfer, Treasury } from '../../domain/accounting/mod.ts';
 import {
   type BankMovement,
@@ -54,6 +54,10 @@ export interface BankMatchRepository {
   /** La categoría elegida para cada contraparte. */
   rules(): Promise<Map<string, string>>;
   saveRule(counterparty: string, category: string): Promise<void>;
+  /** Guarda los movimientos de un extracto subido (los ya guardados no cambian). */
+  saveMovements(movements: readonly BankMovement[]): Promise<void>;
+  /** Todos los movimientos de los extractos subidos. */
+  movements(): Promise<BankMovement[]>;
   /** Los alumnos a los que paga cada remitente de transferencias, según lo que se casó con ellas. */
   payerStudents(): Promise<Map<string, string[]>>;
   /** Añade alumnos a los que paga un remitente. */
@@ -356,6 +360,7 @@ export class ReconcileStatement {
       payerStudents,
     );
     await this.remember(items, stored);
+    await this.matches.saveMovements(statement.movements);
     return {
       from: statement.from,
       to: statement.to,
@@ -1082,24 +1087,34 @@ export class AcceptReconciliation {
       });
       return { targets: [{ source: 'transfer', sourceId: id }], students: [] };
     }
-    if (input.record) {
-      if (kind !== 'income' && kind !== 'expense' && kind !== 'card_settlement') {
-        throw new InvalidValue('record', 'Este movimiento no se apunta como ingreso ni gasto.');
-      }
-      const id = await this.actions.recordEntry({
-        date: appDay(m),
-        kind: kind === 'expense' ? 'expense' : 'income',
-        concept: input.record.concept,
-        category: input.record.category,
-        method: kind === 'card_settlement' || (kind === 'expense' && paidByCard(m))
-          ? 'card'
-          : 'transfer',
-        amountCents: amount,
-      });
-      await this.matches.saveRule(counterparty(m.concept), input.record.category);
-      return { targets: [{ source: 'manual', sourceId: id }], students: [] };
+    if (input.record && input.items.length === 0 && input.fees.length === 0) {
+      return { targets: [await this.record(m, kind, input.record, amount)], students: [] };
     }
     return await this.link(m, kind, amount, input, used);
+  }
+
+  /** Apunta un ingreso o gasto nuevo por ese importe con la forma de pago del movimiento y recuerda su categoría. */
+  private async record(
+    m: BankMovement,
+    kind: MovementKind,
+    record: { concept: string; category: string },
+    amountCents: number,
+  ): Promise<MatchTarget> {
+    if (kind !== 'income' && kind !== 'expense' && kind !== 'card_settlement') {
+      throw new InvalidValue('record', 'Este movimiento no se apunta como ingreso ni gasto.');
+    }
+    const id = await this.actions.recordEntry({
+      date: appDay(m),
+      kind: kind === 'expense' ? 'expense' : 'income',
+      concept: record.concept,
+      category: record.category,
+      method: kind === 'card_settlement' || (kind === 'expense' && paidByCard(m))
+        ? 'card'
+        : 'transfer',
+      amountCents,
+    });
+    await this.matches.saveRule(counterparty(m.concept), record.category);
+    return { source: 'manual', sourceId: id };
   }
 
   /**
@@ -1139,11 +1154,12 @@ export class AcceptReconciliation {
         'Algo de lo elegido ya está casado con otro movimiento del banco.',
       );
     }
-    const charges = this.feeAmounts(
-      quotes,
-      amount - sum(chosen) - quotes.reduce((a, b) => a + b, 0),
-      input.adjust,
-    );
+    // Lo que falta tras lo elegido se puede completar con un ingreso o gasto nuevo.
+    const left = amount - sum(chosen) - quotes.reduce((a, b) => a + b, 0);
+    if (input.record && left <= 0) {
+      throw new InvalidValue('record', 'Lo elegido ya suma el importe: no queda nada que apuntar.');
+    }
+    const charges = this.feeAmounts(quotes, input.record ? 0 : left, input.adjust);
     const expected = kind === 'expense'
       ? 'expense'
       : kind === 'card_settlement' || kind === 'income'
@@ -1195,6 +1211,7 @@ export class AcceptReconciliation {
       }
       charged.push({ source: 'payment', sourceId: id });
     }
+    if (input.record) charged.push(await this.record(m, kind, input.record, left));
     const studentOf = new Map(lines.map((l) => [`${l.source}:${l.sourceId}`, l.studentId]));
     const students = kind === 'income'
       ? [
@@ -1229,6 +1246,70 @@ export class QuoteFee {
     return {
       monthly: await this.fees.quote(studentId, day, 'monthly'),
       membership: await this.fees.quote(studentId, day, 'membership'),
+    };
+  }
+}
+
+/** Algo de la app con su importe con signo: lo que suma al banco en positivo y lo que resta, en negativo. */
+export interface PendingAppItem {
+  source: string;
+  sourceId: string;
+  date: string;
+  concept: string;
+  method: string;
+  amountCents: number;
+}
+
+export interface PendingReconciliationView {
+  /** Lo de tarjeta y transferencia del ejercicio (y los traspasos) que no está casado con el banco. */
+  app: { totalCents: number; items: PendingAppItem[] };
+  /** Los movimientos de los extractos subidos que no están casados con nada de la app. */
+  bank: { totalCents: number; items: BankMovement[] };
+}
+
+/**
+ * Lo que queda por conciliar a cada lado: en la app, lo que pasa por el banco en el ejercicio de hoy y no está casado;
+ * en el banco, lo de los extractos subidos que no casa con nada. Si todo estuviera conciliado, los dos serían cero.
+ */
+export class PendingReconciliation {
+  constructor(
+    private readonly ledger: LedgerQuery,
+    private readonly transfers: TransferRepository,
+    private readonly matches: BankMatchRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(): Promise<PendingReconciliationView> {
+    const month = YearMonth.of(LocalDate.fromInstant(this.clock.now()));
+    const first = FiscalYear.ofMonth(month).firstMonth();
+    const stored = (await this.matches.matches()).filter((m) => m.targets.length > 0);
+    const reconciled = new Set(stored.flatMap((m) => m.targets.map(keyOf)));
+    const matched = new Set(stored.map((m) => m.key));
+    const lines = (await this.ledger.linesBetween(first, month))
+      .filter((l) => BANK_METHODS.has(l.method) && l.amountCents !== 0)
+      .map(toItem);
+    const transfers = (await this.transfers.transfersBetween(first.firstDay(), month.lastDay()))
+      .map(transferItem);
+    const app = [...lines, ...transfers]
+      .filter((i) => !reconciled.has(keyOf(i)))
+      .map((i) => ({
+        source: i.source,
+        sourceId: i.sourceId,
+        date: i.date,
+        concept: i.concept,
+        method: i.method,
+        amountCents: i.kind === 'expense' || (i.kind === 'transfer' && i.method !== 'bank')
+          ? -i.amountCents
+          : i.amountCents,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    const bank = (await this.matches.movements())
+      .filter((m) => !matched.has(movementKey(m)))
+      .sort((a, b) => a.operationDate.localeCompare(b.operationDate));
+    const total = (amounts: number[]) => amounts.reduce((a, b) => a + b, 0);
+    return {
+      app: { totalCents: total(app.map((i) => i.amountCents)), items: app },
+      bank: { totalCents: total(bank.map((m) => m.amountCents)), items: bank },
     };
   }
 }
