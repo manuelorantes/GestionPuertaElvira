@@ -51,6 +51,8 @@ const SETTLEMENTS = [
     minutes: 360,
     rateCents: 1800,
     amountCents: 10800,
+    advancesCents: 0,
+    toPayCents: 10800,
     lines: [{ label: 'Adultos I', minutes: 360, amountCents: 10800 }],
     status: 'paid',
     paidOn: '2026-10-02',
@@ -62,6 +64,8 @@ const SETTLEMENTS = [
     minutes: 480,
     rateCents: 1600,
     amountCents: 12800,
+    advancesCents: 0,
+    toPayCents: 12800,
     lines: [{ label: 'Iniciación A', minutes: 480, amountCents: 12800 }],
     status: 'pending',
     paidOn: null,
@@ -996,11 +1000,13 @@ describe('Profesorado', () => {
     const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
     await userEvent.click(
       within(within(table).getByRole('row', { name: /Lucía/ })).getByRole('button', {
-        name: 'Marcar como pagada',
+        name: 'Pagar',
       }),
     );
+    const dialog = await screen.findByRole('dialog', { name: /Pagar la liquidación/ });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pagar' }));
 
-    expect(await screen.findByText(/temporada cerrada/)).toBeInTheDocument();
+    expect(await within(dialog).findByText(/temporada cerrada/)).toBeInTheDocument();
   });
 
   it('highlights «Horas» in the mobile bar only on the hours tab', async () => {
@@ -1015,7 +1021,12 @@ describe('Profesorado', () => {
   });
 
   it('shows the monthly settlements, their detail and pays a pending one', async () => {
-    const fetch = api({ 'POST /api/admin/payroll/settlements/t1/2026-09/payment': [204] });
+    const fetch = api({
+      'POST /api/admin/payroll/settlements/t1/2026-09/payment': [
+        200,
+        { status: 'paid', remainingCents: 0, advanceCents: 0 },
+      ],
+    });
     renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
 
     const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
@@ -1032,13 +1043,110 @@ describe('Profesorado', () => {
       within(lucia).getByRole('button', { name: 'Ver detalle de Lucía Moreno Gil' }),
     );
     expect(within(table).getByText('Iniciación A · 8 h')).toBeInTheDocument();
-    await userEvent.click(within(lucia).getByRole('button', { name: 'Marcar como pagada' }));
+    await userEvent.click(within(lucia).getByRole('button', { name: 'Pagar' }));
+
+    // El diálogo de pago, relleno: concepto, categoría y lo que queda; se elige la forma de pago.
+    const dialog = await screen.findByRole('dialog', {
+      name: 'Pagar la liquidación de Lucía Moreno Gil',
+    });
+    expect(dialog).toHaveTextContent('Liquidación de septiembre 2026 · Lucía Moreno Gil');
+    expect(dialog).toHaveTextContent('Profesores');
+    expect(within(dialog).getByLabelText('Importe pagado (€)')).toHaveValue('128');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Forma de pago'), 'cash');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pagar' }));
 
     expect(await screen.findByText('Liquidación de Lucía Moreno Gil pagada')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/admin/payroll/settlements/t1/2026-09/payment',
-      expect.objectContaining({ method: 'POST' }),
+    const sent = fetch.mock.calls.find(
+      ([url]) => url === '/api/admin/payroll/settlements/t1/2026-09/payment',
     );
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ amount: '128', method: 'cash' });
+  });
+
+  it('pays part of a settlement, after confirming, and leaves the rest pending', async () => {
+    const fetch = api({
+      'POST /api/admin/payroll/settlements/t1/2026-09/payment': [
+        200,
+        { status: 'partial', remainingCents: 2800, advanceCents: 0 },
+      ],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
+
+    const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
+    await userEvent.click(
+      within(within(table).getByRole('row', { name: /Lucía/ })).getByRole('button', {
+        name: 'Pagar',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: /Pagar la liquidación/ });
+    const amount = within(dialog).getByLabelText('Importe pagado (€)');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '100');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pagar' }));
+
+    const confirm = await screen.findByRole('dialog', { name: 'Pago parcial' });
+    expect(confirm).toHaveTextContent('Se apuntan 100,00 € a cuenta y quedan 28,00 € por pagar');
+    expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/payment'))).toBe(false);
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Pagar 100,00 €' }));
+
+    expect(
+      await screen.findByText('Pago parcial de Lucía Moreno Gil: quedan 28,00 € por pagar'),
+    ).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(([url]) => String(url).endsWith('/t1/2026-09/payment'));
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ amount: '100' });
+  });
+
+  it('pays more than owed, after confirming, and keeps the excess as an advance of next month', async () => {
+    api({
+      'POST /api/admin/payroll/settlements/t1/2026-09/payment': [
+        200,
+        { status: 'paid', remainingCents: 0, advanceCents: 2200 },
+      ],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
+
+    const table = await screen.findByRole('table', { name: 'Liquidación de septiembre 2026' });
+    await userEvent.click(
+      within(within(table).getByRole('row', { name: /Lucía/ })).getByRole('button', {
+        name: 'Pagar',
+      }),
+    );
+    const dialog = await screen.findByRole('dialog', { name: /Pagar la liquidación/ });
+    const amount = within(dialog).getByLabelText('Importe pagado (€)');
+    await userEvent.clear(amount);
+    await userEvent.type(amount, '150');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pagar' }));
+
+    const confirm = await screen.findByRole('dialog', { name: 'Pago de más' });
+    expect(confirm).toHaveTextContent(
+      'Pagas 22,00 € de más: se apuntan como anticipo de octubre 2026',
+    );
+    await userEvent.click(within(confirm).getByRole('button', { name: 'Pagar 150,00 €' }));
+
+    expect(
+      await screen.findByText(
+        'Liquidación de Lucía Moreno Gil pagada; 22,00 € como anticipo de octubre 2026',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('pays every pending settlement of the month with the chosen method and date', async () => {
+    const fetch = api({
+      'POST /api/admin/payroll/settlements/2026-09/payment': [200, { paid: 1 }],
+    });
+    renderApp('/panel/profesores?mes=2026-09&pestana=liquidacion');
+
+    // Lo pendiente: lo que queda por pagar de cada una.
+    await userEvent.click(await screen.findByRole('button', { name: 'Pagar todas' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Pagar todas las liquidaciones' });
+    expect(dialog).toHaveTextContent('1 liquidación de septiembre 2026 por 128,00 €');
+    await userEvent.selectOptions(within(dialog).getByLabelText('Forma de pago'), 'card');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Pagar todas' }));
+
+    expect(await screen.findByText('1 liquidaciones pagadas')).toBeInTheDocument();
+    const sent = fetch.mock.calls.find(
+      ([url]) => url === '/api/admin/payroll/settlements/2026-09/payment',
+    );
+    expect(JSON.parse(String(sent?.[1]?.body))).toMatchObject({ method: 'card' });
   });
 
   it('lets superadministration change the payment date of a paid settlement, after confirming', async () => {

@@ -2,8 +2,8 @@ import { ChevronDown, ChevronRight, Pencil, Printer } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
 import { formatCents, monthLabel } from '@/features/billing/money';
-import { payAllSettlements, paySettlement, type Settlement } from '@/features/payroll/api';
-import { usePayrollMutation, useSettlements } from '@/features/payroll/hooks';
+import type { Settlement } from '@/features/payroll/api';
+import { useSettlements } from '@/features/payroll/hooks';
 import { hoursLabel } from '@/features/payroll/hours';
 import { formatDate } from '@/features/students/format';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -12,10 +12,9 @@ import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
-import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
-import { useToast } from '@/shared/ui/Toast';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
 
+import { PayAllSettlementsDialog, PaySettlementDialog } from './PaySettlementDialog';
 import { SettlementPaymentDateDialog } from './SettlementPaymentDateDialog';
 import { SettlementSheetDialog } from './SettlementSheetDialog';
 import { TeacherLink } from './TeacherLink';
@@ -38,13 +37,11 @@ export function SettlementsTab({ month }: { month: string }) {
   const settlements = useSettlements(month);
   const [open, setOpen] = useState<string | null>(null);
   const [printing, setPrinting] = useState<string | null>(null);
-  const [confirmAll, setConfirmAll] = useState(false);
+  const [payingAll, setPayingAll] = useState(false);
+  const [paying, setPaying] = useState<Settlement | null>(null);
   const [editing, setEditing] = useState<Settlement | null>(null);
   // Cambiar una liquidación ya pagada es cosa de superadministración.
   const canEdit = useSession().data?.role === 'superadministrator';
-  const pay = usePayrollMutation((s: Settlement) => paySettlement(s.teacherId, month));
-  const payAll = usePayrollMutation(() => payAllSettlements(month));
-  const toast = useToast();
   const { header, apply } = useTableSort(COLUMNS, { key: 'teacher' });
   const items = settlements.data ?? [];
   const pending = items.filter((s) => s.status === 'pending');
@@ -55,7 +52,6 @@ export function SettlementsTab({ month }: { month: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      {pay.isError && <Alert>{apiErrorMessage(pay.error)}</Alert>}
       <Card className="flex flex-wrap items-center gap-6 px-6 py-5">
         <div className="flex-[1_1_280px]">
           <h2 className="font-display text-xl font-semibold tracking-[0.04em] uppercase">
@@ -74,12 +70,10 @@ export function SettlementsTab({ month }: { month: string }) {
         <div>
           <p className="text-[13px] text-ink-muted">Pendiente · {pending.length}</p>
           <p className="font-display text-[28px] font-bold text-warning-fg">
-            {formatCents(pending.reduce((sum, s) => sum + s.amountCents, 0))}
+            {formatCents(pending.reduce((sum, s) => sum + Math.max(s.toPayCents, 0), 0))}
           </p>
         </div>
-        {pending.length > 0 && (
-          <Button onClick={() => setConfirmAll(true)}>Marcar todas como pagadas</Button>
-        )}
+        {pending.length > 0 && <Button onClick={() => setPayingAll(true)}>Pagar todas</Button>}
       </Card>
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[860px] text-left text-sm">
@@ -151,16 +145,10 @@ export function SettlementsTab({ month }: { month: string }) {
                       {s.status === 'pending' && (
                         <button
                           type="button"
-                          disabled={pay.isPending}
-                          onClick={() =>
-                            void pay.mutateAsync(s).then(
-                              () => toast(`Liquidación de ${s.teacherName} pagada`),
-                              () => undefined,
-                            )
-                          }
+                          onClick={() => setPaying(s)}
                           className="inline-flex h-9 cursor-pointer items-center rounded-sm bg-brand px-3 text-[13px] font-semibold text-surface-raised hover:bg-brand-strong"
                         >
-                          Marcar como pagada
+                          Pagar
                         </button>
                       )}
                       {s.status === 'paid' && canEdit && (
@@ -218,26 +206,12 @@ export function SettlementsTab({ month }: { month: string }) {
           onClose={() => setEditing(null)}
         />
       )}
-      {confirmAll && (
-        <ConfirmDialog
-          title="Marcar todas como pagadas"
-          message={`Se marcarán como pagadas ${pending.length} liquidaciones de ${monthLabel(month).toLowerCase()} con fecha de hoy.`}
-          confirmLabel="Marcar como pagadas"
-          busy={payAll.isPending}
-          error={payAll.isError ? apiErrorMessage(payAll.error) : null}
-          onCancel={() => {
-            payAll.reset();
-            setConfirmAll(false);
-          }}
-          onConfirm={() =>
-            void payAll.mutateAsync(undefined).then(
-              (paid) => {
-                toast(`${paid} liquidaciones pagadas`);
-                setConfirmAll(false);
-              },
-              () => undefined,
-            )
-          }
+      {paying && <PaySettlementDialog settlement={paying} onClose={() => setPaying(null)} />}
+      {payingAll && (
+        <PayAllSettlementsDialog
+          month={month}
+          pending={pending.filter((s) => s.minutes > 0)}
+          onClose={() => setPayingAll(false)}
         />
       )}
     </div>
