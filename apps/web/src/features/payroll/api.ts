@@ -86,11 +86,23 @@ export interface UpcomingSession {
   substitution: boolean;
 }
 
-/** Las sesiones del mes, sus festivos y, al mirar un profesor, lo que aún le queda por dar (vacío si no). */
+/** Una clase o turno del profesor que ese día dio otro. */
+export interface SubstitutedClass {
+  date: string;
+  /** Clase o turno. */
+  label: string;
+  substituteName: string;
+}
+
+/**
+ * Las sesiones del mes, sus festivos y, al mirar un profesor, lo que aún le queda por dar y los días en que le
+ * sustituyeron (vacíos si no).
+ */
 export interface MonthSessions {
   items: Session[];
   upcoming: UpcomingSession[];
   holidays: Holiday[];
+  substitutedBy: SubstitutedClass[];
 }
 
 export function fetchSessions(month: string, teacherId: string): Promise<MonthSessions> {

@@ -366,6 +366,7 @@ function SessionsSection({
         sessions={items}
         upcoming={sessions.data?.upcoming ?? []}
         holidays={sessions.data?.holidays ?? []}
+        substitutedBy={sessions.data?.substitutedBy ?? []}
       />
       {items.length === 0 ? (
         <Empty>Sin sesiones en {monthLabel(month).toLowerCase()}.</Empty>
