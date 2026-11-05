@@ -78,6 +78,9 @@ Si al darse de baja se canceló su cuota de socio y vuelve a darse de alta en la
 esa cuota MUST volver a deberse (lo que se hubiera cobrado de ella sigue contando).
 Cualquier alumno que no haya pagado la cuota de socio de la temporada MUST poder pagarla desde «Registrar cobro»
 (concepto «Cuota de socio»); al pagarla pasa a ser socio.
+Al conciliar con el banco se MUST poder cobrar a cualquier alumno, también a un socio provisional, un **pago a cuenta**
+(concepto «Pago a cuenta»): un recibo de cuotas sin meses por el importe que se indique,
+que queda entero como saldo a favor y cubre sus próximas cuotas (para el dinero que llega sin saber aún a qué va).
 Los pedidos de [material deportivo](../material/spec.md) con precio MUST generar un cobro que sale con las cuotas del
 mes en que se pidió (y de los meses siguientes mientras quede algo pendiente), con el producto como concepto, y se cobra
 con el concepto «Material» de «Registrar cobro» eligiendo el pedido. Ese cobro no se cancela desde «Cuotas»: se cancela
