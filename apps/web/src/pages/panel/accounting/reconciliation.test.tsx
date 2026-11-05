@@ -528,6 +528,89 @@ describe('bank reconciliation', () => {
     });
   });
 
+  it('completes the payments of a settlement with a new income for the rest', async () => {
+    const fetch = api();
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const settlement = (await screen.findByText('Liquidacion Efectuada El 10/09/2026')).closest(
+      'li',
+    ) as HTMLElement;
+    await userEvent.click(within(settlement).getByRole('checkbox', { name: /Cuota · p2/ }));
+    await userEvent.click(
+      within(settlement).getByRole('checkbox', { name: /Apuntar lo que falta \(40,00 €\)/ }),
+    );
+    expect(settlement).toHaveTextContent('40,00 € se apuntará como un ingreso nuevo');
+    const concept = within(settlement).getByLabelText('Concepto');
+    await userEvent.clear(concept);
+    await userEvent.type(concept, 'Venta de libros');
+    await userEvent.click(within(settlement).getByRole('button', { name: 'Casar con lo elegido' }));
+
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toEqual({
+      movement: MOVEMENTS[1],
+      items: [{ source: 'payment', sourceId: 'p2' }],
+      record: { concept: 'Venta de libros', category: 'other_income' },
+      transfer: false,
+      fees: [],
+      adjust: false,
+    });
+  });
+
+  it('shows under the balances what is left to reconcile in the app and in the bank', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/accounting/balances': [200, { clubCents: 0, bankCents: 0, cashCents: 0 }],
+      'GET /api/admin/accounting/categories': [200, { items: CATEGORIES }],
+      'GET /api/admin/accounting/reconciliation/pending': [
+        200,
+        {
+          app: {
+            totalCents: 1800,
+            items: [
+              {
+                source: 'payment',
+                sourceId: 'p2',
+                date: '2026-10-02',
+                concept: 'Octubre · Ana',
+                method: 'transfer',
+                amountCents: 3000,
+              },
+              {
+                source: 'manual',
+                sourceId: 'e1',
+                date: '2026-10-05',
+                concept: 'Cuerdas',
+                method: 'card',
+                amountCents: -1200,
+              },
+            ],
+          },
+          bank: {
+            totalCents: 700,
+            items: [{ ...MOVEMENTS[0], concept: 'Transferencia De Quien Sea', amountCents: 700 }],
+          },
+        },
+      ],
+    });
+    renderApp('/panel/contabilidad');
+
+    expect(await screen.findByText('En la app sin conciliar')).toBeInTheDocument();
+    expect(await screen.findByText('18,00 €')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '2 sin conciliar' }));
+    expect(screen.getByText('Cuerdas')).toBeInTheDocument();
+    expect(screen.getByText(/^.12,00 €$/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: '1 sin conciliar' }));
+    expect(screen.getByText('Transferencia De Quien Sea')).toBeInTheDocument();
+  });
+
+  it('does not show what is left to reconcile to administration', async () => {
+    api(ADMIN);
+    renderApp('/panel/contabilidad');
+    expect(await screen.findByText('Saldo en caja')).toBeInTheDocument();
+    expect(screen.queryByText('En la app sin conciliar')).not.toBeInTheDocument();
+  });
+
   it('is only offered to superadministration', async () => {
     api(ADMIN);
     renderApp('/panel/contabilidad?pestana=conciliacion');
