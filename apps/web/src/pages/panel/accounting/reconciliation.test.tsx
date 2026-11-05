@@ -68,6 +68,7 @@ const VIEW = {
           method: 'transfer',
         },
         transfer: null,
+        fees: [],
       },
     }),
     item(1, {
@@ -104,6 +105,7 @@ function api(user: typeof SUPERADMIN | typeof ADMIN = SUPERADMIN) {
       [200, MATCHED],
     ],
     'POST /api/admin/accounting/reconciliation/accept': [204],
+    'POST /api/admin/accounting/reconciliation/release': [204],
   });
 }
 
@@ -146,6 +148,7 @@ describe('bank reconciliation', () => {
         items: [],
         record: { concept: 'Agua de octubre', category: 'utilities' },
         transfer: false,
+        fees: [],
       },
     ]);
     expect(await screen.findByText('Todo cuadra con el banco.')).toBeInTheDocument();
@@ -175,7 +178,79 @@ describe('bank reconciliation', () => {
       ],
       record: null,
       transfer: false,
+      fees: [],
     });
+  });
+
+  it('charges the fee of a transfer nobody recorded and undoes a match', async () => {
+    const transfer = {
+      operationDate: '2026-11-03',
+      valueDate: '2026-11-03',
+      concept: 'Transferencia De Rosa Ruiz Duran, Concepto Ana Noviembre',
+      amountCents: 5500,
+      balanceCents: 105500,
+    };
+    const fee = {
+      ...item(0, {}),
+      movement: transfer,
+      kind: 'income',
+      status: 'suggested',
+      note: 'Es la cuota de quien paga, que aún no está cobrada.',
+      proposal: {
+        items: [],
+        changes: [
+          'Cobrar a Ana Gil Ruiz «Noviembre 2026» (55,00 €) por transferencia el 03/11/2026',
+        ],
+        record: null,
+        transfer: null,
+        fees: [
+          {
+            studentId: 'ana',
+            student: 'Ana Gil Ruiz',
+            concept: 'Noviembre 2026',
+            amountCents: 5500,
+          },
+        ],
+      },
+    };
+    const matched = {
+      ...fee,
+      status: 'matched',
+      note: 'Casado al conciliar.',
+      matched: [{ ...payment('payment-ana', 5500), date: '2026-11-03' }],
+      proposal: null,
+    };
+    const one = (i: object) => ({ ...VIEW, items: [i] });
+    const fetch = mockApi({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/accounting/balances': [200, { clubCents: 0, bankCents: 0, cashCents: 0 }],
+      'GET /api/admin/accounting/categories': [200, { items: CATEGORIES }],
+      'POST /api/admin/accounting/reconciliation': [
+        [200, one(fee)],
+        [200, one(matched)],
+        [200, one(fee)],
+      ],
+      'POST /api/admin/accounting/reconciliation/accept': [204],
+      'POST /api/admin/accounting/reconciliation/release': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const row = (await screen.findByText(transfer.concept)).closest('li') as HTMLElement;
+    expect(row).toHaveTextContent('Cobrar a Ana Gil Ruiz «Noviembre 2026» (55,00 €)');
+    await userEvent.click(within(row).getByRole('button', { name: 'Aceptar' }));
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toMatchObject({
+      movement: transfer,
+      fees: ['ana'],
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /Cuadran/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Deshacer' }));
+    expect(await screen.findByText('Casamiento deshecho')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/release')).toEqual([
+      { movement: transfer },
+    ]);
   });
 
   it('is only offered to superadministration', async () => {

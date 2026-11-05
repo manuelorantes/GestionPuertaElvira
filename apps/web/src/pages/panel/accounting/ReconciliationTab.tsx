@@ -10,6 +10,7 @@ import {
   type ReconciliationAppItem,
   type ReconciliationItem,
   reconcileStatement,
+  releaseReconciliation,
 } from '@/features/accounting/api';
 import { useAccountingMutation, useCategoryOptions } from '@/features/accounting/hooks';
 import { type BankMovement, readStatement, StatementError } from '@/features/accounting/statement';
@@ -79,8 +80,8 @@ export function ReconciliationTab() {
         <div>
           <h2 className="font-display text-lg font-bold">Conciliar con el banco</h2>
           <p className="text-sm text-ink-muted">
-            Sube el extracto de la cuenta (Excel o PDF de la banca online). Nada cambia hasta que
-            aceptes cada sugerencia.
+            Sube el extracto de la cuenta (Excel o PDF de la banca online). Lo que cuadra queda
+            recordado; lo demás no cambia hasta que aceptes cada sugerencia.
           </p>
         </div>
         <label htmlFor={inputId} className="shrink-0">
@@ -205,6 +206,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const categories = useCategoryOptions(proposal?.record?.kind ?? 'expense');
   const accept = useAccountingMutation(acceptReconciliation);
+  const release = useAccountingMutation(releaseReconciliation);
   const toast = useToast();
   const target = Math.abs(movement.amountCents);
   const fixedSum = item.fixed.reduce((sum, i) => sum + i.amountCents, 0);
@@ -229,6 +231,16 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
       items: proposal.items.map(({ source, sourceId }) => ({ source, sourceId })),
       record: proposal.record ? { concept: concept.trim(), category } : null,
       transfer: proposal.transfer !== null,
+      fees: proposal.fees.map((f) => f.studentId),
+    });
+  }
+
+  function undo() {
+    release.mutate(movement, {
+      onSuccess: () => {
+        toast('Casamiento deshecho');
+        onAccepted();
+      },
     });
   }
 
@@ -256,6 +268,19 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
             </li>
           ))}
         </ul>
+      )}
+      {item.status === 'matched' && (
+        <div>
+          <Button
+            size="md"
+            variant="ghost"
+            busy={release.isPending}
+            busyLabel="Deshaciendo…"
+            onClick={undo}
+          >
+            Deshacer
+          </Button>
+        </div>
       )}
       {proposal && !choosing && (
         <div className="flex flex-col gap-3 rounded-sm bg-surface-muted p-3">
@@ -363,6 +388,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
                   })),
                   record: null,
                   transfer: false,
+                  fees: [],
                 })
               }
             >
@@ -377,6 +403,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
         </fieldset>
       )}
       {accept.isError && <Alert>{apiErrorMessage(accept.error)}</Alert>}
+      {release.isError && <Alert>{apiErrorMessage(release.error)}</Alert>}
     </Card>
   );
 }
