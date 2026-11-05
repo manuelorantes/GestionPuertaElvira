@@ -343,6 +343,15 @@ export interface ReconciliationAppItem {
   category: string;
   method: string;
   amountCents: number;
+  period: string;
+}
+
+/** Una cuota que se propone cobrar por transferencia. */
+interface ReconciliationFee {
+  studentId: string;
+  student: string;
+  concept: string;
+  amountCents: number;
 }
 
 export interface ReconciliationItem {
@@ -362,6 +371,7 @@ export interface ReconciliationItem {
       method: string;
     } | null;
     transfer: { from: 'bank' | 'cash'; to: 'bank' | 'cash' } | null;
+    fees: ReconciliationFee[];
   } | null;
   candidates: ReconciliationAppItem[];
   fixed: ReconciliationAppItem[];
@@ -380,6 +390,8 @@ export interface ReconciliationAcceptance {
   items: { source: string; sourceId: string }[];
   record: { concept: string; category: string } | null;
   transfer: boolean;
+  /** Alumnos a los que se cobra una cuota por transferencia. */
+  fees: string[];
 }
 
 export function reconcileStatement(movements: BankMovement[]): Promise<Reconciliation> {
@@ -388,4 +400,9 @@ export function reconcileStatement(movements: BankMovement[]): Promise<Reconcili
 
 export function acceptReconciliation(acceptance: ReconciliationAcceptance): Promise<void> {
   return apiSend('POST', '/api/admin/accounting/reconciliation/accept', acceptance);
+}
+
+/** Deshace el casamiento de un movimiento: vuelve a salir para elegir lo suyo y ya no casa solo. */
+export function releaseReconciliation(movement: BankMovement): Promise<void> {
+  return apiSend('POST', '/api/admin/accounting/reconciliation/release', { movement });
 }
