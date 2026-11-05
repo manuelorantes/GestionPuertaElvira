@@ -54,6 +54,7 @@ import {
 } from '../persistence/accounting.ts';
 import { SqlClosedPeriods, SqlPaymentRepository } from '../persistence/billing.ts';
 import { ChangePaymentMethod } from '../../application/billing/mod.ts';
+import { SqlReconciledItems } from '../persistence/reconciliation.ts';
 
 /** El tipo se deduce del contenido, no de lo que declare el navegador. */
 export function sniffMimeType(bytes: Uint8Array): string {
@@ -149,6 +150,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
       api.deps.clock,
     ),
     transfers: new SqlTransferRepository(scope.tx),
+    reconciled: new SqlReconciledItems(scope.tx),
     treasury: new TreasuryBalances(
       new SqlLedgerQuery(scope.tx),
       new SqlAccountingRepository(scope.tx),
@@ -160,9 +162,10 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   api.defineRoute(admin('GET', '/api/admin/accounting/ledger'), async (c, scope) => {
     const month = c.req.query('month');
     if (!month) throw new InvalidValue('month', 'Indica el mes (AAAA-MM).');
-    const { ledger, accounting } = repos(scope);
+    const { ledger, accounting, reconciled } = repos(scope);
     const view = await new MonthLedger(ledger, accounting).execute(month);
     const catalog = await accounting.catalog();
+    const bank = await reconciled.keys();
     return c.json({
       month: view.month,
       incomeCents: view.incomeCents,
@@ -172,6 +175,7 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
         ...l,
         categoryLabel: catalog.label(l.category),
         methodLabel: methodLabel(methodFromName(l.method)),
+        reconciled: bank.has(`${l.source}:${l.sourceId}`),
       })),
     });
   });
@@ -195,11 +199,12 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   // Editar un movimiento del libro: el «source» y «sourceId» van en el cuerpo (los de Profesorado llevan «/»).
   api.defineRoute(admin('PUT', '/api/admin/accounting/movements'), async (c, scope) => {
     const b = await JsonBody.from(c.req.raw);
-    const { accounting, closed, ledger } = repos(scope);
+    const { accounting, closed, ledger, reconciled } = repos(scope);
     const payments = new SqlPaymentRepository(scope.tx);
     await new EditMovement(accounting, accounting, closed, accounting, ledger, accounting, {
-      changePaymentMethod: (id, method) => new ChangePaymentMethod(payments).execute(id, method),
-    }).execute({
+      changePaymentMethod: (id, method) =>
+        new ChangePaymentMethod(payments, reconciled).execute(id, method),
+    }, reconciled).execute({
       source: b.requiredString('source'),
       sourceId: b.requiredString('sourceId'),
       month: b.requiredString('month'),
@@ -218,8 +223,8 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   });
 
   api.defineRoute(admin('DELETE', '/api/admin/accounting/entries/:id'), async (c, scope) => {
-    const { accounting, closed } = repos(scope);
-    await new DeleteEntry(accounting, closed).execute(param(c, 'id'));
+    const { accounting, closed, reconciled } = repos(scope);
+    await new DeleteEntry(accounting, closed, reconciled).execute(param(c, 'id'));
     return c.body(null, 204);
   });
 
@@ -296,8 +301,8 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
     { method: 'PUT', path: '/api/admin/accounting/invoices/:id', access: 'superadmin' },
     async (c, scope) => {
       const b = await JsonBody.from(c.req.raw);
-      const { accounting, closed } = repos(scope);
-      await new AmendInvoice(accounting, closed, accounting).execute(param(c, 'id'), {
+      const { accounting, closed, reconciled } = repos(scope);
+      await new AmendInvoice(accounting, closed, accounting, reconciled).execute(param(c, 'id'), {
         date: b.requiredString('date'),
         number: b.optionalString('number') ?? '',
         supplier: b.requiredString('supplier'),
@@ -402,8 +407,8 @@ export function registerAccountingRoutes(api: ApiApp, storage: DocumentStorage):
   });
 
   api.defineRoute(admin('DELETE', '/api/admin/accounting/transfers/:id'), async (c, scope) => {
-    const { transfers, closed } = repos(scope);
-    await new DeleteTransfer(transfers, closed).execute(param(c, 'id'));
+    const { transfers, closed, reconciled } = repos(scope);
+    await new DeleteTransfer(transfers, closed, reconciled).execute(param(c, 'id'));
     return c.body(null, 204);
   });
 

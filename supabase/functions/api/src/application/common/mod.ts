@@ -28,3 +28,26 @@ export class PeriodClosed extends Error {
     if (await periods.isClosed(date)) throw new PeriodClosed();
   }
 }
+
+/**
+ * Lo conciliado con el extracto del banco (cobros, apuntes, facturas y traspasos casados con un movimiento): su forma de
+ * pago, su fecha y su importe ya no cambian ni se borra, salvo deshaciendo antes la conciliación.
+ */
+export interface ReconciledItems {
+  isReconciled(source: string, sourceId: string): Promise<boolean>;
+}
+
+export class ReconciledWithBank extends Error {
+  constructor() {
+    super(
+      'Está conciliado con el banco: no se puede cambiar su forma de pago, fecha ni importe, ni borrar. ' +
+        'Si está mal, deshaz antes la conciliación.',
+    );
+    this.name = 'ReconciledWithBank';
+  }
+
+  /** Falla si lo indicado está conciliado: se llama solo cuando el cambio toca lo que cuadra con el banco. */
+  static async guard(items: ReconciledItems, source: string, sourceId: string): Promise<void> {
+    if (await items.isReconciled(source, sourceId)) throw new ReconciledWithBank();
+  }
+}

@@ -29,7 +29,7 @@ import {
   type SupplierInvoiceRepository,
   type TransferRepository,
 } from '../../src/application/accounting/mod.ts';
-import type { ClosedPeriods } from '../../src/application/common/mod.ts';
+import type { ClosedPeriods, ReconciledItems } from '../../src/application/common/mod.ts';
 import { FrozenClock } from './identity.ts';
 
 /** Dobles en memoria de Accounting; el libro se compone de apuntes, facturas pagadas y líneas externas. */
@@ -45,8 +45,15 @@ export class AccountingFixture
     LedgerCorrections,
     PaymentMethods,
     TransferRepository,
-    ExpectedExpenseRepository {
+    ExpectedExpenseRepository,
+    ReconciledItems {
   expectedList = new Map<string, ExpectedExpense>();
+  /** Lo conciliado con el banco, como «source:sourceId». */
+  reconciledKeys = new Set<string>();
+
+  isReconciled(source: string, sourceId: string): Promise<boolean> {
+    return Promise.resolve(this.reconciledKeys.has(`${source}:${sourceId}`));
+  }
   /** «gasto/mes» → id del apunte con que se pagó, o null si se saltó. */
   expectedMonths = new Map<string, string | null>();
 

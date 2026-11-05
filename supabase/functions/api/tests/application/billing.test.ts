@@ -13,6 +13,7 @@ import {
 import {
   AdjustCharge,
   CancelCharge,
+  ChangePaymentMethod,
   ChargeNotFound,
   CorrectPaymentAmount,
   DeletePayment,
@@ -29,13 +30,14 @@ import {
   ReactivateCharge,
   RecalculateCharges,
   RegisterPayment,
+  ReschedulePayment,
   ResetCharge,
   SetChargeDiscount,
   type SettingsInput,
   UpdateBillingSettings,
   UpdateStudentAccount,
 } from '../../src/application/billing/mod.ts';
-import { PeriodClosed } from '../../src/application/common/mod.ts';
+import { PeriodClosed, ReconciledWithBank } from '../../src/application/common/mod.ts';
 import { BillingFixture } from '../support/billing.ts';
 
 function generate(fx: BillingFixture, month: string): Promise<void> {
@@ -683,7 +685,7 @@ Deno.test('Paying what was raised by hand should cover that charge, not the next
   assertEquals(await pending(), [100, 2000]);
 
   // Corregir el recibo de septiembre con el euro que faltaba lo deja cobrado.
-  await new CorrectPaymentAmount(fx, fx).execute(september, 4600, 'Faltaba un euro');
+  await new CorrectPaymentAmount(fx, fx, fx).execute(september, 4600, 'Faltaba un euro');
   assertEquals(await pending(), [0, 2000]);
 
   // Lo mismo al cobrar un mes: paga lo que le faltaba a ese mes.
@@ -748,7 +750,7 @@ Deno.test('DeletePayment should uncover what it paid, give back its points and r
       redeemPoints: 5,
     });
   assertEquals((await account(fx, id)).charges[0]?.pendingCents, 0);
-  const deletion = new DeletePayment(fx, fx, fx);
+  const deletion = new DeletePayment(fx, fx, fx, fx);
 
   await assertRejects(() => deletion.execute(paymentId, ' '), InvalidValue, 'motivo');
   const deleted = await deletion.execute(paymentId, 'Anotado dos veces');
@@ -767,4 +769,37 @@ Deno.test('DeletePayment should uncover what it paid, give back its points and r
   const closed = await register(fx, id, 1);
   fx.closedDates = ['2026-10-02'];
   await assertRejects(() => deletion.execute(closed, 'Error'), PeriodClosed);
+});
+
+Deno.test('a payment reconciled with the bank should keep its method, date and amount and not be deleted', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-10');
+  const paymentId = await register(fx, id, 1);
+  fx.reconciledKeys.add(`payment:${paymentId}`);
+  const total = (await fx.payment(PaymentId.fromString(paymentId)))!.total.cents;
+
+  await assertRejects(
+    () => new ChangePaymentMethod(fx, fx).execute(paymentId, 'cash'),
+    ReconciledWithBank,
+  );
+  await assertRejects(
+    () => new ReschedulePayment(fx, fx.clock, fx).execute(paymentId, '2026-10-01'),
+    ReconciledWithBank,
+  );
+  await assertRejects(
+    () => new CorrectPaymentAmount(fx, fx, fx).execute(paymentId, total + 100, 'Otro'),
+    ReconciledWithBank,
+  );
+  await assertRejects(
+    () => new DeletePayment(fx, fx, fx, fx).execute(paymentId, 'Error'),
+    ReconciledWithBank,
+  );
+  // Lo que no toca al banco sigue igual.
+  await new ChangePaymentMethod(fx, fx).execute(paymentId, 'transfer');
+  await new ReschedulePayment(fx, fx.clock, fx).execute(paymentId, '2026-10-02');
+
+  fx.reconciledKeys.clear();
+  await new ChangePaymentMethod(fx, fx).execute(paymentId, 'cash');
+  assertEquals((await fx.payment(PaymentId.fromString(paymentId)))!.method, 'cash');
 });

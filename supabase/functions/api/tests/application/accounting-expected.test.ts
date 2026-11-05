@@ -99,7 +99,7 @@ Deno.test('each month an expected expense is pending until paid for what it real
 
   // «Volver a esperarlo» deshace el salto; quitar el apunte deja el mes pendiente otra vez.
   await new RestoreExpectedMonth(fx, fx).execute(rent, '2026-11');
-  await new DeleteEntry(fx, fx).execute(entryId);
+  await new DeleteEntry(fx, fx, fx).execute(entryId);
   assertEquals((await ofMonth('2026-11')).map((m) => m[1]), ['pending', 'pending']);
 
   // Pagar un mes saltado lo deja pagado.

@@ -31,7 +31,12 @@ import {
   TransferId,
   Treasury,
 } from '../../domain/accounting/mod.ts';
-import { type ClosedPeriods, PeriodClosed } from '../common/mod.ts';
+import {
+  type ClosedPeriods,
+  PeriodClosed,
+  type ReconciledItems,
+  ReconciledWithBank,
+} from '../common/mod.ts';
 
 // ---- Puertos ---------------------------------------------------------------------------------
 
@@ -224,6 +229,7 @@ export class EditMovement {
     private readonly ledger: LedgerQuery,
     private readonly corrections: LedgerCorrections,
     private readonly payments: PaymentMethods,
+    private readonly reconciled: ReconciledItems,
   ) {}
 
   async execute(edit: MovementEdit): Promise<void> {
@@ -233,6 +239,7 @@ export class EditMovement {
     const amount = Money.fromDecimal(edit.amount);
     const shares = sharesFrom(amount, edit.period, edit.shares) as PeriodShares;
     await guardShares(this.closed, shares);
+    await this.guardBank(edit, amount);
     if (edit.source === 'manual') {
       const entry = await this.entries.entry(ManualEntryId.fromString(edit.sourceId));
       if (entry === null) throw new EntryNotFound();
@@ -276,6 +283,17 @@ export class EditMovement {
         LocalDate.fromString(line.date),
       ),
     );
+  }
+
+  /** Lo conciliado con el banco puede cambiar de concepto, categoría o meses, pero no de forma de pago ni de importe. */
+  private async guardBank(edit: MovementEdit, amount: Money): Promise<void> {
+    if (!(await this.reconciled.isReconciled(edit.source, edit.sourceId))) return;
+    const line = (await this.ledger.lines(YearMonth.fromString(edit.month))).find(
+      (l) => l.source === edit.source && l.sourceId === edit.sourceId,
+    );
+    if (line && (line.method !== edit.method || line.amountCents !== amount.cents)) {
+      throw new ReconciledWithBank();
+    }
   }
 }
 
@@ -546,12 +564,14 @@ export class DeleteEntry {
   constructor(
     private readonly entries: ManualEntryRepository,
     private readonly closed: ClosedPeriods,
+    private readonly reconciled: ReconciledItems,
   ) {}
 
   async execute(id: string): Promise<void> {
     const entry = await this.entries.entry(ManualEntryId.fromString(id));
     if (entry === null) throw new EntryNotFound();
     await PeriodClosed.guard(this.closed, entry.date);
+    await ReconciledWithBank.guard(this.reconciled, 'manual', entry.id.value);
     await this.entries.deleteEntry(entry.id);
   }
 }
@@ -640,12 +660,17 @@ export class AmendInvoice {
     private readonly invoices: SupplierInvoiceRepository,
     private readonly closed: ClosedPeriods,
     private readonly categories: AccountingCategoryRepository,
+    private readonly reconciled: ReconciledItems,
   ) {}
 
   async execute(id: string, input: InvoiceAmendmentInput): Promise<void> {
     const invoice = await this.invoices.invoice(SupplierInvoiceId.fromString(id));
     if (invoice === null) throw new SupplierInvoiceNotFound();
     const amendment = await this.amendmentFrom(input, invoice.isPaid());
+    const changesBank = !amendment.amount.equals(invoice.amount) ||
+      amendment.paidOn?.toString() !== invoice.paidOn()?.toString() ||
+      amendment.method !== invoice.method();
+    if (changesBank) await ReconciledWithBank.guard(this.reconciled, 'invoice', invoice.id.value);
     for (const date of [invoice.paidOn() ?? invoice.date, amendment.date, amendment.paidOn]) {
       if (date !== null) await PeriodClosed.guard(this.closed, date);
     }
@@ -1274,12 +1299,14 @@ export class DeleteTransfer {
   constructor(
     private readonly transfers: TransferRepository,
     private readonly closed: ClosedPeriods,
+    private readonly reconciled: ReconciledItems,
   ) {}
 
   async execute(id: string): Promise<void> {
     const transfer = await this.transfers.transfer(TransferId.fromString(id));
     if (transfer === null) throw new TransferNotFound();
     await PeriodClosed.guard(this.closed, transfer.date);
+    await ReconciledWithBank.guard(this.reconciled, 'transfer', transfer.id.value);
     await this.transfers.deleteTransfer(transfer.id);
   }
 }
