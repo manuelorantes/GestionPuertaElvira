@@ -50,6 +50,7 @@ const DOMAIN_ERRORS = new Map<string, [number, string]>([
   ['UserNotFound', [404, 'not_found']],
   ['InvalidValue', [422, 'unprocessable']],
   ['PeriodClosed', [409, 'period_closed']],
+  ['ReconciledWithBank', [409, 'reconciled_with_bank']],
 ]);
 
 export function registerDomainErrors(errors: Record<string, [number, string]>): void {

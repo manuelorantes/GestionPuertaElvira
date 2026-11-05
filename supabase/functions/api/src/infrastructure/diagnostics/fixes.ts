@@ -45,6 +45,7 @@ import {
 } from '../persistence/payroll.ts';
 import { PostgresAdvisoryLocks, SavepointTransactionRunner } from '../persistence/sql.ts';
 import { SqlStudentQuery, SqlStudentRepository } from '../persistence/students.ts';
+import { SqlReconciledItems } from '../persistence/reconciliation.ts';
 
 export class UseCaseFixExecutor implements FixExecutor {
   constructor(
@@ -214,7 +215,7 @@ export class UseCaseFixExecutor implements FixExecutor {
       date: entry.date.toString(),
       note: entry.concept,
     });
-    await new DeleteEntry(accounting, closed).execute(entryId);
+    await new DeleteEntry(accounting, closed, new SqlReconciledItems(this.tx)).execute(entryId);
   }
 
   private async firstUnsettledMonth(

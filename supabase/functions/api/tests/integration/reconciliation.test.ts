@@ -199,16 +199,28 @@ Deno.test('reconciliation should charge the fee of a transfer nobody recorded an
     const matched = await reconcile();
     assertEquals(matched.status, 'matched');
     const payments = (await superadmin.get(`/api/admin/billing/payments?studentId=${ana}`))
-      .body as { items: { id: string; method: string }[] };
-    assertEquals(payments.items.map((p) => [p.id, p.method]), [[
-      matched.matched[0]!.sourceId,
+      .body as { items: { id: string; method: string; reconciled: boolean }[] };
+    const paymentId = matched.matched[0]!.sourceId;
+    assertEquals(payments.items.map((p) => [p.id, p.method, p.reconciled]), [[
+      paymentId,
       'transfer',
+      true,
     ]]);
+    const ledger = (await superadmin.get('/api/admin/accounting/ledger?month=2026-11')).body as {
+      items: { sourceId: string; reconciled: boolean }[];
+    };
+    assertEquals(ledger.items.find((l) => l.sourceId === paymentId)?.reconciled, true);
+    const toCash = () =>
+      superadmin.json('PUT', `/api/admin/billing/payments/${paymentId}/method`, {
+        method: 'cash',
+      });
+    assertError(await toCash(), 409, 'reconciled_with_bank');
 
     const released = await superadmin.json('POST', '/api/admin/accounting/reconciliation/release', {
       movement: item.movement,
     });
     assertEquals(released.status, 204, JSON.stringify(released.body));
     assertEquals((await reconcile()).status === 'matched', false);
+    assertEquals((await toCash()).status, 204);
   });
 });

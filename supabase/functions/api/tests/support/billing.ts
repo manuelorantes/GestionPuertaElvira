@@ -19,7 +19,7 @@ import type {
   StudentAccountRepository,
   StudentDirectory,
 } from '../../src/application/billing/mod.ts';
-import type { ClosedPeriods, Locks } from '../../src/application/common/mod.ts';
+import type { ClosedPeriods, Locks, ReconciledItems } from '../../src/application/common/mod.ts';
 import { ImmediateTransactionRunner } from './classes.ts';
 import { FrozenClock } from './identity.ts';
 
@@ -42,7 +42,8 @@ export class BillingFixture
     ChargeRepository,
     PaymentRepository,
     DocumentSequence,
-    StudentDirectory {
+    StudentDirectory,
+    ReconciledItems {
   settings = BillingSettings.defaults();
   accounts = new Map<string, StudentAccount>();
   charges = new Map<string, Charge>();
@@ -51,6 +52,12 @@ export class BillingFixture
   students = new Map<string, BillingStudent>();
   /** Fechas de temporadas cerradas. */
   closedDates: string[] = [];
+  /** Lo conciliado con el banco, como «source:sourceId». */
+  reconciledKeys = new Set<string>();
+
+  isReconciled(source: string, sourceId: string): Promise<boolean> {
+    return Promise.resolve(this.reconciledKeys.has(`${source}:${sourceId}`));
+  }
   readonly clock: FrozenClock;
   readonly transactions = new ImmediateTransactionRunner();
   readonly locks = new RecordingLocks();
