@@ -11,6 +11,7 @@ import {
 } from '../../application/accounting/reconciliation.ts';
 import {
   BillingStudentNotFound,
+  CorrectPaymentAmount,
   type PaymentRequest,
   ReschedulePayment,
 } from '../../application/billing/mod.ts';
@@ -77,11 +78,11 @@ function actions(api: ApiApp, scope: RequestScope): ReconciliationActions {
 /** Las cuotas mensuales, cobradas por transferencia con el caso de uso de Cobros. */
 function feePayments(api: ApiApp, scope: RequestScope): FeePayments {
   const b = billing(api, scope);
-  const request = (studentId: string, date: string): PaymentRequest => ({
+  const request = (studentId: string, date: string, method = 'transfer'): PaymentRequest => ({
     studentId,
     kind: 'monthly',
     months: 1,
-    method: 'transfer',
+    method,
     date,
     specialPercent: null,
     specialAmountCents: null,
@@ -102,7 +103,13 @@ function feePayments(api: ApiApp, scope: RequestScope): FeePayments {
         throw error;
       }
     },
-    register: (studentId, date) => b.register.execute(request(studentId, date)),
+    register: (studentId, date, method) => b.register.execute(request(studentId, date, method)),
+    correct: (paymentId, totalCents, reason) =>
+      new CorrectPaymentAmount(
+        new SqlPaymentRepository(scope.tx),
+        b.charges,
+        new SqlReconciledItems(scope.tx),
+      ).execute(paymentId, totalCents, reason),
   };
 }
 
@@ -156,6 +163,7 @@ export function registerReconciliationRoutes(api: ApiApp): void {
         },
         transfer: b.bool('transfer'),
         fees: b.stringList('fees'),
+        adjust: b.bool('adjust'),
       });
       return c.body(null, 204);
     },
