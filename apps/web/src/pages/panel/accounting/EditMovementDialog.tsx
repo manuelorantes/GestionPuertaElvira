@@ -136,14 +136,26 @@ export function EditMovementDialog({
           options={categoryOptions}
         />
         <div className="grid gap-4 sm:grid-cols-2">
-          <Select label="Forma de pago" value={method} onChange={setMethod} options={METHODS} />
+          <Select
+            label="Forma de pago"
+            value={method}
+            onChange={setMethod}
+            options={METHODS}
+            disabled={item.reconciled}
+          />
           <TextField
             label="Importe (€)"
             inputMode="decimal"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            disabled={item.reconciled}
           />
         </div>
+        {item.reconciled && (
+          <p className="text-sm text-ink-muted">
+            Conciliado con el banco: la forma de pago y el importe ya no se cambian.
+          </p>
+        )}
         <PeriodSharesField
           date={item.date}
           totalCents={cents ?? 0}

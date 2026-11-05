@@ -15,6 +15,7 @@ import {
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { formatCents, monthLabel, shiftMonth } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
+import { BankStatus } from '@/features/accounting/BankStatus';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
@@ -226,7 +227,12 @@ function LedgerTable({
                   {item.categoryLabel}
                 </span>
               </td>
-              <td className="px-3 py-3 text-ink-soft">{item.methodLabel}</td>
+              <td className="px-3 py-3 text-ink-soft">
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  {item.methodLabel}
+                  <BankStatus method={item.method} reconciled={item.reconciled} />
+                </span>
+              </td>
               <td
                 className={`px-3 py-3 text-right font-semibold whitespace-nowrap ${item.kind === 'income' ? 'text-success-fg' : 'text-danger-fg'}`}
               >
@@ -242,7 +248,7 @@ function LedgerTable({
                 >
                   <Pencil aria-hidden size={16} />
                 </button>
-                {item.source === 'manual' ? (
+                {item.source === 'manual' && !item.reconciled ? (
                   <button
                     type="button"
                     aria-label={`Quitar ${item.concept}`}

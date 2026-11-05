@@ -8,6 +8,7 @@ import {
 import { usePayments } from '@/features/billing/hooks';
 import { formatCents } from '@/features/billing/money';
 import { formatDate } from '@/features/students/format';
+import { BankStatus } from '@/features/accounting/BankStatus';
 import { Badge } from '@/shared/ui/Badge';
 import { Card } from '@/shared/ui/Card';
 import { type SortColumn, useTableSort } from '@/shared/ui/useTableSort';
@@ -94,9 +95,10 @@ export function PaymentsTab({ onOpenReceipt }: { onOpenReceipt: (paymentId: stri
               </td>
               <td className="px-5 py-3">{payment.concept}</td>
               <td className="px-5 py-3 text-ink-soft">
-                <span className="inline-flex items-center gap-2">
+                <span className="inline-flex flex-wrap items-center gap-2">
                   <MethodIcon method={payment.method} />
                   {PAYMENT_METHOD_LABEL[payment.method]}
+                  <BankStatus method={payment.method} reconciled={payment.reconciled} />
                 </span>
               </td>
               <td className="px-5 py-3 text-right font-semibold text-brand-strong">
