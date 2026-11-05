@@ -78,9 +78,14 @@ function actions(api: ApiApp, scope: RequestScope): ReconciliationActions {
 /** Las cuotas mensuales, cobradas por transferencia con el caso de uso de Cobros. */
 function feePayments(api: ApiApp, scope: RequestScope): FeePayments {
   const b = billing(api, scope);
-  const request = (studentId: string, date: string, method = 'transfer'): PaymentRequest => ({
+  const request = (
+    studentId: string,
+    date: string,
+    method = 'transfer',
+    kind = 'monthly',
+  ): PaymentRequest => ({
     studentId,
-    kind: 'monthly',
+    kind,
     months: 1,
     method,
     date,
@@ -91,9 +96,9 @@ function feePayments(api: ApiApp, scope: RequestScope): FeePayments {
   });
   return {
     payers: (day) => new SqlPayerNames(scope.tx).active(day),
-    quote: async (studentId, date) => {
+    quote: async (studentId, date, kind = 'monthly') => {
       try {
-        const quote = await b.quotes.execute(request(studentId, date));
+        const quote = await b.quotes.execute(request(studentId, date, 'transfer', kind));
         return { concept: quote.concept, amountCents: quote.quote.total.cents };
       } catch (error) {
         // Sin nada que cobrar (sin grupos, temporada pagada…) no hay cuota que proponer.
@@ -103,7 +108,10 @@ function feePayments(api: ApiApp, scope: RequestScope): FeePayments {
         throw error;
       }
     },
-    register: (studentId, date, method) => b.register.execute(request(studentId, date, method)),
+    register: (studentId, date, method, kind = 'monthly') =>
+      b.register.execute(request(studentId, date, method, kind)),
+    registerCredit: (studentId, date, method, amountCents) =>
+      b.registerCredit.execute({ studentId, date, method, amountCents }),
     correct: (paymentId, totalCents, reason) =>
       new CorrectPaymentAmount(
         new SqlPaymentRepository(scope.tx),
@@ -162,7 +170,17 @@ export function registerReconciliationRoutes(api: ApiApp): void {
           category: record.requiredString('category'),
         },
         transfer: b.bool('transfer'),
-        fees: b.stringList('fees'),
+        fees: b.objectList('fees').map((f) => {
+          const kind = f.requiredString('kind');
+          if (kind !== 'monthly' && kind !== 'membership' && kind !== 'credit') {
+            throw new InvalidValue('fees', 'Tipo de cuota desconocido.');
+          }
+          return {
+            studentId: f.requiredString('studentId'),
+            kind,
+            amountCents: f.optionalInt('amountCents'),
+          };
+        }),
         adjust: b.bool('adjust'),
       });
       return c.body(null, 204);

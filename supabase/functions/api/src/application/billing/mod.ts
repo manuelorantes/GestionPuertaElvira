@@ -1019,6 +1019,61 @@ export class RegisterPayment {
 }
 
 /**
+ * Pago a cuenta: dinero de un alumno que aún no se sabe a qué cuota va (por ejemplo, de un socio provisional sin
+ * grupos). Es un recibo de cuotas sin meses: todo lo que cubre queda como saldo a favor y paga sus próximas cuotas.
+ */
+export class RegisterCreditPayment {
+  static readonly CONCEPT = 'Pago a cuenta';
+
+  constructor(
+    private readonly directory: StudentDirectory,
+    private readonly payments: PaymentRepository,
+    private readonly sequence: DocumentSequence,
+    private readonly transactions: TransactionRunner,
+    private readonly closed: ClosedPeriods,
+    private readonly locks: Locks,
+  ) {}
+
+  execute(request: {
+    studentId: string;
+    date: string;
+    method: string;
+    amountCents: number;
+  }): Promise<string> {
+    return this.transactions.run(async () => {
+      const ref = StudentRef.fromString(request.studentId);
+      await this.locks.acquire(`billing:student:${ref.value}`);
+      const date = LocalDate.fromString(request.date);
+      if (await this.directory.find(ref, date) === null) throw new BillingStudentNotFound();
+      if (!Number.isInteger(request.amountCents) || request.amountCents <= 0) {
+        throw new InvalidValue('amountCents', 'El importe a cuenta debe ser mayor que cero.');
+      }
+      await PeriodClosed.guard(this.closed, date);
+      const season = Season.containing(YearMonth.of(date));
+      const amount = Money.cents(request.amountCents);
+      const payment = Payment.register({
+        id: PaymentId.generate(),
+        student: ref,
+        paidOn: date,
+        method: paymentMethodFromName(request.method),
+        receipt: DocumentNumber.receipt(
+          season.startYear,
+          await this.sequence.next('R', season.startYear),
+        ),
+        kind: 'monthly',
+        concept: RegisterCreditPayment.CONCEPT,
+        lines: [new QuoteLine(RegisterCreditPayment.CONCEPT, amount)],
+        total: amount,
+        periods: [],
+        credit: amount,
+      });
+      await this.payments.savePayment(payment);
+      return payment.id.value;
+    });
+  }
+}
+
+/**
  * Cobro traído de la hoja de cálculo: un mes (o la cuota de socio) por el importe exacto que apuntó el club,
  * con su recibo. Si ese mes ya estaba cobrado en la aplicación, no se duplica. Se usa dentro de una transacción.
  */

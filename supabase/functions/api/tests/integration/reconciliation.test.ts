@@ -201,7 +201,7 @@ Deno.test('reconciliation should charge the fee of a transfer nobody recorded an
     const accepted = await superadmin.json('POST', '/api/admin/accounting/reconciliation/accept', {
       movement: item.movement,
       items: [],
-      fees: [ana],
+      fees: [{ studentId: ana, kind: 'monthly' }],
     });
     assertEquals(accepted.status, 204, JSON.stringify(accepted.body));
     const matched = await reconcile();
@@ -246,7 +246,7 @@ Deno.test('reconciliation should split a transfer by hand among fees and remembe
         `/api/admin/accounting/reconciliation/fee?studentId=${id}&day=2026-11-03`,
       );
       assertEquals(response.status, 200, JSON.stringify(response.body));
-      return (response.body as { amountCents: number }).amountCents;
+      return (response.body as { monthly: { amountCents: number } }).monthly.amountCents;
     };
     const total = await feeOf(ana) + await feeOf(luis);
     assertError(
@@ -271,7 +271,7 @@ Deno.test('reconciliation should split a transfer by hand among fees and remembe
     const accepted = await superadmin.json('POST', '/api/admin/accounting/reconciliation/accept', {
       movement: first.movement,
       items: [],
-      fees: [ana, luis],
+      fees: [{ studentId: ana, kind: 'monthly' }, { studentId: luis, kind: 'monthly' }],
     });
     assertEquals(accepted.status, 204, JSON.stringify(accepted.body));
     assertEquals((await reconcile('2026-11-03', 100_000 + total)).matched.length, 2);
@@ -295,7 +295,7 @@ Deno.test('reconciliation should leave in favour of each student what a transfer
     const feeOf = async (id: string) =>
       ((await superadmin.get(
         `/api/admin/accounting/reconciliation/fee?studentId=${id}&day=2026-11-03`,
-      )).body as { amountCents: number }).amountCents;
+      )).body as { monthly: { amountCents: number } }).monthly.amountCents;
     const fees = await feeOf(andres) + await feeOf(luis);
     const movement = {
       operationDate: '2026-11-03',
@@ -308,7 +308,7 @@ Deno.test('reconciliation should leave in favour of each student what a transfer
       superadmin.json('POST', '/api/admin/accounting/reconciliation/accept', {
         movement,
         items: [],
-        fees: [andres, luis],
+        fees: [{ studentId: andres, kind: 'monthly' }, { studentId: luis, kind: 'monthly' }],
         adjust,
       });
     assertError(await accept(false), 422, 'unprocessable');
@@ -323,5 +323,49 @@ Deno.test('reconciliation should leave in favour of each student what a transfer
         .body as { items: { method: string; reconciled: boolean }[] };
       assertEquals(payments.items.map((p) => [p.method, p.reconciled]), [['transfer', true]]);
     }
+  });
+});
+
+Deno.test('reconciliation should charge a provisional member the membership fee and the rest on account', async () => {
+  await atTime('2026-11-05T10:00:00+01:00', async () => {
+    const { superadmin } = await clients();
+    const created = await superadmin.json('POST', '/api/admin/students', {
+      fullName: 'Álvaro Tejero Gilabert',
+      provisional: true,
+    });
+    assertEquals(created.status, 201, JSON.stringify(created.body));
+    const alvaro = (created.body as { id: string }).id;
+    const options = (await superadmin.get(
+      `/api/admin/accounting/reconciliation/fee?studentId=${alvaro}&day=2026-11-03`,
+    )).body as { monthly: unknown; membership: { amountCents: number } | null };
+    assertEquals(options.monthly, null);
+    const membership = options.membership!.amountCents;
+    const movement = {
+      operationDate: '2026-11-03',
+      valueDate: '2026-11-03',
+      concept: 'Transferencia De Alvaro Tejero Gilabert, Concepto Socio',
+      amountCents: membership + 2000,
+      balanceCents: 100_000 + membership + 2000,
+    };
+    const accepted = await superadmin.json('POST', '/api/admin/accounting/reconciliation/accept', {
+      movement,
+      items: [],
+      fees: [
+        { studentId: alvaro, kind: 'membership' },
+        { studentId: alvaro, kind: 'credit', amountCents: 2000 },
+      ],
+    });
+    assertEquals(accepted.status, 204, JSON.stringify(accepted.body));
+    const account = (await superadmin.get(`/api/admin/billing/accounts/${alvaro}`)).body as {
+      balanceCents: number;
+      membershipPaid: boolean;
+    };
+    assertEquals([account.membershipPaid, account.balanceCents], [true, 2000]);
+    const payments = (await superadmin.get(`/api/admin/billing/payments?studentId=${alvaro}`))
+      .body as { items: { concept: string; amountCents?: number; reconciled: boolean }[] };
+    assertEquals(
+      payments.items.map((p) => [p.concept, p.reconciled]).sort(),
+      [['Cuota de socio 2026/27', true], ['Pago a cuenta', true]],
+    );
   });
 });
