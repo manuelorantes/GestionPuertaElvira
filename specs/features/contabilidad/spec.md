@@ -336,6 +336,8 @@ y la conciliación MUST NOT cambiar la forma de pago de nada (como mucho, la fec
   (apuntados con otra fecha); si hay varias combinaciones posibles, se eligen a mano,
   con el total elegido a la vista, hasta que coincide.
   Si sobra, lo dice.
+  También se puede repartir a mano con cuotas de cualquier alumno, cobradas con tarjeta el día de la liquidación,
+  como una transferencia (con el mismo reparto de lo que no cuadra).
 - **Transferencia recibida**: cuadra con el cobro, o los cobros de un mismo alumno o familia, por transferencia que
   suman su importe con fecha cercana; un cobro cuyo nombre aparece en el concepto se casa antes que otro que solo
   coincide en el importe.
@@ -358,6 +360,11 @@ y la conciliación MUST NOT cambiar la forma de pago de nada (como mucho, la fec
   Una transferencia recibida MUST poderse **repartir a mano** entre cobros por transferencia ya apuntados
   y cuotas de cualquier alumno activo (la que le toca, como desde Cobros), también de alumnos distintos,
   hasta que todo junto suma su importe.
+  Si con cuotas elegidas no suma justo, MUST poderse aceptar tras confirmarlo: la diferencia se reparte a partes iguales
+  entre esas cuotas (los céntimos que sobran, a las primeras) con una línea de corrección en cada recibo;
+  lo pagado de más queda como saldo a favor de cada alumno y lo de menos, pendiente en su cuota («Pagada en parte»).
+  La confirmación MUST decir cuánto sobra o falta y qué cobro se añade a cada alumno.
+  Ninguna cuota puede quedarse sin cobrar nada.
 - **Pago o recibo**: cuadra con el gasto del mismo importe en el banco con fecha cercana (del mismo mes o del siguiente),
   o con varios gastos en el banco de esos días que suman su importe, si solo hay una combinación posible
   (meses de alquiler o impuestos pagados de una vez).
@@ -365,6 +372,9 @@ y la conciliación MUST NOT cambiar la forma de pago de nada (como mucho, la fec
 - **Sacar efectivo o ingresarlo**: cuadra con el traspaso entre caja y banco del mismo importe y fecha cercana;
   si no lo hay, sugiere apuntarlo.
 
+Fuera de sacar o ingresar efectivo, cada movimiento por casar MUST ofrecer siempre, además de su sugerencia,
+**elegir a mano** lo que le corresponde y **crear un registro** nuevo (un ingreso o un gasto con su concepto y su
+categoría; en una liquidación del datáfono, un ingreso con tarjeta del día cobrado).
 Antes de aceptar, el concepto, la categoría y los cobros elegidos se pueden cambiar.
 Aceptar una sugerencia MUST hacer el cambio con las mismas operaciones que el resto de Contabilidad y Cobros
 (queda en el historial) y recordar qué movimiento del extracto corresponde a qué cobros, gasto o traspaso.
@@ -413,6 +423,12 @@ La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse 
 - **WHEN** el extracto trae la liquidación del 10/09/2026 por 90 € y en la app no hay cobros con tarjeta ese día,
   pero sí uno de 90 € con tarjeta del 03/09, y otro de 90 € en efectivo del 09/09
 - **THEN** se sugiere pasar el de tarjeta al 10/09 (el de efectivo no se ofrece); al aceptarlo, el movimiento cuadra
+
+#### Scenario: Una transferencia que paga de más
+- **WHEN** llega una transferencia de 80 € de Luis Porras Wadley y superadministración elige las cuotas de noviembre
+  de Andrés y de Luis, de 32 € cada una
+- **THEN** «Casar con lo elegido» pide confirmar que los 16 € de más se reparten, 8 € a favor de cada uno;
+  al confirmarlo se cobran dos recibos de 40 € por transferencia y cada alumno queda con 8 € a su favor
 
 #### Scenario: Una transferencia repartida entre dos alumnos
 - **WHEN** llega una transferencia de 100 € de Marta Ruiz Sol, que no se parece a ningún alumno,
