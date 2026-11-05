@@ -565,6 +565,12 @@ describe('Mis horas', () => {
     expect(legend).toHaveTextContent('Mis clases previstas');
     expect(legend).toHaveTextContent('Festivo');
     expect(within(calendar).getByTitle('Fiesta local')).toHaveTextContent('Festivo');
+    // El día en que otro dio su clase, en rojo con quién y cuál (aunque caiga en fin de semana).
+    const covered = within(calendar).getByRole('cell', { name: /^Día 15(\D|$)/ });
+    expect(
+      within(covered).getByTitle('Sustituido por Ana Belén Torres · Iniciación A'),
+    ).toHaveClass('bg-danger-bg');
+    expect(legend).toHaveTextContent('Sustituido');
 
     const notes = screen.getByRole('list', { name: 'Sustituciones del mes' });
     const [gave, received] = within(notes).getAllByRole('listitem');

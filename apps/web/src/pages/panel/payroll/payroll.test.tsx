@@ -741,6 +741,10 @@ describe('Profesorado', () => {
             session({ id: 's4', date: date(second), substitution: true, countedMinutes: 60 }),
           ],
           holidays: [{ date: date(third), name: 'Fiesta local' }],
+          // El lunes de la semana siguiente le sustituyeron.
+          substitutedBy: [
+            { date: date(monday + 7), label: 'Iniciación A', substituteName: 'Ana Belén Torres' },
+          ],
           upcoming: [
             {
               date: date(fourth),
@@ -789,6 +793,13 @@ describe('Profesorado', () => {
     // Un festivo, en rojo y con su nombre, para que se vea por qué no hubo clase.
     expect(within(day(third)).getByTitle('Fiesta local')).toHaveClass('bg-danger-bg');
     expect(day(third)).toHaveTextContent('Festivo · Fiesta local');
+    // El día en que le sustituyeron, también en rojo: quién dio la clase y cuál, para que se sepa por qué está vacío.
+    const substituted = within(day(monday + 7)).getByTitle(
+      'Sustituido por Ana Belén Torres · Iniciación A',
+    );
+    expect(substituted).toHaveClass('bg-danger-bg');
+    expect(substituted).toHaveTextContent('Sustituido por Ana Belén Torres');
+    expect(day(monday + 7)).not.toHaveTextContent(' h ');
     // Lo que aún le queda por dar, en los tonos claros: verde sus clases, gris las sustituciones.
     expect(day(fourth)).toHaveTextContent('3 h previstas de sus clases');
     expect(day(fourth).querySelector('[data-kind="upcomingOwn"]')).toHaveClass('bg-brand-soft');
@@ -802,6 +813,7 @@ describe('Profesorado', () => {
     expect(legend).toHaveTextContent('Sus clases previstas');
     expect(legend).toHaveTextContent('Sustituciones previstas');
     expect(legend).toHaveTextContent('Festivo');
+    expect(legend).toHaveTextContent('Sustituido');
     // Sin clases en fin de semana, el calendario va de lunes a viernes.
     expect(within(calendar).queryByRole('columnheader', { name: 'Sáb' })).not.toBeInTheDocument();
   });
