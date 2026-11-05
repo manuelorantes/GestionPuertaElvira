@@ -3,10 +3,19 @@ import type { BankMovement } from '../../domain/accounting/reconciliation.ts';
 import { EditMovement, RecordEntry, RecordTransfer } from '../../application/accounting/mod.ts';
 import {
   AcceptReconciliation,
+  type FeePayments,
   ReconcileStatement,
   type ReconciliationActions,
+  ReleaseMatch,
 } from '../../application/accounting/reconciliation.ts';
-import { ChangePaymentMethod, ReschedulePayment } from '../../application/billing/mod.ts';
+import {
+  BillingStudentNotFound,
+  ChangePaymentMethod,
+  type PaymentRequest,
+  ReschedulePayment,
+} from '../../application/billing/mod.ts';
+import { InvalidPaymentRequest } from '../../domain/billing/mod.ts';
+import { billing } from '../billing/routes.ts';
 import type { ApiApp, RequestScope } from '../http/app.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
@@ -83,11 +92,43 @@ function actions(api: ApiApp, scope: RequestScope): ReconciliationActions {
   };
 }
 
+/** Las cuotas mensuales, cobradas por transferencia con el caso de uso de Cobros. */
+function feePayments(api: ApiApp, scope: RequestScope): FeePayments {
+  const b = billing(api, scope);
+  const request = (studentId: string, date: string): PaymentRequest => ({
+    studentId,
+    kind: 'monthly',
+    months: 1,
+    method: 'transfer',
+    date,
+    specialPercent: null,
+    specialAmountCents: null,
+    specialConcept: null,
+    redeemPoints: 0,
+  });
+  return {
+    payers: (day) => new SqlPayerNames(scope.tx).active(day),
+    quote: async (studentId, date) => {
+      try {
+        const quote = await b.quotes.execute(request(studentId, date));
+        return { concept: quote.concept, amountCents: quote.quote.total.cents };
+      } catch (error) {
+        // Sin nada que cobrar (sin grupos, temporada pagada…) no hay cuota que proponer.
+        if (error instanceof InvalidPaymentRequest || error instanceof BillingStudentNotFound) {
+          return null;
+        }
+        throw error;
+      }
+    },
+    register: (studentId, date) => b.register.execute(request(studentId, date)),
+  };
+}
+
 /** Conciliación con el extracto del banco: solo superadministración. */
 export function registerReconciliationRoutes(api: ApiApp): void {
   registerDomainErrors({ MovementAlreadyMatched: [409, 'already_matched'] });
 
-  // Calcula sin guardar nada: es POST porque el extracto va en el cuerpo.
+  // Calcula las sugerencias y recuerda lo que cuadra solo; el extracto va en el cuerpo.
   api.defineRoute(
     { method: 'POST', path: '/api/admin/accounting/reconciliation', access: 'superadmin' },
     async (c, scope) => {
@@ -102,6 +143,7 @@ export function registerReconciliationRoutes(api: ApiApp): void {
         new SqlAccountingRepository(scope.tx),
         new SqlBankMatchRepository(scope.tx),
         new SqlPayerNames(scope.tx),
+        feePayments(api, scope),
       ).execute(movements.map(movementIn));
       return c.json(view);
     },
@@ -119,6 +161,7 @@ export function registerReconciliationRoutes(api: ApiApp): void {
         new SqlTransferRepository(scope.tx),
         new SqlBankMatchRepository(scope.tx),
         actions(api, scope),
+        feePayments(api, scope),
       ).execute({
         movement: movementIn(movement),
         items: b.objectList('items').map((i) => ({
@@ -130,7 +173,19 @@ export function registerReconciliationRoutes(api: ApiApp): void {
           category: record.requiredString('category'),
         },
         transfer: b.bool('transfer'),
+        fees: b.stringList('fees'),
       });
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'POST', path: '/api/admin/accounting/reconciliation/release', access: 'superadmin' },
+    async (c, scope) => {
+      const b = await JsonBody.from(c.req.raw);
+      const movement = b.optionalObject('movement');
+      if (movement === null) throw new InvalidValue('movement', 'Falta el movimiento del banco.');
+      await new ReleaseMatch(new SqlBankMatchRepository(scope.tx)).execute(movementIn(movement));
       return c.body(null, 204);
     },
   );

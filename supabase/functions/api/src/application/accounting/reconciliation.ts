@@ -23,7 +23,8 @@ import type {
 
 /**
  * Conciliación con el extracto del banco (ver conciliacion-bancaria-con-extracto.md): cada movimiento del extracto
- * cuadra con algo de la app o trae una sugerencia; lo aceptado se recuerda y lo demás se vuelve a calcular cada vez.
+ * cuadra con algo de la app o trae una sugerencia; lo que cuadra y lo aceptado se recuerdan y lo demás se vuelve a
+ * calcular cada vez.
  */
 
 // ---- Puertos ---------------------------------------------------------------------------------
@@ -34,6 +35,10 @@ export interface MatchTarget {
   sourceId: string;
 }
 
+/**
+ * Un movimiento del extracto ya conciliado. Sin `targets`, es uno cuyo casamiento se deshizo: no vuelve a casar solo y
+ * espera a que se elija lo suyo.
+ */
 export interface BankMatch {
   key: string;
   operationDate: string;
@@ -44,6 +49,7 @@ export interface BankMatch {
 
 export interface BankMatchRepository {
   matches(): Promise<BankMatch[]>;
+  /** Guarda el casamiento de un movimiento, sustituyendo el que tuviera. */
   saveMatch(match: BankMatch): Promise<void>;
   /** La categoría elegida para cada contraparte. */
   rules(): Promise<Map<string, string>>;
@@ -53,6 +59,28 @@ export interface BankMatchRepository {
 /** Los nombres con los que puede aparecer en el banco quien paga a un alumno: el suyo y los de sus tutores. */
 export interface PayerNames {
   names(studentIds: string[]): Promise<Map<string, string[]>>;
+}
+
+/** Un alumno activo y los nombres con los que puede aparecer en el banco quien le paga. */
+export interface Payer {
+  studentId: string;
+  name: string;
+  names: string[];
+}
+
+/** Lo que costaría el cobro de una cuota mensual: la pendiente más antigua o la del mes del cobro. */
+export interface FeeQuote {
+  concept: string;
+  amountCents: number;
+}
+
+/** Las cuotas de los alumnos, para cobrar por transferencia la que llega al banco sin estar cobrada en la app. */
+export interface FeePayments {
+  payers(day: string): Promise<Payer[]>;
+  /** Lo que costaría cobrar una cuota mensual ese día, o null si no hay nada que cobrar. */
+  quote(studentId: string, date: string): Promise<FeeQuote | null>;
+  /** Cobra una cuota mensual por transferencia ese día, como desde Cobros; devuelve el id del cobro. */
+  register(studentId: string, date: string): Promise<string>;
 }
 
 /** Las operaciones de siempre con las que se aplica una sugerencia aceptada. */
@@ -86,6 +114,16 @@ export interface AppItem {
   category: string;
   method: string;
   amountCents: number;
+  /** Primer mes al que corresponde («AAAA-MM»). */
+  period: string;
+}
+
+/** Una cuota que se propone cobrar por transferencia. */
+export interface FeeProposal {
+  studentId: string;
+  student: string;
+  concept: string;
+  amountCents: number;
 }
 
 export interface Proposal {
@@ -97,6 +135,8 @@ export interface Proposal {
   record: { kind: 'income' | 'expense'; concept: string; category: string; method: string } | null;
   /** Un traspaso nuevo entre banco y caja. */
   transfer: { from: 'bank' | 'cash'; to: 'bank' | 'cash' } | null;
+  /** Cuotas nuevas cobradas por transferencia. */
+  fees: FeeProposal[];
 }
 
 export type ItemStatus = 'matched' | 'suggested' | 'pending';
@@ -157,6 +197,7 @@ const toItem = (l: LedgerLine): AppItem => ({
   category: l.category,
   method: l.method,
   amountCents: l.amountCents,
+  period: l.period,
 });
 
 const transferItem = (t: Transfer): AppItem => ({
@@ -170,6 +211,7 @@ const transferItem = (t: Transfer): AppItem => ({
   category: '',
   method: t.to,
   amountCents: t.amount.cents,
+  period: t.date.toString().slice(0, 7),
 });
 
 const keyOf = (t: MatchTarget) => `${t.source}:${t.sourceId}`;
@@ -209,9 +251,40 @@ function window(from: string, to: string): [YearMonth, YearMonth] {
   ];
 }
 
+/**
+ * Una sugerencia de ingreso que deja paso a cobrar una cuota: la de apuntar un ingreso suelto o la de pasar al día del
+ * banco cobros de meses anteriores que ya estaban en el banco (los pagó otra transferencia).
+ */
+function replaceable(item: ReconciliationItem): boolean {
+  const proposal = item.proposal;
+  if (proposal === null) return false;
+  if (proposal.record !== null) return true;
+  const month = item.movement.operationDate.slice(0, 7);
+  return proposal.items.length > 0 &&
+    proposal.items.every((i) => i.method === 'transfer' && i.period < month);
+}
+
+function uniqueItems(items: readonly AppItem[]): AppItem[] {
+  const seen = new Set<string>();
+  return items.filter((i) => !seen.has(keyOf(i)) && seen.add(keyOf(i)));
+}
+
+function matchOf(m: BankMovement, targets: readonly MatchTarget[]): BankMatch {
+  return {
+    key: movementKey(m),
+    operationDate: m.operationDate,
+    amountCents: m.amountCents,
+    concept: [...m.concept].slice(0, 200).join(''),
+    targets: targets.map(({ source, sourceId }) => ({ source, sourceId })),
+  };
+}
+
 // ---- Casos de uso ----------------------------------------------------------------------------
 
-/** Cruza el extracto con la app: qué cuadra y qué se sugiere. No guarda nada. */
+/**
+ * Cruza el extracto con la app: qué cuadra y qué se sugiere. Lo que cuadra solo se recuerda, para que no vuelva a casar
+ * con otro movimiento en extractos posteriores; las sugerencias no se guardan.
+ */
 export class ReconcileStatement {
   constructor(
     private readonly ledger: LedgerQuery,
@@ -219,6 +292,7 @@ export class ReconcileStatement {
     private readonly closings: SeasonClosingRepository,
     private readonly matches: BankMatchRepository,
     private readonly payers: PayerNames,
+    private readonly fees: FeePayments,
   ) {}
 
   async execute(movements: readonly BankMovement[]): Promise<ReconciliationView> {
@@ -232,6 +306,8 @@ export class ReconcileStatement {
       ...new Set(lines.flatMap((l) => (l.studentId ? [l.studentId] : []))),
     ]);
     const matcher = new Matcher(lines, transfers, stored, rules, names);
+    const items = await this.offerFees(matcher.run(statement.movements), statement.from);
+    await this.remember(items, stored);
     return {
       from: statement.from,
       to: statement.to,
@@ -240,8 +316,67 @@ export class ReconcileStatement {
         openingCents: await this.bankOn(LocalDate.fromString(statement.from).plusDays(-1)),
         closingCents: await this.bankOn(LocalDate.fromString(statement.to)),
       },
-      items: matcher.run(statement.movements),
+      items,
     };
+  }
+
+  /** Guarda lo que ha cuadrado solo en esta pasada. */
+  private async remember(items: readonly ReconciliationItem[], stored: readonly BankMatch[]) {
+    const known = new Set(stored.map((s) => s.key));
+    for (const item of items) {
+      if (item.status !== 'matched' || known.has(item.key)) continue;
+      known.add(item.key);
+      await this.matches.saveMatch(matchOf(item.movement, item.matched));
+    }
+  }
+
+  /**
+   * Una transferencia de quien paga a un alumno sin cobro suyo que casar (o con uno de un mes anterior que ya estaba en
+   * el banco): si sus cuotas por cobrar suman el importe de una sola forma, se propone cobrarlas.
+   */
+  private async offerFees(
+    items: ReconciliationItem[],
+    day: string,
+  ): Promise<ReconciliationItem[]> {
+    const open = items.filter((i) => i.kind === 'income' && i.status === 'suggested');
+    if (open.length === 0) return items;
+    const payers = await this.fees.payers(day);
+    const result: ReconciliationItem[] = [];
+    for (const item of items) {
+      const fees = open.includes(item) && replaceable(item)
+        ? await this.feesFor(item.movement, payers)
+        : null;
+      result.push(
+        fees === null ? item : {
+          ...item,
+          note: 'Es la cuota de quien paga, que aún no está cobrada.',
+          proposal: {
+            items: [],
+            changes: fees.map((f) =>
+              `Cobrar a ${f.student} «${f.concept}» (${
+                euros(f.amountCents)
+              }) por transferencia el ${dayLabel(item.movement.operationDate)}`
+            ),
+            record: null,
+            transfer: null,
+            fees,
+          },
+          candidates: uniqueItems([...(item.proposal?.items ?? []), ...item.candidates]),
+        },
+      );
+    }
+    return result;
+  }
+
+  private async feesFor(m: BankMovement, payers: readonly Payer[]): Promise<FeeProposal[] | null> {
+    const named = payers.filter((p) => p.names.some((n) => nameScore(m.concept, n) >= 2));
+    const quoted: FeeProposal[] = [];
+    for (const p of named) {
+      const quote = await this.fees.quote(p.studentId, m.operationDate);
+      if (quote) quoted.push({ studentId: p.studentId, student: p.name, ...quote });
+    }
+    const combos = subsetsSumming(quoted.map((f) => f.amountCents), m.amountCents);
+    return combos.length === 1 ? combos[0]!.map((index) => quoted[index]!) : null;
   }
 
   /** El saldo del banco según la app al terminar un día. */
@@ -263,6 +398,8 @@ export class ReconcileStatement {
 class Matcher {
   private readonly used = new Set<string>();
   private readonly storedByKey = new Map<string, BankMatch>();
+  /** Movimientos cuyo casamiento se deshizo: no casan solos. */
+  private readonly released = new Set<string>();
   private readonly items: AppItem[];
   private readonly payments: AppItem[];
   private readonly studentOf = new Map<string, string>();
@@ -279,6 +416,10 @@ class Matcher {
     this.payments = this.items.filter((i) => i.source === 'payment');
     for (const l of lines) if (l.studentId) this.studentOf.set(l.sourceId, l.studentId);
     for (const match of stored) {
+      if (match.targets.length === 0) {
+        this.released.add(match.key);
+        continue;
+      }
       this.storedByKey.set(match.key, match);
       for (const t of match.targets) this.used.add(keyOf(t));
     }
@@ -286,14 +427,17 @@ class Matcher {
 
   run(movements: readonly BankMovement[]): ReconciliationItem[] {
     const results = new Map<number, ReconciliationItem>();
+    const released = new Set<number>();
     movements.forEach((m, index) => {
       const stored = this.storedByKey.get(movementKey(m));
       if (stored) results.set(index, this.storedMatch(m, stored));
+      if (this.released.has(movementKey(m))) released.add(index);
     });
+    const decided = (index: number) => results.has(index) || released.has(index);
     // Primero lo que casa con nombre: un cobro de otra familia con el mismo importe no debe quitarle el suyo a nadie.
     for (const namedOnly of [true, false]) {
       movements.forEach((m, index) => {
-        if (results.has(index)) return;
+        if (decided(index)) return;
         const exact = this.exact(m, namedOnly);
         if (exact) {
           this.take(exact);
@@ -303,14 +447,14 @@ class Matcher {
     }
     // Luego las combinaciones: varios gastos pagados de una vez o cobros menos lo que se descontó.
     movements.forEach((m, index) => {
-      if (results.has(index)) return;
+      if (decided(index)) return;
       const combined = this.combined(m);
       if (combined) {
         this.take(combined);
         results.set(index, this.result(m, 'matched', 'Cuadra con la app.', { matched: combined }));
       }
     });
-    this.samePayerGroups(movements, results);
+    this.samePayerGroups(movements, results, released);
     // Las liquidaciones, al final: sus combinaciones no deben quitar a una transferencia el cobro con su nombre.
     const order = movements.map((m, index) => ({ m, index }))
       .sort((a, b) =>
@@ -481,9 +625,12 @@ class Matcher {
   private samePayerGroups(
     movements: readonly BankMovement[],
     results: Map<number, ReconciliationItem>,
+    released: ReadonlySet<number>,
   ): void {
     const open = movements.map((m, index) => ({ m, index }))
-      .filter(({ m, index }) => !results.has(index) && movementKind(m) === 'income');
+      .filter(({ m, index }) =>
+        !results.has(index) && !released.has(index) && movementKind(m) === 'income'
+      );
     const groups = new Map<string, { m: BankMovement; index: number }[]>();
     for (const entry of open) {
       const who = counterparty(entry.m.concept);
@@ -541,6 +688,7 @@ class Matcher {
             ],
             record: null,
             transfer,
+            fees: [],
           },
         },
       );
@@ -588,6 +736,7 @@ class Matcher {
             changes: paymentChanges(chosen, 'card', day),
             record: null,
             transfer: null,
+            fees: [],
           },
           candidates: pool,
           fixed: cards,
@@ -638,6 +787,7 @@ class Matcher {
             changes: chosen.flatMap((i) => paymentChanges([i], 'transfer', transferDate(i, m))),
             record: null,
             transfer: null,
+            fees: [],
           },
           candidates,
         },
@@ -650,6 +800,7 @@ class Matcher {
         changes: [`Apuntar un ingreso de ${euros(amount)} el ${dayLabel(m.operationDate)}`],
         record: { kind: 'income', concept: shortConcept(m.concept), category, method: 'transfer' },
         transfer: null,
+        fees: [],
       },
       candidates,
     });
@@ -683,6 +834,7 @@ class Matcher {
               : [],
             record: null,
             transfer: null,
+            fees: [],
           },
           candidates,
         },
@@ -710,6 +862,7 @@ class Matcher {
               ),
             record: null,
             transfer: null,
+            fees: [],
           },
           candidates,
         },
@@ -721,6 +874,7 @@ class Matcher {
         changes: [`Apuntar un gasto de ${euros(amount)} el ${dayLabel(m.operationDate)}`],
         record: { kind: 'expense', concept: shortConcept(m.concept), category, method },
         transfer: null,
+        fees: [],
       },
       candidates,
     });
@@ -737,6 +891,8 @@ export interface AcceptInput {
   record: { concept: string; category: string } | null;
   /** Apuntar el traspaso entre banco y caja. */
   transfer: boolean;
+  /** Cobrar por transferencia una cuota de cada uno de estos alumnos. */
+  fees: string[];
 }
 
 export class MovementAlreadyMatched extends Error {
@@ -756,24 +912,50 @@ export class AcceptReconciliation {
     private readonly transfers: TransferRepository,
     private readonly matches: BankMatchRepository,
     private readonly actions: ReconciliationActions,
+    private readonly fees: FeePayments,
   ) {}
 
   async execute(input: AcceptInput): Promise<void> {
     const m = BankStatement.of([input.movement]).movements[0]!;
     const key = movementKey(m);
     const stored = await this.matches.matches();
-    if (stored.some((s) => s.key === key)) throw new MovementAlreadyMatched();
+    if (stored.some((s) => s.key === key && s.targets.length > 0)) {
+      throw new MovementAlreadyMatched();
+    }
     const used = new Set(stored.flatMap((s) => s.targets.map(keyOf)));
     const kind = movementKind(m);
     const amount = Math.abs(m.amountCents);
     const targets = await this.apply(m, kind, amount, input, used);
-    await this.matches.saveMatch({
-      key,
-      operationDate: m.operationDate,
-      amountCents: m.amountCents,
-      concept: [...m.concept].slice(0, 200).join(''),
-      targets,
-    });
+    await this.matches.saveMatch(matchOf(m, targets));
+  }
+
+  /** Cobra las cuotas elegidas, si entre todas suman el importe de la transferencia. */
+  private async chargeFees(
+    m: BankMovement,
+    kind: MovementKind,
+    studentIds: string[],
+  ): Promise<MatchTarget[]> {
+    if (kind !== 'income') {
+      throw new InvalidValue('fees', 'Solo se cobran cuotas con una transferencia recibida.');
+    }
+    if (new Set(studentIds).size !== studentIds.length) {
+      throw new InvalidValue('fees', 'Hay alumnos repetidos.');
+    }
+    let total = 0;
+    for (const studentId of studentIds) {
+      total += (await this.fees.quote(studentId, m.operationDate))?.amountCents ?? 0;
+    }
+    if (total !== m.amountCents) {
+      throw new InvalidValue('fees', 'Las cuotas no suman el importe del movimiento.');
+    }
+    const targets: MatchTarget[] = [];
+    for (const studentId of studentIds) {
+      targets.push({
+        source: 'payment',
+        sourceId: await this.fees.register(studentId, m.operationDate),
+      });
+    }
+    return targets;
   }
 
   private async apply(
@@ -783,6 +965,7 @@ export class AcceptReconciliation {
     input: AcceptInput,
     used: Set<string>,
   ): Promise<MatchTarget[]> {
+    if (input.fees.length > 0) return await this.chargeFees(m, kind, input.fees);
     if (input.transfer) {
       if (kind !== 'cash_withdrawal' && kind !== 'cash_deposit') {
         throw new InvalidValue(
@@ -884,5 +1067,15 @@ export class AcceptReconciliation {
     if (item.method === method) return;
     const line = lines.find((l) => l.source === item.source && l.sourceId === item.sourceId)!;
     await this.actions.changeLineMethod(line, method);
+  }
+}
+
+/** Deshace el casamiento de un movimiento del extracto: vuelve a salir para elegir lo suyo y ya no casa solo. */
+export class ReleaseMatch {
+  constructor(private readonly matches: BankMatchRepository) {}
+
+  async execute(movement: BankMovement): Promise<void> {
+    const m = BankStatement.of([movement]).movements[0]!;
+    await this.matches.saveMatch(matchOf(m, []));
   }
 }
