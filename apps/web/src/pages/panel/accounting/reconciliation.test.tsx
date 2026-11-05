@@ -247,7 +247,7 @@ describe('bank reconciliation', () => {
     expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
     expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toMatchObject({
       movement: transfer,
-      fees: ['ana'],
+      fees: [{ studentId: 'ana', kind: 'monthly', amountCents: null }],
     });
 
     await userEvent.click(screen.getByRole('button', { name: /Cuadran/ }));
@@ -285,7 +285,7 @@ describe('bank reconciliation', () => {
       ],
       'GET /api/admin/accounting/reconciliation/fee?studentId=s1&day=2026-11-03': [
         200,
-        { concept: 'Noviembre 2026', amountCents: 4500 },
+        { monthly: { concept: 'Noviembre 2026', amountCents: 4500 }, membership: null },
       ],
       'POST /api/admin/accounting/reconciliation': [
         [200, { ...VIEW, items: [pending] }],
@@ -302,6 +302,9 @@ describe('bank reconciliation', () => {
     expect(match).toBeDisabled();
     await userEvent.type(within(row).getByRole('combobox', { name: 'Alumno' }), 'luis');
     await userEvent.click(await within(row).findByRole('option', { name: 'Luis Mora Vela' }));
+    await userEvent.click(
+      await within(row).findByRole('button', { name: 'Noviembre 2026 · 45,00 €' }),
+    );
     expect(await within(row).findByText('Luis Mora Vela · Noviembre 2026')).toBeInTheDocument();
     expect(row).toHaveTextContent('Elegido: 100,00 € de 100,00 €');
     await userEvent.click(match);
@@ -312,7 +315,7 @@ describe('bank reconciliation', () => {
       items: [{ source: 'payment', sourceId: 'p1' }],
       record: null,
       transfer: false,
-      fees: ['s1'],
+      fees: [{ studentId: 's1', kind: 'monthly', amountCents: null }],
       adjust: false,
     });
   });
@@ -349,8 +352,14 @@ describe('bank reconciliation', () => {
           total: 2,
         },
       ],
-      [quote('a')]: [200, { concept: 'Noviembre 2026', amountCents: 3200 }],
-      [quote('l')]: [200, { concept: 'Noviembre 2026', amountCents: 3200 }],
+      [quote('a')]: [
+        200,
+        { monthly: { concept: 'Noviembre 2026', amountCents: 3200 }, membership: null },
+      ],
+      [quote('l')]: [
+        200,
+        { monthly: { concept: 'Noviembre 2026', amountCents: 3200 }, membership: null },
+      ],
       'POST /api/admin/accounting/reconciliation': [
         [200, { ...VIEW, items: [pending] }],
         [200, MATCHED],
@@ -364,6 +373,9 @@ describe('bank reconciliation', () => {
     for (const name of ['Andres Porras Romero', 'Luis Porras Wadley']) {
       await userEvent.type(within(row).getByRole('combobox', { name: 'Alumno' }), name.slice(0, 5));
       await userEvent.click(await within(row).findByRole('option', { name }));
+      await userEvent.click(
+        await within(row).findByRole('button', { name: 'Noviembre 2026 · 32,00 €' }),
+      );
       await within(row).findByText(`${name} · Noviembre 2026`);
     }
     expect(row).toHaveTextContent(
@@ -384,7 +396,10 @@ describe('bank reconciliation', () => {
       items: [],
       record: null,
       transfer: false,
-      fees: ['a', 'l'],
+      fees: [
+        { studentId: 'a', kind: 'monthly', amountCents: null },
+        { studentId: 'l', kind: 'monthly', amountCents: null },
+      ],
       adjust: true,
     });
   });
@@ -410,6 +425,106 @@ describe('bank reconciliation', () => {
       items: [],
       record: { concept: 'Venta de libros' },
       fees: [],
+    });
+  });
+
+  it('charges a provisional member the membership fee and the rest on account', async () => {
+    const transfer = {
+      operationDate: '2026-11-03',
+      valueDate: '2026-11-03',
+      concept: 'Transferencia De Alvaro Tejero Gilabert, Concepto Socio',
+      amountCents: 8000,
+      balanceCents: 108000,
+    };
+    const pending = {
+      ...item(0, {}),
+      movement: transfer,
+      day: transfer.operationDate,
+      kind: 'income',
+      status: 'pending',
+      note: 'No hay ningún cobro ni ingreso que le corresponda.',
+    };
+    const fetch = mockApi({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/accounting/balances': [200, { clubCents: 0, bankCents: 0, cashCents: 0 }],
+      'GET /api/admin/accounting/categories': [200, { items: CATEGORIES }],
+      'GET /api/admin/students?filter=active': [200, { items: [], total: 0 }],
+      'GET /api/admin/students?filter=provisional': [
+        200,
+        { items: [{ id: 'p', fullName: 'Alvaro Tejero Gilabert' }], total: 1 },
+      ],
+      'GET /api/admin/accounting/reconciliation/fee?studentId=p&day=2026-11-03': [
+        200,
+        { monthly: null, membership: { concept: 'Cuota de socio 2026/27', amountCents: 5000 } },
+      ],
+      'POST /api/admin/accounting/reconciliation': [
+        [200, { ...VIEW, items: [pending] }],
+        [200, MATCHED],
+      ],
+      'POST /api/admin/accounting/reconciliation/accept': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const row = (await screen.findByText(transfer.concept)).closest('li') as HTMLElement;
+    const pick = async () => {
+      await userEvent.type(within(row).getByRole('combobox', { name: 'Alumno' }), 'alvaro');
+      await userEvent.click(
+        await within(row).findByRole('option', { name: 'Alvaro Tejero Gilabert (provisional)' }),
+      );
+    };
+    await pick();
+    await userEvent.click(
+      await within(row).findByRole('button', { name: 'Cuota de socio 2026/27 · 50,00 €' }),
+    );
+    await pick();
+    expect(await within(row).findByLabelText('A cuenta (€)')).toHaveValue('30');
+    await userEvent.click(within(row).getByRole('button', { name: 'Añadir a cuenta' }));
+    expect(row).toHaveTextContent('Alvaro Tejero Gilabert (provisional) · Pago a cuenta');
+    expect(row).toHaveTextContent('Elegido: 80,00 € de 80,00 €');
+    await userEvent.click(within(row).getByRole('button', { name: 'Casar con lo elegido' }));
+
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toMatchObject({
+      fees: [
+        { studentId: 'p', kind: 'membership', amountCents: null },
+        { studentId: 'p', kind: 'credit', amountCents: 3000 },
+      ],
+      adjust: false,
+    });
+  });
+
+  it('lets untick what a card settlement already counted', async () => {
+    const settlement = {
+      ...item(1, {}),
+      kind: 'card_settlement',
+      status: 'pending',
+      note: 'En la app hay 31,00 € más con tarjeta el 10/09/2026 de lo que abonó el banco.',
+      fixed: [payment('p1', 9000), payment('p2', 3100)].map((p) => ({ ...p, method: 'card' })),
+    };
+    const fetch = mockApi({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/accounting/balances': [200, { clubCents: 0, bankCents: 0, cashCents: 0 }],
+      'GET /api/admin/accounting/categories': [200, { items: CATEGORIES }],
+      'POST /api/admin/accounting/reconciliation': [
+        [200, { ...VIEW, items: [settlement] }],
+        [200, MATCHED],
+      ],
+      'POST /api/admin/accounting/reconciliation/accept': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const row = (await screen.findByText('Liquidacion Efectuada El 10/09/2026')).closest(
+      'li',
+    ) as HTMLElement;
+    expect(row).toHaveTextContent('Elegido: 121,00 € de 90,00 €');
+    await userEvent.click(within(row).getByRole('checkbox', { name: /Cuota · p2/ }));
+    await userEvent.click(within(row).getByRole('button', { name: 'Casar con lo elegido' }));
+
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toMatchObject({
+      items: [{ source: 'payment', sourceId: 'p1' }],
     });
   });
 
