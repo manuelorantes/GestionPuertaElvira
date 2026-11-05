@@ -191,6 +191,37 @@ describe('Cobros y cuotas', () => {
     expect(within(receipt).queryByRole('button', { name: 'Borrar' })).not.toBeInTheDocument();
   });
 
+  it('marks a payment reconciled with the bank and no longer lets it be edited or deleted', async () => {
+    const reconciled = {
+      ...RECEIPT,
+      method: 'transfer',
+      methodLabel: 'Transferencia',
+      reconciled: true,
+    };
+    const pending = { ...RECEIPT, id: 'p8', receiptNumber: 'R-2026-0001', method: 'card' };
+    api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/billing/payments': [200, { items: [reconciled, pending] }],
+      'GET /api/admin/billing/payments/p9': [200, reconciled],
+    });
+    renderApp('/panel/cobros?pestana=registro');
+
+    const table = await screen.findByRole('table', { name: 'Cobros registrados' });
+    expect(within(table).getByRole('row', { name: /R-2026-0002/ })).toHaveTextContent('Conciliado');
+    expect(within(table).getByRole('row', { name: /R-2026-0001/ })).toHaveTextContent(
+      'Sin conciliar',
+    );
+    await userEvent.click(
+      within(within(table).getByRole('row', { name: /R-2026-0002/ })).getByRole('button', {
+        name: 'Ver recibo',
+      }),
+    );
+    const receipt = await screen.findByRole('dialog', { name: 'Recibo' });
+    expect(await within(receipt).findByText(/Conciliado con el banco/)).toBeInTheDocument();
+    expect(within(receipt).queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
+    expect(within(receipt).queryByRole('button', { name: 'Borrar' })).not.toBeInTheDocument();
+  });
+
   it('corrects the method and amount of a receipt after confirming what changes', async () => {
     const fetch = api({
       'GET /api/auth/me': [200, { user: SUPERADMIN }],
