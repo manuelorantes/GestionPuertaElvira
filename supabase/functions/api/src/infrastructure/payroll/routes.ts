@@ -17,6 +17,7 @@ import {
   RefillDay,
   RemoveHoliday,
   SaveDuty,
+  SubstitutedDays,
   SubstituteTeacher,
   TeacherAgenda,
   TeacherReport,
@@ -159,6 +160,10 @@ export function registerPayrollRoutes(api: ApiApp): void {
       // Lo que aún le queda por dar ese mes, solo al mirar un profesor.
       upcoming: teacher
         ? await upcomingSessions(scope.tx, api.deps.clock).execute(teacher, period)
+        : [],
+      // Los días en que otro dio sus clases, para que se vea por qué están vacíos.
+      substitutedBy: teacher
+        ? await new SubstitutedDays(new SqlTeacherReportQuery(scope.tx)).execute(teacher, period)
         : [],
     });
   });
