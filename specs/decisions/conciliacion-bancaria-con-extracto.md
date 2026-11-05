@@ -42,7 +42,9 @@ decidiendo cada cambio.
 ## Consequences
 - Subir dos veces el mismo extracto, extractos solapados o el mismo en Excel y en PDF no duplica nada.
 - Subir un extracto ya escribe en la base de datos (lo que cuadra), aunque no cambia cobros ni gastos.
-- Lo conciliado antes de guardar lo que cuadra solo no está recordado: hay que subir una vez esos extractos.
+- Lo conciliado antes de guardar lo que cuadra solo no estaba recordado. Lo del cierre del 02/11/2026 (extracto del
+  02/09 al 30/10/2026) se cargó con una migración de datos, calculada con esta misma conciliación;
+  lo que no entre en ese periodo se recuerda al subir su extracto.
 - Si el banco cambia el formato del Excel o del PDF, hay que adaptar solo el lector de la web.
 - Las combinaciones ambiguas de cobros con tarjeta no se adivinan: se eligen a mano.
 - `pdfjs-dist` debe seguir en la 6.2.108 o posterior:
