@@ -365,8 +365,8 @@ Table accounting_bank_match {
   operation_date date [not null]
   amount_cents int [not null, note: 'con signo: positivo si entra dinero']
   concept varchar(200) [not null]
-  targets jsonb [not null, note: 'lo que le corresponde en la app [{source, sourceId}]: cobros, gastos, apuntes o traspasos (source transfer)']
-  Note: 'Movimiento del extracto del banco ya conciliado: sale como «cuadra» y lo suyo no casa con otro'
+  targets jsonb [not null, note: 'lo que le corresponde en la app [{source, sourceId}]: cobros, gastos, apuntes o traspasos (source transfer); vacío si se deshizo el casamiento']
+  Note: 'Movimiento del extracto del banco ya conciliado (aceptado o que cuadró solo): sale como «cuadra» y lo suyo no casa con otro; sin targets, ya no casa solo'
 }
 
 Table accounting_bank_rule {
