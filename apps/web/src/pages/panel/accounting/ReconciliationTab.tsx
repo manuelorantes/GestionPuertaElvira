@@ -8,6 +8,7 @@ import {
   type Reconciliation,
   type ReconciliationAcceptance,
   type ReconciliationAppItem,
+  type ReconciliationFee,
   type ReconciliationItem,
   reconcileStatement,
   releaseReconciliation,
@@ -25,6 +26,8 @@ import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
+
+import { FeePicker } from './FeePicker';
 
 type Filter = 'review' | 'matched' | 'all';
 
@@ -202,8 +205,11 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
   const { movement, proposal } = item;
   const [concept, setConcept] = useState(proposal?.record?.concept ?? '');
   const [category, setCategory] = useState(proposal?.record?.category ?? '');
-  const [choosing, setChoosing] = useState(item.status === 'pending' && item.candidates.length > 0);
+  // Una transferencia recibida se puede repartir a mano entre cobros y cuotas de cualquier alumno.
+  const canChoose = item.kind === 'income' || item.candidates.length > 0;
+  const [choosing, setChoosing] = useState(item.status === 'pending' && canChoose);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
+  const [fees, setFees] = useState<ReconciliationFee[]>([]);
   const categories = useCategoryOptions(proposal?.record?.kind ?? 'expense');
   const accept = useAccountingMutation(acceptReconciliation);
   const release = useAccountingMutation(releaseReconciliation);
@@ -211,7 +217,10 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
   const target = Math.abs(movement.amountCents);
   const fixedSum = item.fixed.reduce((sum, i) => sum + i.amountCents, 0);
   const chosenItems = item.candidates.filter((c) => chosen.has(keyOf(c)));
-  const chosenSum = fixedSum + chosenItems.reduce((sum, i) => sum + i.amountCents, 0);
+  const chosenSum =
+    fixedSum +
+    chosenItems.reduce((sum, i) => sum + i.amountCents, 0) +
+    fees.reduce((sum, f) => sum + f.amountCents, 0);
 
   function send(acceptance: Omit<ReconciliationAcceptance, 'movement'>) {
     accept.mutate(
@@ -326,7 +335,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
             >
               Aceptar
             </Button>
-            {item.candidates.length > 0 && (
+            {canChoose && (
               <Button size="md" variant="ghost" onClick={() => setChoosing(true)}>
                 Elegir a mano
               </Button>
@@ -347,9 +356,11 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
               ))}
             </>
           )}
-          <p className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-            Elige lo que le corresponde
-          </p>
+          {item.candidates.length > 0 && (
+            <p className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+              Elige lo que le corresponde
+            </p>
+          )}
           <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto">
             {item.candidates.map((c) => (
               <li key={keyOf(c)}>
@@ -370,6 +381,9 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
               </li>
             ))}
           </ul>
+          {item.kind === 'income' && (
+            <FeePicker day={movement.operationDate} fees={fees} onChange={setFees} />
+          )}
           <p className="text-sm" aria-live="polite">
             Elegido: <strong className="tabular-nums">{formatCents(chosenSum)}</strong> de{' '}
             <span className="tabular-nums">{formatCents(target)}</span>
@@ -379,7 +393,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
               size="md"
               busy={accept.isPending}
               busyLabel="Aceptando…"
-              disabled={chosenItems.length === 0 || chosenSum !== target}
+              disabled={(chosenItems.length === 0 && fees.length === 0) || chosenSum !== target}
               onClick={() =>
                 send({
                   items: [...item.fixed, ...chosenItems].map(({ source, sourceId }) => ({
@@ -388,7 +402,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
                   })),
                   record: null,
                   transfer: false,
-                  fees: [],
+                  fees: fees.map((f) => f.studentId),
                 })
               }
             >
