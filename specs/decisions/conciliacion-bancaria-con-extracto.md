@@ -18,8 +18,12 @@ decidiendo cada cambio.
   Así la API no depende de formatos de fichero y el fichero no se guarda en ningún sitio.
 - La API **calcula las sugerencias en cada pasada**, sin guardarlas:
   lo que no se acepta no deja rastro y vuelve a salir.
-  Aceptar una sugerencia usa los casos de uso de siempre (corregir fecha y forma de pago de un cobro,
-  apuntar un gasto o un ingreso, anotar un traspaso, corregir la forma de pago de un movimiento).
+  Aceptar una sugerencia usa los casos de uso de siempre (corregir la fecha de un cobro,
+  apuntar un gasto o un ingreso, anotar un traspaso, cobrar una cuota).
+- Lo del extracto **solo casa con lo que ya es del banco** (revisado el 05/11/2026):
+  tarjeta con una liquidación del datáfono, transferencia con una transferencia recibida.
+  La conciliación no cambia la forma de pago de nada: lo de efectivo no pasó por el banco,
+  y convertirlo descuadraba la caja; si falta algo, se crea su registro (gasto, ingreso o cuota).
 - Lo aceptado se recuerda en `accounting_bank_match`: la huella del movimiento del extracto
   (fechas de operación y valor, importe y saldo tras él; no el concepto, que el PDF a veces corta)
   y lo que le corresponde en la app.
@@ -35,6 +39,11 @@ decidiendo cada cambio.
   conciliación.
 - Una transferencia con el nombre de un alumno (o de su tutor) sin cobro suyo que casar propone **cobrar su cuota**
   con el caso de uso de Cobros (recibo, cuotas cubiertas y descuentos como siempre), si el importe coincide.
+- Una transferencia recibida se puede **repartir a mano** entre cobros por transferencia y cuotas nuevas de varios
+  alumnos (revisado el 05/11/2026): una familia paga a veces a varios niños con apellidos distintos.
+  Los alumnos a los que paga cada remitente (sacado del concepto, como la contraparte) se recuerdan en
+  `accounting_bank_payer` al casar su transferencia y la próxima vez cuentan como si salieran en el concepto,
+  así que se propone cobrarles; siempre se acepta a mano.
 - La categoría elegida al apuntar un gasto o un ingreso se recuerda por contraparte (quien cobra o paga, sacado del
   concepto) en `accounting_bank_rule`, para proponerla la próxima vez.
 - Solo superadministración usa la conciliación: cambia cobros y gastos de muchas personas de golpe.
