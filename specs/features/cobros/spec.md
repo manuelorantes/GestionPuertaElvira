@@ -258,12 +258,19 @@ Superadministración MUST poder corregir desde el propio recibo un cobro ya regi
 
 Antes de guardar se confirma lo que cambia.
 El número de recibo y los meses cobrados no cambian.
+Un cobro **conciliado con el banco** (ver la conciliación en [Contabilidad](../contabilidad/spec.md)) MUST NOT poder
+corregirse ni borrarse: su recibo lo indica y no ofrece «Editar» ni «Borrar»;
+para corregirlo hay que deshacer antes la conciliación.
 El recibo y Contabilidad muestran los datos corregidos y cada cambio queda en el historial.
 Un recibo que se queda en 0 € no sale en Contabilidad y no impide ver el mes.
 
 #### Scenario: Anotado como transferencia y pagado en efectivo
 - **WHEN** superadministración cambia a «Efectivo» un cobro registrado como transferencia
 - **THEN** el recibo y el movimiento de Contabilidad pasan a «Efectivo» con el mismo importe
+
+#### Scenario: Cobro conciliado
+- **WHEN** superadministración abre el recibo de un cobro por transferencia ya conciliado con el banco
+- **THEN** el recibo indica que está conciliado y no ofrece «Editar» ni «Borrar»; si se intenta igualmente, se rechaza
 
 #### Scenario: Recibo corregido a 0 €
 - **WHEN** superadministración corrige a 0 € un recibo de 1 € de octubre
@@ -277,8 +284,7 @@ Al borrarlo:
 
 - lo que cubría deja de estar cubierto y las cuotas del alumno se reparten de nuevo con sus otros cobros,
   así que los meses que pagaba vuelven a quedar pendientes (o a cubrirse con el saldo a favor que haya);
-- deja de salir en Contabilidad y en la conciliación con el banco
-  (el movimiento del banco con el que se había casado vuelve a quedar por conciliar);
+- deja de salir en Contabilidad;
 - los puntos canjeados en él vuelven al alumno;
 - queda en el historial con su número de recibo, el alumno, el importe y el motivo.
 

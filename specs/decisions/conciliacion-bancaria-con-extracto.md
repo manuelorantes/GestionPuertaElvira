@@ -29,6 +29,10 @@ decidiendo cada cambio.
   para otra transferencia de la misma familia.
   Por si casó mal, se puede **deshacer**: el movimiento queda guardado sin nada que le corresponda,
   ya no casa solo y espera a que se acepte su sugerencia o se elija a mano.
+- Lo casado queda **bloqueado** (revisado el 05/11/2026): los casos de uso que cambian la forma de pago, la fecha o el
+  importe de un cobro, apunte, factura o traspaso, o lo borran, lo rechazan si está en `accounting_bank_match`.
+  Así lo que cuadra con el banco no se descuadra desde Cobros o Contabilidad; la única salida es deshacer la
+  conciliación.
 - Una transferencia con el nombre de un alumno (o de su tutor) sin cobro suyo que casar propone **cobrar su cuota**
   con el caso de uso de Cobros (recibo, cuotas cubiertas y descuentos como siempre), si el importe coincide.
 - La categoría elegida al apuntar un gasto o un ingreso se recuerda por contraparte (quien cobra o paga, sacado del
