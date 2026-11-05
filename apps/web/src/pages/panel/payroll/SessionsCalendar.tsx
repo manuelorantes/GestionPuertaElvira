@@ -1,6 +1,6 @@
 import { monthLabel } from '@/features/billing/money';
 import { LEVELS } from '@/features/classes/levels';
-import type { Holiday, Session, UpcomingSession } from '@/features/payroll/api';
+import type { Holiday, Session, SubstitutedClass, UpcomingSession } from '@/features/payroll/api';
 import { monthWeeks } from '@/features/payroll/calendar';
 import { hoursLabel } from '@/features/payroll/hours';
 
@@ -73,30 +73,41 @@ function isWeekend(date: string): boolean {
   return day === 0 || day === 6;
 }
 
+/** «Sustituido por Ana Belén Torres · Iniciación A». */
+const substitutedNote = (s: SubstitutedClass) => `Sustituido por ${s.substituteName} · ${s.label}`;
+
 /**
  * Calendario del mes con las horas que dio cada día y, en tonos claros, las que aún le quedan por dar según el
- * horario. Los festivos van en rojo, para que se vea por qué ese día no hay clase. Las clases en las que le sustituyeron no están entre sus sesiones, así que ese día sale vacío. Sábado y
- * domingo solo aparecen si ese mes tiene algo en fin de semana.
+ * horario. Los festivos van en rojo, para que se vea por qué ese día no hay clase; también en rojo, quién dio cada
+ * clase en la que le sustituyeron, que no está entre sus sesiones. Sábado y domingo solo aparecen si ese mes tiene
+ * algo en fin de semana.
  */
 export function SessionsCalendar({
   month,
   sessions,
   upcoming = [],
   holidays = [],
+  substitutedBy = [],
   viewer = 'staff',
 }: {
   month: string;
   sessions: CalendarSession[];
   upcoming?: UpcomingSession[];
   holidays?: Holiday[];
+  /** Las clases suyas que dio otro. */
+  substitutedBy?: SubstitutedClass[];
   viewer?: CalendarViewer;
 }) {
   const holidayOn = new Map(holidays.map((h) => [h.date, h.name]));
   const byDay = minutesByDay(sessions, upcoming);
   const wording = WORDING[viewer];
-  const weekLength = [...sessions, ...upcoming].some((s) => isWeekend(s.date)) ? 7 : 5;
+  const weekLength = [...sessions, ...upcoming, ...substitutedBy].some((s) => isWeekend(s.date))
+    ? 7
+    : 5;
   const shown = new Set(monthWeeks(month, weekLength).flat());
   const anyHoliday = holidays.some((h) => shown.has(h.date));
+  const anySubstituted = substitutedBy.some((s) => shown.has(s.date));
+  const isRed = (date: string) => holidayOn.has(date) || substitutedBy.some((s) => s.date === date);
   // Lo previsto solo sale en la leyenda cuando el mes tiene algo por dar.
   const legend = (Object.keys(KINDS) as Kind[]).filter(
     (kind) => !UPCOMING_KINDS.includes(kind) || upcoming.length > 0,
@@ -122,13 +133,14 @@ export function SessionsCalendar({
               {week.map((date, i) => (
                 <td
                   key={date ?? `vacío-${i}`}
-                  className={`h-16 border-r border-line-soft p-1.5 last:border-r-0 ${date && holidayOn.has(date) ? 'bg-danger-bg/40' : ''}`}
+                  className={`h-16 border-r border-line-soft p-1.5 last:border-r-0 ${date && isRed(date) ? 'bg-danger-bg/40' : ''}`}
                 >
                   {date && (
                     <CalendarDay
                       date={date}
                       minutes={byDay.get(date)}
                       holiday={holidayOn.get(date) ?? null}
+                      substitutedBy={substitutedBy.filter((s) => s.date === date)}
                       wording={wording}
                     />
                   )}
@@ -157,6 +169,15 @@ export function SessionsCalendar({
             Festivo
           </li>
         )}
+        {anySubstituted && (
+          <li className="flex items-center gap-1.5">
+            <span
+              aria-hidden
+              className="size-3 rounded-sm border border-danger-fg/30 bg-danger-bg"
+            />
+            Sustituido
+          </li>
+        )}
       </ul>
     </div>
   );
@@ -166,12 +187,14 @@ function CalendarDay({
   date,
   minutes,
   holiday,
+  substitutedBy,
   wording,
 }: {
   date: string;
   minutes: DayMinutes | undefined;
   /** Nombre del festivo, o null si ese día no lo es. */
   holiday: string | null;
+  substitutedBy: SubstitutedClass[];
   wording: (typeof WORDING)[CalendarViewer];
 }) {
   const kinds = (Object.keys(KINDS) as Kind[]).filter((k) => (minutes?.[k] ?? 0) > 0);
@@ -189,6 +212,16 @@ function CalendarDay({
           Festivo<span className="hidden sm:inline"> · {holiday}</span>
         </span>
       )}
+      {substitutedBy.map((s) => (
+        <span
+          key={s.label}
+          title={substitutedNote(s)}
+          className="truncate rounded-sm bg-danger-bg px-1 py-0.5 text-[12px] leading-tight font-medium text-danger-fg sm:px-1.5"
+        >
+          Sustituido por {s.substituteName}
+          <span className="hidden sm:inline"> · {s.label}</span>
+        </span>
+      ))}
       {kinds.map((kind) => (
         <span
           key={kind}

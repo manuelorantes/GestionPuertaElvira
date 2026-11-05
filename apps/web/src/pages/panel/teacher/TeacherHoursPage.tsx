@@ -32,6 +32,12 @@ const substitutionNote = (s: TeacherSubstitution) =>
     ? `Sustituiste a ${s.otherName} en ${s.label}`
     : `Te sustituyó ${s.otherName} en ${s.label}`;
 
+/** Las clases suyas que dio otro, para marcarlas en el calendario. */
+const substitutedBy = (substitutions: TeacherSubstitution[]) =>
+  substitutions
+    .filter((s) => s.role === 'received')
+    .map(({ date, label, otherName }) => ({ date, label, substituteName: otherName }));
+
 /** Lo que cuentan las sesiones del mes (como en la liquidación): de sus clases y de sustitución. */
 function monthTotal(sessions: TeacherSession[]): { own: number; substitution: number } {
   return sessions.reduce(
@@ -91,6 +97,7 @@ export function TeacherHoursPage() {
               sessions={sessions}
               upcoming={hours.data?.upcoming ?? []}
               holidays={hours.data?.holidays ?? []}
+              substitutedBy={substitutedBy(substitutions)}
               viewer="teacher"
             />
             {substitutions.length > 0 && (
