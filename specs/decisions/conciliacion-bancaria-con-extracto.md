@@ -24,13 +24,21 @@ decidiendo cada cambio.
   (fechas de operación y valor, importe y saldo tras él; no el concepto, que el PDF a veces corta)
   y lo que le corresponde en la app.
   Los movimientos ya casados salen como «cuadra» y lo suyo en la app no se ofrece a otro movimiento.
-  Lo que casa exactamente (mismo importe, fecha cercana, forma de pago del banco) cuadra sin guardar nada.
+  Lo que casa solo (mismo importe, fecha cercana, forma de pago del banco) **también se guarda** al subir el extracto
+  (revisado el 05/11/2026): sin guardarlo, un extracto posterior que no lo incluía volvía a ofrecer esa cuota
+  para otra transferencia de la misma familia.
+  Por si casó mal, se puede **deshacer**: el movimiento queda guardado sin nada que le corresponda,
+  ya no casa solo y espera a que se acepte su sugerencia o se elija a mano.
+- Una transferencia con el nombre de un alumno (o de su tutor) sin cobro suyo que casar propone **cobrar su cuota**
+  con el caso de uso de Cobros (recibo, cuotas cubiertas y descuentos como siempre), si el importe coincide.
 - La categoría elegida al apuntar un gasto o un ingreso se recuerda por contraparte (quien cobra o paga, sacado del
   concepto) en `accounting_bank_rule`, para proponerla la próxima vez.
 - Solo superadministración usa la conciliación: cambia cobros y gastos de muchas personas de golpe.
 
 ## Consequences
 - Subir dos veces el mismo extracto, extractos solapados o el mismo en Excel y en PDF no duplica nada.
+- Subir un extracto ya escribe en la base de datos (lo que cuadra), aunque no cambia cobros ni gastos.
+- Lo conciliado antes de guardar lo que cuadra solo no está recordado: hay que subir una vez esos extractos.
 - Si el banco cambia el formato del Excel o del PDF, hay que adaptar solo el lector de la web.
 - Las combinaciones ambiguas de cobros con tarjeta no se adivinan: se eligen a mano.
 - `pdfjs-dist` debe seguir en la 6.2.108 o posterior:
