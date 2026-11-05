@@ -45,6 +45,7 @@ const item = (index: number, rest: object) => ({
   proposal: null,
   candidates: [],
   fixed: [],
+  day: MOVEMENTS[index]?.operationDate,
   ...rest,
 });
 
@@ -69,6 +70,7 @@ const VIEW = {
         },
         transfer: null,
         fees: [],
+        adjust: false,
       },
     }),
     item(1, {
@@ -93,6 +95,7 @@ const MATCHED = {
 const CATEGORIES = [
   { code: 'water', kind: 'expense', label: 'Agua', custom: false },
   { code: 'utilities', kind: 'expense', label: 'Suministros', custom: false },
+  { code: 'other_income', kind: 'income', label: 'Otros ingresos', custom: false },
 ];
 
 function api(user: typeof SUPERADMIN | typeof ADMIN = SUPERADMIN) {
@@ -149,6 +152,7 @@ describe('bank reconciliation', () => {
         record: { concept: 'Agua de octubre', category: 'utilities' },
         transfer: false,
         fees: [],
+        adjust: false,
       },
     ]);
     expect(await screen.findByText('Todo cuadra con el banco.')).toBeInTheDocument();
@@ -179,6 +183,7 @@ describe('bank reconciliation', () => {
       record: null,
       transfer: false,
       fees: [],
+      adjust: false,
     });
   });
 
@@ -264,6 +269,7 @@ describe('bank reconciliation', () => {
     const pending = {
       ...item(0, {}),
       movement: transfer,
+      day: transfer.operationDate,
       kind: 'income',
       status: 'pending',
       note: 'No hay ningún cobro que le corresponda.',
@@ -307,6 +313,103 @@ describe('bank reconciliation', () => {
       record: null,
       transfer: false,
       fees: ['s1'],
+      adjust: false,
+    });
+  });
+
+  it('confirms charging two fees when the transfer brings more, leaving it in their favour', async () => {
+    const transfer = {
+      operationDate: '2026-11-03',
+      valueDate: '2026-11-03',
+      concept: 'Transferencia De Luis Porras Wadley, Concepto Mensualidad',
+      amountCents: 8000,
+      balanceCents: 108000,
+    };
+    const pending = {
+      ...item(0, {}),
+      movement: transfer,
+      day: transfer.operationDate,
+      kind: 'income',
+      status: 'pending',
+      note: 'No hay ningún cobro ni ingreso que le corresponda.',
+    };
+    const quote = (id: string) =>
+      `GET /api/admin/accounting/reconciliation/fee?studentId=${id}&day=2026-11-03`;
+    const fetch = mockApi({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/accounting/balances': [200, { clubCents: 0, bankCents: 0, cashCents: 0 }],
+      'GET /api/admin/accounting/categories': [200, { items: CATEGORIES }],
+      'GET /api/admin/students?filter=active': [
+        200,
+        {
+          items: [
+            { id: 'a', fullName: 'Andres Porras Romero' },
+            { id: 'l', fullName: 'Luis Porras Wadley' },
+          ],
+          total: 2,
+        },
+      ],
+      [quote('a')]: [200, { concept: 'Noviembre 2026', amountCents: 3200 }],
+      [quote('l')]: [200, { concept: 'Noviembre 2026', amountCents: 3200 }],
+      'POST /api/admin/accounting/reconciliation': [
+        [200, { ...VIEW, items: [pending] }],
+        [200, MATCHED],
+      ],
+      'POST /api/admin/accounting/reconciliation/accept': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const row = (await screen.findByText(transfer.concept)).closest('li') as HTMLElement;
+    for (const name of ['Andres Porras Romero', 'Luis Porras Wadley']) {
+      await userEvent.type(within(row).getByRole('combobox', { name: 'Alumno' }), name.slice(0, 5));
+      await userEvent.click(await within(row).findByRole('option', { name }));
+      await within(row).findByText(`${name} · Noviembre 2026`);
+    }
+    expect(row).toHaveTextContent(
+      'Elegido: 64,00 € de 80,00 € · 16,00 € de más: quedará a su favor',
+    );
+    await userEvent.click(within(row).getByRole('button', { name: 'Casar con lo elegido' }));
+
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('¿Cobrar con saldo a favor?');
+    expect(dialog).toHaveTextContent('Los 16,00 € de más se reparten a partes iguales');
+    expect(within(dialog).getAllByText('8,00 € a su favor')).toHaveLength(2);
+    expect(within(dialog).getAllByText('40,00 €')).toHaveLength(2);
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sí, cobrar así' }));
+
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toEqual({
+      movement: transfer,
+      items: [],
+      record: null,
+      transfer: false,
+      fees: ['a', 'l'],
+      adjust: true,
+    });
+  });
+
+  it('records by hand an income for a card settlement nothing matches', async () => {
+    const fetch = api();
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const settlement = (await screen.findByText('Liquidacion Efectuada El 10/09/2026')).closest(
+      'li',
+    ) as HTMLElement;
+    expect(within(settlement).getByRole('combobox', { name: 'Alumno' })).toBeInTheDocument();
+    await userEvent.click(within(settlement).getByRole('button', { name: 'Crear un ingreso' }));
+    const concept = within(settlement).getByLabelText('Concepto');
+    await userEvent.clear(concept);
+    await userEvent.type(concept, 'Venta de libros');
+    await userEvent.click(within(settlement).getByRole('button', { name: 'Apuntar' }));
+
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toMatchObject({
+      movement: MOVEMENTS[1],
+      items: [],
+      record: { concept: 'Venta de libros' },
+      fees: [],
     });
   });
 
