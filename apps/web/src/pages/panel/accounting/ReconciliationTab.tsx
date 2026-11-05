@@ -5,6 +5,7 @@ import { useId, useRef, useState } from 'react';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import {
   acceptReconciliation,
+  adjustedFees,
   type Reconciliation,
   type ReconciliationAcceptance,
   type ReconciliationAppItem,
@@ -27,6 +28,7 @@ import { TextField } from '@/shared/ui/TextField';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
 import { useToast } from '@/shared/ui/Toast';
 
+import { AdjustFeesDialog } from './AdjustFeesDialog';
 import { FeePicker } from './FeePicker';
 
 type Filter = 'review' | 'matched' | 'all';
@@ -201,16 +203,34 @@ function AppItemLine({ item }: { item: ReconciliationAppItem }) {
   );
 }
 
+type Mode = 'proposal' | 'choose' | 'record' | null;
+
 function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccepted: () => void }) {
   const { movement, proposal } = item;
-  const [concept, setConcept] = useState(proposal?.record?.concept ?? '');
+  // Lo del banco siempre se puede elegir a mano o apuntar como un registro nuevo (salvo sacar o ingresar efectivo).
+  const canRecord = ['income', 'expense', 'card_settlement'].includes(item.kind);
+  const canFees = item.kind === 'income' || item.kind === 'card_settlement';
+  const canChoose = canFees || item.candidates.length > 0;
+  const recordKind = movement.amountCents < 0 ? 'expense' : 'income';
+  const initialMode: Mode =
+    item.status === 'matched'
+      ? null
+      : proposal
+        ? 'proposal'
+        : canChoose
+          ? 'choose'
+          : canRecord
+            ? 'record'
+            : null;
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [concept, setConcept] = useState(
+    proposal?.record?.concept ?? [...movement.concept].slice(0, 120).join(''),
+  );
   const [category, setCategory] = useState(proposal?.record?.category ?? '');
-  // Una transferencia recibida se puede repartir a mano entre cobros y cuotas de cualquier alumno.
-  const canChoose = item.kind === 'income' || item.candidates.length > 0;
-  const [choosing, setChoosing] = useState(item.status === 'pending' && canChoose);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [fees, setFees] = useState<ReconciliationFee[]>([]);
-  const categories = useCategoryOptions(proposal?.record?.kind ?? 'expense');
+  const [confirming, setConfirming] = useState(false);
+  const categories = useCategoryOptions(recordKind);
   const accept = useAccountingMutation(acceptReconciliation);
   const release = useAccountingMutation(releaseReconciliation);
   const toast = useToast();
@@ -221,12 +241,20 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
     fixedSum +
     chosenItems.reduce((sum, i) => sum + i.amountCents, 0) +
     fees.reduce((sum, f) => sum + f.amountCents, 0);
+  const difference = target - chosenSum;
+  // Con cuotas elegidas, lo que no cuadra se reparte entre ellas (sin dejar ninguna a cero).
+  const adjustable =
+    fees.length > 0 &&
+    difference !== 0 &&
+    adjustedFees(fees, difference).every((f) => f.chargedCents > 0);
+  const recordCategory = category || categories[0]?.value || '';
 
   function send(acceptance: Omit<ReconciliationAcceptance, 'movement'>) {
     accept.mutate(
       { movement, ...acceptance },
       {
         onSuccess: () => {
+          setConfirming(false);
           toast('Movimiento conciliado');
           onAccepted();
         },
@@ -238,9 +266,20 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
     if (!proposal) return;
     send({
       items: proposal.items.map(({ source, sourceId }) => ({ source, sourceId })),
-      record: proposal.record ? { concept: concept.trim(), category } : null,
+      record: proposal.record ? { concept: concept.trim(), category: recordCategory } : null,
       transfer: proposal.transfer !== null,
       fees: proposal.fees.map((f) => f.studentId),
+      adjust: false,
+    });
+  }
+
+  function acceptChosen(adjust: boolean) {
+    send({
+      items: [...item.fixed, ...chosenItems].map(({ source, sourceId }) => ({ source, sourceId })),
+      record: null,
+      transfer: false,
+      fees: fees.map((f) => f.studentId),
+      adjust,
     });
   }
 
@@ -252,6 +291,27 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
       },
     });
   }
+
+  /** Los botones para pasar a las otras formas de casarlo. */
+  const switches = (
+    <>
+      {proposal && mode !== 'proposal' && (
+        <Button size="md" variant="ghost" onClick={() => setMode('proposal')}>
+          Volver a la sugerencia
+        </Button>
+      )}
+      {canChoose && mode !== 'choose' && (
+        <Button size="md" variant="ghost" onClick={() => setMode('choose')}>
+          Elegir a mano
+        </Button>
+      )}
+      {canRecord && mode !== 'record' && !(mode === 'proposal' && proposal?.record) && (
+        <Button size="md" variant="ghost" onClick={() => setMode('record')}>
+          {recordKind === 'income' ? 'Crear un ingreso' : 'Crear un gasto'}
+        </Button>
+      )}
+    </>
+  );
 
   const status = STATUS[item.status];
   return (
@@ -291,7 +351,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
           </Button>
         </div>
       )}
-      {proposal && !choosing && (
+      {mode === 'proposal' && proposal && (
         <div className="flex flex-col gap-3 rounded-sm bg-surface-muted p-3">
           {proposal.changes.length > 0 && (
             <ul className="list-disc pl-5 text-sm">
@@ -310,20 +370,13 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
             </ul>
           )}
           {proposal.record && (
-            <div className="grid gap-3 md:grid-cols-2">
-              <TextField
-                label="Concepto"
-                value={concept}
-                maxLength={120}
-                onChange={(e) => setConcept(e.target.value)}
-              />
-              <Select
-                label="Categoría"
-                options={categories}
-                value={category}
-                onChange={setCategory}
-              />
-            </div>
+            <RecordFields
+              concept={concept}
+              onConcept={setConcept}
+              category={recordCategory}
+              onCategory={setCategory}
+              categories={categories}
+            />
           )}
           <div className="flex flex-wrap gap-2">
             <Button
@@ -335,15 +388,11 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
             >
               Aceptar
             </Button>
-            {canChoose && (
-              <Button size="md" variant="ghost" onClick={() => setChoosing(true)}>
-                Elegir a mano
-              </Button>
-            )}
+            {switches}
           </div>
         </div>
       )}
-      {choosing && (
+      {mode === 'choose' && (
         <fieldset className="flex flex-col gap-2 rounded-sm bg-surface-muted p-3">
           <legend className="sr-only">Lo que le corresponde en la app</legend>
           {item.fixed.length > 0 && (
@@ -381,43 +430,107 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
               </li>
             ))}
           </ul>
-          {item.kind === 'income' && (
-            <FeePicker day={movement.operationDate} fees={fees} onChange={setFees} />
-          )}
+          {canFees && <FeePicker day={item.day} fees={fees} onChange={setFees} />}
           <p className="text-sm" aria-live="polite">
             Elegido: <strong className="tabular-nums">{formatCents(chosenSum)}</strong> de{' '}
             <span className="tabular-nums">{formatCents(target)}</span>
+            {adjustable &&
+              (difference > 0
+                ? ` · ${formatCents(difference)} de más: quedará a su favor`
+                : ` · faltan ${formatCents(-difference)}: quedará pendiente`)}
           </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="md"
+              busy={accept.isPending && !confirming}
+              busyLabel="Aceptando…"
+              disabled={
+                (chosenItems.length === 0 && fees.length === 0) || (difference !== 0 && !adjustable)
+              }
+              onClick={() => (difference === 0 ? acceptChosen(false) : setConfirming(true))}
+            >
+              Casar con lo elegido
+            </Button>
+            {switches}
+          </div>
+        </fieldset>
+      )}
+      {mode === 'record' && (
+        <div className="flex flex-col gap-3 rounded-sm bg-surface-muted p-3">
+          <p className="text-sm">
+            {recordKind === 'income' ? 'Apuntar un ingreso' : 'Apuntar un gasto'} de{' '}
+            {formatCents(target)} el {formatDate(item.day)}
+            {item.kind === 'card_settlement' ? ' con tarjeta' : ''}
+          </p>
+          <RecordFields
+            concept={concept}
+            onConcept={setConcept}
+            category={recordCategory}
+            onCategory={setCategory}
+            categories={categories}
+          />
           <div className="flex flex-wrap gap-2">
             <Button
               size="md"
               busy={accept.isPending}
               busyLabel="Aceptando…"
-              disabled={(chosenItems.length === 0 && fees.length === 0) || chosenSum !== target}
+              disabled={concept.trim() === '' || recordCategory === ''}
               onClick={() =>
                 send({
-                  items: [...item.fixed, ...chosenItems].map(({ source, sourceId }) => ({
-                    source,
-                    sourceId,
-                  })),
-                  record: null,
+                  items: [],
+                  record: { concept: concept.trim(), category: recordCategory },
                   transfer: false,
-                  fees: fees.map((f) => f.studentId),
+                  fees: [],
+                  adjust: false,
                 })
               }
             >
-              Casar con lo elegido
+              Apuntar
             </Button>
-            {proposal && (
-              <Button size="md" variant="ghost" onClick={() => setChoosing(false)}>
-                Volver a la sugerencia
-              </Button>
-            )}
+            {switches}
           </div>
-        </fieldset>
+        </div>
       )}
-      {accept.isError && <Alert>{apiErrorMessage(accept.error)}</Alert>}
+      {mode === null && item.status !== 'matched' && switches}
+      {confirming && (
+        <AdjustFeesDialog
+          fees={fees}
+          bankCents={target}
+          differenceCents={difference}
+          busy={accept.isPending}
+          error={accept.isError ? apiErrorMessage(accept.error) : null}
+          onConfirm={() => acceptChosen(true)}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
+      {accept.isError && !confirming && <Alert>{apiErrorMessage(accept.error)}</Alert>}
       {release.isError && <Alert>{apiErrorMessage(release.error)}</Alert>}
     </Card>
+  );
+}
+
+function RecordFields({
+  concept,
+  onConcept,
+  category,
+  onCategory,
+  categories,
+}: {
+  concept: string;
+  onConcept: (concept: string) => void;
+  category: string;
+  onCategory: (category: string) => void;
+  categories: { value: string; label: string }[];
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <TextField
+        label="Concepto"
+        value={concept}
+        maxLength={120}
+        onChange={(e) => onConcept(e.target.value)}
+      />
+      <Select label="Categoría" options={categories} value={category} onChange={onCategory} />
+    </div>
   );
 }

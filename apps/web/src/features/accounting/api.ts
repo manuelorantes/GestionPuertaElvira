@@ -377,6 +377,8 @@ export interface ReconciliationItem {
   } | null;
   candidates: ReconciliationAppItem[];
   fixed: ReconciliationAppItem[];
+  /** El día que llevan en la app los cobros o apuntes nuevos (en una liquidación, el día cobrado). */
+  day: string;
 }
 
 export interface Reconciliation {
@@ -392,8 +394,27 @@ export interface ReconciliationAcceptance {
   items: { source: string; sourceId: string }[];
   record: { concept: string; category: string } | null;
   transfer: boolean;
-  /** Alumnos a los que se cobra una cuota por transferencia. */
+  /** Alumnos a los que se cobra una cuota (por transferencia, o con tarjeta en una liquidación). */
   fees: string[];
+  /** Repartir a partes iguales entre esas cuotas lo que no cuadra: lo de más, a favor; lo de menos, pendiente. */
+  adjust: boolean;
+}
+
+/** Reparte una diferencia a partes iguales; los céntimos que sobran, a los primeros (como la API). */
+function evenShares(totalCents: number, count: number): number[] {
+  const sign = totalCents < 0 ? -1 : 1;
+  const whole = Math.floor(Math.abs(totalCents) / count);
+  const rest = Math.abs(totalCents) - whole * count;
+  return Array.from({ length: count }, (_, i) => sign * (whole + (i < rest ? 1 : 0)) || 0);
+}
+
+/** Lo que se cobra a cada alumno cuando el banco no trae justo lo que suman sus cuotas. */
+export function adjustedFees(fees: ReconciliationFee[], differenceCents: number) {
+  const shares = fees.length ? evenShares(differenceCents, fees.length) : [];
+  return fees.map((f, i) => {
+    const shareCents = shares[i] ?? 0;
+    return { ...f, shareCents, chargedCents: f.amountCents + shareCents };
+  });
 }
 
 export function reconcileStatement(movements: BankMovement[]): Promise<Reconciliation> {
