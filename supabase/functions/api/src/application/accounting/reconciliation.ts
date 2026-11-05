@@ -83,8 +83,10 @@ export interface FeePayments {
   payers(day: string): Promise<Payer[]>;
   /** Lo que costaría cobrar una cuota mensual ese día, o null si no hay nada que cobrar. */
   quote(studentId: string, date: string): Promise<FeeQuote | null>;
-  /** Cobra una cuota mensual por transferencia ese día, como desde Cobros; devuelve el id del cobro. */
-  register(studentId: string, date: string): Promise<string>;
+  /** Cobra una cuota mensual ese día con esa forma de pago, como desde Cobros; devuelve el id del cobro. */
+  register(studentId: string, date: string, method: 'transfer' | 'card'): Promise<string>;
+  /** Corrige el importe de un cobro con una línea de corrección: lo de más queda a favor, lo de menos pendiente. */
+  correct(paymentId: string, totalCents: number, reason: string): Promise<void>;
 }
 
 /**
@@ -158,6 +160,8 @@ export interface ReconciliationItem {
   /** Lo que se puede elegir a mano para casarlo (y lo que ya cuenta sin cambiar, en `fixed`). */
   candidates: AppItem[];
   fixed: AppItem[];
+  /** El día que llevan en la app los cobros o apuntes nuevos: el de la operación o, en una liquidación, el cobrado. */
+  day: string;
 }
 
 export interface ReconciliationView {
@@ -241,6 +245,22 @@ function transferDate(item: AppItem, movement: BankMovement): string | null {
   return Math.abs(daysBetween(item.date, movement.operationDate)) > CLOSE_DAYS.transfer
     ? movement.operationDate
     : null;
+}
+
+/** El día que llevan en la app los cobros o apuntes nuevos de un movimiento: el cobrado, en una liquidación. */
+function appDay(m: BankMovement): string {
+  return settlementDay(m) ?? m.operationDate;
+}
+
+/**
+ * Reparte una diferencia a partes iguales entre `count` cuotas; los céntimos que sobran, a las primeras.
+ * La web hace la misma cuenta para enseñarla antes de confirmar.
+ */
+export function evenShares(totalCents: number, count: number): number[] {
+  const sign = totalCents < 0 ? -1 : 1;
+  const whole = Math.floor(Math.abs(totalCents) / count);
+  const rest = Math.abs(totalCents) - whole * count;
+  return Array.from({ length: count }, (_, i) => sign * (whole + (i < rest ? 1 : 0)) || 0);
 }
 
 /**
@@ -509,6 +529,7 @@ class Matcher {
       proposal: parts.proposal ?? null,
       candidates: parts.candidates ?? [],
       fixed: parts.fixed ?? [],
+      day: appDay(m),
     };
   }
 
@@ -921,8 +942,13 @@ export interface AcceptInput {
   record: { concept: string; category: string } | null;
   /** Apuntar el traspaso entre banco y caja. */
   transfer: boolean;
-  /** Cobrar por transferencia una cuota de cada uno de estos alumnos. */
+  /** Cobrar una cuota de cada uno de estos alumnos (por transferencia, o con tarjeta en una liquidación). */
   fees: string[];
+  /**
+   * Si lo elegido no suma el importe, repartir la diferencia a partes iguales entre esas cuotas:
+   * lo pagado de más queda a favor de cada alumno y lo de menos, pendiente.
+   */
+  adjust: boolean;
 }
 
 export class MovementAlreadyMatched extends Error {
@@ -962,24 +988,40 @@ export class AcceptReconciliation {
     }
   }
 
-  /** Lo que costarían las cuotas elegidas; falla si alguna no se puede cobrar o hay alumnos repetidos. */
-  private async feesTotal(m: BankMovement, kind: MovementKind, studentIds: string[]) {
-    if (studentIds.length === 0) return 0;
-    if (kind !== 'income') {
-      throw new InvalidValue('fees', 'Solo se cobran cuotas con una transferencia recibida.');
+  /** Lo que costaría cada cuota elegida; falla si alguna no se puede cobrar o hay alumnos repetidos. */
+  private async feeQuotes(m: BankMovement, kind: MovementKind, studentIds: string[]) {
+    if (studentIds.length === 0) return [];
+    if (kind !== 'income' && kind !== 'card_settlement') {
+      throw new InvalidValue(
+        'fees',
+        'Solo se cobran cuotas con una transferencia recibida o una liquidación del datáfono.',
+      );
     }
     if (new Set(studentIds).size !== studentIds.length) {
       throw new InvalidValue('fees', 'Hay alumnos repetidos.');
     }
-    let total = 0;
+    const quotes: number[] = [];
     for (const studentId of studentIds) {
-      const quote = await this.fees.quote(studentId, m.operationDate);
+      const quote = await this.fees.quote(studentId, appDay(m));
       if (quote === null) {
         throw new InvalidValue('fees', 'Algún alumno elegido no tiene ninguna cuota por cobrar.');
       }
-      total += quote.amountCents;
+      quotes.push(quote.amountCents);
     }
-    return total;
+    return quotes;
+  }
+
+  /** Lo que se cobra en cada cuota: lo que cuesta más su parte de la diferencia, si se reparte. */
+  private feeAmounts(quotes: number[], difference: number, adjust: boolean): number[] {
+    if (difference === 0) return quotes;
+    if (!adjust || quotes.length === 0) {
+      throw new InvalidValue('items', 'Lo elegido no suma el importe del movimiento.');
+    }
+    const amounts = evenShares(difference, quotes.length).map((share, i) => quotes[i]! + share);
+    if (amounts.some((a) => a <= 0)) {
+      throw new InvalidValue('items', 'Falta tanto que alguna cuota se quedaría sin cobrar nada.');
+    }
+    return amounts;
   }
 
   private async apply(
@@ -1006,16 +1048,17 @@ export class AcceptReconciliation {
       return { targets: [{ source: 'transfer', sourceId: id }], students: [] };
     }
     if (input.record) {
-      if (kind !== 'income' && kind !== 'expense') {
+      if (kind !== 'income' && kind !== 'expense' && kind !== 'card_settlement') {
         throw new InvalidValue('record', 'Este movimiento no se apunta como ingreso ni gasto.');
       }
-      const recordKind = kind;
       const id = await this.actions.recordEntry({
-        date: m.operationDate,
-        kind: recordKind,
+        date: appDay(m),
+        kind: kind === 'expense' ? 'expense' : 'income',
         concept: input.record.concept,
         category: input.record.category,
-        method: kind === 'expense' && paidByCard(m) ? 'card' : 'transfer',
+        method: kind === 'card_settlement' || (kind === 'expense' && paidByCard(m))
+          ? 'card'
+          : 'transfer',
         amountCents: amount,
       });
       await this.matches.saveRule(counterparty(m.concept), input.record.category);
@@ -1042,7 +1085,7 @@ export class AcceptReconciliation {
     }
     const wanted = new Set(targets.map(keyOf));
     if (wanted.size !== targets.length) throw new InvalidValue('items', 'Hay elegidos repetidos.');
-    const feesCents = await this.feesTotal(m, kind, input.fees);
+    const quotes = await this.feeQuotes(m, kind, input.fees);
     const [first, last] = window(m.operationDate, m.operationDate);
     const lines = await this.ledger.linesBetween(first, last);
     const transfers = await this.transfers.transfersBetween(first.firstDay(), last.lastDay());
@@ -1061,9 +1104,11 @@ export class AcceptReconciliation {
         'Algo de lo elegido ya está casado con otro movimiento del banco.',
       );
     }
-    if (sum(chosen) + feesCents !== amount) {
-      throw new InvalidValue('items', 'Lo elegido no suma el importe del movimiento.');
-    }
+    const charges = this.feeAmounts(
+      quotes,
+      amount - sum(chosen) - quotes.reduce((a, b) => a + b, 0),
+      input.adjust,
+    );
     const expected = kind === 'expense'
       ? 'expense'
       : kind === 'card_settlement' || kind === 'income'
@@ -1094,11 +1139,23 @@ export class AcceptReconciliation {
       }
     }
     const charged: MatchTarget[] = [];
-    for (const studentId of input.fees) {
-      charged.push({
-        source: 'payment',
-        sourceId: await this.fees.register(studentId, m.operationDate),
-      });
+    const method = kind === 'card_settlement' ? 'card' : 'transfer';
+    for (const [i, studentId] of input.fees.entries()) {
+      const id = await this.fees.register(studentId, appDay(m), method);
+      const share = charges[i]! - quotes[i]!;
+      if (share !== 0) {
+        const paid = `${kind === 'card_settlement' ? 'con tarjeta' : 'por transferencia'} el ${
+          dayLabel(appDay(m))
+        }`;
+        await this.fees.correct(
+          id,
+          charges[i]!,
+          share > 0
+            ? `pagado de más ${paid}, ${euros(share)} a su favor`
+            : `pagado de menos ${paid}, faltan ${euros(-share)}`,
+        );
+      }
+      charged.push({ source: 'payment', sourceId: id });
     }
     const studentOf = new Map(lines.map((l) => [`${l.source}:${l.sourceId}`, l.studentId]));
     const students = kind === 'income'
