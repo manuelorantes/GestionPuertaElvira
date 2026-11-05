@@ -317,7 +317,7 @@ El sistema MUST leer sus movimientos (fecha de operación, fecha valor, concepto
 detectar las fechas que cubre (del primer al último movimiento)
 y comprobar que cada saldo es el anterior más el importe;
 si un fichero no se entiende o sus saldos no encadenan, MUST decirlo y no seguir.
-Nada se guarda al subirlo.
+Al subirlo no cambia ningún cobro ni gasto; solo se recuerda lo que cuadra (ver más abajo).
 Arriba MUST verse, al empezar y al terminar el periodo, el saldo del banco según el extracto,
 el saldo del banco según la app y la diferencia.
 
@@ -339,8 +339,13 @@ o con una **sugerencia** que superadministración acepta una por una:
     (lo que el club pagó por él y se descontó de lo que tenía que pagar).
 
   Si casan por importe y nombre (del alumno, del tutor o de quien paga) pero con
-  otra fecha u otra forma de pago, sugiere corregir la fecha y la forma de pago de esos cobros;
-  si no hay ninguno, sugiere apuntar un ingreso con su concepto y categoría, o elegir a mano los cobros a los que corresponde.
+  otra fecha u otra forma de pago, sugiere corregir la fecha y la forma de pago de esos cobros.
+  Si el nombre es el de un alumno activo (o el de su tutor) y no tiene ningún cobro que casar,
+  o solo los tiene de meses anteriores que ya estaban por transferencia (los pagó otra transferencia),
+  sugiere cobrarle la cuota mensual que toca (la pendiente más antigua o la del mes de la transferencia)
+  por transferencia y con la fecha del banco, como desde Cobros, si su importe coincide;
+  con varios alumnos de la misma familia, las cuotas que suman el importe, si solo hay una combinación posible.
+  Si no, sugiere apuntar un ingreso con su concepto y categoría, o elegir a mano los cobros a los que corresponde.
 - **Pago o recibo**: cuadra con el gasto del mismo importe en el banco con fecha cercana (del mismo mes o del siguiente),
   o con varios gastos en el banco de esos días que suman su importe, si solo hay una combinación posible
   (meses de alquiler o impuestos pagados de una vez).
@@ -351,9 +356,12 @@ o con una **sugerencia** que superadministración acepta una por una:
 
 Antes de aceptar, el concepto, la categoría y los cobros elegidos se pueden cambiar.
 Aceptar una sugerencia MUST hacer el cambio con las mismas operaciones que el resto de Contabilidad y Cobros
-(queda en el historial) y recordar qué movimiento del extracto corresponde a qué cobros, gasto o traspaso:
-así ese movimiento sale como «cuadra» en las siguientes pasadas y lo de la app que ya casó no vuelve a casar con otro,
-aunque los extractos se solapen.
+(queda en el historial) y recordar qué movimiento del extracto corresponde a qué cobros, gasto o traspaso.
+Lo que cuadra solo, sin aceptar nada, MUST recordarse igual al subir el extracto.
+Así ese movimiento sale como «cuadra» en las siguientes pasadas y lo de la app que ya casó no vuelve a casar con otro,
+aunque los extractos se solapen o el siguiente no incluya ese movimiento.
+Un movimiento que cuadra MUST poderse **deshacer**: deja de estar casado, lo suyo queda libre,
+y en las siguientes pasadas ya no casa solo: sale con su sugerencia para aceptarla o elegir a mano lo que le corresponde.
 Lo que no se acepta no se hace y MUST volver a salir igual al subir de nuevo un extracto que lo incluya.
 La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse la próxima vez.
 
@@ -396,6 +404,22 @@ La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse 
 - **WHEN** superadministración acepta apuntar el recibo de agua con la categoría «Agua» y el mes siguiente sube un
   extracto con otro recibo de la misma empresa
 - **THEN** la sugerencia propone ya la categoría «Agua»
+
+#### Scenario: Lo que cuadra se recuerda
+- **WHEN** el extracto de octubre trae una transferencia de Rosa Ruiz Durán de 55 € que cuadra con la cuota de octubre
+  de su hija, y después se sube un extracto solo de noviembre con otra transferencia suya de 55 €
+- **THEN** la cuota de octubre no se ofrece para la de noviembre: ya está casada con la de octubre
+
+#### Scenario: Cuota que nadie había cobrado
+- **WHEN** el extracto trae el 03/11 una transferencia de Rosa Ruiz Durán de 55 €, la cuota de noviembre de su hija Ana
+  cuesta 55 € y en la app no hay ningún cobro suyo que casar (o solo el de octubre, ya por transferencia)
+- **THEN** se sugiere cobrar a Ana la cuota de noviembre por transferencia el 03/11; al aceptarlo, el cobro queda
+  registrado con su recibo y el movimiento cuadra
+
+#### Scenario: Deshacer un casamiento
+- **WHEN** una transferencia cuadra con el cobro de otra familia y superadministración pulsa «Deshacer»
+- **THEN** el movimiento sale de nuevo para elegir lo suyo, ese cobro queda libre y la transferencia no vuelve a casar
+  sola al subir otra vez el extracto
 
 #### Scenario: Sacar efectivo
 - **WHEN** el extracto trae «Disposición efectivo» por 2.000 € y no hay ningún traspaso
