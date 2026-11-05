@@ -1377,6 +1377,31 @@ export interface TeacherGroupView {
   students: number;
 }
 
+/** Una clase o turno de un profesor que ese día dio otro. */
+export interface SubstitutedView {
+  date: string;
+  /** Clase o turno. */
+  label: string;
+  substituteName: string;
+}
+
+/** Los días de un mes en que le sustituyeron, con quién dio cada clase, del primero al último. */
+export class SubstitutedDays {
+  constructor(private readonly query: Pick<TeacherReportQuery, 'substitutions'>) {}
+
+  async execute(teacherId: string, period: YearMonth): Promise<SubstitutedView[]> {
+    const substitutions = await this.query.substitutions(
+      teacherId,
+      period.firstDay(),
+      period.lastDay(),
+    );
+    return substitutions
+      .filter((s) => s.role === 'received')
+      .map(({ date, label, otherName }) => ({ date, label, substituteName: otherName }))
+      .sort((x, y) => x.date.localeCompare(y.date) || x.label.localeCompare(y.label));
+  }
+}
+
 export interface TeacherStudentView {
   id: string;
   name: string;
