@@ -450,6 +450,27 @@ export function quoteReconciliationFee(
   );
 }
 
+export interface PendingReconciliation {
+  /** Lo de tarjeta y transferencia del ejercicio (y los traspasos) sin conciliar, con signo: lo que resta, en negativo. */
+  app: {
+    totalCents: number;
+    items: {
+      source: string;
+      sourceId: string;
+      date: string;
+      concept: string;
+      method: string;
+      amountCents: number;
+    }[];
+  };
+  /** Las líneas de los extractos subidos que no casan con nada. */
+  bank: { totalCents: number; items: BankMovement[] };
+}
+
+export function fetchPendingReconciliation(): Promise<PendingReconciliation> {
+  return apiGet('/api/admin/accounting/reconciliation/pending');
+}
+
 /** Deshace el casamiento de un movimiento: vuelve a salir para elegir lo suyo y ya no casa solo. */
 export function releaseReconciliation(movement: BankMovement): Promise<void> {
   return apiSend('POST', '/api/admin/accounting/reconciliation/release', { movement });

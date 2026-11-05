@@ -232,6 +232,8 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
   const [chosen, setChosen] = useState<Set<string>>(new Set(item.fixed.map(keyOf)));
   const [fees, setFees] = useState<ChosenFee[]>([]);
   const [confirming, setConfirming] = useState(false);
+  // Completar lo elegido con un ingreso o gasto nuevo por lo que falta.
+  const [completing, setCompleting] = useState(false);
   const categories = useCategoryOptions(recordKind);
   const accept = useAccountingMutation(acceptReconciliation);
   const release = useAccountingMutation(releaseReconciliation);
@@ -248,6 +250,8 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
     difference !== 0 &&
     adjustedFees(fees, difference).every((f) => f.chargedCents > 0);
   const recordCategory = category || categories[0]?.value || '';
+  const canComplete = canRecord && difference > 0 && (chosenItems.length > 0 || fees.length > 0);
+  const completes = completing && canComplete;
 
   function send(acceptance: Omit<ReconciliationAcceptance, 'movement'>) {
     accept.mutate(
@@ -280,7 +284,7 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
   function acceptChosen(adjust: boolean) {
     send({
       items: chosenItems.map(({ source, sourceId }) => ({ source, sourceId })),
-      record: null,
+      record: completes ? { concept: concept.trim(), category: recordCategory } : null,
       transfer: false,
       fees: fees.map((f) => ({
         studentId: f.studentId,
@@ -439,20 +443,47 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
           <p className="text-sm" aria-live="polite">
             Elegido: <strong className="tabular-nums">{formatCents(chosenSum)}</strong> de{' '}
             <span className="tabular-nums">{formatCents(target)}</span>
-            {adjustable &&
-              (difference > 0
-                ? ` · ${formatCents(difference)} de más: quedará a su favor`
-                : ` · faltan ${formatCents(-difference)}: quedará pendiente`)}
+            {completes
+              ? ` · ${formatCents(difference)} se apuntará como ${recordKind === 'income' ? 'un ingreso' : 'un gasto'} nuevo`
+              : adjustable &&
+                (difference > 0
+                  ? ` · ${formatCents(difference)} de más: quedará a su favor`
+                  : ` · faltan ${formatCents(-difference)}: quedará pendiente`)}
           </p>
+          {canComplete && (
+            <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={completing}
+                onChange={(e) => setCompleting(e.target.checked)}
+              />
+              Apuntar lo que falta ({formatCents(difference)}) como{' '}
+              {recordKind === 'income' ? 'un ingreso nuevo' : 'un gasto nuevo'}
+            </label>
+          )}
+          {completes && (
+            <RecordFields
+              concept={concept}
+              onConcept={setConcept}
+              category={recordCategory}
+              onCategory={setCategory}
+              categories={categories}
+            />
+          )}
           <div className="flex flex-wrap gap-2">
             <Button
               size="md"
               busy={accept.isPending && !confirming}
               busyLabel="Aceptando…"
               disabled={
-                (chosenItems.length === 0 && fees.length === 0) || (difference !== 0 && !adjustable)
+                (chosenItems.length === 0 && fees.length === 0) ||
+                (completes
+                  ? concept.trim() === '' || recordCategory === ''
+                  : difference !== 0 && !adjustable)
               }
-              onClick={() => (difference === 0 ? acceptChosen(false) : setConfirming(true))}
+              onClick={() =>
+                difference === 0 || completes ? acceptChosen(false) : setConfirming(true)
+              }
             >
               Casar con lo elegido
             </Button>
