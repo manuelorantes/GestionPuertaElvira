@@ -46,6 +46,9 @@ test('should pay the pending settlement of last month', async ({ page }) => {
 
   const row = page.getByRole('row', { name: /Miguel Á. Fernández/ });
   await expect(row.getByText('Pendiente')).toBeVisible();
-  await row.getByRole('button', { name: 'Marcar como pagada' }).click();
+  await row.getByRole('button', { name: 'Pagar' }).click();
+  const dialog = page.getByRole('dialog', { name: /Pagar la liquidación de Miguel/ });
+  await dialog.getByLabel('Forma de pago').selectOption('cash');
+  await dialog.getByRole('button', { name: 'Pagar' }).click();
   await expect(row.getByText(/Pagada el/)).toBeVisible();
 });

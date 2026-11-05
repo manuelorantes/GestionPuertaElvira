@@ -235,12 +235,38 @@ export function deleteDuty(id: string): Promise<void> {
   return apiSend('DELETE', `${BASE}/duties/${id}`, {});
 }
 
-export function paySettlement(teacherId: string, month: string): Promise<void> {
-  return apiSend('POST', `${BASE}/settlements/${teacherId}/${month}/payment`);
+/** Cómo queda una liquidación tras pagarla: lo que aún falta y lo que sobró como anticipo del mes siguiente. */
+export interface SettlementPaymentResult {
+  status: 'paid' | 'partial';
+  remainingCents: number;
+  advanceCents: number;
 }
 
-export async function payAllSettlements(month: string): Promise<number> {
-  return (await apiSend<{ paid: number }>('POST', `${BASE}/settlements/${month}/payment`)).paid;
+/** Paga una liquidación por lo que se paga de verdad (menos: a cuenta; más: lo que sobra, al mes siguiente). */
+export function paySettlement(input: {
+  teacherId: string;
+  month: string;
+  amount: string;
+  method: string;
+  date: string;
+}): Promise<SettlementPaymentResult> {
+  const { teacherId, month, ...body } = input;
+  return apiSend<SettlementPaymentResult>(
+    'POST',
+    `${BASE}/settlements/${teacherId}/${month}/payment`,
+    body,
+  );
+}
+
+/** Paga todas las pendientes del mes por lo que queda de cada una. Devuelve cuántas. */
+export async function payAllSettlements(input: {
+  month: string;
+  method: string;
+  date: string;
+}): Promise<number> {
+  const { month, ...body } = input;
+  return (await apiSend<{ paid: number }>('POST', `${BASE}/settlements/${month}/payment`, body))
+    .paid;
 }
 
 // ---- Ficha del profesor ----------------------------------------------------------------------
@@ -309,6 +335,7 @@ export async function recordAdvance(input: {
   month: string;
   amount: string;
   date: string;
+  method: string;
   note: string | null;
 }): Promise<string> {
   return (await apiSend<{ id: string }>('POST', `${BASE}/advances`, input)).id;
