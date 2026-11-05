@@ -324,13 +324,17 @@ Arriba MUST verse, al empezar y al terminar el periodo, el saldo del banco segú
 el saldo del banco según la app y la diferencia.
 
 Cada movimiento del extracto MUST salir como **cuadra** (con lo que le corresponde en la app)
-o con una **sugerencia** que superadministración acepta una por una:
+o con una **sugerencia** que superadministración acepta una por una.
+Lo del extracto pasa por el banco, así que MUST casar solo con lo que tiene la forma de pago que dice el extracto
+(tarjeta en una liquidación del datáfono, transferencia en una transferencia recibida, tarjeta o transferencia en un pago),
+o con un registro nuevo; nunca con lo cobrado o pagado en efectivo,
+y la conciliación MUST NOT cambiar la forma de pago de nada (como mucho, la fecha de un cobro):
 - **Liquidación del datáfono** («Liquidación efectuada el DD/MM/AAAA»): es lo cobrado con tarjeta ese día.
   Cuadra si lo cobrado con tarjeta ese día (cobros de alumnos y apuntes manuales de ingreso, como una venta de libros)
   suma su importe.
-  Si falta dinero, sugiere pasar a tarjeta y a ese día los cobros que completan la cifra entre los que no están en el
-  banco (cobros con otra forma de pago o en otra fecha que no casan con ninguna transferencia); si hay varias
-  combinaciones posibles, se eligen los cobros a mano, con el total elegido a la vista, hasta que coincide.
+  Si falta dinero, sugiere pasar a ese día los cobros con tarjeta de días cercanos que completan la cifra
+  (apuntados con otra fecha); si hay varias combinaciones posibles, se eligen a mano,
+  con el total elegido a la vista, hasta que coincide.
   Si sobra, lo dice.
 - **Transferencia recibida**: cuadra con el cobro, o los cobros de un mismo alumno o familia, por transferencia que
   suman su importe con fecha cercana; un cobro cuyo nombre aparece en el concepto se casa antes que otro que solo
@@ -340,19 +344,24 @@ o con una **sugerencia** que superadministración acepta una por una:
   - con esos cobros menos un gasto del banco con fecha cercana que nombra al alumno
     (lo que el club pagó por él y se descontó de lo que tenía que pagar).
 
-  Si casan por importe y nombre (del alumno, del tutor o de quien paga) pero con
-  otra fecha u otra forma de pago, sugiere corregir la fecha y la forma de pago de esos cobros.
-  Si el nombre es el de un alumno activo (o el de su tutor) y no tiene ningún cobro que casar,
+  Si casan por importe y nombre (del alumno, del tutor o de quien paga) pero con otra fecha,
+  sugiere corregir la fecha de esos cobros.
+  Quien transfiere (sacado del concepto) MUST recordarse con los alumnos a los que pagó al casar su transferencia:
+  la próxima vez cuentan como si su nombre saliera en el concepto.
+  Si el nombre es el de un alumno activo (o el de su tutor, o uno al que ya pagó quien transfiere)
+  y no tiene ningún cobro que casar,
   o solo los tiene de meses anteriores que ya estaban por transferencia (los pagó otra transferencia),
   sugiere cobrarle la cuota mensual que toca (la pendiente más antigua o la del mes de la transferencia)
   por transferencia y con la fecha del banco, como desde Cobros, si su importe coincide;
   con varios alumnos de la misma familia, las cuotas que suman el importe, si solo hay una combinación posible.
-  Si no, sugiere apuntar un ingreso con su concepto y categoría, o elegir a mano los cobros a los que corresponde.
+  Si no, sugiere apuntar un ingreso con su concepto y categoría.
+  Una transferencia recibida MUST poderse **repartir a mano** entre cobros por transferencia ya apuntados
+  y cuotas de cualquier alumno activo (la que le toca, como desde Cobros), también de alumnos distintos,
+  hasta que todo junto suma su importe.
 - **Pago o recibo**: cuadra con el gasto del mismo importe en el banco con fecha cercana (del mismo mes o del siguiente),
   o con varios gastos en el banco de esos días que suman su importe, si solo hay una combinación posible
   (meses de alquiler o impuestos pagados de una vez).
-  Si el que casa está en efectivo, sugiere pasarlo al banco;
-  si no hay ninguno, sugiere apuntar el gasto con su fecha, un concepto sacado del extracto y una categoría propuesta.
+  Si no hay ninguno en el banco, sugiere apuntar el gasto con su fecha, un concepto sacado del extracto y una categoría propuesta.
 - **Sacar efectivo o ingresarlo**: cuadra con el traspaso entre caja y banco del mismo importe y fecha cercana;
   si no lo hay, sugiere apuntarlo.
 
@@ -400,10 +409,16 @@ La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse 
   (y ninguna otra combinación suma 285 €)
 - **THEN** el movimiento sale como «cuadra» con los dos gastos
 
-#### Scenario: Cobros con tarjeta apuntados como transferencia
+#### Scenario: Cobro con tarjeta apuntado otro día
 - **WHEN** el extracto trae la liquidación del 10/09/2026 por 90 € y en la app no hay cobros con tarjeta ese día,
-  pero sí uno de 90 € por transferencia del 03/09 que no casa con ninguna transferencia del extracto
-- **THEN** se sugiere pasar ese cobro a tarjeta y al 10/09; al aceptarlo, el cobro cambia y el movimiento cuadra
+  pero sí uno de 90 € con tarjeta del 03/09, y otro de 90 € en efectivo del 09/09
+- **THEN** se sugiere pasar el de tarjeta al 10/09 (el de efectivo no se ofrece); al aceptarlo, el movimiento cuadra
+
+#### Scenario: Una transferencia repartida entre dos alumnos
+- **WHEN** llega una transferencia de 100 € de Marta Ruiz Sol, que no se parece a ningún alumno,
+  y superadministración la reparte a mano entre el cobro por transferencia de 55 € de Ana y la cuota de 45 € de Luis
+- **THEN** se cobra la cuota de Luis por transferencia con la fecha del banco, el movimiento cuadra con los dos cobros,
+  y en la siguiente transferencia de Marta Ruiz Sol se sugiere cobrar las cuotas de Ana y de Luis
 
 #### Scenario: Recibo sin apuntar
 - **WHEN** el extracto trae un recibo de agua de 43,76 € que no está en la app
