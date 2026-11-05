@@ -450,7 +450,7 @@ export class SqlLedgerQuery implements LedgerQuery {
        WHERE p.paid_on BETWEEN ${from} AND ${to} AND p.total_cents > 0
       UNION ALL
       SELECT 'settlement', st.teacher_id::text || '/' || st.month, st.paid_on::text, 'expense',
-             'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', 'transfer',
+             'Liquidación ' || st.month || ' · ' || t.full_name, 'teachers', st.method,
              -- Lo adelantado a cuenta de ese mes ya salió como anticipo.
              st.amount_cents - COALESCE((SELECT SUM(a.amount_cents) FROM payroll_advance a
                 WHERE a.teacher_id = st.teacher_id AND a.month = st.month), 0), NULL, st.month, NULL, NULL
@@ -459,7 +459,7 @@ export class SqlLedgerQuery implements LedgerQuery {
       UNION ALL
       SELECT 'advance', a.teacher_id::text || '/' || a.id::text, a.paid_on::text, 'expense',
              'Anticipo a cuenta de ' || a.month || ' · ' || t.full_name || COALESCE(' · ' || a.note, ''),
-             'teachers', 'transfer', a.amount_cents, NULL, a.month, NULL, NULL
+             'teachers', a.method, a.amount_cents, NULL, a.month, NULL, NULL
         FROM payroll_advance a JOIN teachers_teacher t ON t.id = a.teacher_id
        WHERE a.paid_on BETWEEN ${from} AND ${to}
       UNION ALL

@@ -1,5 +1,8 @@
 import { InvalidValue, LocalDate, Money, Season, Uuid, YearMonth } from '../common/mod.ts';
 
+/** Cómo se pagó una liquidación o un anticipo (las mismas formas de pago que en Contabilidad). */
+export type PayMethod = 'cash' | 'transfer' | 'card';
+
 export class TimesheetEntryId extends Uuid {}
 export class TeacherRef extends Uuid {}
 export class GroupRef extends Uuid {}
@@ -317,13 +320,14 @@ export class SettlementCalculator {
   }
 }
 
-/** Liquidación pagada de un profesor y mes: congela horas, tarifa, importe y detalle. */
+/** Liquidación pagada de un profesor y mes: congela horas, tarifa, importe y detalle, y cómo se pagó. */
 export class MonthlySettlement {
   constructor(
     readonly teacher: TeacherRef,
     readonly month: YearMonth,
     readonly settlement: Settlement,
     readonly paidOn: LocalDate,
+    readonly method: PayMethod = 'transfer',
   ) {}
 }
 
@@ -339,6 +343,7 @@ export class Advance {
     readonly amount: Money,
     readonly paidOn: LocalDate,
     readonly note: string | null,
+    readonly method: PayMethod = 'transfer',
   ) {
     if (amount.cents <= 0) {
       throw new InvalidValue('amount', 'El anticipo debe ser mayor que 0,00 €.');

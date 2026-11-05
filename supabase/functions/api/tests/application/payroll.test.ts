@@ -26,6 +26,7 @@ import {
   ListSettlements,
   PayAllSettlements,
   PaySettlement,
+  PayTeacher,
   PendingPayroll,
   PlanSubstitution,
   Profitability,
@@ -1098,4 +1099,82 @@ Deno.test('SubstitutedDays should list only the classes another teacher gave, fi
     { date: '2026-11-05', label: 'Iniciación A', substituteName: 'Lucía' },
     { date: '2026-11-12', label: 'Adultos I', substituteName: 'Ana' },
   ]);
+});
+
+Deno.test('PayTeacher should pay a settlement in parts, each with its method, and keep any excess for next month', async () => {
+  const { fx, carlos, lucia, list } = setUp();
+  // Octubre: Carlos 108,00 € y Lucía 128,00 €.
+  await fx.recordMonth('2026-10');
+  const payTeacher = new PayTeacher(
+    new PaySettlement(fx, fx, fx, fx, fx.transactions, fx.locks),
+    new RecordAdvance(fx, fx, fx, fx),
+    list(),
+    fx.transactions,
+  );
+  const of = async (teacher: string, month = '2026-10') =>
+    (await list().execute(month)).find((s) => s.teacherId === teacher);
+  const advancesOf = (teacher: string) =>
+    [...fx.advances.values()]
+      .filter((a) => a.teacher.value === teacher)
+      .map((a) => [a.month.toString(), a.amount.cents, a.method, a.note]);
+
+  // Una parte en efectivo: queda pendiente por lo que falta.
+  assertEquals(
+    await payTeacher.execute({
+      teacherId: carlos,
+      month: '2026-10',
+      amount: '40',
+      method: 'cash',
+      date: '2026-11-02',
+    }),
+    { status: 'partial', remainingCents: 6800, advanceCents: 0 },
+  );
+  const partial = await of(carlos);
+  assertEquals([partial?.status, partial?.advancesCents, partial?.toPayCents], [
+    'pending',
+    4000,
+    6800,
+  ]);
+  // El resto por transferencia: queda pagada con esa forma de pago.
+  assertEquals(
+    await payTeacher.execute({
+      teacherId: carlos,
+      month: '2026-10',
+      amount: '68',
+      method: 'transfer',
+      date: '2026-11-03',
+    }),
+    { status: 'paid', remainingCents: 0, advanceCents: 0 },
+  );
+  assertEquals((await of(carlos))?.status, 'paid');
+  assertEquals(fx.paidSettlements.get(`${carlos}2026-10`)?.method, 'transfer');
+  assertEquals(advancesOf(carlos), [['2026-10', 4000, 'cash', 'Pago parcial de la liquidación']]);
+
+  // De más con tarjeta: pagada, y lo que sobra, anticipo de noviembre.
+  assertEquals(
+    await payTeacher.execute({
+      teacherId: lucia,
+      month: '2026-10',
+      amount: '150',
+      method: 'card',
+      date: '2026-11-02',
+    }),
+    { status: 'paid', remainingCents: 0, advanceCents: 2200 },
+  );
+  assertEquals(fx.paidSettlements.get(`${lucia}2026-10`)?.method, 'card');
+  assertEquals(advancesOf(lucia), [
+    ['2026-11', 2200, 'card', 'Pagado de más con la liquidación de octubre 2026'],
+  ]);
+
+  await assertRejects(
+    () =>
+      payTeacher.execute({
+        teacherId: lucia,
+        month: '2026-11',
+        amount: '0',
+        method: 'cash',
+        date: '2026-11-02',
+      }),
+    InvalidValue,
+  );
 });

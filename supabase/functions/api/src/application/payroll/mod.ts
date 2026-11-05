@@ -7,6 +7,7 @@ import {
   Season,
   YearMonth,
 } from '../../domain/common/mod.ts';
+import { type Method, methodFromName } from '../../domain/accounting/mod.ts';
 import {
   Advance,
   ClubDuty,
@@ -680,7 +681,12 @@ export class PaySettlement {
     private readonly locks: Locks,
   ) {}
 
-  execute(teacherId: string, month: string, paidOn: string): Promise<void> {
+  execute(
+    teacherId: string,
+    month: string,
+    paidOn: string,
+    method: Method = 'transfer',
+  ): Promise<void> {
     const teacher = TeacherRef.fromString(teacherId);
     const period = YearMonth.fromString(month);
     return this.transactions.run(async () => {
@@ -700,8 +706,77 @@ export class PaySettlement {
           period,
           new SettlementCalculator().settle(entries, rate.rate),
           LocalDate.fromString(paidOn),
+          method,
         ),
       );
+    });
+  }
+}
+
+export interface TeacherPaymentInput {
+  teacherId: string;
+  month: string;
+  /** Lo que se paga; null, justo lo que queda. */
+  amount: string | null;
+  method: string;
+  date: string;
+}
+
+/** Cómo queda la liquidación tras un pago: lo que aún falta y lo que sobró como anticipo del mes siguiente. */
+export interface TeacherPaymentResult {
+  status: 'paid' | 'partial';
+  remainingCents: number;
+  advanceCents: number;
+}
+
+/**
+ * «Pagar» una liquidación pendiente por lo que se paga de verdad: si es menos de lo que queda, es un pago parcial a
+ * cuenta de ese mes (un anticipo) y sigue pendiente; si es eso o más, queda pagada y lo que sobra se descuenta del
+ * mes siguiente. Cada parte con su forma de pago.
+ */
+export class PayTeacher {
+  constructor(
+    private readonly pay: PaySettlement,
+    private readonly advances: RecordAdvance,
+    private readonly list: ListSettlements,
+    private readonly transactions: TransactionRunner,
+  ) {}
+
+  execute(input: TeacherPaymentInput): Promise<TeacherPaymentResult> {
+    const period = YearMonth.fromString(input.month);
+    const method = methodFromName(input.method);
+    return this.transactions.run(async () => {
+      const settlement = (await this.list.execute(period.toString())).find((s) =>
+        s.teacherId === input.teacherId
+      );
+      if (settlement?.status === 'paid') throw new SettlementAlreadyPaid();
+      const owed = Math.max(settlement?.toPayCents ?? 0, 0);
+      const paid = input.amount === null ? owed : Money.fromDecimal(input.amount).cents;
+      if (paid < owed) {
+        if (paid <= 0) throw new InvalidValue('amount', 'Indica lo que se paga.');
+        await this.advances.execute({
+          teacherId: input.teacherId,
+          month: period.toString(),
+          amount: (paid / 100).toFixed(2),
+          date: input.date,
+          method,
+          note: 'Pago parcial de la liquidación',
+        });
+        return { status: 'partial', remainingCents: owed - paid, advanceCents: 0 };
+      }
+      await this.pay.execute(input.teacherId, period.toString(), input.date, method);
+      const excess = paid - owed;
+      if (excess > 0) {
+        await this.advances.execute({
+          teacherId: input.teacherId,
+          month: period.next().toString(),
+          amount: (excess / 100).toFixed(2),
+          date: input.date,
+          method,
+          note: `Pagado de más con la liquidación de ${period.label()}`,
+        });
+      }
+      return { status: 'paid', remainingCents: 0, advanceCents: excess };
     });
   }
 }
@@ -715,12 +790,14 @@ export class PayAllSettlements {
   ) {}
 
   /** Todas o ninguna: si una falla, no queda ninguna marcada. */
-  execute(month: string, paidOn: string): Promise<number> {
+  execute(month: string, paidOn: string, method: Method = 'transfer'): Promise<number> {
     return this.transactions.run(async () => {
       const pending = (await this.list.execute(month)).filter((s) =>
         s.status === 'pending' && s.minutes > 0
       );
-      for (const settlement of pending) await this.pay.execute(settlement.teacherId, month, paidOn);
+      for (const settlement of pending) {
+        await this.pay.execute(settlement.teacherId, month, paidOn, method);
+      }
       return pending.length;
     });
   }
@@ -1283,6 +1360,8 @@ export interface AdvanceInput {
   amount: string;
   /** Día en que se pagó. */
   date: string;
+  /** Forma de pago; por defecto, transferencia. */
+  method?: string;
   note: string | null;
 }
 
@@ -1311,6 +1390,7 @@ export class RecordAdvance {
         Money.fromDecimal(input.amount),
         paidOn,
         input.note?.trim() || null,
+        methodFromName(input.method ?? 'transfer'),
       ),
     );
     return id;
