@@ -349,7 +349,7 @@ export interface ReconciliationAppItem {
 }
 
 /** Una cuota que se propone cobrar por transferencia. */
-interface ReconciliationFee {
+export interface ReconciliationFee {
   studentId: string;
   student: string;
   concept: string;
@@ -402,6 +402,16 @@ export function reconcileStatement(movements: BankMovement[]): Promise<Reconcili
 
 export function acceptReconciliation(acceptance: ReconciliationAcceptance): Promise<void> {
   return apiSend('POST', '/api/admin/accounting/reconciliation/accept', acceptance);
+}
+
+/** La cuota que se le cobraría a un alumno con una transferencia de ese día, para repartirla a mano. */
+export function quoteReconciliationFee(
+  studentId: string,
+  day: string,
+): Promise<{ concept: string; amountCents: number }> {
+  return apiGet(
+    `/api/admin/accounting/reconciliation/fee?studentId=${encodeURIComponent(studentId)}&day=${day}`,
+  );
 }
 
 /** Deshace el casamiento de un movimiento: vuelve a salir para elegir lo suyo y ya no casa solo. */

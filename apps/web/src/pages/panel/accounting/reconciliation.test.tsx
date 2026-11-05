@@ -253,6 +253,63 @@ describe('bank reconciliation', () => {
     ]);
   });
 
+  it('splits a transfer by hand between a recorded payment and the fee of another student', async () => {
+    const transfer = {
+      operationDate: '2026-11-03',
+      valueDate: '2026-11-03',
+      concept: 'Transferencia De Marta Ruiz Sol, Concepto Clases',
+      amountCents: 10000,
+      balanceCents: 110000,
+    };
+    const pending = {
+      ...item(0, {}),
+      movement: transfer,
+      kind: 'income',
+      status: 'pending',
+      note: 'No hay ningún cobro que le corresponda.',
+      candidates: [{ ...payment('p1', 5500), date: '2026-11-01' }],
+    };
+    const fetch = mockApi({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/accounting/balances': [200, { clubCents: 0, bankCents: 0, cashCents: 0 }],
+      'GET /api/admin/accounting/categories': [200, { items: CATEGORIES }],
+      'GET /api/admin/students?filter=active': [
+        200,
+        { items: [{ id: 's1', fullName: 'Luis Mora Vela' }], total: 1 },
+      ],
+      'GET /api/admin/accounting/reconciliation/fee?studentId=s1&day=2026-11-03': [
+        200,
+        { concept: 'Noviembre 2026', amountCents: 4500 },
+      ],
+      'POST /api/admin/accounting/reconciliation': [
+        [200, { ...VIEW, items: [pending] }],
+        [200, MATCHED],
+      ],
+      'POST /api/admin/accounting/reconciliation/accept': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const row = (await screen.findByText(transfer.concept)).closest('li') as HTMLElement;
+    const match = within(row).getByRole('button', { name: 'Casar con lo elegido' });
+    await userEvent.click(within(row).getByRole('checkbox', { name: /Cuota · p1/ }));
+    expect(match).toBeDisabled();
+    await userEvent.type(within(row).getByRole('combobox', { name: 'Alumno' }), 'luis');
+    await userEvent.click(await within(row).findByRole('option', { name: 'Luis Mora Vela' }));
+    expect(await within(row).findByText('Luis Mora Vela · Noviembre 2026')).toBeInTheDocument();
+    expect(row).toHaveTextContent('Elegido: 100,00 € de 100,00 €');
+    await userEvent.click(match);
+
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toEqual({
+      movement: transfer,
+      items: [{ source: 'payment', sourceId: 'p1' }],
+      record: null,
+      transfer: false,
+      fees: ['s1'],
+    });
+  });
+
   it('is only offered to superadministration', async () => {
     api(ADMIN);
     renderApp('/panel/contabilidad?pestana=conciliacion');
