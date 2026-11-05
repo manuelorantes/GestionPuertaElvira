@@ -194,7 +194,10 @@ ficha con lo que sale de Clases, Alumnos y Profesorado restringido a él o ella:
   las de sus clases en el verde de intermedio y las de sustitución en el negro de avanzado,
   por separado si ese día dio de las dos;
   cada sesión cuenta lo que cuenta en su liquidación (sin contar dos veces lo que se pisa);
-  el día en que le sustituyeron no lleva nada de esa clase;
+  el día en que le sustituyeron no lleva horas de esa clase,
+  sino en rojo, como los festivos, «Sustituido por Ana Belén Torres · Iniciación A»
+  (quién la dio y qué clase, una por cada clase en que le sustituyeron),
+  con «Sustituido» en la leyenda, para que se sepa por qué ese día está vacío;
   también marca, según el horario, las horas que aún le quedan por dar ese mes (de hoy, lo que no ha acabado;
   sin festivos; con las sustituciones planificadas; nunca lo que ya se le ha apuntado; y, como en la liquidación,
   sin contar dos veces lo que se pisa el mismo día, con lo previsto o con lo ya apuntado),
@@ -220,7 +223,8 @@ si el mes aún no tiene fila, MUST bajar hasta las clases dadas.
 
 #### Scenario: Calendario de clases dadas
 - **WHEN** un miércoles un profesor da 2 h de sus clases y 1,5 h sustituyendo a otro, y el jueves le sustituyen
-- **THEN** el miércoles sale con 2 h en verde y 1,5 h en negro, y el jueves sin horas
+- **THEN** el miércoles sale con 2 h en verde y 1,5 h en negro,
+  y el jueves sin horas y en rojo con «Sustituido por» y el nombre de quien le sustituyó y la clase
 
 #### Scenario: Horas que aún quedan por dar
 - **WHEN** es martes a las 17:30, el profesor tiene clase de 17:00 a 18:30 los martes y el miércoles sustituye a otro
@@ -268,8 +272,10 @@ y, de solo lectura, lo del club que se indica:
   - el **total del mes**, que cambia al cambiar de mes: las horas del mes (lo que cuenta cada sesión, como en su
     liquidación) con el número de sesiones, y por separado las de sus clases y las de sustitución;
   - el mismo calendario que ve administración en su ficha (ver «Ficha del profesor»), con lo que aún le queda por dar
-    en tonos claros y los festivos en rojo, y la leyenda «Mis clases» y «Sustituciones» (y «Mis clases previstas» y
-    «Sustituciones previstas» cuando el mes tiene algo por dar, y «Festivo» cuando tiene festivos);
+    en tonos claros, los festivos en rojo y, también en rojo, «Sustituido por …» los días en que otro dio su clase,
+    y la leyenda «Mis clases» y «Sustituciones» (y «Mis clases previstas» y
+    «Sustituciones previstas» cuando el mes tiene algo por dar, «Festivo» cuando tiene festivos
+    y «Sustituido» cuando le sustituyeron);
   - debajo, las **sustituciones** del mes, del primer día al último: «Sustituiste a Carlos Ruiz Márquez en Adultos I»
     los días que dio la clase de otro, y «Te sustituyó Ana Belén Torres en Iniciación A» los días que otro dio la suya,
     con el motivo si lo hay;
@@ -296,7 +302,8 @@ No MUST poder apuntar ni cambiar horas, sustituciones, turnos ni pagos.
 #### Scenario: Sus horas
 - **WHEN** Lucía da el miércoles 14 sus 2 h y 1,5 h sustituyendo a Carlos, el jueves 15 la sustituye Ana y abre
   Mis horas
-- **THEN** el miércoles sale con 2 h en verde y 1,5 h en negro, y debajo «Sustituiste a Carlos Ruiz Márquez en
+- **THEN** el miércoles sale con 2 h en verde y 1,5 h en negro, el jueves en rojo con «Sustituido por Ana Belén
+  Torres · Iniciación A», y debajo «Sustituiste a Carlos Ruiz Márquez en
   Adultos I» el miércoles y «Te sustituyó Ana Belén Torres en Iniciación A» el jueves
 
 #### Scenario: El total de otro mes
