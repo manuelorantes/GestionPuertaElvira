@@ -134,13 +134,37 @@ son iguales en eso, a la que va antes).
 - **WHEN** Ángel tiene clase de 16:30 a 18:00 y la actividad «Viernes» de 17:00 a 20:00
 - **THEN** se le pagan 3,5 horas: 1,5 de la clase y 2 de la actividad
 Se paga a mes vencido, pero, como en todos los selectores de meses, por defecto se muestra el mes en curso.
-Se puede imprimir y marcar como pagada, una a una o todas.
+Se puede imprimir y pagar, una a una o todas.
+El total pendiente del mes suma lo que queda por pagar de cada liquidación pendiente (su importe menos sus anticipos).
+
+«Pagar» (en cada liquidación pendiente) MUST abrir el diálogo de pago, relleno con el concepto
+(«Liquidación de octubre · Jorge Rivas Pérez»), la categoría «Profesores», lo que queda por pagar y la fecha de hoy,
+para elegir la forma de pago (transferencia, efectivo o tarjeta) y poder cambiar el importe y la fecha:
+- si se paga justo lo que queda, la liquidación queda pagada con esa fecha y forma de pago;
+- si se paga menos, tras confirmar («Pago parcial: se apuntan 100,00 € a cuenta y quedan 107,00 € por pagar»)
+  se apunta como anticipo de ese mes («Pago parcial de la liquidación») con su forma de pago,
+  y la liquidación sigue pendiente por lo que falta, que se puede pagar después de otra forma;
+- si se paga más, tras confirmar («Pagas 90,00 € de más: se apuntan como anticipo de noviembre»)
+  la liquidación queda pagada y lo que sobra se apunta como anticipo del mes siguiente
+  («Pagado de más con la liquidación de octubre 2026»), con la misma fecha y forma de pago.
+«Pagar todas» MUST pedir la forma de pago y la fecha (por defecto, transferencia y hoy) y pagar cada liquidación
+pendiente del mes por lo que queda de ella.
 La lista MUST poder ordenarse desde las cabeceras por profesor (por defecto), horas, tarifa, importe o estado, en ambos
 sentidos.
 
 #### Scenario: Pagar una liquidación
-- **WHEN** administración marca como pagada una liquidación
+- **WHEN** administración paga una liquidación
 - **THEN** sus horas, tarifa e importe quedan congelados aunque después cambie la tarifa, y las sesiones de ese profesor y mes ya no se pueden cambiar
+
+#### Scenario: Pagar en dos partes
+- **WHEN** a Jorge le quedan 207,00 € de octubre, se pagan 100,00 € en efectivo, se confirma, y luego 107,00 € por
+  transferencia
+- **THEN** tras el primero su liquidación sigue pendiente con −100,00 € de anticipo y 107,00 € por pagar,
+  y tras el segundo queda pagada; en Contabilidad salen 100,00 € en efectivo y 107,00 € por transferencia
+
+#### Scenario: Pagar de más
+- **WHEN** a Jorge le quedan 207,00 € de octubre y se pagan 250,00 € y se confirma
+- **THEN** la liquidación de octubre queda pagada y la de noviembre lleva −43,00 € de anticipo
 
 ### Requirement: Editar una liquidación pagada
 Solo superadministración MUST poder cambiar, desde «Liquidación mensual», la fecha de pago de una liquidación ya pagada,
@@ -239,8 +263,8 @@ si el mes aún no tiene fila, MUST bajar hasta las clases dadas.
 - **THEN** ese viernes marca 3 h previstas, no 4,5 h
 
 ### Requirement: Anticipos y fecha de pago
-Administración MUST poder apuntar un anticipo a un profesor (importe, mes del que se descuenta, día en que se pagó y
-nota) mientras la liquidación de ese mes no esté pagada, y quitarlo en las mismas condiciones. El anticipo sale en
+Administración MUST poder apuntar un anticipo a un profesor (importe, mes del que se descuenta, día en que se pagó,
+forma de pago y nota) mientras la liquidación de ese mes no esté pagada, y quitarlo en las mismas condiciones. El anticipo sale en
 Contabilidad el día que se paga y se descuenta de la liquidación de su mes (lo que queda por pagar y lo que sale en
 Contabilidad al pagarla). Administración MUST poder corregir el día en que se pagó una liquidación desde la ficha
 del profesor, tras confirmar el cambio.
