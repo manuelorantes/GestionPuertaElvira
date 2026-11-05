@@ -10,6 +10,7 @@ import {
   ListSettlements,
   PayAllSettlements,
   PaySettlement,
+  PayTeacher,
   PlanSubstitution,
   Profitability,
   RecordAdvance,
@@ -24,6 +25,7 @@ import {
   UpcomingSessions,
   UpdateSession,
 } from '../../application/payroll/mod.ts';
+import { methodFromName } from '../../domain/accounting/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
 import { httpError, registerDomainErrors } from '../http/errors.ts';
 import { JsonBody } from '../http/json-body.ts';
@@ -86,6 +88,7 @@ function payroll(api: ApiApp, scope: RequestScope) {
   );
   return {
     advances,
+    transactions,
     closed: new SqlClosedPeriods(tx),
     timesheets,
     settlements,
@@ -143,10 +146,6 @@ export function registerPayrollRoutes(api: ApiApp): void {
     const value = c.req.query('month');
     return value ? YearMonth.fromString(value) : YearMonth.of(p.today());
   };
-  const paidOn = async (
-    c: Parameters<Parameters<ApiApp['defineRoute']>[1]>[0],
-    p: ReturnType<typeof payroll>,
-  ) => (await JsonBody.from(c.req.raw)).optionalString('date') ?? p.today().toString();
 
   api.defineRoute(admin('GET', '/api/admin/payroll/sessions'), async (c, scope) => {
     const p = payroll(api, scope);
@@ -381,8 +380,21 @@ export function registerPayrollRoutes(api: ApiApp): void {
     admin('POST', '/api/admin/payroll/settlements/:teacherId/:month/payment'),
     async (c, scope) => {
       const p = payroll(api, scope);
-      await p.pay.execute(param(c, 'teacherId'), param(c, 'month'), await paidOn(c, p));
-      return c.body(null, 204);
+      const b = await JsonBody.from(c.req.raw);
+      return c.json(
+        await new PayTeacher(
+          p.pay,
+          new RecordAdvance(p.advances, p.settlements, p.teachers, p.closed),
+          p.list,
+          p.transactions,
+        ).execute({
+          teacherId: param(c, 'teacherId'),
+          month: param(c, 'month'),
+          amount: b.optionalString('amount'),
+          method: b.optionalString('method') ?? 'transfer',
+          date: b.optionalString('date') ?? p.today().toString(),
+        }),
+      );
     },
   );
 
@@ -409,6 +421,7 @@ export function registerPayrollRoutes(api: ApiApp): void {
       month: b.requiredString('month'),
       amount: b.requiredString('amount'),
       date: b.requiredString('date'),
+      method: b.optionalString('method') ?? 'transfer',
       note: b.optionalString('note'),
     });
     return c.json({ id }, 201);
@@ -443,7 +456,14 @@ export function registerPayrollRoutes(api: ApiApp): void {
     admin('POST', '/api/admin/payroll/settlements/:month/payment'),
     async (c, scope) => {
       const p = payroll(api, scope);
-      return c.json({ paid: await p.payAll.execute(param(c, 'month'), await paidOn(c, p)) });
+      const b = await JsonBody.from(c.req.raw);
+      return c.json({
+        paid: await p.payAll.execute(
+          param(c, 'month'),
+          b.optionalString('date') ?? p.today().toString(),
+          methodFromName(b.optionalString('method') ?? 'transfer'),
+        ),
+      });
     },
   );
 
