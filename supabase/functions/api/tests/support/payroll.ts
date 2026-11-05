@@ -124,7 +124,7 @@ export class PayrollFixture
     if (s) {
       this.paidSettlements.set(
         teacher.value + month.toString(),
-        new MonthlySettlement(s.teacher, s.month, s.settlement, date),
+        new MonthlySettlement(s.teacher, s.month, s.settlement, date, s.method),
       );
     }
     return Promise.resolve();

@@ -1,4 +1,5 @@
 import { LocalDate, Money, YearMonth } from '../../domain/common/mod.ts';
+import { methodFromName } from '../../domain/accounting/mod.ts';
 import {
   Advance,
   ClubDuty,
@@ -109,6 +110,7 @@ function toSettlement(row: Row): MonthlySettlement {
       lines.map((l) => new SettlementLine(l.label, l.minutes, Money.cents(l.amountCents))),
     ),
     LocalDate.fromString(row.string('paid_on')),
+    methodFromName(row.string('method')),
   );
 }
 
@@ -130,7 +132,7 @@ export class SqlSettlementRepository implements SettlementRepository, ProposalLo
 
   async saveSettlement(s: MonthlySettlement): Promise<void> {
     await this
-      .sql`INSERT INTO payroll_settlement (teacher_id, month, minutes, rate_cents, amount_cents, lines, paid_on)
+      .sql`INSERT INTO payroll_settlement (teacher_id, month, minutes, rate_cents, amount_cents, lines, paid_on, method)
       VALUES (${s.teacher.value}, ${s.month.toString()}, ${s.settlement.minutes}, ${s.settlement.rate.cents}, ${s.settlement.amount.cents},
               ${
       this.sql.json(
@@ -141,7 +143,7 @@ export class SqlSettlementRepository implements SettlementRepository, ProposalLo
         })),
       )
     },
-              ${s.paidOn.toString()})`;
+              ${s.paidOn.toString()}, ${s.method})`;
   }
 
   async changePaidOn(teacher: TeacherRef, month: YearMonth, date: LocalDate): Promise<void> {
@@ -169,6 +171,7 @@ function toAdvance(row: Row): Advance {
     Money.cents(row.int('amount_cents')),
     LocalDate.fromString(row.string('paid_on')),
     row.nullableString('note'),
+    methodFromName(row.string('method')),
   );
 }
 
@@ -178,21 +181,23 @@ export class SqlAdvanceRepository implements AdvanceRepository {
 
   async forTeacherAdvances(teacher: TeacherRef): Promise<Advance[]> {
     return Row.all(
-      await this.sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note
+      await this
+        .sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note, method
         FROM payroll_advance WHERE teacher_id = ${teacher.value} ORDER BY paid_on DESC`,
     ).map(toAdvance);
   }
 
   async advancesOf(month: YearMonth): Promise<Advance[]> {
     return Row.all(
-      await this.sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note
+      await this
+        .sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note, method
         FROM payroll_advance WHERE month = ${month.toString()}`,
     ).map(toAdvance);
   }
 
   async advance(id: string): Promise<Advance | null> {
     const rows = await this
-      .sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note
+      .sql`SELECT id, teacher_id, month, amount_cents, paid_on::text AS paid_on, note, method
       FROM payroll_advance WHERE id::text = ${id}`;
     return rows[0] ? toAdvance(new Row(rows[0])) : null;
   }
@@ -206,6 +211,7 @@ export class SqlAdvanceRepository implements AdvanceRepository {
         amount_cents: a.amount.cents,
         paid_on: a.paidOn.toString(),
         note: a.note,
+        method: a.method,
       })
     }`;
   }

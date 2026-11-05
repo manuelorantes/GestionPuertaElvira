@@ -212,7 +212,7 @@ Deno.test({
           `/api/admin/payroll/settlements/${teacher}/${previousMonth}/payment`,
           { date: today },
         )).status,
-        204,
+        200,
       );
       const paid = (await client.get('/api/admin/dashboard')).body as { monthChart: Chart };
       assertEquals(at(paid.monthChart, previousMonth), {

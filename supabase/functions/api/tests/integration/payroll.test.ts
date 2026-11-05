@@ -91,13 +91,43 @@ Deno.test({
     assertEquals(settlement?.status, 'pending');
     assertEquals(settlement?.minutes, (count - 1) * 60 + 180);
 
+    // Una parte en efectivo: sigue pendiente, con eso a cuenta.
+    const part = await client.json(
+      'POST',
+      `/api/admin/payroll/settlements/${teacher}/${month}/payment`,
+      {
+        amount: '10',
+        method: 'cash',
+        date: today,
+      },
+    );
+    assertEquals(part.status, 200, JSON.stringify(part.body));
+    assertEquals(body<{ status: string }>(part).status, 'partial');
+    const partial =
+      body<{ items: { status: string; advancesCents: number; amountCents: number }[] }>(
+        await client.get(`/api/admin/payroll/settlements?month=${month}`),
+      ).items[0];
+    assertEquals([partial?.status, partial?.advancesCents], ['pending', 1000]);
+
+    // El resto, todas a la vez con tarjeta.
     assertEquals(
       body<{ paid: number }>(
         await client.json('POST', `/api/admin/payroll/settlements/${month}/payment`, {
           date: today,
+          method: 'card',
         }),
       ).paid,
       1,
+    );
+    const ledger = body<{ items: { source: string; method: string; amountCents: number }[] }>(
+      await client.get(`/api/admin/accounting/ledger?month=${month}`),
+    ).items.filter((i) => i.source === 'settlement' || i.source === 'advance');
+    assertEquals(
+      ledger.map((i) => [i.source, i.method, i.amountCents]).sort(),
+      [
+        ['advance', 'cash', 1000],
+        ['settlement', 'card', (partial?.amountCents ?? 0) - 1000],
+      ],
     );
     const detail = body<Record<string, unknown>>(
       await client.get(`/api/admin/payroll/settlements/${teacher}/${month}`),
