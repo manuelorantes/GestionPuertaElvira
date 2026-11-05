@@ -35,6 +35,7 @@ import {
   RecordSession,
   RefillDay,
   SaveDuty,
+  SubstitutedDays,
   SubstituteTeacher,
   SubstitutionNeedsReason,
   TeacherAgenda,
@@ -1063,5 +1064,38 @@ Deno.test('UpcomingSessions should list what a teacher still has to give in a mo
     ['2026-10-23', 'Viernes', 180, 90],
     ['2026-10-30', 'Viernes 17:00', 90, 90],
     ['2026-10-30', 'Viernes', 180, 90],
+  ]);
+});
+
+Deno.test('SubstitutedDays should list only the classes another teacher gave, first day first', async () => {
+  const query = {
+    substitutions: () =>
+      Promise.resolve([
+        {
+          date: '2026-11-12',
+          label: 'Adultos I',
+          role: 'received' as const,
+          otherName: 'Ana',
+          reason: null,
+        },
+        {
+          date: '2026-11-10',
+          label: 'Peques',
+          role: 'gave' as const,
+          otherName: 'Carlos',
+          reason: null,
+        },
+        {
+          date: '2026-11-05',
+          label: 'Iniciación A',
+          role: 'received' as const,
+          otherName: 'Lucía',
+          reason: 'Torneo',
+        },
+      ]),
+  };
+  assertEquals(await new SubstitutedDays(query).execute('t', YearMonth.fromString('2026-11')), [
+    { date: '2026-11-05', label: 'Iniciación A', substituteName: 'Lucía' },
+    { date: '2026-11-12', label: 'Adultos I', substituteName: 'Ana' },
   ]);
 });
