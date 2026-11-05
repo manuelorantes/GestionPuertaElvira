@@ -23,6 +23,8 @@ export interface LedgerItem {
   corrected: boolean;
   categoryLabel: string;
   methodLabel: string;
+  /** Casado con un movimiento del extracto del banco: su forma de pago e importe ya no cambian. */
+  reconciled: boolean;
 }
 
 export interface Ledger {

@@ -90,6 +90,8 @@ export interface PaymentSummary {
   method: PaymentMethod;
   totalCents: number;
   invoiceNumber: string | null;
+  /** Casado con un movimiento del extracto del banco: su forma de pago, fecha e importe ya no cambian. */
+  reconciled: boolean;
 }
 
 interface Invoice {

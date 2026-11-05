@@ -99,6 +99,11 @@ export function ReceiptDialog({ paymentId, onClose }: { paymentId: string; onClo
               </span>
             </div>
             <p className="mt-2 text-[13px] text-ink-muted">Forma de pago: {p.methodLabel}</p>
+            {p.reconciled && (
+              <p className="mt-1 text-[13px] text-ink-muted print:hidden">
+                Conciliado con el banco: su fecha, forma de pago e importe ya no se cambian.
+              </p>
+            )}
             {p.invoice && (
               <section aria-label="Factura" className="mt-4 rounded-sm border border-line p-4">
                 <p className="mb-2 flex items-center gap-2 font-semibold">
@@ -126,12 +131,12 @@ export function ReceiptDialog({ paymentId, onClose }: { paymentId: string; onClo
         <Button variant="secondary" onClick={onClose}>
           Cerrar
         </Button>
-        {p && canCorrect && !p.invoice && (
+        {p && canCorrect && !p.invoice && !p.reconciled && (
           <Button variant="secondary" onClick={() => setDeleting(true)}>
             Borrar
           </Button>
         )}
-        {p && canCorrect && (
+        {p && canCorrect && !p.reconciled && (
           <Button variant="secondary" onClick={() => setEditing(true)}>
             Editar
           </Button>
