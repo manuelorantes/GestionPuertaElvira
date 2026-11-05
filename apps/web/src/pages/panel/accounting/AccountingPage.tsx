@@ -14,6 +14,7 @@ import { Tabs } from '@/shared/ui/Tabs';
 
 import { BalanceCards } from './BalanceCards';
 import { DiagnosticsTab } from './DiagnosticsTab';
+import { PendingReconciliationCards } from './PendingReconciliationCards';
 import { FeesVsFixedSection } from './FeesVsFixedSection';
 import { InvoiceDialog } from './InvoiceDialog';
 import { InvoicesTab } from './InvoicesTab';
@@ -137,6 +138,7 @@ export function AccountingPage() {
         }}
       />
       <BalanceCards />
+      {superadmin && <PendingReconciliationCards />}
       <Tabs
         label="Vistas de contabilidad"
         tabs={tabs}

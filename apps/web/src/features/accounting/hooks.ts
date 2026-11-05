@@ -46,6 +46,14 @@ export function useCategoryOptions(kind: 'income' | 'expense', except: string[] 
     .map((c) => ({ value: c.code, label: c.label }));
 }
 
+/** Lo que queda por conciliar en la app y en el banco (solo superadministración). */
+export function usePendingReconciliation() {
+  return useQuery({
+    queryKey: ['accounting-reconciliation-pending'],
+    queryFn: api.fetchPendingReconciliation,
+  });
+}
+
 /** Saldos del club, del banco y de caja. */
 export function useBalances() {
   return useQuery({ queryKey: ['accounting-balances'], queryFn: api.fetchBalances });
