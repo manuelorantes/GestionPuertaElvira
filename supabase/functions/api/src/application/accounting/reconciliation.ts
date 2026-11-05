@@ -82,9 +82,21 @@ export interface FeeQuote {
 export interface FeePayments {
   payers(day: string): Promise<Payer[]>;
   /** Lo que costaría cobrar una cuota mensual ese día, o null si no hay nada que cobrar. */
-  quote(studentId: string, date: string): Promise<FeeQuote | null>;
+  quote(studentId: string, date: string, kind?: 'monthly' | 'membership'): Promise<FeeQuote | null>;
   /** Cobra una cuota mensual ese día con esa forma de pago, como desde Cobros; devuelve el id del cobro. */
-  register(studentId: string, date: string, method: 'transfer' | 'card'): Promise<string>;
+  register(
+    studentId: string,
+    date: string,
+    method: 'transfer' | 'card',
+    kind?: 'monthly' | 'membership',
+  ): Promise<string>;
+  /** Cobra a cuenta ese importe: queda como saldo a favor del alumno; devuelve el id del cobro. */
+  registerCredit(
+    studentId: string,
+    date: string,
+    method: 'transfer' | 'card',
+    amountCents: number,
+  ): Promise<string>;
   /** Corrige el importe de un cobro con una línea de corrección: lo de más queda a favor, lo de menos pendiente. */
   correct(paymentId: string, totalCents: number, reason: string): Promise<void>;
 }
@@ -942,13 +954,24 @@ export interface AcceptInput {
   record: { concept: string; category: string } | null;
   /** Apuntar el traspaso entre banco y caja. */
   transfer: boolean;
-  /** Cobrar una cuota de cada uno de estos alumnos (por transferencia, o con tarjeta en una liquidación). */
-  fees: string[];
+  /** Lo que se cobra a cada alumno (por transferencia, o con tarjeta en una liquidación). */
+  fees: FeeChoice[];
   /**
    * Si lo elegido no suma el importe, repartir la diferencia a partes iguales entre esas cuotas:
    * lo pagado de más queda a favor de cada alumno y lo de menos, pendiente.
    */
   adjust: boolean;
+}
+
+/**
+ * Lo que se cobra a un alumno al casar un movimiento: la cuota del mes que le toca, su cuota de socio o un pago a cuenta
+ * (con su importe) que queda como saldo a favor, por ejemplo de un socio provisional del que aún no se sabe a qué va.
+ */
+export interface FeeChoice {
+  studentId: string;
+  kind: 'monthly' | 'membership' | 'credit';
+  /** Solo en un pago a cuenta. */
+  amountCents: number | null;
 }
 
 export class MovementAlreadyMatched extends Error {
@@ -988,23 +1011,35 @@ export class AcceptReconciliation {
     }
   }
 
-  /** Lo que costaría cada cuota elegida; falla si alguna no se puede cobrar o hay alumnos repetidos. */
-  private async feeQuotes(m: BankMovement, kind: MovementKind, studentIds: string[]) {
-    if (studentIds.length === 0) return [];
+  /** Lo que costaría cada cuota elegida; falla si alguna no se puede cobrar o se repite. */
+  private async feeQuotes(m: BankMovement, kind: MovementKind, choices: FeeChoice[]) {
+    if (choices.length === 0) return [];
     if (kind !== 'income' && kind !== 'card_settlement') {
       throw new InvalidValue(
         'fees',
         'Solo se cobran cuotas con una transferencia recibida o una liquidación del datáfono.',
       );
     }
-    if (new Set(studentIds).size !== studentIds.length) {
-      throw new InvalidValue('fees', 'Hay alumnos repetidos.');
+    if (new Set(choices.map((c) => `${c.studentId}:${c.kind}`)).size !== choices.length) {
+      throw new InvalidValue('fees', 'Hay cuotas repetidas.');
     }
     const quotes: number[] = [];
-    for (const studentId of studentIds) {
-      const quote = await this.fees.quote(studentId, appDay(m));
+    for (const choice of choices) {
+      if (choice.kind === 'credit') {
+        if (choice.amountCents === null || choice.amountCents <= 0) {
+          throw new InvalidValue('fees', 'Indica cuánto se cobra a cuenta.');
+        }
+        quotes.push(choice.amountCents);
+        continue;
+      }
+      const quote = await this.fees.quote(choice.studentId, appDay(m), choice.kind);
       if (quote === null) {
-        throw new InvalidValue('fees', 'Algún alumno elegido no tiene ninguna cuota por cobrar.');
+        throw new InvalidValue(
+          'fees',
+          choice.kind === 'membership'
+            ? 'Algún alumno elegido ya tiene pagada la cuota de socio.'
+            : 'Algún alumno elegido no tiene ninguna cuota por cobrar.',
+        );
       }
       quotes.push(quote.amountCents);
     }
@@ -1140,9 +1175,12 @@ export class AcceptReconciliation {
     }
     const charged: MatchTarget[] = [];
     const method = kind === 'card_settlement' ? 'card' : 'transfer';
-    for (const [i, studentId] of input.fees.entries()) {
-      const id = await this.fees.register(studentId, appDay(m), method);
-      const share = charges[i]! - quotes[i]!;
+    for (const [i, choice] of input.fees.entries()) {
+      // Un pago a cuenta se cobra ya con su parte de lo que no cuadra: todo es saldo a favor.
+      const id = choice.kind === 'credit'
+        ? await this.fees.registerCredit(choice.studentId, appDay(m), method, charges[i]!)
+        : await this.fees.register(choice.studentId, appDay(m), method, choice.kind);
+      const share = choice.kind === 'credit' ? 0 : charges[i]! - quotes[i]!;
       if (share !== 0) {
         const paid = `${kind === 'card_settlement' ? 'con tarjeta' : 'por transferencia'} el ${
           dayLabel(appDay(m))
@@ -1162,7 +1200,7 @@ export class AcceptReconciliation {
       ? [
         ...new Set([
           ...chosen.flatMap((i) => studentOf.get(keyOf(i)) ?? []),
-          ...input.fees,
+          ...input.fees.map((f) => f.studentId),
         ]),
       ]
       : [];
@@ -1173,20 +1211,25 @@ export class AcceptReconciliation {
   }
 }
 
-/** La cuota que se le cobraría a un alumno con una transferencia de ese día, para repartir una transferencia a mano. */
+/**
+ * Lo que se le puede cobrar a un alumno con un movimiento de ese día, para repartirlo a mano: la cuota del mes y la de
+ * socio, si las tiene pendientes (además, siempre, un pago a cuenta).
+ */
 export class QuoteFee {
   constructor(private readonly fees: FeePayments) {}
 
-  async execute(studentId: string, day: string): Promise<FeeQuote> {
+  async execute(
+    studentId: string,
+    day: string,
+  ): Promise<{ monthly: FeeQuote | null; membership: FeeQuote | null }> {
     if (!/^[0-9a-f-]{36}$/i.test(studentId)) {
       throw new InvalidValue('studentId', 'Elige un alumno.');
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new InvalidValue('day', 'Fecha no válida.');
-    const quote = await this.fees.quote(studentId, day);
-    if (quote === null) {
-      throw new InvalidValue('studentId', 'Este alumno no tiene ninguna cuota por cobrar.');
-    }
-    return quote;
+    return {
+      monthly: await this.fees.quote(studentId, day, 'monthly'),
+      membership: await this.fees.quote(studentId, day, 'membership'),
+    };
   }
 }
 
