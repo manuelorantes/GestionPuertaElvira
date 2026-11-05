@@ -5,6 +5,7 @@ Fuente: sección «Contabilidad» (Movimientos, Facturas, Mes a mes y cierre) y 
 ```
 AccountingPage (/panel/contabilidad)
 ├── SectionHeader: «Temporada 2026/27» | «Contabilidad» | acción «Añadir factura» (icono upload)
+├── PendingReconciliationCards (solo superadministración, bajo los saldos): dos tarjetas en 2 columnas (1 en móvil) «En la app sin conciliar» · «En el banco sin conciliar»: etiqueta, total grande, explicación y botón «N sin conciliar» que despliega una lista con borde a la izquierda (fecha · concepto · forma de pago, solo en la app · importe verde/rojo), con desplazamiento si es larga
 ├── Tabs: Movimientos · Facturas · Mes a mes y cierre · Ajustes · Diagnóstico (?pestana=movimientos|facturas|cierre|ajustes|diagnostico)
 ├── LedgerTab: MonthNav (?mes) + botón «Añadir movimiento»
 │   ├── Filtros sobre la tabla: chips «Todo | Ingresos | Pagos» (?tipo=ingresos|pagos; activo en negro) y, con Ingresos, debajo, franja «Forma de pago» con subfiltro «Todos | Tarjeta | Transferencia | Efectivo» (?forma=…; chips pequeños, activo verde suave); con filtro, «N movimientos · ±X» bajo la tabla
