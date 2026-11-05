@@ -379,6 +379,8 @@ y la conciliación MUST NOT cambiar la forma de pago de nada (como mucho, la fec
 Fuera de sacar o ingresar efectivo, cada movimiento por casar MUST ofrecer siempre, además de su sugerencia,
 **elegir a mano** lo que le corresponde y **crear un registro** nuevo (un ingreso o un gasto con su concepto y su
 categoría; en una liquidación del datáfono, un ingreso con tarjeta del día cobrado).
+Al elegir a mano, si lo elegido no llega al importe, lo que falta MUST poderse **completar con un ingreso o gasto
+nuevo** (con su concepto y categoría, y la forma de pago y el día del movimiento).
 Antes de aceptar, el concepto, la categoría y los cobros elegidos se pueden cambiar.
 Aceptar una sugerencia MUST hacer el cambio con las mismas operaciones que el resto de Contabilidad y Cobros
 (queda en el historial) y recordar qué movimiento del extracto corresponde a qué cobros, gasto o traspaso.
@@ -397,6 +399,21 @@ Lo casado con un movimiento del extracto (cobros, apuntes, facturas y traspasos)
   desde ninguna parte de la app; solo deshaciendo antes su conciliación;
 - no se ofrece a ningún otro movimiento del extracto.
 La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse la próxima vez.
+
+Los movimientos de cada extracto subido MUST guardarse, y bajo los saldos del club, del banco y de caja,
+superadministración MUST ver lo que queda **sin conciliar** a cada lado:
+- **En la app**: lo de tarjeta y transferencia del ejercicio en curso (y los traspasos entre caja y banco) que no está
+  casado con el banco, sumado con signo (lo que entra en el banco suma y lo que sale resta);
+- **En el banco**: las líneas de los extractos subidos que no casan con nada de la app, sumadas igual.
+Cada lado MUST poderse desplegar para ver su lista: en la app, día, concepto, forma de pago e importe con signo;
+en el banco, día, concepto del banco e importe.
+Lo casado en cualquier ronda (también lo cobrado de más o de menos y lo apuntado nuevo) sale de las dos listas.
+
+#### Scenario: Lo que queda sin conciliar
+- **WHEN** en octubre hay un cobro por transferencia de 30 € y un gasto con tarjeta de 12 € sin casar,
+  y el último extracto subido trae una transferencia de 7 € que no casa con nada
+- **THEN** «En la app sin conciliar» suma 18 € (30 € y −12 €) y «En el banco sin conciliar» suma 7 €,
+  y al desplegarlos salen esas líneas
 
 #### Scenario: Liquidación del datáfono que cuadra
 - **WHEN** el extracto trae «Liquidación efectuada el 24/09/2026» por 648 € y ese día hay en la app dos cobros con

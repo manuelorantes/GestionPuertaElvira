@@ -16,6 +16,8 @@ decidiendo cada cambio.
   El Excel (`.xlsx`, aunque el banco lo llame `.xls`) se descomprime y lee con las APIs del navegador, sin librerías;
   el PDF se lee con `pdfjs-dist`, cargado solo al subir un PDF.
   Así la API no depende de formatos de fichero y el fichero no se guarda en ningún sitio.
+  Sus movimientos sí se guardan, en `accounting_bank_movement` (revisado el 05/11/2026),
+  para saber en cualquier momento qué hay en el banco sin conciliar sin volver a subir el extracto.
 - La API **calcula las sugerencias en cada pasada**, sin guardarlas:
   lo que no se acepta no deja rastro y vuelve a salir.
   Aceptar una sugerencia usa los casos de uso de siempre (corregir la fecha de un cobro,
