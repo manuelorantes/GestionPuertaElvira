@@ -2,6 +2,7 @@ import type {
   BankMatch,
   BankMatchRepository,
   MatchTarget,
+  Payer,
   PayerNames,
 } from '../../application/accounting/reconciliation.ts';
 import { Row, type Sql } from './sql.ts';
@@ -25,7 +26,8 @@ export class SqlBankMatchRepository implements BankMatchRepository {
     await this
       .sql`INSERT INTO accounting_bank_match (movement_key, operation_date, amount_cents, concept, targets)
       VALUES (${match.key}, ${match.operationDate}, ${match.amountCents}, ${match.concept},
-        ${this.sql.json(match.targets.map((t) => ({ source: t.source, sourceId: t.sourceId })))})`;
+        ${this.sql.json(match.targets.map((t) => ({ source: t.source, sourceId: t.sourceId })))})
+      ON CONFLICT (movement_key) DO UPDATE SET targets = EXCLUDED.targets, concept = EXCLUDED.concept`;
   }
 
   async rules(): Promise<Map<string, string>> {
@@ -60,16 +62,25 @@ export class SqlPayerNames implements PayerNames {
     if (studentIds.length === 0) return new Map();
     const rows = await this.sql`SELECT id, full_name, guardians FROM students_student
       WHERE id = ANY(${studentIds}::uuid[])`;
-    return new Map(
-      Row.all(rows).map((r) => {
-        const guardians = r.json('guardians');
-        const names = Array.isArray(guardians)
-          ? guardians.flatMap((
-            g,
-          ) => (typeof g?.name === 'string' && g.name ? [g.name as string] : []))
-          : [];
-        return [r.string('id'), [r.string('full_name'), ...names]];
-      }),
-    );
+    return new Map(Row.all(rows).map((r) => [r.string('id'), namesOf(r)]));
   }
+
+  /** Los alumnos activos ese día, con sus nombres. */
+  async active(day: string): Promise<Payer[]> {
+    const rows = await this.sql`SELECT id, full_name, guardians FROM students_student
+      WHERE withdrawn_on IS NULL OR withdrawn_on > ${day}`;
+    return Row.all(rows).map((r) => ({
+      studentId: r.string('id'),
+      name: r.string('full_name'),
+      names: namesOf(r),
+    }));
+  }
+}
+
+function namesOf(r: Row): string[] {
+  const guardians = r.json('guardians');
+  const names = Array.isArray(guardians)
+    ? guardians.flatMap((g) => (typeof g?.name === 'string' && g.name ? [g.name as string] : []))
+    : [];
+  return [r.string('full_name'), ...names];
 }
