@@ -26,6 +26,7 @@ export class AuditLabels {
     'POST /api/admin/accounting/transfers': 'Apuntar traspaso entre caja y banco',
     'DELETE /api/admin/accounting/transfers/:id': 'Quitar traspaso entre caja y banco',
     'POST /api/admin/accounting/reconciliation/accept': 'Conciliar con el banco',
+    'POST /api/admin/accounting/reconciliation/release': 'Deshacer conciliación con el banco',
     'POST /api/admin/accounting/invoices': 'Registrar factura de proveedor',
     'POST /api/admin/accounting/invoices/:id/payment': 'Pagar factura de proveedor',
     'PUT /api/admin/accounting/invoices/:id': 'Editar factura de proveedor',

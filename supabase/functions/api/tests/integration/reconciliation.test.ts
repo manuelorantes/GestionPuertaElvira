@@ -1,13 +1,16 @@
 import { assertEquals } from '@std/assert';
 
-import { ApiClient, assertError, createUser, resetDatabase } from '../support/http.ts';
+import { newGroup, newTeacher } from '../support/classes-http.ts';
+import { ApiClient, assertError, atTime, createUser, resetDatabase } from '../support/http.ts';
 
 interface Item {
   status: string;
   movement: Record<string, unknown>;
   matched: { source: string; sourceId: string }[];
+  note: string;
   proposal: {
     items: { source: string; sourceId: string; method: string }[];
+    fees: { studentId: string; student: string; concept: string; amountCents: number }[];
     record: { concept: string; category: string } | null;
     transfer: { from: string; to: string } | null;
   } | null;
@@ -153,4 +156,59 @@ Deno.test('reconciliation should be reserved to superadministration', async () =
     403,
     'forbidden',
   );
+});
+
+Deno.test('reconciliation should charge the fee of a transfer nobody recorded and let a match be undone', async () => {
+  await atTime('2026-11-05T10:00:00+01:00', async () => {
+    const { superadmin } = await clients();
+    const group = await newGroup(superadmin, await newTeacher(superadmin));
+    const created = await superadmin.json('POST', '/api/admin/students', {
+      fullName: 'Ana Pérez Gil',
+      groupIds: [group],
+    });
+    assertEquals(created.status, 201, JSON.stringify(created.body));
+    const ana = (created.body as { id: string }).id;
+    const quote = await superadmin.json('POST', '/api/admin/billing/quote', {
+      studentId: ana,
+      months: 1,
+      method: 'transfer',
+      date: '2026-11-03',
+    });
+    assertEquals(quote.status, 200, JSON.stringify(quote.body));
+    const fee = (quote.body as { totalCents: number }).totalCents;
+    const movements = [{
+      operationDate: '2026-11-03',
+      valueDate: '2026-11-03',
+      concept: 'Transferencia Inmediata De Ana Perez Gil, Concepto Noviembre',
+      amountCents: fee,
+      balanceCents: 100_000 + fee,
+    }];
+    const reconcile = async () =>
+      ((await superadmin.json('POST', '/api/admin/accounting/reconciliation', { movements }))
+        .body as View).items[0]!;
+
+    const item = await reconcile();
+    assertEquals(item.status, 'suggested');
+    assertEquals(item.proposal!.fees.map((f) => [f.studentId, f.amountCents]), [[ana, fee]]);
+    const accepted = await superadmin.json('POST', '/api/admin/accounting/reconciliation/accept', {
+      movement: item.movement,
+      items: [],
+      fees: [ana],
+    });
+    assertEquals(accepted.status, 204, JSON.stringify(accepted.body));
+    const matched = await reconcile();
+    assertEquals(matched.status, 'matched');
+    const payments = (await superadmin.get(`/api/admin/billing/payments?studentId=${ana}`))
+      .body as { items: { id: string; method: string }[] };
+    assertEquals(payments.items.map((p) => [p.id, p.method]), [[
+      matched.matched[0]!.sourceId,
+      'transfer',
+    ]]);
+
+    const released = await superadmin.json('POST', '/api/admin/accounting/reconciliation/release', {
+      movement: item.movement,
+    });
+    assertEquals(released.status, 204, JSON.stringify(released.body));
+    assertEquals((await reconcile()).status === 'matched', false);
+  });
 });
