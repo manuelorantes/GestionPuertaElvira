@@ -2,6 +2,7 @@ import { ArrowLeft, CalendarClock, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 
+import { METHODS } from '@/features/accounting/categories';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { currentMonth, formatCents, monthLabel, shiftMonth } from '@/features/billing/money';
 import { SeasonMonths } from '@/features/billing/SeasonMonths';
@@ -628,6 +629,7 @@ function AdvanceDialog({ teacherId, onClose }: { teacherId: string; onClose: () 
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(todayIso());
   const [note, setNote] = useState('');
+  const [method, setMethod] = useState('transfer');
   const save = usePayrollMutation(recordAdvance);
   const toast = useToast();
   const year = new Date().getFullYear();
@@ -642,6 +644,7 @@ function AdvanceDialog({ teacherId, onClose }: { teacherId: string; onClose: () 
         month,
         amount: amount.replace(',', '.'),
         date,
+        method,
         note: note.trim() || null,
       })
       .then(
@@ -682,6 +685,7 @@ function AdvanceDialog({ teacherId, onClose }: { teacherId: string; onClose: () 
           fromYear={year - 1}
           toYear={year + 1}
         />
+        <Select label="Forma de pago" value={method} onChange={setMethod} options={METHODS} />
         <TextField
           label="Nota (opcional)"
           placeholder="Por ejemplo: pago de más en septiembre"
