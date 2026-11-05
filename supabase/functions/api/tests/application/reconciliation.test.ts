@@ -32,6 +32,16 @@ class Memory implements BankMatchRepository {
     this.ruleMap.set(counterparty, category);
     return Promise.resolve();
   }
+  payers = new Map<string, string[]>();
+  payerStudents() {
+    return Promise.resolve(new Map(this.payers));
+  }
+  savePayerStudents(counterparty: string, studentIds: string[]) {
+    this.payers.set(counterparty, [
+      ...new Set([...(this.payers.get(counterparty) ?? []), ...studentIds]),
+    ]);
+    return Promise.resolve();
+  }
 }
 
 const payment = (
@@ -84,15 +94,6 @@ function setUp(lines: LedgerLine[]) {
       fx.external = fx.external.map((l) => (l.sourceId === id ? { ...l, date } : l));
       return Promise.resolve();
     },
-    changePaymentMethod: (id, method) => {
-      calls.push(`forma ${id} ${method}`);
-      fx.external = fx.external.map((l) => (l.sourceId === id ? { ...l, method } : l));
-      return Promise.resolve();
-    },
-    changeLineMethod: (line, method) => {
-      calls.push(`forma ${line.sourceId} ${method}`);
-      return Promise.resolve();
-    },
     recordEntry: (input) => {
       calls.push(`apunte ${input.kind} ${input.amountCents} ${input.category} ${input.method}`);
       return Promise.resolve('entry-1');
@@ -112,7 +113,8 @@ function setUp(lines: LedgerLine[]) {
         ),
       ),
   };
-  /** Solo Ana tiene una cuota por cobrar: la del mes del cobro, de 55,00 €. */
+  /** Solo Ana tiene una cuota por cobrar (la del mes del cobro, de 55,00 €), salvo que el test añada otras. */
+  const feeCents = new Map([['ana', 5500]]);
   const fees: FeePayments = {
     payers: () =>
       Promise.resolve([
@@ -121,10 +123,10 @@ function setUp(lines: LedgerLine[]) {
       ]),
     quote: (studentId, date) =>
       Promise.resolve(
-        studentId === 'ana'
+        feeCents.has(studentId)
           ? {
             concept: date.startsWith('2026-11') ? 'Noviembre 2026' : 'Octubre 2026',
-            amountCents: 5500,
+            amountCents: feeCents.get(studentId)!,
           }
           : null,
       ),
@@ -137,7 +139,7 @@ function setUp(lines: LedgerLine[]) {
     new ReconcileStatement(fx, fx, fx, memory, names, fees).execute(movements);
   const accept = new AcceptReconciliation(fx, fx, memory, actions, fees);
   const release = new ReleaseMatch(memory);
-  return { fx, memory, calls, reconcile, accept, release };
+  return { fx, memory, calls, reconcile, accept, release, feeCents };
 }
 
 Deno.test('ReconcileStatement should match a card settlement with the card payments of its day', async () => {
@@ -153,15 +155,18 @@ Deno.test('ReconcileStatement should match a card settlement with the card payme
   assertEquals(view.bank, { openingCents: 100_000, closingCents: 164_800 });
 });
 
-Deno.test('ReconcileStatement should suggest moving to card the payments that complete a settlement', async () => {
+Deno.test('ReconcileStatement should suggest moving to the bank day the card payments that complete a settlement', async () => {
   const { reconcile, accept, calls } = setUp([
-    payment('p1', '2026-09-03', 'transfer', 9000, 'pedro'),
+    payment('p1', '2026-09-03', 'card', 9000, 'pedro'),
+    payment('p2', '2026-09-09', 'cash', 9000, 'pedro'),
+    payment('p3', '2026-09-09', 'transfer', 9000, 'pedro'),
   ]);
   const movements = statement(['2026-09-11', 'Liquidacion Efectuada El 10/09/2026', 9000]);
   const item = (await reconcile(movements)).items[0]!;
   assertEquals(item.status, 'suggested');
   assertEquals(item.proposal!.items.map((i) => i.sourceId), ['p1']);
-  assertEquals(item.proposal!.changes, ['Pasar «Cuota · p1» (90,00 €) a tarjeta y al 10/09/2026']);
+  assertEquals(item.candidates.map((i) => i.sourceId), ['p1']);
+  assertEquals(item.proposal!.changes, ['Pasar «Cuota · p1» (90,00 €) al 10/09/2026']);
   await accept.execute({
     movement: item.movement,
     items: [{ source: 'payment', sourceId: 'p1' }],
@@ -169,15 +174,16 @@ Deno.test('ReconcileStatement should suggest moving to card the payments that co
     transfer: false,
     fees: [],
   });
-  assertEquals(calls, ['fecha p1 2026-09-10', 'forma p1 card']);
+  assertEquals(calls, ['fecha p1 2026-09-10']);
   const again = (await reconcile(movements)).items[0]!;
   assertEquals([again.status, again.note], ['matched', 'Casado al conciliar.']);
 });
 
 Deno.test('ReconcileStatement should leave ambiguous settlements to be chosen by hand', async () => {
   const { reconcile } = setUp([
-    payment('p1', '2026-09-03', 'transfer', 3600),
-    payment('p2', '2026-09-04', 'cash', 3600),
+    payment('p1', '2026-09-03', 'card', 3600),
+    payment('p2', '2026-09-04', 'card', 3600),
+    payment('p3', '2026-09-04', 'cash', 3600),
   ]);
   const item =
     (await reconcile(statement(['2026-09-11', 'Liquidacion Efectuada El 10/09/2026', 3600])))
@@ -186,10 +192,11 @@ Deno.test('ReconcileStatement should leave ambiguous settlements to be chosen by
   assertEquals(item.candidates.map((i) => i.sourceId).sort(), ['p1', 'p2']);
 });
 
-Deno.test('ReconcileStatement should match a received transfer and suggest fixing one paid by name', async () => {
+Deno.test('ReconcileStatement should match a received transfer and suggest fixing the date of one paid by name', async () => {
   const { reconcile } = setUp([
     payment('p1', '2026-10-02', 'transfer', 5500, 'pedro'),
-    payment('p2', '2026-09-20', 'cash', 2700),
+    payment('p2', '2026-09-28', 'cash', 2700),
+    payment('p3', '2026-09-20', 'transfer', 2700),
   ]);
   const view = await reconcile(statement(
     ['2026-10-03', 'Transferencia De Pedro Sanz, Concepto Octubre', 5500],
@@ -197,9 +204,9 @@ Deno.test('ReconcileStatement should match a received transfer and suggest fixin
   ));
   assertEquals(view.items[0]!.status, 'matched');
   assertEquals(view.items[1]!.status, 'suggested');
-  assertEquals(view.items[1]!.proposal!.changes, [
-    'Pasar «Cuota · p2» (27,00 €) a transferencia y al 05/10/2026',
-  ]);
+  assertEquals(view.items[1]!.proposal!.items.map((i) => i.sourceId), ['p3']);
+  assertEquals(view.items[1]!.proposal!.changes, ['Pasar «Cuota · p3» (27,00 €) al 05/10/2026']);
+  assertEquals(view.items[1]!.candidates.map((i) => i.sourceId), ['p3']);
 });
 
 Deno.test('ReconcileStatement should suggest recording an unknown receipt, remembering its category', async () => {
@@ -225,7 +232,7 @@ Deno.test('ReconcileStatement should suggest recording an unknown receipt, remem
   assertEquals((await reconcile(next)).items[0]!.proposal!.record!.category, 'utilities');
 });
 
-Deno.test('ReconcileStatement should match bank expenses and suggest moving a cash one to the bank', async () => {
+Deno.test('ReconcileStatement should match bank expenses and never a cash one', async () => {
   const { reconcile, accept, calls } = setUp([
     expense('e1', '2026-10-01', 'transfer', 1200),
     expense('e2', '2026-10-06', 'cash', 33580),
@@ -235,15 +242,21 @@ Deno.test('ReconcileStatement should match bank expenses and suggest moving a ca
     ['2026-10-06', 'Transferencia A Favor De Angel Ruiz Concepto Nomina', -33580],
   ));
   assertEquals(view.items[0]!.status, 'matched');
-  assertEquals(view.items[1]!.proposal!.items.map((i) => i.sourceId), ['e2']);
-  await accept.execute({
-    movement: view.items[1]!.movement,
-    items: [{ source: 'invoice', sourceId: 'e2' }],
-    record: null,
-    transfer: false,
-    fees: [],
-  });
-  assertEquals(calls, ['forma e2 transfer']);
+  assertEquals(view.items[1]!.proposal!.items, []);
+  assertEquals(view.items[1]!.candidates, []);
+  await assertRejects(
+    () =>
+      accept.execute({
+        movement: view.items[1]!.movement,
+        items: [{ source: 'invoice', sourceId: 'e2' }],
+        record: null,
+        transfer: false,
+        fees: [],
+      }),
+    InvalidValue,
+    'efectivo',
+  );
+  assertEquals(calls, []);
 });
 
 Deno.test('ReconcileStatement should suggest a transfer to cash for a withdrawal', async () => {
@@ -264,8 +277,9 @@ Deno.test('ReconcileStatement should suggest a transfer to cash for a withdrawal
 
 Deno.test('AcceptReconciliation should refuse choices that do not add up, are taken or repeat a movement', async () => {
   const { reconcile, accept } = setUp([
-    payment('p1', '2026-09-03', 'transfer', 9000),
-    payment('p2', '2026-09-04', 'transfer', 4000),
+    payment('p1', '2026-09-03', 'card', 9000),
+    payment('p2', '2026-09-04', 'card', 4000),
+    payment('p3', '2026-09-04', 'transfer', 9000),
   ]);
   const movement =
     (await reconcile(statement(['2026-09-11', 'Liquidacion Efectuada El 10/09/2026', 9000])))
@@ -279,8 +293,56 @@ Deno.test('AcceptReconciliation should refuse choices that do not add up, are ta
       fees: [],
     });
   await assertRejects(() => choose(['p2']), InvalidValue);
+  await assertRejects(() => choose(['p3']), InvalidValue, 'tarjeta');
   await choose(['p1']);
   await assertRejects(() => choose(['p1']), MovementAlreadyMatched);
+});
+
+Deno.test('AcceptReconciliation should split a transfer between payments and new fees and remember who sends it', async () => {
+  const { reconcile, accept, calls, memory, feeCents } = setUp([
+    payment('p1', '2026-10-01', 'transfer', 5500),
+  ]);
+  feeCents.set('pedro', 4500);
+  const concept = 'Transferencia Inmediata De Luis Mora Vela, Concepto Clases';
+  const item = (await reconcile(statement(['2026-10-02', concept, 10000]))).items[0]!;
+  assertEquals(item.proposal!.fees, []);
+  assertEquals(item.proposal!.record!.kind, 'income');
+  await accept.execute({
+    movement: item.movement,
+    items: [{ source: 'payment', sourceId: 'p1' }],
+    record: null,
+    transfer: false,
+    fees: ['pedro'],
+  });
+  assertEquals(calls, ['cobro pedro 2026-10-02']);
+  assertEquals(memory.saved.at(-1)!.targets, [
+    { source: 'payment', sourceId: 'p1' },
+    { source: 'payment', sourceId: 'payment-pedro' },
+  ]);
+  assertEquals(memory.payers.get('luis mora vela'), ['ana', 'pedro']);
+
+  feeCents.set('ana', 5500);
+  const next = (await reconcile(statement(['2026-11-03', concept, 10000]))).items[0]!;
+  assertEquals(next.status, 'suggested');
+  assertEquals(next.proposal!.fees.map((f) => f.studentId).sort(), ['ana', 'pedro']);
+});
+
+Deno.test('AcceptReconciliation should refuse fees that do not add up with the payments chosen', async () => {
+  const { reconcile, accept, calls } = setUp([payment('p1', '2026-10-01', 'transfer', 5500)]);
+  const item = (await reconcile(
+    statement(['2026-10-02', 'Transferencia De Luis Mora Vela, Concepto Clases', 10000]),
+  )).items[0]!;
+  const choose = (fees: string[]) =>
+    accept.execute({
+      movement: item.movement,
+      items: [{ source: 'payment', sourceId: 'p1' }],
+      record: null,
+      transfer: false,
+      fees,
+    });
+  await assertRejects(() => choose(['ana']), InvalidValue, 'suma');
+  await assertRejects(() => choose(['pedro']), InvalidValue, 'cuota');
+  assertEquals(calls, []);
 });
 
 Deno.test('ReconcileStatement should match several months of an expense paid at once', async () => {

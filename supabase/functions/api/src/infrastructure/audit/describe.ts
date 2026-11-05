@@ -205,6 +205,7 @@ export function titleOf(
     case 'accounting_bank_match':
       return join(text(row, 'concept'), dateLabel(text(row, 'operation_date')));
     case 'accounting_bank_rule':
+    case 'accounting_bank_payer':
       return text(row, 'counterparty');
     case 'accounting_transfer':
       return join(
