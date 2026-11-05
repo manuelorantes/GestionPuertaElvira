@@ -5,11 +5,11 @@ import { useId, useRef, useState } from 'react';
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import {
   acceptReconciliation,
+  type ChosenFee,
   adjustedFees,
   type Reconciliation,
   type ReconciliationAcceptance,
   type ReconciliationAppItem,
-  type ReconciliationFee,
   type ReconciliationItem,
   reconcileStatement,
   releaseReconciliation,
@@ -227,18 +227,18 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
     proposal?.record?.concept ?? [...movement.concept].slice(0, 120).join(''),
   );
   const [category, setCategory] = useState(proposal?.record?.category ?? '');
-  const [chosen, setChosen] = useState<Set<string>>(new Set());
-  const [fees, setFees] = useState<ReconciliationFee[]>([]);
+  // Lo que ya cuenta (lo cobrado con tarjeta ese día) sale marcado, pero se puede desmarcar si no va con este abono.
+  const options = [...item.fixed, ...item.candidates];
+  const [chosen, setChosen] = useState<Set<string>>(new Set(item.fixed.map(keyOf)));
+  const [fees, setFees] = useState<ChosenFee[]>([]);
   const [confirming, setConfirming] = useState(false);
   const categories = useCategoryOptions(recordKind);
   const accept = useAccountingMutation(acceptReconciliation);
   const release = useAccountingMutation(releaseReconciliation);
   const toast = useToast();
   const target = Math.abs(movement.amountCents);
-  const fixedSum = item.fixed.reduce((sum, i) => sum + i.amountCents, 0);
-  const chosenItems = item.candidates.filter((c) => chosen.has(keyOf(c)));
+  const chosenItems = options.filter((c) => chosen.has(keyOf(c)));
   const chosenSum =
-    fixedSum +
     chosenItems.reduce((sum, i) => sum + i.amountCents, 0) +
     fees.reduce((sum, f) => sum + f.amountCents, 0);
   const difference = target - chosenSum;
@@ -268,17 +268,25 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
       items: proposal.items.map(({ source, sourceId }) => ({ source, sourceId })),
       record: proposal.record ? { concept: concept.trim(), category: recordCategory } : null,
       transfer: proposal.transfer !== null,
-      fees: proposal.fees.map((f) => f.studentId),
+      fees: proposal.fees.map((f) => ({
+        studentId: f.studentId,
+        kind: 'monthly' as const,
+        amountCents: null,
+      })),
       adjust: false,
     });
   }
 
   function acceptChosen(adjust: boolean) {
     send({
-      items: [...item.fixed, ...chosenItems].map(({ source, sourceId }) => ({ source, sourceId })),
+      items: chosenItems.map(({ source, sourceId }) => ({ source, sourceId })),
       record: null,
       transfer: false,
-      fees: fees.map((f) => f.studentId),
+      fees: fees.map((f) => ({
+        studentId: f.studentId,
+        kind: f.kind,
+        amountCents: f.kind === 'credit' ? f.amountCents : null,
+      })),
       adjust,
     });
   }
@@ -395,23 +403,13 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
       {mode === 'choose' && (
         <fieldset className="flex flex-col gap-2 rounded-sm bg-surface-muted p-3">
           <legend className="sr-only">Lo que le corresponde en la app</legend>
-          {item.fixed.length > 0 && (
-            <>
-              <p className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
-                Ya cuenta
-              </p>
-              {item.fixed.map((m) => (
-                <AppItemLine key={keyOf(m)} item={m} />
-              ))}
-            </>
-          )}
-          {item.candidates.length > 0 && (
+          {options.length > 0 && (
             <p className="text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
               Elige lo que le corresponde
             </p>
           )}
           <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto">
-            {item.candidates.map((c) => (
+            {options.map((c) => (
               <li key={keyOf(c)}>
                 <label className="flex cursor-pointer items-start gap-2">
                   <input
@@ -430,7 +428,14 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
               </li>
             ))}
           </ul>
-          {canFees && <FeePicker day={item.day} fees={fees} onChange={setFees} />}
+          {canFees && (
+            <FeePicker
+              day={item.day}
+              fees={fees}
+              remainingCents={Math.max(difference, 0)}
+              onChange={setFees}
+            />
+          )}
           <p className="text-sm" aria-live="polite">
             Elegido: <strong className="tabular-nums">{formatCents(chosenSum)}</strong> de{' '}
             <span className="tabular-nums">{formatCents(target)}</span>

@@ -348,8 +348,23 @@ export interface ReconciliationAppItem {
   period: string;
 }
 
+interface FeeQuote {
+  concept: string;
+  amountCents: number;
+}
+
+/** Lo que se cobra a un alumno al casar un movimiento a mano. */
+export interface ChosenFee {
+  studentId: string;
+  student: string;
+  /** La cuota del mes, la de socio o un pago a cuenta (queda como saldo a favor). */
+  kind: 'monthly' | 'membership' | 'credit';
+  concept: string;
+  amountCents: number;
+}
+
 /** Una cuota que se propone cobrar por transferencia. */
-export interface ReconciliationFee {
+interface ReconciliationFee {
   studentId: string;
   student: string;
   concept: string;
@@ -394,8 +409,8 @@ export interface ReconciliationAcceptance {
   items: { source: string; sourceId: string }[];
   record: { concept: string; category: string } | null;
   transfer: boolean;
-  /** Alumnos a los que se cobra una cuota (por transferencia, o con tarjeta en una liquidación). */
-  fees: string[];
+  /** Lo que se cobra a cada alumno (por transferencia, o con tarjeta en una liquidación). */
+  fees: { studentId: string; kind: ChosenFee['kind']; amountCents: number | null }[];
   /** Repartir a partes iguales entre esas cuotas lo que no cuadra: lo de más, a favor; lo de menos, pendiente. */
   adjust: boolean;
 }
@@ -409,7 +424,7 @@ function evenShares(totalCents: number, count: number): number[] {
 }
 
 /** Lo que se cobra a cada alumno cuando el banco no trae justo lo que suman sus cuotas. */
-export function adjustedFees(fees: ReconciliationFee[], differenceCents: number) {
+export function adjustedFees(fees: ChosenFee[], differenceCents: number) {
   const shares = fees.length ? evenShares(differenceCents, fees.length) : [];
   return fees.map((f, i) => {
     const shareCents = shares[i] ?? 0;
@@ -429,7 +444,7 @@ export function acceptReconciliation(acceptance: ReconciliationAcceptance): Prom
 export function quoteReconciliationFee(
   studentId: string,
   day: string,
-): Promise<{ concept: string; amountCents: number }> {
+): Promise<{ monthly: FeeQuote | null; membership: FeeQuote | null }> {
   return apiGet(
     `/api/admin/accounting/reconciliation/fee?studentId=${encodeURIComponent(studentId)}&day=${day}`,
   );
