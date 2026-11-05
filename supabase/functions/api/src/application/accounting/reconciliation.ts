@@ -54,6 +54,10 @@ export interface BankMatchRepository {
   /** La categoría elegida para cada contraparte. */
   rules(): Promise<Map<string, string>>;
   saveRule(counterparty: string, category: string): Promise<void>;
+  /** Los alumnos a los que paga cada remitente de transferencias, según lo que se casó con ellas. */
+  payerStudents(): Promise<Map<string, string[]>>;
+  /** Añade alumnos a los que paga un remitente. */
+  savePayerStudents(counterparty: string, studentIds: string[]): Promise<void>;
 }
 
 /** Los nombres con los que puede aparecer en el banco quien paga a un alumno: el suyo y los de sus tutores. */
@@ -83,12 +87,12 @@ export interface FeePayments {
   register(studentId: string, date: string): Promise<string>;
 }
 
-/** Las operaciones de siempre con las que se aplica una sugerencia aceptada. */
+/**
+ * Las operaciones de siempre con las que se aplica una sugerencia aceptada. La conciliación nunca cambia la forma de
+ * pago: lo del banco solo casa con lo que ya es de tarjeta o transferencia (como mucho se corrige la fecha de un cobro).
+ */
 export interface ReconciliationActions {
   reschedulePayment(paymentId: string, date: string): Promise<void>;
-  changePaymentMethod(paymentId: string, method: string): Promise<void>;
-  /** Cambia la forma de pago de un movimiento del libro que no es un cobro (gasto, liquidación, apunte…). */
-  changeLineMethod(line: LedgerLine, method: string): Promise<void>;
   recordEntry(input: {
     date: string;
     kind: 'income' | 'expense';
@@ -223,24 +227,31 @@ const methodLabel = (method: string) =>
   ] ?? method;
 const dayLabel = (iso: string) => iso.split('-').reverse().join('/');
 
-/** Lo que cambia al pasar un cobro al banco: su forma de pago y, si se indica, su fecha. */
-function paymentChanges(items: readonly AppItem[], method: string, date: string | null): string[] {
-  return items.flatMap((i) => {
-    const parts: string[] = [];
-    if (i.method !== method) parts.push(`a ${methodLabel(method)}`);
-    if (date !== null && i.date !== date) parts.push(`al ${dayLabel(date)}`);
-    return parts.length
-      ? [`Pasar «${i.concept}» (${euros(i.amountCents)}) ${parts.join(' y ')}`]
-      : [];
-  });
+/** Lo que cambia al casar unos cobros: su fecha, si se indica (la forma de pago nunca). */
+function dateChanges(items: readonly AppItem[], date: string | null): string[] {
+  return items.flatMap((i) =>
+    date !== null && i.date !== date
+      ? [`Pasar «${i.concept}» (${euros(i.amountCents)}) al ${dayLabel(date)}`]
+      : []
+  );
 }
 
-/** La fecha a la que pasa un cobro por transferencia: la del banco si la de la app está lejos o no es transferencia. */
+/** La fecha a la que pasa un cobro por transferencia: la del banco si la de la app está lejos. */
 function transferDate(item: AppItem, movement: BankMovement): string | null {
-  return item.method !== 'transfer' ||
-      Math.abs(daysBetween(item.date, movement.operationDate)) > CLOSE_DAYS.transfer
+  return Math.abs(daysBetween(item.date, movement.operationDate)) > CLOSE_DAYS.transfer
     ? movement.operationDate
     : null;
+}
+
+/**
+ * La forma de pago que debe tener lo que casa con un movimiento: tarjeta para una liquidación del datáfono,
+ * transferencia para una transferencia recibida y cualquiera del banco para un pago (lo de efectivo, nunca).
+ */
+function fitsMovement(item: AppItem, kind: MovementKind): boolean {
+  if (kind === 'card_settlement') return item.method === 'card';
+  if (kind === 'income') return item.method === 'transfer';
+  if (kind === 'expense') return BANK_METHODS.has(item.method);
+  return true;
 }
 
 /** Los meses del libro que hay que mirar para un periodo: dos antes y dos después. */
@@ -305,8 +316,13 @@ export class ReconcileStatement {
     const names = await this.payers.names([
       ...new Set(lines.flatMap((l) => (l.studentId ? [l.studentId] : []))),
     ]);
-    const matcher = new Matcher(lines, transfers, stored, rules, names);
-    const items = await this.offerFees(matcher.run(statement.movements), statement.from);
+    const payerStudents = await this.matches.payerStudents();
+    const matcher = new Matcher(lines, transfers, stored, rules, names, payerStudents);
+    const items = await this.offerFees(
+      matcher.run(statement.movements),
+      statement.from,
+      payerStudents,
+    );
     await this.remember(items, stored);
     return {
       from: statement.from,
@@ -337,6 +353,7 @@ export class ReconcileStatement {
   private async offerFees(
     items: ReconciliationItem[],
     day: string,
+    payerStudents: Map<string, string[]>,
   ): Promise<ReconciliationItem[]> {
     const open = items.filter((i) => i.kind === 'income' && i.status === 'suggested');
     if (open.length === 0) return items;
@@ -344,7 +361,7 @@ export class ReconcileStatement {
     const result: ReconciliationItem[] = [];
     for (const item of items) {
       const fees = open.includes(item) && replaceable(item)
-        ? await this.feesFor(item.movement, payers)
+        ? await this.feesFor(item.movement, payers, payerStudents)
         : null;
       result.push(
         fees === null ? item : {
@@ -368,8 +385,16 @@ export class ReconcileStatement {
     return result;
   }
 
-  private async feesFor(m: BankMovement, payers: readonly Payer[]): Promise<FeeProposal[] | null> {
-    const named = payers.filter((p) => p.names.some((n) => nameScore(m.concept, n) >= 2));
+  /** Las cuotas de los alumnos de quien transfiere: los nombrados en el concepto y a los que ya pagó antes. */
+  private async feesFor(
+    m: BankMovement,
+    payers: readonly Payer[],
+    payerStudents: Map<string, string[]>,
+  ): Promise<FeeProposal[] | null> {
+    const remembered = new Set(payerStudents.get(counterparty(m.concept)) ?? []);
+    const named = payers.filter((p) =>
+      remembered.has(p.studentId) || p.names.some((n) => nameScore(m.concept, n) >= 2)
+    );
     const quoted: FeeProposal[] = [];
     for (const p of named) {
       const quote = await this.fees.quote(p.studentId, m.operationDate);
@@ -410,6 +435,7 @@ class Matcher {
     stored: readonly BankMatch[],
     private readonly rules: Map<string, string>,
     private readonly names: Map<string, string[]>,
+    private readonly payerStudents: Map<string, string[]>,
   ) {
     this.items = [...lines.map(toItem), ...transfers.map(transferItem)]
       .sort((a, b) => a.date.localeCompare(b.date) || a.sourceId.localeCompare(b.sourceId));
@@ -505,9 +531,15 @@ class Matcher {
     return student ? this.names.get(student) ?? [] : [];
   }
 
-  /** Cuánto se parece el concepto del banco a quien paga un cobro. */
+  /**
+   * Cuánto se parece el concepto del banco a quien paga un cobro: un alumno al que ya pagó ese remitente cuenta como su
+   * nombre.
+   */
   private score(m: BankMovement, i: AppItem): number {
-    return Math.max(0, ...this.namesOf(i).map((n) => nameScore(m.concept, n)));
+    const student = this.studentOf.get(i.sourceId);
+    const remembered = student !== undefined &&
+      (this.payerStudents.get(counterparty(m.concept)) ?? []).includes(student);
+    return Math.max(remembered ? 2 : 0, ...this.namesOf(i).map((n) => nameScore(m.concept, n)));
   }
 
   private near(i: AppItem, date: string, days: number): boolean {
@@ -696,11 +728,11 @@ class Matcher {
     return kind === 'income' ? this.suggestIncome(m) : this.suggestExpense(m);
   }
 
-  /** Los cobros que pueden completar una liquidación: los que no están ya en el banco, cerca de ese día. */
+  /** Lo cobrado con tarjeta otro día cercano que puede completar una liquidación (apuntado con otra fecha). */
   private settlementPool(day: string): AppItem[] {
-    return this.payments
+    return this.items
       .filter((p) =>
-        this.free(p) && !(p.method === 'card' && p.date === day) &&
+        this.free(p) && p.kind === 'income' && p.method === 'card' && p.date !== day &&
         this.near(p, day, CLOSE_DAYS.search)
       )
       .sort((a, b) => Math.abs(daysBetween(a.date, day)) - Math.abs(daysBetween(b.date, day)))
@@ -733,7 +765,7 @@ class Matcher {
         {
           proposal: {
             items: [...cards, ...chosen],
-            changes: paymentChanges(chosen, 'card', day),
+            changes: dateChanges(chosen, day),
             record: null,
             transfer: null,
             fees: [],
@@ -760,7 +792,9 @@ class Matcher {
   private suggestIncome(m: BankMovement): ReconciliationItem {
     const amount = m.amountCents;
     const pool = this.payments
-      .filter((p) => this.free(p) && this.near(p, m.operationDate, CLOSE_DAYS.search))
+      .filter((p) =>
+        this.free(p) && p.method === 'transfer' && this.near(p, m.operationDate, CLOSE_DAYS.search)
+      )
       .sort((a, b) =>
         this.score(m, b) - this.score(m, a) ||
         Math.abs(daysBetween(a.date, m.operationDate)) -
@@ -784,7 +818,7 @@ class Matcher {
         {
           proposal: {
             items: chosen,
-            changes: chosen.flatMap((i) => paymentChanges([i], 'transfer', transferDate(i, m))),
+            changes: chosen.flatMap((i) => dateChanges([i], transferDate(i, m))),
             record: null,
             transfer: null,
             fees: [],
@@ -811,7 +845,8 @@ class Matcher {
     const method = paidByCard(m) ? 'card' : 'transfer';
     const pool = this.items
       .filter((i) =>
-        this.free(i) && i.kind === 'expense' && this.near(i, m.operationDate, CLOSE_DAYS.search)
+        this.free(i) && i.kind === 'expense' && BANK_METHODS.has(i.method) &&
+        this.near(i, m.operationDate, CLOSE_DAYS.search)
       )
       .sort((a, b) =>
         Number(b.amountCents === amount) - Number(a.amountCents === amount) ||
@@ -829,9 +864,7 @@ class Matcher {
         {
           proposal: {
             items: [same],
-            changes: same.method === 'cash' || !BANK_METHODS.has(same.method)
-              ? [`Pasar «${same.concept}» (${euros(amount)}) a ${methodLabel(method)}`]
-              : [],
+            changes: [],
             record: null,
             transfer: null,
             fees: [],
@@ -856,10 +889,7 @@ class Matcher {
         {
           proposal: {
             items: chosen,
-            changes: chosen.filter((i) => !BANK_METHODS.has(i.method))
-              .map((i) =>
-                `Pasar «${i.concept}» (${euros(i.amountCents)}) a ${methodLabel(method)}`
-              ),
+            changes: [],
             record: null,
             transfer: null,
             fees: [],
@@ -925,16 +955,16 @@ export class AcceptReconciliation {
     const used = new Set(stored.flatMap((s) => s.targets.map(keyOf)));
     const kind = movementKind(m);
     const amount = Math.abs(m.amountCents);
-    const targets = await this.apply(m, kind, amount, input, used);
+    const { targets, students } = await this.apply(m, kind, amount, input, used);
     await this.matches.saveMatch(matchOf(m, targets));
+    if (students.length > 0) {
+      await this.matches.savePayerStudents(counterparty(m.concept), students);
+    }
   }
 
-  /** Cobra las cuotas elegidas, si entre todas suman el importe de la transferencia. */
-  private async chargeFees(
-    m: BankMovement,
-    kind: MovementKind,
-    studentIds: string[],
-  ): Promise<MatchTarget[]> {
+  /** Lo que costarían las cuotas elegidas; falla si alguna no se puede cobrar o hay alumnos repetidos. */
+  private async feesTotal(m: BankMovement, kind: MovementKind, studentIds: string[]) {
+    if (studentIds.length === 0) return 0;
     if (kind !== 'income') {
       throw new InvalidValue('fees', 'Solo se cobran cuotas con una transferencia recibida.');
     }
@@ -943,19 +973,13 @@ export class AcceptReconciliation {
     }
     let total = 0;
     for (const studentId of studentIds) {
-      total += (await this.fees.quote(studentId, m.operationDate))?.amountCents ?? 0;
+      const quote = await this.fees.quote(studentId, m.operationDate);
+      if (quote === null) {
+        throw new InvalidValue('fees', 'Algún alumno elegido no tiene ninguna cuota por cobrar.');
+      }
+      total += quote.amountCents;
     }
-    if (total !== m.amountCents) {
-      throw new InvalidValue('fees', 'Las cuotas no suman el importe del movimiento.');
-    }
-    const targets: MatchTarget[] = [];
-    for (const studentId of studentIds) {
-      targets.push({
-        source: 'payment',
-        sourceId: await this.fees.register(studentId, m.operationDate),
-      });
-    }
-    return targets;
+    return total;
   }
 
   private async apply(
@@ -964,8 +988,7 @@ export class AcceptReconciliation {
     amount: number,
     input: AcceptInput,
     used: Set<string>,
-  ): Promise<MatchTarget[]> {
-    if (input.fees.length > 0) return await this.chargeFees(m, kind, input.fees);
+  ): Promise<{ targets: MatchTarget[]; students: string[] }> {
     if (input.transfer) {
       if (kind !== 'cash_withdrawal' && kind !== 'cash_deposit') {
         throw new InvalidValue(
@@ -980,7 +1003,7 @@ export class AcceptReconciliation {
         amountCents: amount,
         note: 'Conciliación con el banco',
       });
-      return [{ source: 'transfer', sourceId: id }];
+      return { targets: [{ source: 'transfer', sourceId: id }], students: [] };
     }
     if (input.record) {
       if (kind !== 'income' && kind !== 'expense') {
@@ -996,22 +1019,30 @@ export class AcceptReconciliation {
         amountCents: amount,
       });
       await this.matches.saveRule(counterparty(m.concept), input.record.category);
-      return [{ source: 'manual', sourceId: id }];
+      return { targets: [{ source: 'manual', sourceId: id }], students: [] };
     }
-    return await this.link(m, kind, amount, input.items, used);
+    return await this.link(m, kind, amount, input, used);
   }
 
-  /** Casa el movimiento con lo elegido, pasándolo al banco (y al día de la liquidación, si es tarjeta). */
+  /**
+   * Casa el movimiento con lo elegido: cobros, gastos o traspasos que ya están en el banco (con la forma de pago que
+   * corresponde al movimiento; como mucho se corrige su fecha) y, en una transferencia, cuotas nuevas de los alumnos
+   * elegidos. Todo junto debe sumar el importe.
+   */
   private async link(
     m: BankMovement,
     kind: MovementKind,
     amount: number,
-    targets: MatchTarget[],
+    input: AcceptInput,
     used: Set<string>,
-  ): Promise<MatchTarget[]> {
-    if (targets.length === 0) throw new InvalidValue('items', 'Elige lo que le corresponde.');
+  ): Promise<{ targets: MatchTarget[]; students: string[] }> {
+    const targets = input.items;
+    if (targets.length === 0 && input.fees.length === 0) {
+      throw new InvalidValue('items', 'Elige lo que le corresponde.');
+    }
     const wanted = new Set(targets.map(keyOf));
     if (wanted.size !== targets.length) throw new InvalidValue('items', 'Hay elegidos repetidos.');
+    const feesCents = await this.feesTotal(m, kind, input.fees);
     const [first, last] = window(m.operationDate, m.operationDate);
     const lines = await this.ledger.linesBetween(first, last);
     const transfers = await this.transfers.transfersBetween(first.firstDay(), last.lastDay());
@@ -1030,7 +1061,7 @@ export class AcceptReconciliation {
         'Algo de lo elegido ya está casado con otro movimiento del banco.',
       );
     }
-    if (sum(chosen) !== amount) {
+    if (sum(chosen) + feesCents !== amount) {
       throw new InvalidValue('items', 'Lo elegido no suma el importe del movimiento.');
     }
     const expected = kind === 'expense'
@@ -1041,32 +1072,64 @@ export class AcceptReconciliation {
     if (chosen.some((i) => i.kind !== expected)) {
       throw new InvalidValue('items', 'Lo elegido no es del mismo tipo que el movimiento.');
     }
-    for (const item of chosen) {
-      if (kind === 'card_settlement') await this.toBank(item, 'card', settlementDay(m), lines);
-      else if (kind === 'income') await this.toBank(item, 'transfer', transferDate(item, m), lines);
-      else if (kind === 'expense' && !BANK_METHODS.has(item.method)) {
-        await this.toBank(item, paidByCard(m) ? 'card' : 'transfer', null, lines);
-      }
+    if (chosen.some((i) => !fitsMovement(i, kind))) {
+      throw new InvalidValue(
+        'items',
+        kind === 'card_settlement'
+          ? 'Una liquidación del datáfono solo casa con lo cobrado con tarjeta.'
+          : kind === 'income'
+          ? 'Una transferencia solo casa con cobros por transferencia.'
+          : 'Lo de efectivo no pasa por el banco: no se casa con un movimiento del extracto.',
+      );
     }
-    return chosen.map((i) => ({ source: i.source, sourceId: i.sourceId }));
-  }
-
-  private async toBank(
-    item: AppItem,
-    method: string,
-    date: string | null,
-    lines: readonly LedgerLine[],
-  ): Promise<void> {
-    if (item.source === 'payment') {
+    for (const item of chosen) {
+      if (item.source !== 'payment') continue;
+      const date = kind === 'card_settlement'
+        ? settlementDay(m)
+        : kind === 'income'
+        ? transferDate(item, m)
+        : null;
       if (date !== null && item.date !== date) {
         await this.actions.reschedulePayment(item.sourceId, date);
       }
-      if (item.method !== method) await this.actions.changePaymentMethod(item.sourceId, method);
-      return;
     }
-    if (item.method === method) return;
-    const line = lines.find((l) => l.source === item.source && l.sourceId === item.sourceId)!;
-    await this.actions.changeLineMethod(line, method);
+    const charged: MatchTarget[] = [];
+    for (const studentId of input.fees) {
+      charged.push({
+        source: 'payment',
+        sourceId: await this.fees.register(studentId, m.operationDate),
+      });
+    }
+    const studentOf = new Map(lines.map((l) => [`${l.source}:${l.sourceId}`, l.studentId]));
+    const students = kind === 'income'
+      ? [
+        ...new Set([
+          ...chosen.flatMap((i) => studentOf.get(keyOf(i)) ?? []),
+          ...input.fees,
+        ]),
+      ]
+      : [];
+    return {
+      targets: [...chosen.map((i) => ({ source: i.source, sourceId: i.sourceId })), ...charged],
+      students,
+    };
+  }
+}
+
+/** La cuota que se le cobraría a un alumno con una transferencia de ese día, para repartir una transferencia a mano. */
+export class QuoteFee {
+  constructor(private readonly fees: FeePayments) {}
+
+  async execute(studentId: string, day: string): Promise<FeeQuote> {
+    if (!/^[0-9a-f-]{36}$/i.test(studentId)) {
+      throw new InvalidValue('studentId', 'Elige un alumno.');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new InvalidValue('day', 'Fecha no válida.');
+    const quote = await this.fees.quote(studentId, day);
+    if (quote === null) {
+      throw new InvalidValue('studentId', 'Este alumno no tiene ninguna cuota por cobrar.');
+    }
+    return quote;
   }
 }
 

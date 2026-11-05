@@ -1,16 +1,16 @@
 import { InvalidValue } from '../../domain/common/mod.ts';
 import type { BankMovement } from '../../domain/accounting/reconciliation.ts';
-import { EditMovement, RecordEntry, RecordTransfer } from '../../application/accounting/mod.ts';
+import { RecordEntry, RecordTransfer } from '../../application/accounting/mod.ts';
 import {
   AcceptReconciliation,
   type FeePayments,
+  QuoteFee,
   ReconcileStatement,
   type ReconciliationActions,
   ReleaseMatch,
 } from '../../application/accounting/reconciliation.ts';
 import {
   BillingStudentNotFound,
-  ChangePaymentMethod,
   type PaymentRequest,
   ReschedulePayment,
 } from '../../application/billing/mod.ts';
@@ -51,33 +51,9 @@ function actions(api: ApiApp, scope: RequestScope): ReconciliationActions {
   const closed = new SqlClosedPeriods(scope.tx);
   const payments = new SqlPaymentRepository(scope.tx);
   const reconciled = new SqlReconciledItems(scope.tx);
-  const changePaymentMethod = (id: string, method: string) =>
-    new ChangePaymentMethod(payments, reconciled).execute(id, method);
   return {
     reschedulePayment: (id, date) =>
       new ReschedulePayment(payments, api.deps.clock, reconciled).execute(id, date),
-    changePaymentMethod,
-    changeLineMethod: (line, method) =>
-      new EditMovement(
-        accounting,
-        accounting,
-        closed,
-        accounting,
-        new SqlLedgerQuery(scope.tx),
-        accounting,
-        { changePaymentMethod },
-        reconciled,
-      ).execute({
-        source: line.source,
-        sourceId: line.sourceId,
-        month: line.date.slice(0, 7),
-        concept: line.concept,
-        category: line.category,
-        method,
-        amount: decimal(line.amountCents),
-        period: line.period,
-        shares: line.shares,
-      }),
     recordEntry: (input) =>
       new RecordEntry(accounting, closed, accounting).execute({
         date: input.date,
@@ -182,6 +158,18 @@ export function registerReconciliationRoutes(api: ApiApp): void {
         fees: b.stringList('fees'),
       });
       return c.body(null, 204);
+    },
+  );
+
+  // Lo que costaría cobrarle a un alumno su cuota con una transferencia de ese día, para repartirla a mano.
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/accounting/reconciliation/fee', access: 'superadmin' },
+    async (c, scope) => {
+      const fee = await new QuoteFee(feePayments(api, scope)).execute(
+        c.req.query('studentId') ?? '',
+        c.req.query('day') ?? '',
+      );
+      return c.json(fee);
     },
   );
 

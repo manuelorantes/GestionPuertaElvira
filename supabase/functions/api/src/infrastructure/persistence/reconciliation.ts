@@ -43,6 +43,25 @@ export class SqlBankMatchRepository implements BankMatchRepository {
       .sql`INSERT INTO accounting_bank_rule (counterparty, category) VALUES (${key}, ${category})
       ON CONFLICT (counterparty) DO UPDATE SET category = EXCLUDED.category`;
   }
+
+  async payerStudents(): Promise<Map<string, string[]>> {
+    const rows = await this.sql`SELECT counterparty, student_id FROM accounting_bank_payer`;
+    const map = new Map<string, string[]>();
+    for (const r of Row.all(rows)) {
+      const key = r.string('counterparty');
+      map.set(key, [...(map.get(key) ?? []), r.string('student_id')]);
+    }
+    return map;
+  }
+
+  async savePayerStudents(counterparty: string, studentIds: string[]): Promise<void> {
+    const key = [...counterparty].slice(0, 120).join('');
+    if (key === '') return;
+    for (const studentId of studentIds) {
+      await this.sql`INSERT INTO accounting_bank_payer (counterparty, student_id)
+        VALUES (${key}, ${studentId}) ON CONFLICT DO NOTHING`;
+    }
+  }
 }
 
 function targetsOf(value: unknown): MatchTarget[] {

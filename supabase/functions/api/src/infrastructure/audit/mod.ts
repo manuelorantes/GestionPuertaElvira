@@ -145,6 +145,7 @@ export class AuditLabels {
     accounting_invoice: 'Factura de proveedor',
     accounting_bank_match: 'Movimiento del banco conciliado',
     accounting_bank_rule: 'Categoría recordada al conciliar',
+    accounting_bank_payer: 'Alumno recordado de quien transfiere',
     accounting_transfer: 'Traspaso entre caja y banco',
     attendance_absence: 'Falta a clase',
     attendance_comment: 'Comentario de clase',
