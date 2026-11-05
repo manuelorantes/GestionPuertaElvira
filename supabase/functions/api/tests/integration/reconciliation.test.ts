@@ -369,3 +369,36 @@ Deno.test('reconciliation should charge a provisional member the membership fee 
     );
   });
 });
+
+Deno.test('reconciliation should tell what is left to reconcile in the app and in the bank', async () => {
+  await atTime('2025-10-25T10:00:00+02:00', async () => {
+    const { superadmin, admin } = await clients();
+    await superadmin.json('POST', '/api/admin/accounting/entries', {
+      date: '2025-10-01',
+      kind: 'expense',
+      concept: 'Alquiler',
+      category: 'rent',
+      method: 'transfer',
+      amount: '50',
+    });
+    await superadmin.json('POST', '/api/admin/accounting/entries', {
+      date: '2025-10-03',
+      kind: 'expense',
+      concept: 'Cuerdas',
+      category: 'other_expenses',
+      method: 'card',
+      amount: '12',
+    });
+    await superadmin.json('POST', '/api/admin/accounting/reconciliation', { movements: MOVEMENTS });
+    const pending = await superadmin.get('/api/admin/accounting/reconciliation/pending');
+    assertEquals(pending.status, 200, JSON.stringify(pending.body));
+    const view = pending.body as {
+      app: { totalCents: number; items: { concept: string; amountCents: number }[] };
+      bank: { totalCents: number; items: { concept: string; amountCents: number }[] };
+    };
+    assertEquals(view.app.items.map((i) => [i.concept, i.amountCents]), [['Cuerdas', -1200]]);
+    assertEquals(view.bank.items.map((m) => m.amountCents), [-20_000, -4376]);
+    assertEquals(view.bank.totalCents, -24_376);
+    assertError(await admin.get('/api/admin/accounting/reconciliation/pending'), 403, 'forbidden');
+  });
+});

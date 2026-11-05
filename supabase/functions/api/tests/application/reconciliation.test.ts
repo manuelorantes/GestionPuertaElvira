@@ -8,6 +8,7 @@ import {
   type BankMatchRepository,
   type FeePayments,
   MovementAlreadyMatched,
+  PendingReconciliation,
   ReconcileStatement,
   type ReconciliationActions,
   ReleaseMatch,
@@ -31,6 +32,15 @@ class Memory implements BankMatchRepository {
   saveRule(counterparty: string, category: string) {
     this.ruleMap.set(counterparty, category);
     return Promise.resolve();
+  }
+  stored: BankMovement[] = [];
+  saveMovements(movements: readonly BankMovement[]) {
+    const keys = new Set(this.stored.map((m) => JSON.stringify(m)));
+    this.stored.push(...movements.filter((m) => !keys.has(JSON.stringify(m))));
+    return Promise.resolve();
+  }
+  movements() {
+    return Promise.resolve([...this.stored]);
   }
   payers = new Map<string, string[]>();
   payerStudents() {
@@ -699,4 +709,69 @@ Deno.test('AcceptReconciliation should charge a membership fee and leave the res
     'payment-pedro',
     'credit-pedro',
   ]);
+});
+
+Deno.test('AcceptReconciliation should complete what was chosen with a new record for the rest', async () => {
+  const { reconcile, accept, calls, memory } = setUp([payment('p1', '2026-09-10', 'card', 9000)]);
+  const movement =
+    (await reconcile(statement(['2026-09-11', 'Liquidacion Efectuada El 10/09/2026', 10500])))
+      .items[0]!.movement;
+  const choose = (items: string[]) =>
+    accept.execute({
+      movement,
+      items: items.map((sourceId) => ({ source: 'payment', sourceId })),
+      record: { concept: 'Venta de libros', category: 'other_income' },
+      transfer: false,
+      fees: [],
+      adjust: false,
+    });
+  await choose(['p1']);
+  assertEquals(calls, ['apunte income 1500 other_income card']);
+  assertEquals(memory.saved.at(-1)!.targets, [
+    { source: 'payment', sourceId: 'p1' },
+    { source: 'manual', sourceId: 'entry-1' },
+  ]);
+});
+
+Deno.test('AcceptReconciliation should refuse a record when what was chosen already adds up', async () => {
+  const { reconcile, accept } = setUp([payment('p1', '2026-09-08', 'card', 9000)]);
+  const movement =
+    (await reconcile(statement(['2026-09-11', 'Liquidacion Efectuada El 10/09/2026', 9000])))
+      .items[0]!.movement;
+  await assertRejects(
+    () =>
+      accept.execute({
+        movement,
+        items: [{ source: 'payment', sourceId: 'p1' }],
+        record: { concept: 'Nada', category: 'other_income' },
+        transfer: false,
+        fees: [],
+        adjust: false,
+      }),
+    InvalidValue,
+    'nada que apuntar',
+  );
+});
+
+Deno.test('PendingReconciliation should list what is not matched in the app and in the uploaded statements', async () => {
+  const { fx, reconcile, memory } = setUp([
+    payment('p1', '2026-10-01', 'transfer', 5500, 'pedro'),
+    payment('p2', '2026-10-02', 'transfer', 3000),
+    payment('p3', '2026-10-02', 'cash', 2000),
+    expense('e1', '2026-10-05', 'card', 1200),
+  ]);
+  await reconcile(statement(
+    ['2026-10-03', 'Transferencia De Pedro Sanz, Concepto Octubre', 5500],
+    ['2026-10-04', 'Transferencia De Quien Sea, Concepto Nada', 700],
+  ));
+  const view = await new PendingReconciliation(fx, fx, memory, fx.clock).execute();
+  assertEquals(view.app.items.map((i) => [i.sourceId, i.amountCents]), [['p2', 3000], [
+    'e1',
+    -1200,
+  ]]);
+  assertEquals(view.app.totalCents, 1800);
+  assertEquals(view.bank.items.map((m) => [m.concept, m.amountCents]), [
+    ['Transferencia De Quien Sea, Concepto Nada', 700],
+  ]);
+  assertEquals(view.bank.totalCents, 700);
 });

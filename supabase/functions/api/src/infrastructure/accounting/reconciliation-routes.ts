@@ -4,6 +4,7 @@ import { RecordEntry, RecordTransfer } from '../../application/accounting/mod.ts
 import {
   AcceptReconciliation,
   type FeePayments,
+  PendingReconciliation,
   QuoteFee,
   ReconcileStatement,
   type ReconciliationActions,
@@ -184,6 +185,20 @@ export function registerReconciliationRoutes(api: ApiApp): void {
         adjust: b.bool('adjust'),
       });
       return c.body(null, 204);
+    },
+  );
+
+  // Lo que queda sin conciliar en la app y en el banco (de los extractos ya subidos).
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/accounting/reconciliation/pending', access: 'superadmin' },
+    async (c, scope) => {
+      const view = await new PendingReconciliation(
+        new SqlLedgerQuery(scope.tx),
+        new SqlTransferRepository(scope.tx),
+        new SqlBankMatchRepository(scope.tx),
+        api.deps.clock,
+      ).execute();
+      return c.json(view);
     },
   );
 

@@ -6,6 +6,7 @@ import type {
   PayerNames,
 } from '../../application/accounting/reconciliation.ts';
 import type { ReconciledItems } from '../../application/common/mod.ts';
+import { type BankMovement, movementKey } from '../../domain/accounting/reconciliation.ts';
 import { Row, type Sql } from './sql.ts';
 
 export class SqlBankMatchRepository implements BankMatchRepository {
@@ -42,6 +43,29 @@ export class SqlBankMatchRepository implements BankMatchRepository {
     await this
       .sql`INSERT INTO accounting_bank_rule (counterparty, category) VALUES (${key}, ${category})
       ON CONFLICT (counterparty) DO UPDATE SET category = EXCLUDED.category`;
+  }
+
+  async saveMovements(movements: readonly BankMovement[]): Promise<void> {
+    for (const m of movements) {
+      await this.sql`INSERT INTO accounting_bank_movement
+          (movement_key, operation_date, value_date, concept, amount_cents, balance_cents)
+        VALUES (${movementKey(m)}, ${m.operationDate}, ${m.valueDate},
+          ${[...m.concept].slice(0, 300).join('')}, ${m.amountCents}, ${m.balanceCents})
+        ON CONFLICT (movement_key) DO NOTHING`;
+    }
+  }
+
+  async movements(): Promise<BankMovement[]> {
+    const rows = await this.sql`SELECT operation_date::text AS operation_date,
+        value_date::text AS value_date, concept, amount_cents, balance_cents
+      FROM accounting_bank_movement ORDER BY operation_date, movement_key`;
+    return Row.all(rows).map((r) => ({
+      operationDate: r.string('operation_date'),
+      valueDate: r.string('value_date'),
+      concept: r.string('concept'),
+      amountCents: r.int('amount_cents'),
+      balanceCents: r.int('balance_cents'),
+    }));
   }
 
   async payerStudents(): Promise<Map<string, string[]>> {
