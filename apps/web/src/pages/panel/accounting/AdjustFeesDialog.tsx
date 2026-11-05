@@ -1,4 +1,4 @@
-import { adjustedFees, type ReconciliationFee } from '@/features/accounting/api';
+import { adjustedFees, type ChosenFee } from '@/features/accounting/api';
 import { formatCents } from '@/features/billing/money';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
@@ -17,7 +17,7 @@ export function AdjustFeesDialog({
   onConfirm,
   onCancel,
 }: {
-  fees: ReconciliationFee[];
+  fees: ChosenFee[];
   bankCents: number;
   differenceCents: number;
   busy: boolean;
