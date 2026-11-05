@@ -44,6 +44,9 @@ decidiendo cada cambio.
   Los alumnos a los que paga cada remitente (sacado del concepto, como la contraparte) se recuerdan en
   `accounting_bank_payer` al casar su transferencia y la próxima vez cuentan como si salieran en el concepto,
   así que se propone cobrarles; siempre se acepta a mano.
+  Si lo que llega no es justo lo que suman las cuotas elegidas, la diferencia se reparte a partes iguales con una
+  corrección en cada recibo (como al corregir un importe en Cobros): lo de más es saldo a favor y lo de menos queda
+  pendiente. Se confirma antes, porque cambia lo que debe cada alumno.
 - La categoría elegida al apuntar un gasto o un ingreso se recuerda por contraparte (quien cobra o paga, sacado del
   concepto) en `accounting_bank_rule`, para proponerla la próxima vez.
 - Solo superadministración usa la conciliación: cambia cobros y gastos de muchas personas de golpe.
