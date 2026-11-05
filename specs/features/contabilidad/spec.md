@@ -98,6 +98,8 @@ lista de lo que cambia («Importe: 45,00 € → 40,00 €»). No se pueden edit
   del resumen): el recibo, las cuotas del alumno y la nómina del profesor no cambian, y el movimiento queda marcado como
   «Corregido en contabilidad». La confirmación MUST avisar de ello. La forma de pago de un cobro es la excepción: cambia
   también en el cobro y en su recibo.
+- En lo conciliado con el banco, la forma de pago y el importe MUST NOT poder cambiarse
+  (el concepto, la categoría y los meses sí).
 
 #### Scenario: Corregir un cobro en contabilidad
 - **WHEN** administración edita un cobro de 45 € en efectivo y lo deja en 40 € por transferencia, y confirma
@@ -363,6 +365,14 @@ aunque los extractos se solapen o el siguiente no incluya ese movimiento.
 Un movimiento que cuadra MUST poderse **deshacer**: deja de estar casado, lo suyo queda libre,
 y en las siguientes pasadas ya no casa solo: sale con su sugerencia para aceptarla o elegir a mano lo que le corresponde.
 Lo que no se acepta no se hace y MUST volver a salir igual al subir de nuevo un extracto que lo incluya.
+
+Lo casado con un movimiento del extracto (cobros, apuntes, facturas y traspasos) queda **conciliado**:
+- MUST verse marcado «Conciliado» en el registro de cobros y en los movimientos de Contabilidad;
+  los cobros y movimientos con tarjeta o transferencia aún sin casar se marcan «Sin conciliar»
+  y los de efectivo no llevan marca, porque no pasan por el banco;
+- MUST NOT poder cambiar su forma de pago, su fecha ni su importe, ni borrarse,
+  desde ninguna parte de la app; solo deshaciendo antes su conciliación;
+- no se ofrece a ningún otro movimiento del extracto.
 La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse la próxima vez.
 
 #### Scenario: Liquidación del datáfono que cuadra
@@ -415,6 +425,11 @@ La categoría elegida para un concepto (por quien cobra o paga) MUST proponerse 
   cuesta 55 € y en la app no hay ningún cobro suyo que casar (o solo el de octubre, ya por transferencia)
 - **THEN** se sugiere cobrar a Ana la cuota de noviembre por transferencia el 03/11; al aceptarlo, el cobro queda
   registrado con su recibo y el movimiento cuadra
+
+#### Scenario: Lo conciliado no se toca
+- **WHEN** una transferencia ha casado con el cobro de octubre de Ana y alguien intenta pasar ese cobro a efectivo,
+  cambiarle la fecha o el importe, o borrarlo
+- **THEN** se rechaza explicando que está conciliado con el banco; tras deshacer la conciliación, sí se puede
 
 #### Scenario: Deshacer un casamiento
 - **WHEN** una transferencia cuadra con el cobro de otra familia y superadministración pulsa «Deshacer»

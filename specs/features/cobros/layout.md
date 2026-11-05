@@ -28,7 +28,7 @@ BillingPage (/panel/cobros)
 │           - vencida: «WhatsApp» (outline, icono message-circle) + «Cobrar»
 │           - cobrada: «Recibo» (icono printer, abre el recibo)
 ├── PaymentsTab
-│   └── PaymentsTable: Fecha | Recibo | Alumno | Concepto | Forma de pago (icono banknote o landmark) | Importe | botón «Ver recibo» (printer)
+│   └── PaymentsTable: Fecha | Recibo | Alumno | Concepto | Forma de pago (icono banknote o landmark; Badge «Conciliado» o «Sin conciliar» si es tarjeta o transferencia) | Importe | botón «Ver recibo» (printer)
 │       └── badge «Factura F-2026-0001» si la tiene
 ├── SettingsTab (formulario en tres tarjetas, con «Guardar ajustes» al pie)
 │   ├── Tarjeta «Cuotas de clases»: 3 h o más · 2 h · 1 h y media · 1 h (€ al mes) · Cuota de socio (€ por temporada)
@@ -46,7 +46,7 @@ BillingPage (/panel/cobros)
 │   └── Pie: Cancelar | «Guardar cobro»
 ├── ReceiptDialog («Recibo»)
 │   ├── Hoja imprimible: logo + «Club Ajedrez Puerta Elvira» + «Recibo R-2026-0001 · 3 oct 2026» + NIF del club;
-│   │   Alumno · Pagado por · Concepto; líneas; Total; «Forma de pago: Transferencia»
+│   │   Alumno · Pagado por · Concepto; líneas; Total; «Forma de pago: Transferencia» (y, si está conciliado, «Conciliado con el banco…», sin Editar ni Borrar)
 │   ├── Si tiene factura: bloque «Factura F-2026-0001» con cliente, NIF, dirección, base imponible, IVA 21 % y total
 │   ├── Pie: Cerrar | «Borrar» y «Editar» (solo superadministración) | «Emitir factura» (si no la tiene) | «Imprimir» (icono printer)
 │   ├── EditPaymentDialog («Editar el cobro <recibo>»): Fecha · Forma de pago · Importe (€) · Motivo (obligatorio si cambia el importe); Cancelar | Guardar
