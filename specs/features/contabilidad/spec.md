@@ -404,7 +404,8 @@ Los movimientos de cada extracto subido MUST guardarse, y bajo los saldos del cl
 superadministración MUST ver lo que queda **sin conciliar** a cada lado:
 - **En la app**: lo de tarjeta y transferencia del ejercicio en curso (y los traspasos entre caja y banco) que no está
   casado con el banco, sumado con signo (lo que entra en el banco suma y lo que sale resta);
-- **En el banco**: las líneas de los extractos subidos que no casan con nada de la app, sumadas igual.
+- **En el banco**: las líneas de los extractos subidos del ejercicio en curso que no casan con nada de la app,
+  sumadas igual; las anteriores al 1 de septiembre son de antes de abrir la temporada y no salen.
 Cada lado MUST poderse desplegar para ver su lista: en la app, día, concepto, forma de pago e importe con signo;
 en el banco, día, concepto del banco e importe.
 Lo casado en cualquier ronda (también lo cobrado de más o de menos y lo apuntado nuevo) sale de las dos listas.
@@ -414,6 +415,10 @@ Lo casado en cualquier ronda (también lo cobrado de más o de menos y lo apunta
   y el último extracto subido trae una transferencia de 7 € que no casa con nada
 - **THEN** «En la app sin conciliar» suma 18 € (30 € y −12 €) y «En el banco sin conciliar» suma 7 €,
   y al desplegarlos salen esas líneas
+
+#### Scenario: Lo del banco de antes de la temporada no queda sin conciliar
+- **WHEN** el extracto subido trae una transferencia del 31/08 y otra del 01/09 que no casan con nada
+- **THEN** «En el banco sin conciliar» solo lleva la del 01/09
 
 #### Scenario: Liquidación del datáfono que cuadra
 - **WHEN** el extracto trae «Liquidación efectuada el 24/09/2026» por 648 € y ese día hay en la app dos cobros con
