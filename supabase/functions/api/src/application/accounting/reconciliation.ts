@@ -1303,8 +1303,10 @@ export class PendingReconciliation {
           : i.amountCents,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
+    // Lo del banco anterior a la temporada no se concilia: es de antes de abrirla.
+    const seasonStart = first.firstDay().toString();
     const bank = (await this.matches.movements())
-      .filter((m) => !matched.has(movementKey(m)))
+      .filter((m) => m.operationDate >= seasonStart && !matched.has(movementKey(m)))
       .sort((a, b) => a.operationDate.localeCompare(b.operationDate));
     const total = (amounts: number[]) => amounts.reduce((a, b) => a + b, 0);
     return {

@@ -775,3 +775,14 @@ Deno.test('PendingReconciliation should list what is not matched in the app and 
   ]);
   assertEquals(view.bank.totalCents, 700);
 });
+
+Deno.test('PendingReconciliation should leave out bank movements from before the season starts', async () => {
+  const { fx, reconcile, memory } = setUp([]);
+  await reconcile(statement(
+    ['2026-08-31', 'Transferencia De Quien Sea, Concepto Agosto', 900],
+    ['2026-09-01', 'Transferencia De Quien Sea, Concepto Septiembre', 700],
+  ));
+  const view = await new PendingReconciliation(fx, fx, memory, fx.clock).execute();
+  assertEquals(view.bank.items.map((m) => m.operationDate), ['2026-09-01']);
+  assertEquals(view.bank.totalCents, 700);
+});
