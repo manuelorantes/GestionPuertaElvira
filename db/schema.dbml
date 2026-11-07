@@ -103,7 +103,7 @@ Table classes_group {
   days json [not null, note: 'días ISO 1–5 (lunes–viernes), ordenados']
   start_minutes smallint [not null, note: 'minutos desde medianoche, 960–1260, múltiplo de 30']
   end_minutes smallint [not null, note: 'mayor que start_minutes']
-  classroom smallint [not null, note: '1 | 2']
+  classroom varchar(10) [not null, note: 'alfil | caballo | peon | rey']
   capacity smallint [not null, note: '1–30']
 
   indexes {

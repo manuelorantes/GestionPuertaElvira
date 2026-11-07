@@ -1,12 +1,12 @@
 # Clases
 
-Grupos de clase del club, su horario semanal en las tres aulas (Alfil, Caballo y Peón) y su ocupación.
+Grupos de clase del club, su horario semanal en las cuatro aulas (Alfil, Caballo, Peón y Rey Batallador) y su ocupación.
 Solo administración puede verlos y gestionarlos.
 
 ### Requirement: Grupos
 Cada grupo MUST tener nivel (iniciación, intermedio, avanzado o particular),
 profesor activo, uno o más días de lunes a viernes, hora de inicio y de fin entre las 16:00 y las 21:00
-en medias horas, aula (Alfil, Caballo o Peón) y plazas (1–30). El nombre (2–80 caracteres) es opcional:
+en medias horas, aula (Alfil, Caballo, Peón o Rey Batallador) y plazas (1–30). El nombre (2–80 caracteres) es opcional:
 sin nombre, el grupo se llama por su día, hora de inicio, nivel y aula («Lunes 17:00 · Iniciación · Peón»,
 «Lunes y miércoles 18:30 · Intermedio · Alfil»), y ese nombre MUST seguir a esos datos cuando cambien.
 
@@ -30,13 +30,23 @@ sin nombre, el grupo se llama por su día, hora de inicio, nivel y aula («Lunes
 - **WHEN** administración cambia los datos de un grupo
 - **THEN** el horario y la lista reflejan los cambios
 
-### Requirement: Sin conflictos de aula
-El sistema MUST impedir dos grupos en la misma aula que coincidan en algún día y franja horaria.
+### Requirement: Aula compartida con confirmación
+Varios grupos MAY coincidir en la misma aula, día y franja horaria, sin límite,
+pero el sistema MUST pedir confirmación antes de guardar un grupo que coincida con otros.
+Al editar, solo se pide confirmación por los grupos con los que el cambio hace coincidir y antes no coincidía.
 Dos grupos seguidos (uno termina cuando empieza el otro) no coinciden.
 
-#### Scenario: Conflicto de aula
-- **WHEN** un grupo nuevo o editado coincide en aula, día y hora con otro
-- **THEN** el sistema no lo guarda e indica con qué grupo coincide y en qué horario
+#### Scenario: Coincidencia sin confirmar
+- **WHEN** un grupo nuevo o editado coincide en aula, día y hora con otros y no se ha confirmado
+- **THEN** el sistema no lo guarda, indica con qué grupos coincide y en qué horario, y pregunta si compartir el aula
+
+#### Scenario: Coincidencia confirmada
+- **WHEN** administración confirma que el grupo comparte el aula
+- **THEN** el sistema lo guarda, aunque coincida con uno o varios grupos
+
+#### Scenario: Edición de un grupo que ya compartía aula
+- **WHEN** se edita un grupo que ya compartía aula sin hacerlo coincidir con ningún grupo nuevo
+- **THEN** el sistema lo guarda sin pedir confirmación
 
 #### Scenario: Misma hora en otra aula
 - **WHEN** un grupo coincide en día y hora con otro, pero en otra aula
@@ -54,21 +64,30 @@ Los grupos de nivel «particular» son siempre «Particular».
 ### Requirement: Horario semanal
 El sistema MUST mostrar, por día y aula, cada grupo en su franja de 16:00 a 21:00,
 con su nombre, horas, profesor y ocupación, coloreado por nivel y con una leyenda de niveles.
-Un aula sin ningún grupo en todo el día no se muestra ese día,
-y un día sin grupos en ninguna de las aulas mostradas tampoco se muestra.
-Si no hay ningún grupo que mostrar, se ven todos los días vacíos.
+Los grupos que coinciden en aula y hora se muestran uno al lado del otro, bajo una sola cabecera del aula.
+En la vista de todas las aulas, un aula sin ningún grupo en todo el día no se muestra ese día,
+y un día sin grupos en ninguna aula tampoco se muestra; si no hay ningún grupo, se ven de lunes a viernes vacíos.
+En la vista de un aula se ven siempre los siete días, de lunes a domingo, aunque no tengan grupos.
 
 #### Scenario: Consultar el horario
 - **WHEN** administración abre «Clases»
-- **THEN** ve el horario semanal de las tres aulas y puede abrir cualquier grupo para editarlo
+- **THEN** ve el horario semanal de las cuatro aulas y puede abrir cualquier grupo para editarlo
 
 #### Scenario: Aula vacía un día
 - **WHEN** el lunes hay grupos en las aulas Alfil y Peón, pero ninguno en la Caballo
 - **THEN** el lunes muestra solo las columnas Alfil y Peón
 
 #### Scenario: Día sin grupos
-- **WHEN** el martes no hay ningún grupo en las aulas mostradas
-- **THEN** el martes no aparece en el horario
+- **WHEN** el martes no hay ningún grupo en ninguna aula
+- **THEN** el martes no aparece en la vista de todas las aulas
+
+#### Scenario: Vista de un aula
+- **WHEN** administración elige un aula concreta
+- **THEN** ve de lunes a domingo, con los días sin grupos vacíos
+
+#### Scenario: Grupos que comparten aula
+- **WHEN** dos grupos coinciden el lunes de 17:00 a 18:00 en el aula Alfil
+- **THEN** el lunes muestra los dos grupos uno al lado del otro, bajo una sola cabecera «Alfil»
 
 ### Requirement: Ocupación
 La ocupación de un grupo MUST contarse por día: cada inscripción activa ocupa plaza los días a los que
