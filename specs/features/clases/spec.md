@@ -54,10 +54,21 @@ Los grupos de nivel «particular» son siempre «Particular».
 ### Requirement: Horario semanal
 El sistema MUST mostrar, por día y aula, cada grupo en su franja de 16:00 a 21:00,
 con su nombre, horas, profesor y ocupación, coloreado por nivel y con una leyenda de niveles.
+Un aula sin ningún grupo en todo el día no se muestra ese día,
+y un día sin grupos en ninguna de las aulas mostradas tampoco se muestra.
+Si no hay ningún grupo que mostrar, se ven todos los días vacíos.
 
 #### Scenario: Consultar el horario
 - **WHEN** administración abre «Clases»
 - **THEN** ve el horario semanal de las tres aulas y puede abrir cualquier grupo para editarlo
+
+#### Scenario: Aula vacía un día
+- **WHEN** el lunes hay grupos en las aulas Alfil y Peón, pero ninguno en la Caballo
+- **THEN** el lunes muestra solo las columnas Alfil y Peón
+
+#### Scenario: Día sin grupos
+- **WHEN** el martes no hay ningún grupo en las aulas mostradas
+- **THEN** el martes no aparece en el horario
 
 ### Requirement: Ocupación
 La ocupación de un grupo MUST contarse por día: cada inscripción activa ocupa plaza los días a los que
