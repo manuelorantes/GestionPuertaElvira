@@ -71,6 +71,7 @@ export class BillingFixture
       name?: string;
       regularHours?: number;
       privateLessons?: PrivateEnrolment[];
+      specialClasses?: BillingStudent['specialClasses'];
       siblings?: boolean;
     } = {},
   ): string {
@@ -83,6 +84,7 @@ export class BillingFixture
       hasSiblings: options.siblings ?? false,
       regularWeeklyHours: options.regularHours ?? 2,
       privateLessons: options.privateLessons ?? [],
+      specialClasses: options.specialClasses ?? [],
     });
     return id;
   }

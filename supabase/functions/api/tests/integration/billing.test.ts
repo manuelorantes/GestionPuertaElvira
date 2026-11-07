@@ -889,3 +889,82 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name:
+    'only superadministration sets the price of a special class or of a student, and fees follow it',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const groups =
+      body<{ items: { id: string }[] }>(await fx.client.get('/api/admin/groups')).items;
+    const group = groups[0]!.id;
+    const fee = async () =>
+      body<{ monthlyFeeCents: number; fixedPrice: string | null }>(
+        await fx.client.get(`/api/admin/billing/accounts/${fx.student}`),
+      );
+    assertEquals((await fee()).monthlyFeeCents, 4500);
+
+    // Administración no puede.
+    assertError(
+      await fx.client.json('PUT', `/api/admin/billing/groups/${group}/price`, {
+        monthlyPrice: '50',
+      }),
+      403,
+      'forbidden',
+    );
+    assertError(
+      await fx.client.json('PUT', `/api/admin/billing/accounts/${fx.student}/price`, {
+        monthlyPrice: '60',
+      }),
+      403,
+      'forbidden',
+    );
+
+    await createUser('super@club.es', 'superadministrator');
+    const superadmin = new ApiClient();
+    await superadmin.logIn('super@club.es');
+
+    // Clase especial: su único grupo pasa a costar 50 € y deja de contar para el tramo.
+    const setGroup = (monthlyPrice: string | null) =>
+      superadmin.json('PUT', `/api/admin/billing/groups/${group}/price`, { monthlyPrice });
+    assertEquals((await setGroup('50')).status, 204);
+    assertEquals((await fee()).monthlyFeeCents, 5000);
+    const shown = body<{ specialPriceCents: number | null }>(
+      await fx.client.get(`/api/admin/groups/${group}`),
+    );
+    assertEquals(shown.specialPriceCents, 5000);
+
+    // El precio del alumno manda sobre la clase especial; quitarlo vuelve a ella.
+    const fix = (monthlyPrice: string | null) =>
+      superadmin.json('PUT', `/api/admin/billing/accounts/${fx.student}/price`, { monthlyPrice });
+    assertEquals((await fix('60')).status, 204);
+    assertEquals(await fee(), { ...(await fee()), monthlyFeeCents: 6000, fixedPrice: '60.00' });
+    assertEquals((await fix(null)).status, 204);
+    assertEquals((await fee()).monthlyFeeCents, 5000);
+    assertEquals((await setGroup(null)).status, 204);
+    assertEquals((await fee()).monthlyFeeCents, 4500);
+
+    assertError(await setGroup('abc'), 422, 'unprocessable');
+    assertError(
+      await superadmin.json(
+        'PUT',
+        '/api/admin/billing/groups/01990000-0000-7000-8000-000000000000/price',
+        { monthlyPrice: '50' },
+      ),
+      404,
+      'not_found',
+    );
+
+    // Las cuotas del mes se recalculan y queda en el historial, en Cuotas.
+    const history = body<{ items: { category: string; label: string }[] }>(
+      await superadmin.get('/api/admin/audit/actions'),
+    ).items;
+    assertEquals(history.slice(0, 4).map((h) => [h.category, h.label]), [
+      ['charges', 'Fijar el precio de una clase especial'],
+      ['charges', 'Fijar el precio de un alumno'],
+      ['charges', 'Fijar el precio de un alumno'],
+      ['charges', 'Fijar el precio de una clase especial'],
+    ]);
+  },
+});

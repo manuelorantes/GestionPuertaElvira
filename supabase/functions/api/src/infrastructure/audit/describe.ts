@@ -165,6 +165,8 @@ export function titleOf(
         `${CHARGE_KIND[text(row, 'kind') ?? ''] ?? 'Cuota'} de ${monthLabel(text(row, 'period'))}`,
         student(),
       );
+    case 'billing_special_class_price':
+      return group();
     case 'billing_account':
     case 'students_past_membership':
     case 'points_photo':

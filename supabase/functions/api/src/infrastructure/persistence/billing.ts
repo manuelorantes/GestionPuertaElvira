@@ -29,6 +29,7 @@ import type {
   PaymentRepository,
   PaymentSummary,
   PrivateEnrolment,
+  SpecialClassPrices,
   StudentAccountRepository,
   StudentDirectory,
 } from '../../application/billing/mod.ts';
@@ -127,6 +128,9 @@ function toAccount(row: Row): StudentAccount {
     row.bool('member'),
     rate === null ? null : Money.cents(rate),
     row.stringList('unbilled_months').map((m) => YearMonth.fromString(m)),
+    row.nullableInt('fixed_price_cents') === null
+      ? null
+      : Money.cents(row.int('fixed_price_cents')),
   );
 }
 
@@ -152,10 +156,18 @@ export class SqlStudentAccountRepository implements StudentAccountRepository {
       member: account.isMember(),
       private_rate_cents: account.privateRate()?.cents ?? null,
       unbilled_months: this.sql.json(account.unbilledMonths().map((m) => m.toString())),
+      fixed_price_cents: account.fixedPrice()?.cents ?? null,
     };
     await this.sql`INSERT INTO billing_account ${this.sql(record)}
       ON CONFLICT (student_id) DO UPDATE SET ${
-      this.sql(record, 'preferred_plan', 'member', 'private_rate_cents', 'unbilled_months')
+      this.sql(
+        record,
+        'preferred_plan',
+        'member',
+        'private_rate_cents',
+        'unbilled_months',
+        'fixed_price_cents',
+      )
     }`;
   }
 }
@@ -543,6 +555,35 @@ export class SqlBillingQuery implements BillingQuery {
 /**
  * Perfil de facturación a partir de Alumnado (tutor, hermanos) y Clases (horas semanales por tipo de grupo).
  */
+/** Precio mensual de las clases especiales, en su propia tabla de cobros. */
+export class SqlSpecialClassPrices implements SpecialClassPrices {
+  constructor(private readonly sql: Sql) {}
+
+  async levelOf(groupId: string): Promise<string | null> {
+    const rows = await this.sql`SELECT level FROM classes_group WHERE id::text = ${groupId}`;
+    return rows[0] ? new Row(rows[0]).string('level') : null;
+  }
+
+  async setPrice(groupId: string, price: Money | null): Promise<void> {
+    if (price === null) {
+      await this.sql`DELETE FROM billing_special_class_price WHERE group_id = ${groupId}`;
+      return;
+    }
+    await this.sql`INSERT INTO billing_special_class_price (group_id, monthly_price_cents)
+      VALUES (${groupId}, ${price.cents})
+      ON CONFLICT (group_id) DO UPDATE SET monthly_price_cents = EXCLUDED.monthly_price_cents`;
+  }
+}
+
+/** Un grupo del alumno en el rango, con su precio de clase especial si lo tiene. */
+interface StudentGroup {
+  name: string;
+  level: string;
+  teacherId: string;
+  hours: number;
+  specialPriceCents: number | null;
+}
+
 export class SqlStudentDirectory implements StudentDirectory {
   constructor(private readonly sql: Sql) {}
 
@@ -597,8 +638,14 @@ export class SqlStudentDirectory implements StudentDirectory {
       const first = guardians[0] ?? {};
       let regular = 0;
       const privateLessons: PrivateEnrolment[] = [];
+      const specialClasses: BillingStudent['specialClasses'] = [];
       for (const group of groups.get(id) ?? []) {
-        if (group.level === 'private_lesson') {
+        if (group.specialPriceCents !== null && group.level !== 'private_lesson') {
+          specialClasses.push({
+            groupName: group.name,
+            monthlyPrice: Money.cents(group.specialPriceCents),
+          });
+        } else if (group.level === 'private_lesson') {
           privateLessons.push({
             groupName: group.name,
             teacherId: group.teacherId,
@@ -616,6 +663,7 @@ export class SqlStudentDirectory implements StudentDirectory {
         hasSiblings: row.bool('has_siblings'),
         regularWeeklyHours: regular,
         privateLessons,
+        specialClasses,
       };
     });
   }
@@ -625,21 +673,19 @@ export class SqlStudentDirectory implements StudentDirectory {
     studentIds: string[],
     from: string,
     to: string,
-  ): Promise<Map<string, { name: string; level: string; teacherId: string; hours: number }[]>> {
+  ): Promise<Map<string, StudentGroup[]>> {
     const rows = await this.sql`
-      SELECT e.student_id, g.name, g.level, g.teacher_id,
+      SELECT e.student_id, g.name, g.level, g.teacher_id, p.monthly_price_cents,
              COALESCE(e.attendance_start_minutes, g.start_minutes) AS start_minutes,
              COALESCE(e.attendance_end_minutes, g.end_minutes) AS end_minutes,
              COALESCE(jsonb_array_length(e.attendance_days::jsonb), jsonb_array_length(g.days::jsonb)) AS sessions
         FROM classes_enrolment e JOIN classes_group g ON g.id = e.class_group_id
+        LEFT JOIN billing_special_class_price p ON p.group_id = g.id
        WHERE e.student_id IN ${
       this.sql(studentIds)
     } AND e.enrolled_on <= ${to} AND (e.ends_on IS NULL OR e.ends_on > ${from})
        ORDER BY g.name`;
-    const groups = new Map<
-      string,
-      { name: string; level: string; teacherId: string; hours: number }[]
-    >();
+    const groups = new Map<string, StudentGroup[]>();
     for (const row of Row.all(rows)) {
       const list = groups.get(row.string('student_id')) ?? [];
       list.push({
@@ -647,6 +693,7 @@ export class SqlStudentDirectory implements StudentDirectory {
         level: row.string('level'),
         teacherId: row.string('teacher_id'),
         hours: ((row.int('end_minutes') - row.int('start_minutes')) / 60) * row.int('sessions'),
+        specialPriceCents: row.nullableInt('monthly_price_cents'),
       });
       groups.set(row.string('student_id'), list);
     }
