@@ -5,6 +5,7 @@ import { useRefreshClubData } from '@/shared/useRefreshClubData';
 import {
   createTeacher,
   fetchGroup,
+  fetchGroupHistory,
   fetchGroups,
   fetchTeachers,
   saveGroup,
@@ -21,6 +22,14 @@ export function useGroups() {
 
 export function useGroup(id: string) {
   return useQuery({ queryKey: [...GROUPS_KEY, id], queryFn: () => fetchGroup(id) });
+}
+
+export function useGroupHistory(id: string) {
+  return useQuery({
+    queryKey: [...GROUPS_KEY, id, 'history'],
+    queryFn: () => fetchGroupHistory(id),
+    select: (data) => data.items,
+  });
 }
 
 export function useTeachers(enabled = true) {
