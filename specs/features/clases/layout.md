@@ -27,7 +27,8 @@ ClassesPage (/panel/clases)
 │   ├── Tarjeta «Alumnos inscritos»: fila por alumno «Nombre · N años» + «Ver ficha»
 │   ├── Tarjeta «Inscribir alumno»: desplegable con búsqueda (al abrirlo salen todos los alumnos activos no inscritos; al escribir se filtran por nombre o apellidos, sin tildes ni mayúsculas) + botón «Inscribir»
 │   ├── Tarjeta «Asistencia»: MonthNav (mes en curso) + GroupAttendanceTable
-│   └── Tarjeta «Comentarios»: GroupClassComments
+│   ├── Tarjeta «Comentarios»: GroupClassComments
+│   └── Tarjeta «Historial» (la última): fila por movimiento «dd/mm/aaaa | Entra/Sale · Alumno (enlace) · motivo» («viene de X», «pasa a X», «baja del club»), lo más reciente arriba
 └── ClassGroupDialog (alta o edición)
     ├── Título «Nuevo grupo» | «Editar grupo», botón cerrar
     ├── Nombre del grupo (opcional; el placeholder muestra el nombre por defecto que tendrá: día, hora, nivel y aula)

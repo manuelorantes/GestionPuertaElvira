@@ -108,6 +108,27 @@ ocupación, en ambos sentidos.
 - **WHEN** en un grupo de lunes y miércoles con 12 plazas hay 9 alumnos, uno de ellos solo los lunes
 - **THEN** la ocupación es 9/12 el lunes y 8/12 el miércoles, y el miércoles queda una plaza libre más
 
+### Requirement: Historial del grupo
+La ficha de un grupo MUST terminar con su historial: cada vez que un alumno entró en el grupo o salió de él,
+con la fecha, el alumno (enlace a su ficha) y, cuando se sabe, el motivo, de lo más reciente a lo más antiguo.
+El motivo se deduce de las fechas de sus inscripciones:
+si ese mismo día dejó otro grupo, «viene de» ese grupo; si ese día entró en otro, «pasa a» ese grupo;
+si ese día se dio de baja del club, «baja del club». Si no, la línea no lleva motivo.
+Una inscripción que empieza y acaba el mismo día no aparece (fue un error que se corrigió).
+
+#### Scenario: Cambio de grupo
+- **WHEN** un alumno pasa el 20/10 de «Iniciación A» a «Avanzado C»
+- **THEN** el historial de «Iniciación A» muestra «20/10/2026 · Sale · alumno · pasa a Avanzado C»
+  y el de «Avanzado C», «20/10/2026 · Entra · alumno · viene de Iniciación A»
+
+#### Scenario: Baja del club
+- **WHEN** un alumno del grupo se da de baja del club el 10/10
+- **THEN** el historial del grupo muestra «10/10/2026 · Sale · alumno · baja del club»
+
+#### Scenario: Grupo sin movimientos
+- **WHEN** nadie ha entrado ni salido todavía del grupo
+- **THEN** el historial dice «Todavía no ha entrado ni salido nadie de este grupo.»
+
 ### Requirement: Acceso restringido
 Crear y cambiar grupos e inscribir alumnos MUST estar reservado a cuentas de administración. El profesorado MUST poder
 consultar «Clases» de solo lectura, sin ningún botón de gestión: horario semanal, grupos con su ocupación y plazas
