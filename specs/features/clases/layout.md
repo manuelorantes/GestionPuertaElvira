@@ -18,7 +18,7 @@ ClassesPage (/panel/clases)
 │       └── ScheduleBlock por grupo (el color ya dice el nivel): **Profesor** en negrita y «9/10 plazas»; en particulares, **nombre** en negrita y «Profesor · 1/1» (borde discontinuo). Sin hora: la da la rejilla
 ├── [Grupos] GroupsTable (tarjeta)
 │   ├── Cabecera: Grupo | Nivel | Profesor | Horario | Aula | Ocupación | (acciones)
-│   └── Fila: color de nivel + nombre | nivel | profesor | horario + modalidad | «Aula Alfil» | barra + «9/12» (+ «Sobre el cupo») | botón «Editar» (icono lápiz)
+│   └── Fila: color de nivel + nombre (+ «Clase especial · 50,00 €/mes» si lo es) | nivel | profesor | horario + modalidad | «Aula Alfil» | barra + «9/12» (+ «Sobre el cupo») | botón «Editar» (icono lápiz)
 ├── [Asistencia] AttendanceTab: selector «Grupo» + meses de la temporada; tarjeta con GroupAttendanceTable
 │   ├── GroupAttendanceTable: Alumno (ordenable, enlace a la ficha) | un día por columna («mar» + «13/10», «Festivo» o «Sin lista») con ✓ / ✗ / ? / vacío | % (ordenable; < 75 % en rojo); leyenda debajo
 │   └── Tarjeta aparte, debajo: GroupClassComments «Comentarios»: botón «Añadir comentario» (Día de la clase, Sobre: toda la clase o un alumno, Comentario); «De la clase» (día · autor); «De los alumnos» con selector «Alumno» (Todos los alumnos o uno de la tabla); editar y quitar en cada uno
@@ -26,6 +26,7 @@ ClassesPage (/panel/clases)
 │   ├── Cabecera: color de nivel, nombre, «Profesor · modalidad», aula, ocupación (por día si hay horarios especiales), botón «Editar»
 │   ├── Tarjeta «Alumnos inscritos»: fila por alumno «Nombre · N años» + «Ver ficha»
 │   ├── Tarjeta «Inscribir alumno»: desplegable con búsqueda (al abrirlo salen todos los alumnos activos no inscritos; al escribir se filtran por nombre o apellidos, sin tildes ni mayúsculas) + botón «Inscribir»
+│   ├── Tarjeta «Clase especial» (no en particulares): precio mensual o «Sin precio especial: se paga por horas»; superadministración puede ponerlo, cambiarlo o quitarlo, con confirmación (ver Cobros)
 │   ├── Tarjeta «Asistencia»: MonthNav (mes en curso) + GroupAttendanceTable
 │   ├── Tarjeta «Comentarios»: GroupClassComments
 │   └── Tarjeta «Historial» (la última): fila por movimiento «dd/mm/aaaa | Entra/Sale · Alumno (enlace) · motivo» («viene de X», «pasa a X», «baja del club»), lo más reciente arriba

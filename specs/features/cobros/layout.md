@@ -57,6 +57,7 @@ BillingPage (/panel/cobros)
 
 StudentPanel (ficha de alumno) → nueva tarjeta «Cuotas y cobros»
 ├── Forma de pago preferida (Select) · Socio (Switch) · Precio por hora de particulares (opcional, €/h) · «Guardar»
+├── «Precio fijado»: «60,00 € al mes» (lo ve todo el que vea la ficha, si lo hay); superadministración ve siempre el campo «Precio fijado (€ al mes)» con «Guardar precio» y «Quitar precio», y cada uno abre la confirmación «Precio fijado del alumno» con lo que pagará y desde qué mes
 ├── «Cuotas de la temporada»: fila por mes (mes · importe · «Fijada a mano · motivo» · Cobrada / Faltan X / Pendiente / Vencida / Próxima · lápiz «Editar la cuota de <mes>») + «Saldo a favor» si sobra
 │   └── ChargeDialog «Cuota de <mes>»: Importe (€) · Motivo · «Solo este mes | Este y los siguientes» · «Volver a la calculada» (si está fijada a mano) · Cancelar · Guardar
 │       └── Paso de confirmación (al bajar una cuota con algo cubierto): «¿Guardar estos cambios?» · «Importe: 55,00 € → 40,00 €» · casilla «Cambiar la cantidad pagada» (marcada) con «El recibo que cubrió la cuota pasa a tener 15,00 € menos, con una línea de corrección.» o, desmarcada, «La diferencia (15,00 €) se quedará como saldo a favor del alumno.» · Volver · Confirmar

@@ -19,7 +19,7 @@ Las consultas (ver pantallas) no se registran.
 Cada acción MUST pertenecer a una categoría, la parte de la aplicación que tocó:
 Alumnos (altas, bajas, datos, familia e importación de la hoja),
 Grupos (grupos e inscripciones),
-Cuotas (cuotas, descuentos, avisos, datos de cobro, tarifas y ajustes),
+Cuotas (cuotas, descuentos, avisos, datos de cobro, tarifas y ajustes, y precios de clases especiales y de alumnos),
 Cobros (cobros, sus correcciones y facturas),
 Asistencia (listas, comentarios y clases o actividades dadas por buenas),
 Puntos (viernes, ajustes y fotos de torneo),
