@@ -100,7 +100,7 @@ y el DNI o NIE, si se indica, MUST tener una letra de control válida.
 En el alta no se eligen grupos: se indican las **horas a las que va a venir** (día, hora de inicio y de fin, en
 medias horas) y el sistema MUST traducirlas a grupos: el grupo que da clase a esa hora ese día, completo si
 cubre todo su horario o con horario especial si solo cubre parte (o solo algunos de sus días). Si a una hora
-hay clase en varias aulas, MUST pedirse el aula; si no hay clase, MUST avisarse y no se puede dar de alta
+hay varios grupos posibles (en varias aulas o compartiendo aula), MUST pedirse el grupo; si no hay clase, MUST avisarse y no se puede dar de alta
 hasta corregirlo. Se puede indicar familia directa ya inscrita. Un alumno MAY darse de alta sin ningún horario:
 es un socio sin clases, queda marcado como socio (se le pedirá la cuota de socio) y se podrá inscribir más adelante.
 La fecha de alta MUST poder elegirse (por defecto hoy, nunca futura): sus grupos empiezan ese día.
