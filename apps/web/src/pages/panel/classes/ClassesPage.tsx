@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import type { ClassGroup } from '@/features/classes/api';
+import { CLASSROOMS } from '@/features/classes/classrooms';
 import { useGroups, useTeachers } from '@/features/classes/hooks';
 import { SectionHeader } from '@/shared/ui/SectionHeader';
 import { Tabs } from '@/shared/ui/Tabs';
@@ -65,7 +66,7 @@ export function ClassesPage() {
   return (
     <main className="mx-auto max-w-[1280px] px-4 py-6 md:px-8 md:py-8">
       <SectionHeader
-        eyebrow={`Lunes a viernes · 3 aulas · ${groupList.length} grupos`}
+        eyebrow={`Lunes a viernes · ${CLASSROOMS.length} aulas · ${groupList.length} grupos`}
         title="Clases"
         {...(canManage && {
           action: {

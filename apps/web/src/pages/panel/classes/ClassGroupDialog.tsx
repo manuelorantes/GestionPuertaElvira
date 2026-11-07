@@ -177,14 +177,20 @@ function GroupForm({
           <p className="text-[13px] text-ink-muted">
             {formatHours(form.weeklyHours)}. La cuota se asigna según las horas semanales.
           </p>
-          {form.conflict && <Alert>{form.conflict} Cambia el aula o el horario.</Alert>}
+          {form.conflict && <Alert>{form.conflict} ¿Compartir el aula igualmente?</Alert>}
         </div>
         <div className="flex justify-end gap-3 border-t border-line px-6 py-4">
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
           <Button type="submit" busy={form.isSubmitting} busyLabel="Guardando…">
-            {group ? 'Guardar cambios' : 'Crear grupo'}
+            {form.conflict
+              ? group
+                ? 'Guardar igualmente'
+                : 'Crear igualmente'
+              : group
+                ? 'Guardar cambios'
+                : 'Crear grupo'}
           </Button>
         </div>
       </form>

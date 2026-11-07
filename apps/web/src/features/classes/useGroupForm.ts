@@ -41,8 +41,14 @@ export function useGroupForm(
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const save = useSaveGroup();
 
-  const set = <K extends keyof GroupPayload>(key: K, value: GroupPayload[K]) =>
+  const apiError = save.error instanceof ApiError ? save.error : null;
+  // Una coincidencia de aula se confirma volviendo a enviar; cualquier cambio en el formulario la descarta.
+  const conflict = apiError?.code === 'classroom_conflict' ? apiError.message : null;
+
+  const set = <K extends keyof GroupPayload>(key: K, value: GroupPayload[K]) => {
+    if (conflict) save.reset();
     setDraft((current) => ({ ...current, [key]: value }));
+  };
   const order = (days: Weekday[]) =>
     WEEKDAYS.map((day) => day.id).filter((id) => days.includes(id));
 
@@ -71,14 +77,13 @@ export function useGroupForm(
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
+    const confirmClassroomShare = conflict !== null;
     save.reset();
-    save.mutate(group ? { payload: values, id: group.id } : { payload: values }, {
-      onSuccess: () => onSaved(values.name.trim() || defaultGroupName(values)),
-    });
+    save.mutate(
+      { payload: values, ...(group && { id: group.id }), confirmClassroomShare },
+      { onSuccess: () => onSaved(values.name.trim() || defaultGroupName(values)) },
+    );
   }
-
-  const apiError = save.error instanceof ApiError ? save.error : null;
-  const conflict = apiError?.code === 'classroom_conflict' ? apiError.message : null;
 
   return {
     values,
