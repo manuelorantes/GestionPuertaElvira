@@ -54,8 +54,10 @@ export interface ScheduleBlock {
   day: Weekday;
   start: string;
   end: string;
-  /** Aula elegida cuando a esa hora hay clase en varias. */
+  /** Aula del tramo, si se sabe. */
   classroom: Classroom | null;
+  /** Grupo elegido cuando a esa hora hay varios posibles (pueden compartir aula). */
+  groupId: string | null;
 }
 
 export interface ScheduleResolution {

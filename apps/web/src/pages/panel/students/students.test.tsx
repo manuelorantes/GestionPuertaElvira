@@ -1049,6 +1049,67 @@ describe('Alumnos', () => {
     });
   });
 
+  it('picks one of the groups that share a classroom at the hours chosen', async () => {
+    const user = userEvent.setup();
+    const choice = (groupName: string) => ({
+      enrolments: [],
+      uncovered: [],
+      choices: [
+        {
+          day: 'mon',
+          start: '17:00',
+          end: '18:00',
+          label: 'Lun · 17:00–18:00',
+          groups: [
+            { id: 'g1', name: 'Alfil A', classroom: 'alfil' },
+            { id: 'g2', name: groupName, classroom: 'alfil' },
+          ],
+        },
+      ],
+      problems: [],
+    });
+    const spy = api({
+      'POST /api/admin/groups/resolve-schedule': [
+        [200, choice('Alfil B')],
+        [
+          200,
+          {
+            enrolments: [
+              {
+                groupId: 'g2',
+                groupName: 'Alfil B',
+                slotLabel: 'Lun · 17:00–18:00',
+                attendance: null,
+                attendanceLabel: null,
+              },
+            ],
+            uncovered: [],
+            choices: [],
+            problems: [],
+          },
+        ],
+      ],
+    });
+    renderApp('/panel/alumnos');
+
+    await user.click(await screen.findByRole('button', { name: 'Nuevo alumno' }));
+    const dialog = screen.getByRole('dialog', { name: 'Nuevo alumno' });
+    await user.click(within(dialog).getByRole('button', { name: 'Añadir horario' }));
+    const block = within(within(dialog).getByRole('group', { name: 'Horario 1' }));
+    await user.selectOptions(
+      await block.findByLabelText('Grupo para Lun · 17:00–18:00'),
+      'Aula Alfil · Alfil B',
+    );
+
+    expect(await within(dialog).findByText('Alfil B')).toBeVisible();
+    const lastResolve = spy.mock.calls
+      .filter(([u]) => u === '/api/admin/groups/resolve-schedule')
+      .at(-1);
+    expect(JSON.parse(String(lastResolve?.[1]?.body))).toMatchObject({
+      blocks: [{ day: 'mon', start: '17:00', end: '18:00', groupId: 'g2' }],
+    });
+  });
+
   it('sets a special schedule for a group while registering', async () => {
     const user = userEvent.setup();
     const spy = api({
