@@ -116,6 +116,32 @@ describe('Clases', () => {
     expect(await screen.findAllByRole('button', { name: /iniciación a/i })).toHaveLength(2);
   });
 
+  it('hides a classroom on a day it has no groups, and the day when no classroom has any', async () => {
+    api({
+      'GET /api/admin/groups': [
+        200,
+        {
+          items: [
+            GROUP,
+            { ...GROUP, id: 'g2', name: 'Avanzado B', days: ['mon'], classroom: 'peon' },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/clases');
+
+    const schedule = await screen.findByRole('region', { name: 'Horario semanal' });
+    await within(schedule).findAllByRole('button', { name: /iniciación a/i });
+    const monday = within(schedule).getByRole('group', { name: 'Lunes' });
+    expect(within(monday).getByText('Alfil')).toBeVisible();
+    expect(within(monday).getByText('Peón')).toBeVisible();
+    expect(within(monday).queryByText('Caballo')).not.toBeInTheDocument();
+    const wednesday = within(schedule).getByRole('group', { name: 'Miércoles' });
+    expect(within(wednesday).getByText('Alfil')).toBeVisible();
+    expect(within(wednesday).queryByText('Peón')).not.toBeInTheDocument();
+    expect(within(schedule).queryByRole('group', { name: 'Martes' })).not.toBeInTheDocument();
+  });
+
   it('should list groups with level, schedule, plan and an over capacity warning', async () => {
     const user = userEvent.setup();
     api();
