@@ -29,6 +29,8 @@ export interface ClassGroup {
   weeklyPlan: WeeklyPlan;
   /** Precio mensual si es clase especial; null si no lo es. */
   specialPriceCents: number | null;
+  /** Tarifa propia de la clase para quien la dé; null, la del profesor (y siempre null para el profesorado). */
+  teacherPay?: { unit: 'hour' | 'session'; amountCents: number } | null;
 }
 
 export interface Teacher {

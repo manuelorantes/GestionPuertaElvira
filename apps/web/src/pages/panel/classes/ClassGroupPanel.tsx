@@ -14,6 +14,7 @@ import {
 } from '@/features/billing/money';
 import { usePanelRole } from '@/features/auth/panelView';
 import { useSession } from '@/features/auth/useSession';
+import { useCanManageClub } from '@/features/auth/useCanManageClub';
 import { classroomLabel } from '@/features/classes/classrooms';
 import type { ClassGroup } from '@/features/classes/api';
 import { useGroup } from '@/features/classes/hooks';
@@ -29,6 +30,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
 import { ConfirmedPriceField } from '../billing/ConfirmedPriceField';
 import { GroupAttendanceTable } from './GroupAttendanceTable';
+import { GroupTeacherPay } from './GroupTeacherPay';
 import { GroupClassComments } from './GroupClassComments';
 import { GroupHistory } from './GroupHistory';
 import { OccupancyByDay } from './OccupancyByDay';
@@ -60,6 +62,7 @@ export function ClassGroupPanel({ groupId, onClose, onEdit, month }: ClassGroupP
   );
   // El precio de clase especial solo lo cambia superadministración (recalcula cuotas).
   const isSuperadmin = usePanelRole(useSession().data) === 'superadministrator';
+  const canManage = useCanManageClub();
   const savePrice = useBillingMutation((price: string | null) =>
     setSpecialClassPrice(groupId, price),
   );
@@ -207,6 +210,19 @@ export function ClassGroupPanel({ groupId, onClose, onEdit, month }: ClassGroupP
                   : `Los ${g.students.length} alumnos de «${g.name}» pagarán ${formatCents(cents)} al mes por esta clase (sin contar sus horas para el tramo) desde ${recalculationStartLabel()}. Se recalcularán sus cuotas.`
               }
               onSave={(price) => savePrice.mutateAsync(price)}
+            />
+          </Card>
+        )}
+        {canManage && (
+          <Card className="p-4">
+            <h3 className="mb-2 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+              Pago al profesor
+            </h3>
+            <GroupTeacherPay
+              groupId={groupId}
+              groupName={g.name}
+              pay={g.teacherPay ?? null}
+              canEdit={isSuperadmin}
             />
           </Card>
         )}

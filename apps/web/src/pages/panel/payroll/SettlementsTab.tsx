@@ -116,7 +116,14 @@ export function SettlementsTab({ month }: { month: string }) {
                     <TeacherLink id={s.teacherId} name={s.teacherName} />
                   </td>
                   <td className="px-4 py-3">{hoursLabel(s.minutes)}</td>
-                  <td className="px-4 py-3">{formatCents(s.rateCents)}/h</td>
+                  <td className="px-4 py-3">
+                    {formatCents(s.rateCents)}/h
+                    {s.customRates && (
+                      <span className="block text-xs text-ink-muted">
+                        Y clases con tarifa propia
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <span className="font-semibold">{formatCents(s.amountCents)}</span>
                     {s.advancesCents > 0 && (
