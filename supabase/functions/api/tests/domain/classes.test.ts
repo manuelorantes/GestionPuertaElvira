@@ -250,6 +250,8 @@ Deno.test('Group values should validate capacity, classroom, name and level', ()
   assertThrows(() => Capacity.of(31), InvalidValue);
   assertEquals(Classroom.fromString('peon').label(), 'Aula Peón');
   assertEquals(Classroom.fromString('caballo').position(), 1);
+  assertEquals(Classroom.fromString('rey').label(), 'Aula Rey Batallador');
+  assertEquals(Classroom.fromString('rey').position(), 3);
   assertThrows(() => Classroom.fromString('3'), InvalidValue);
   assertThrows(() => levelFromName('adults'), InvalidValue);
   assertEquals(GroupName.fromString('  Iniciación   A ').value, 'Iniciación A');

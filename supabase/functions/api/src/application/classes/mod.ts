@@ -120,20 +120,27 @@ export class ClassGroupNotFound extends Error {
   }
 }
 
+/** El grupo coincide en aula y hora con otros: se guarda solo si administración lo confirma. */
 export class ClassroomConflict extends Error implements HasErrorDetails {
-  constructor(private readonly conflicting: ClassGroup) {
-    const details = conflicting.details();
-    super(
-      `Coincide en el aula ${details.classroom.name()} con «${details.name.value}» (${details.slot.label()}).`,
+  private readonly first: ClassGroup;
+
+  constructor(conflicting: readonly [ClassGroup, ...ClassGroup[]]) {
+    const names = conflicting.map((group) =>
+      `«${group.details().name.value}» (${group.details().slot.label()})`
     );
+    const listed = names.length === 1
+      ? names[0]
+      : `${names.slice(0, -1).join(', ')} y ${names[names.length - 1]}`;
+    super(`Coincide en el aula ${conflicting[0].details().classroom.name()} con ${listed}.`);
     this.name = 'ClassroomConflict';
+    this.first = conflicting[0];
   }
 
   details(): Record<string, string> {
     return {
-      groupId: this.conflicting.id.value,
-      groupName: this.conflicting.details().name.value,
-      slotLabel: this.conflicting.details().slot.label(),
+      groupId: this.first.id.value,
+      groupName: this.first.details().name.value,
+      slotLabel: this.first.details().slot.label(),
     };
   }
 }
@@ -180,17 +187,32 @@ export function groupDetails(input: GroupInput): GroupDetails {
   );
 }
 
-/** Reglas comunes al crear y editar un grupo: profesor activo y aula libre. */
+/**
+ * Reglas comunes al crear y editar un grupo: profesor activo y, si coincide en aula y hora con otros grupos
+ * con los que no coincidía ya, confirmación de que comparten aula.
+ */
 class GroupDetailsGuard {
   constructor(
     private readonly groups: ClassGroupRepository,
     private readonly teachers: TeacherDirectory,
   ) {}
 
-  async assertAcceptable(id: ClassGroupId, details: GroupDetails): Promise<void> {
+  async assertAcceptable(
+    id: ClassGroupId,
+    details: GroupDetails,
+    current: GroupDetails | null,
+    confirmClassroomShare: boolean,
+  ): Promise<void> {
     if (!(await this.teachers.isActive(details.teacher))) throw new TeacherNotAvailable();
-    const conflicts = new ClassroomSchedule().conflictsFor(id, details, await this.groups.all());
-    if (conflicts[0]) throw new ClassroomConflict(conflicts[0]);
+    if (confirmClassroomShare) return;
+    const schedule = new ClassroomSchedule();
+    const all = await this.groups.all();
+    const alreadyShared = current === null ? [] : schedule.conflictsFor(id, current, all);
+    const added = schedule.conflictsFor(id, details, all).filter((group) =>
+      !alreadyShared.some((shared) => shared.id.equals(group.id))
+    );
+    const [first, ...rest] = added;
+    if (first) throw new ClassroomConflict([first, ...rest]);
   }
 }
 
@@ -200,10 +222,11 @@ export class CreateClassGroup {
     private readonly teachers: TeacherDirectory,
   ) {}
 
-  async execute(input: GroupInput): Promise<string> {
+  async execute(input: GroupInput, confirmClassroomShare = false): Promise<string> {
     const id = ClassGroupId.generate();
     const details = groupDetails(input);
-    await new GroupDetailsGuard(this.groups, this.teachers).assertAcceptable(id, details);
+    await new GroupDetailsGuard(this.groups, this.teachers)
+      .assertAcceptable(id, details, null, confirmClassroomShare);
     await this.groups.save(ClassGroup.create(id, details));
     return id.value;
   }
@@ -215,11 +238,12 @@ export class UpdateClassGroup {
     private readonly teachers: TeacherDirectory,
   ) {}
 
-  async execute(id: string, input: GroupInput): Promise<void> {
+  async execute(id: string, input: GroupInput, confirmClassroomShare = false): Promise<void> {
     const group = await this.groups.find(ClassGroupId.fromString(id));
     if (group === null) throw new ClassGroupNotFound();
     const details = groupDetails(input);
-    await new GroupDetailsGuard(this.groups, this.teachers).assertAcceptable(group.id, details);
+    await new GroupDetailsGuard(this.groups, this.teachers)
+      .assertAcceptable(group.id, details, group.details(), confirmClassroomShare);
     group.update(details);
     await this.groups.save(group);
   }
