@@ -1,4 +1,4 @@
-import type { ClassGroup, Weekday } from './api';
+import type { CalendarDay, ClassGroup, Weekday } from './api';
 
 export const WEEKDAYS: { id: Weekday; short: string; long: string }[] = [
   { id: 'mon', short: 'Lun', long: 'Lunes' },
@@ -6,6 +6,13 @@ export const WEEKDAYS: { id: Weekday; short: string; long: string }[] = [
   { id: 'wed', short: 'Mié', long: 'Miércoles' },
   { id: 'thu', short: 'Jue', long: 'Jueves' },
   { id: 'fri', short: 'Vie', long: 'Viernes' },
+];
+
+/** Días de la semana completa, para la vista de un aula: sábado y domingo no tienen grupos todavía. */
+export const WHOLE_WEEK: { id: CalendarDay; short: string; long: string }[] = [
+  ...WEEKDAYS,
+  { id: 'sat', short: 'Sáb', long: 'Sábado' },
+  { id: 'sun', short: 'Dom', long: 'Domingo' },
 ];
 
 const OPENING = 16 * 60;
@@ -39,8 +46,8 @@ export function gridRows(start: string, end: string): { rowStart: number; rowEnd
   };
 }
 
-export function groupsOn(day: Weekday, groups: ClassGroup[]): ClassGroup[] {
-  return groups.filter((group) => group.days.includes(day));
+export function groupsOn(day: CalendarDay, groups: ClassGroup[]): ClassGroup[] {
+  return groups.filter((group) => group.days.some((d) => d === day));
 }
 
 export function weeklyHours(days: number, start: string, end: string): number {

@@ -35,7 +35,15 @@ function useInvalidateClasses() {
 export function useSaveGroup() {
   const invalidate = useInvalidateClasses();
   return useMutation({
-    mutationFn: ({ payload, id }: { payload: GroupPayload; id?: string }) => saveGroup(payload, id),
+    mutationFn: ({
+      payload,
+      id,
+      confirmClassroomShare,
+    }: {
+      payload: GroupPayload;
+      id?: string;
+      confirmClassroomShare?: boolean;
+    }) => saveGroup(payload, id, confirmClassroomShare),
     onSuccess: invalidate,
   });
 }

@@ -2,8 +2,10 @@ import { apiGet, apiSend } from '@/shared/api/client';
 
 export type Level = 'beginner' | 'intermediate' | 'advanced' | 'private_lesson';
 /** Las tres aulas del club, con nombre de pieza. */
-export type Classroom = 'alfil' | 'caballo' | 'peon';
+export type Classroom = 'alfil' | 'caballo' | 'peon' | 'rey';
 export type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri';
+/** Cualquier día de la semana; los grupos solo se reúnen de lunes a viernes (`Weekday`). */
+export type CalendarDay = Weekday | 'sat' | 'sun';
 export type WeeklyPlan =
   'one_hour' | 'hour_and_half' | 'two_hours' | 'three_hours' | 'private_lesson';
 
@@ -23,7 +25,7 @@ export interface ClassGroup {
   /** Plazas ocupadas el día más lleno. */
   occupied: number;
   /** Plazas ocupadas cada día del grupo. */
-  occupancyByDay: Partial<Record<Weekday, number>>;
+  occupancyByDay: Partial<Record<CalendarDay, number>>;
   weeklyPlan: WeeklyPlan;
 }
 
@@ -88,10 +90,16 @@ export async function fetchTeachers(): Promise<Teacher[]> {
   return (await apiGet<{ items: Teacher[] }>('/api/admin/teachers')).items;
 }
 
-export function saveGroup(payload: GroupPayload, id?: string): Promise<unknown> {
+/** Con `confirmClassroomShare`, el grupo se guarda aunque coincida en aula y hora con otros. */
+export function saveGroup(
+  payload: GroupPayload,
+  id?: string,
+  confirmClassroomShare = false,
+): Promise<unknown> {
+  const body = confirmClassroomShare ? { ...payload, confirmClassroomShare } : payload;
   return id
-    ? apiSend('PUT', `/api/admin/groups/${id}`, payload)
-    : apiSend('POST', '/api/admin/groups', payload);
+    ? apiSend('PUT', `/api/admin/groups/${id}`, body)
+    : apiSend('POST', '/api/admin/groups', body);
 }
 
 export function createTeacher(fullName: string): Promise<unknown> {

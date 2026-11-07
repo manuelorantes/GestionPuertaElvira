@@ -170,7 +170,7 @@ const VALUES: Record<string, Record<string, string>> = {
     advanced: 'Avanzado',
     private_lesson: 'Particular',
   },
-  classroom: { alfil: 'Alfil', caballo: 'Caballo', peon: 'Peón' },
+  classroom: { alfil: 'Alfil', caballo: 'Caballo', peon: 'Peón', rey: 'Rey Batallador' },
   role: {
     superadministrator: 'Superadministración',
     administrator: 'Administración',
