@@ -48,6 +48,16 @@ export function shiftMonth(month: string, delta: number): string {
   return `${Math.floor(index / 12)}-${String((index % 12) + 1).padStart(2, '0')}`;
 }
 
+/**
+ * Desde qué mes se recalculan las cuotas al cambiar lo que las determina: el actual del día 1 al 10, si no el siguiente.
+ * «noviembre de 2026».
+ */
+export function recalculationStartLabel(today = new Date()): string {
+  const month = currentMonth();
+  const start = today.getDate() <= 10 ? month : shiftMonth(month, 1);
+  return `${monthName(start)} de ${start.slice(0, 4)}`;
+}
+
 export function currentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

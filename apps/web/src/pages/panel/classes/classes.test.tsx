@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { currentMonth, shiftMonth } from '@/features/billing/money';
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
 const TEACHER = {
   id: 't1',
@@ -672,6 +672,59 @@ describe('Clases', () => {
     expect(
       await within(sheet).findByText('Todavía no ha entrado ni salido nadie de este grupo.'),
     ).toBeInTheDocument();
+  });
+
+  it('lets superadministration make a group a special class after confirming it', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/groups/g1': [
+        200,
+        {
+          ...GROUP,
+          specialPriceCents: null,
+          students: [{ id: 's1', fullName: 'Ana Ruiz Gil', age: 12, attendanceLabel: null }],
+        },
+      ],
+      'PUT /api/admin/billing/groups/g1/price': [204],
+    });
+    renderApp('/panel/clases?grupo=g1');
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(within(sheet).getByText('Sin precio especial: se paga por horas')).toBeInTheDocument();
+    await user.type(within(sheet).getByLabelText('Precio de clase especial (€ al mes)'), '50');
+    await user.click(within(sheet).getByRole('button', { name: 'Guardar precio' }));
+
+    const confirm = await screen.findByRole('dialog', { name: 'Precio de la clase especial' });
+    expect(confirm).toHaveTextContent(
+      'Los 1 alumnos de «Iniciación A» pagarán 50,00 € al mes por esta clase',
+    );
+    expect(spy.mock.calls.some(([url]) => url === '/api/admin/billing/groups/g1/price')).toBe(
+      false,
+    );
+    await user.click(within(confirm).getByRole('button', { name: 'Guardar precio' }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Precio de la clase especial' }),
+      ).not.toBeInTheDocument(),
+    );
+    const call = spy.mock.calls.find(([url]) => url === '/api/admin/billing/groups/g1/price');
+    expect(call?.[1]?.method).toBe('PUT');
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ monthlyPrice: '50' });
+  });
+
+  it('shows the price of a special class to administration without letting it change it', async () => {
+    api({
+      'GET /api/admin/groups': [200, { items: [{ ...GROUP, specialPriceCents: 5000 }] }],
+      'GET /api/admin/groups/g1': [200, { ...GROUP, specialPriceCents: 5000, students: [] }],
+    });
+    renderApp('/panel/clases?grupo=g1');
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(within(sheet).getByText('50,00 € al mes')).toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Guardar precio' })).not.toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Quitar precio' })).not.toBeInTheDocument();
   });
 
   it('opens the attendance of a group in the month of its link', async () => {

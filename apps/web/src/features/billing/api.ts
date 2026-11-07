@@ -119,6 +119,8 @@ export interface Account {
   preferredPlan: PreferredPlan;
   member: boolean;
   privateRate: string | null;
+  /** Precio mensual fijado por superadministración (manda sobre todo), o null. */
+  fixedPrice: string | null;
   points: number;
   suggestedMonths: number;
   remainingMonths: number;
@@ -272,6 +274,16 @@ export function updateAccount(
   account: { preferredPlan: PreferredPlan; member: boolean; privateRate: string | null },
 ): Promise<void> {
   return apiSend('PUT', `${BASE}/accounts/${studentId}`, account);
+}
+
+/** Solo superadministración: fija (o quita, con null) el precio mensual de un alumno. Recalcula sus cuotas. */
+export function setStudentPrice(studentId: string, monthlyPrice: string | null): Promise<void> {
+  return apiSend('PUT', `${BASE}/accounts/${studentId}/price`, { monthlyPrice });
+}
+
+/** Solo superadministración: fija (o quita) el precio mensual de una clase especial. Recalcula sus cuotas. */
+export function setSpecialClassPrice(groupId: string, monthlyPrice: string | null): Promise<void> {
+  return apiSend('PUT', `${BASE}/groups/${groupId}/price`, { monthlyPrice });
 }
 
 export function fetchSettings(): Promise<BillingSettings> {
