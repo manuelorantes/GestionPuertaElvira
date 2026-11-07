@@ -30,6 +30,7 @@
 | Estado | Dueño |
 |---|---|
 | Grupos | consulta `['groups']` (`GET /api/admin/groups`) |
+| Historial de un grupo | consulta `['groups', id, 'history']` (`GET /api/admin/groups/:id/history`); se refresca con cualquier cambio de datos |
 | Profesores | consulta `['teachers']` (`GET /api/admin/teachers`) |
 | Pestaña activa | parámetro de URL `pestana` (`horario` por defecto) |
 | Diálogo de grupo | estado local de `ClassesPage`: `{ mode: 'create' } | { mode: 'edit', group }` o nada |
