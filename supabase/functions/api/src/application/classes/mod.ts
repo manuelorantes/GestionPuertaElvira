@@ -106,11 +106,79 @@ export interface EnrolledStudent {
   attendanceLabel: string | null;
 }
 
+/** Una inscripción, pasada o vigente, con los nombres de su alumno y su grupo. */
+export interface StudentEnrolmentFact {
+  studentId: string;
+  studentName: string;
+  groupId: string;
+  groupName: string;
+  enrolledOn: string;
+  /** Fin no incluido; null si sigue vigente. */
+  endsOn: string | null;
+}
+
+/** Lo necesario para el historial de un grupo: las inscripciones de quienes pasaron por él y sus bajas del club. */
+export interface GroupHistoryFacts {
+  enrolments: StudentEnrolmentFact[];
+  withdrawals: { studentId: string; withdrawnOn: string }[];
+}
+
+/** Una entrada o salida de un alumno en un grupo y, si se sabe, por qué. */
+export interface GroupMovement {
+  date: string;
+  movement: 'joined' | 'left';
+  studentId: string;
+  studentName: string;
+  /** Viene de otro grupo, pasa a otro grupo o se da de baja del club; null si solo entra o sale del grupo. */
+  reason: 'moved_from' | 'moved_to' | 'withdrawn' | null;
+  /** El otro grupo cuando viene de él o pasa a él. */
+  otherGroup: string | null;
+}
+
+/**
+ * Entradas y salidas de alumnos en un grupo, de la más reciente a la más antigua, deducidas de las fechas de sus
+ * inscripciones: si el mismo día deja otro grupo, viene de él; si ese día entra en otro, pasa a él; si ese día se
+ * da de baja del club, es una baja. Una inscripción que empieza y acaba el mismo día no cuenta (fue un error).
+ */
+export function groupHistory(groupId: string, facts: GroupHistoryFacts): GroupMovement[] {
+  const others = (e: StudentEnrolmentFact) =>
+    facts.enrolments.filter((o) => o.studentId === e.studentId && o.groupId !== groupId);
+  const movements: GroupMovement[] = [];
+  for (const e of facts.enrolments) {
+    if (e.groupId !== groupId || e.enrolledOn === e.endsOn) continue;
+    const student = { studentId: e.studentId, studentName: e.studentName };
+    const from = others(e).find((o) => o.endsOn === e.enrolledOn);
+    movements.push({
+      date: e.enrolledOn,
+      movement: 'joined',
+      ...student,
+      reason: from ? 'moved_from' : null,
+      otherGroup: from?.groupName ?? null,
+    });
+    if (e.endsOn === null) continue;
+    const to = others(e).find((o) => o.enrolledOn === e.endsOn);
+    const withdrawn = facts.withdrawals.some((w) =>
+      w.studentId === e.studentId && w.withdrawnOn === e.endsOn
+    );
+    movements.push({
+      date: e.endsOn,
+      movement: 'left',
+      ...student,
+      reason: to ? 'moved_to' : withdrawn ? 'withdrawn' : null,
+      otherGroup: to?.groupName ?? null,
+    });
+  }
+  return movements.sort((a, b) =>
+    b.date.localeCompare(a.date) || a.studentName.localeCompare(b.studentName, 'es')
+  );
+}
+
 export interface ClassQuery {
   /** Ordenados por primer día de la semana, hora de inicio y aula. */
   groups(on: LocalDate): Promise<GroupSummary[]>;
   group(id: string, on: LocalDate): Promise<GroupSummary | null>;
   enrolledStudents(groupId: string, on: LocalDate): Promise<EnrolledStudent[]>;
+  historyFacts(groupId: string): Promise<GroupHistoryFacts>;
 }
 
 export class ClassGroupNotFound extends Error {

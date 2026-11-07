@@ -5,6 +5,7 @@ import type { StudentReference, TeacherReference } from '../../domain/classes/mo
 import {
   ClassGroupNotFound,
   CreateClassGroup,
+  groupHistory,
   type GroupInput,
   type GroupSummary,
   ResolveSchedule,
@@ -129,6 +130,16 @@ export function registerClassRoutes(api: ApiApp): void {
         ...present(group),
         students: await query(scope).enrolledStudents(id, today(api)),
       });
+    },
+  );
+
+  // Entradas y salidas de alumnos del grupo, de la más reciente a la más antigua.
+  api.defineRoute(
+    { method: 'GET', path: '/api/admin/groups/:id/history', access: 'clubReader' },
+    async (c, scope) => {
+      const id = param(c, 'id');
+      if ((await query(scope).group(id, today(api))) === null) throw new ClassGroupNotFound();
+      return c.json({ items: groupHistory(id, await query(scope).historyFacts(id)) });
     },
   );
 

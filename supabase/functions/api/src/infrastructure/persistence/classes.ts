@@ -23,6 +23,7 @@ import type {
   ClassQuery,
   EnrolledStudent,
   EnrolmentRepository,
+  GroupHistoryFacts,
   GroupSummary,
 } from '../../application/classes/mod.ts';
 import { Row, type Sql } from './sql.ts';
@@ -224,6 +225,38 @@ export class SqlClassQuery implements ClassQuery {
     const rows = await this.sql`${this.select()} WHERE g.id = ${id}`;
     if (!rows[0]) return null;
     return toSummary(new Row(rows[0]), (await this.activeEnrolments(on, id)).get(id) ?? []);
+  }
+
+  /** Inscripciones de los alumnos que alguna vez estuvieron en el grupo y las fechas de sus bajas del club. */
+  async historyFacts(groupId: string): Promise<GroupHistoryFacts> {
+    const enrolments = await this.sql`
+      SELECT e.student_id, s.full_name, e.class_group_id, g.name AS group_name,
+             e.enrolled_on::text, e.ends_on::text
+        FROM classes_enrolment e
+        JOIN students_student s ON s.id = e.student_id
+        JOIN classes_group g ON g.id = e.class_group_id
+       WHERE e.student_id IN (SELECT student_id FROM classes_enrolment WHERE class_group_id = ${groupId})`;
+    const withdrawals = await this.sql`
+      SELECT s.id AS student_id, s.withdrawn_on::text FROM students_student s
+       WHERE s.withdrawn_on IS NOT NULL
+         AND s.id IN (SELECT student_id FROM classes_enrolment WHERE class_group_id = ${groupId})
+      UNION ALL
+      SELECT p.student_id, p.withdrawn_on::text FROM students_past_membership p
+       WHERE p.student_id IN (SELECT student_id FROM classes_enrolment WHERE class_group_id = ${groupId})`;
+    return {
+      enrolments: Row.all(enrolments).map((row) => ({
+        studentId: row.string('student_id'),
+        studentName: row.string('full_name'),
+        groupId: row.string('class_group_id'),
+        groupName: row.string('group_name'),
+        enrolledOn: row.string('enrolled_on'),
+        endsOn: row.nullableString('ends_on'),
+      })),
+      withdrawals: Row.all(withdrawals).map((row) => ({
+        studentId: row.string('student_id'),
+        withdrawnOn: row.string('withdrawn_on'),
+      })),
+    };
   }
 
   /** Alumnos con inscripción activa, por nombre. */
