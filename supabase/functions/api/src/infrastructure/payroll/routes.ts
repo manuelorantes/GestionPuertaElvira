@@ -18,6 +18,7 @@ import {
   RefillDay,
   RemoveHoliday,
   SaveDuty,
+  SetGroupPay,
   SubstitutedDays,
   SubstituteTeacher,
   TeacherAgenda,
@@ -34,6 +35,7 @@ import { SqlBillingSettingsRepository, SqlClosedPeriods } from '../persistence/b
 import {
   SqlAdvanceRepository,
   SqlDutyRepository,
+  SqlGroupPayRepository,
   SqlHolidayCalendar,
   SqlMonthlyFees,
   SqlPayrollQuery,
@@ -133,6 +135,7 @@ export function registerPayrollRoutes(api: ApiApp): void {
     SubstitutionNotFound: [404, 'not_found'],
     DutyNotFound: [404, 'not_found'],
     SubstitutionNeedsReason: [409, 'reason_required'],
+    GroupNotFound: [404, 'not_found'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string) => ({
     method,
@@ -407,6 +410,20 @@ export function registerPayrollRoutes(api: ApiApp): void {
         param(c, 'teacherId'),
         param(c, 'month'),
         b.requiredString('date'),
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  // Tarifa propia de una clase para quien la dé: solo superadministración (cambia liquidaciones sin pagar).
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/payroll/groups/:id/pay', access: 'superadmin' },
+    async (c, scope) => {
+      const b = await JsonBody.from(c.req.raw);
+      const amount = b.optionalString('amount');
+      await new SetGroupPay(new SqlGroupPayRepository(scope.tx)).execute(
+        param(c, 'id'),
+        amount === null ? null : { unit: b.optionalString('unit') ?? 'hour', amount },
       );
       return c.body(null, 204);
     },

@@ -44,6 +44,47 @@ export class SessionMinutes {
 
 export class DutyRef extends Uuid {}
 
+/** Cómo se paga una clase con tarifa propia: por hora o por sesión. */
+export type PayUnit = 'hour' | 'session';
+
+/**
+ * Tarifa propia de una clase para quien la dé (su profesor o un sustituto), en lugar de su tarifa por hora: tanto por
+ * hora o tanto por sesión. Una sesión que solo cuenta en parte (se pisa con otra) cobra esa parte.
+ */
+export class GroupPay {
+  private constructor(
+    readonly unit: PayUnit,
+    readonly amount: Money,
+  ) {}
+
+  static of(unit: string, amount: Money): GroupPay {
+    if (unit !== 'hour' && unit !== 'session') {
+      throw new InvalidValue(
+        'unit',
+        'La tarifa de la clase es por hora (hour) o por sesión (session).',
+      );
+    }
+    if (amount.isNegative()) throw new InvalidValue('amount', 'La tarifa no puede ser negativa.');
+    return new GroupPay(unit, amount);
+  }
+
+  /** Céntimos (sin redondear) de `counted` minutos que cuentan de una sesión de `minutes`. */
+  exactCents(counted: number, minutes: number): number {
+    if (this.unit === 'hour') return (this.amount.cents * counted) / 60;
+    return minutes === 0 ? 0 : (this.amount.cents * counted) / minutes;
+  }
+}
+
+/** Céntimos (sin redondear) de lo que cuenta de una sesión: con la tarifa de su clase, si tiene, o con la del profesor. */
+function sessionCents(
+  rate: Money,
+  pay: GroupPay | undefined,
+  counted: number,
+  minutes: number,
+): number {
+  return pay ? pay.exactCents(counted, minutes) : (rate.cents * counted) / 60;
+}
+
 /** Grupo del horario: profesor, días ISO (1 = lunes), duración y hora de inicio (minutos desde las 00:00). */
 export class ScheduledGroup {
   constructor(
@@ -53,6 +94,8 @@ export class ScheduledGroup {
     readonly weekdays: readonly number[],
     readonly minutes: number,
     readonly start: number,
+    /** Tarifa propia de la clase para quien la dé; null, la tarifa por hora de cada profesor. */
+    readonly pay: GroupPay | null = null,
   ) {}
 }
 
@@ -288,13 +331,18 @@ export class Settlement {
 }
 
 /**
- * Liquidación = horas × tarifa, redondeada a céntimos, con el detalle por grupo o actividad. Las horas que se
- * solapan el mismo día (una actividad del club mientras da una clase, dos clases a la vez por una sustitución) cuentan
- * una sola vez y van a la sesión más corta: esta cuenta entera y las más largas aportan solo lo que les sobra.
+ * Liquidación = horas × tarifa, redondeada a céntimos, con el detalle por grupo o actividad; las clases con tarifa propia
+ * (por hora o por sesión) se pagan con ella. Las horas que se solapan el mismo día (una actividad del club mientras da
+ * una clase, dos clases a la vez por una sustitución) cuentan una sola vez y van a la sesión más corta: esta cuenta
+ * entera y las más largas aportan solo lo que les sobra.
  */
 export class SettlementCalculator {
-  settle(entries: readonly TimesheetEntry[], rate: Money): Settlement {
-    const byLabel = new Map<string, number>();
+  settle(
+    entries: readonly TimesheetEntry[],
+    rate: Money,
+    pays: ReadonlyMap<string, GroupPay> = new Map(),
+  ): Settlement {
+    const byLabel = new Map<string, { minutes: number; cents: number }>();
     const spans = effectiveMinutes(entries, (e) => ({
       day: e.date.toString(),
       start: e.start,
@@ -302,19 +350,25 @@ export class SettlementCalculator {
       substitution: e.label.endsWith(SUBSTITUTION_SUFFIX),
     }));
     for (const [entry, minutes] of spans) {
-      byLabel.set(entry.label, (byLabel.get(entry.label) ?? 0) + minutes);
+      const line = byLabel.get(entry.label) ?? { minutes: 0, cents: 0 };
+      const pay = entry.group ? pays.get(entry.group.value) : undefined;
+      byLabel.set(entry.label, {
+        minutes: line.minutes + minutes,
+        cents: line.cents + sessionCents(rate, pay, minutes, entry.minutes().minutes),
+      });
     }
-    const minutes = [...byLabel.values()].reduce((sum, m) => sum + m, 0);
-    const amount = rate.times(minutes / 60);
+    const totals = [...byLabel.values()];
+    const minutes = totals.reduce((sum, l) => sum + l.minutes, 0);
+    const amount = Money.cents(1).times(totals.reduce((sum, l) => sum + l.cents, 0));
     const lines: SettlementLine[] = [];
     let assigned = Money.zero();
     const labels = [...byLabel.entries()];
-    labels.forEach(([label, labelMinutes], index) => {
+    labels.forEach(([label, line], index) => {
       const lineAmount = index === labels.length - 1
         ? amount.minus(assigned)
-        : rate.times(labelMinutes / 60);
+        : Money.cents(1).times(line.cents);
       assigned = assigned.plus(lineAmount);
-      lines.push(new SettlementLine(label, labelMinutes, lineAmount));
+      lines.push(new SettlementLine(label, line.minutes, lineAmount));
     });
     return new Settlement(minutes, rate, amount, lines);
   }
@@ -428,7 +482,28 @@ export class ExpectedHours {
     duties: readonly ClubDuty[],
     holidays: ReadonlySet<string>,
   ): Map<string, number> {
+    return new Map(
+      [...this.costsOfMonth(month, groups, duties, holidays, new Map())].map((
+        [teacher, cost],
+      ) => [teacher, cost.minutes]),
+    );
+  }
+
+  /**
+   * Horas y coste esperados de cada profesor: cada sesión a la tarifa propia de su clase o, si no tiene, a la del
+   * profesor (`rates`, por id; sin tarifa conocida, 0).
+   */
+  costsOfMonth(
+    month: YearMonth,
+    groups: readonly ScheduledGroup[],
+    duties: readonly ClubDuty[],
+    holidays: ReadonlySet<string>,
+    rates: ReadonlyMap<string, Money>,
+  ): Map<string, { minutes: number; cents: number }> {
     const planner = new DailyPlanner();
+    const pays = new Map(
+      groups.flatMap((g) => g.pay ? [[g.id.value, g.pay] as const] : []),
+    );
     const sessions: PlannedSession[] = [];
     for (let day = month.firstDay(); !month.lastDay().isBefore(day); day = day.plusDays(1)) {
       if (holidays.has(day.toString())) continue;
@@ -438,16 +513,25 @@ export class ExpectedHours {
     for (const s of sessions) {
       byTeacher.set(s.teacher.value, [...(byTeacher.get(s.teacher.value) ?? []), s]);
     }
-    const minutes = new Map<string, number>();
+    const costs = new Map<string, { minutes: number; cents: number }>();
     for (const [teacher, own] of byTeacher) {
-      const total = effectiveMinutes(own, (s) => ({
-        day: s.date.toString(),
-        start: s.start,
-        minutes: s.minutes.minutes,
-      })).reduce((sum, [, m]) => sum + m, 0);
-      minutes.set(teacher, total);
+      const rate = rates.get(teacher) ?? Money.zero();
+      let minutes = 0;
+      let cents = 0;
+      for (
+        const [session, counted] of effectiveMinutes(own, (s) => ({
+          day: s.date.toString(),
+          start: s.start,
+          minutes: s.minutes.minutes,
+        }))
+      ) {
+        minutes += counted;
+        const pay = session.group ? pays.get(session.group.value) : undefined;
+        cents += sessionCents(rate, pay, counted, session.minutes.minutes);
+      }
+      costs.set(teacher, { minutes, cents: Money.cents(1).times(cents).cents });
     }
-    return minutes;
+    return costs;
   }
 }
 

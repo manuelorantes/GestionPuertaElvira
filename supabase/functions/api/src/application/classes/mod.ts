@@ -98,6 +98,8 @@ export interface GroupSummary {
   weeklyPlan: string;
   /** Precio mensual si es clase especial (lo fija superadministración en Cobros); null si no lo es. */
   specialPriceCents: number | null;
+  /** Tarifa propia de la clase para quien la dé (por hora o por sesión); null, la del profesor. */
+  teacherPay: { unit: 'hour' | 'session'; amountCents: number } | null;
 }
 
 export interface EnrolledStudent {

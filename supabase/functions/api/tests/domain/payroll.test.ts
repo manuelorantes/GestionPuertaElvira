@@ -6,6 +6,7 @@ import {
   DailyPlanner,
   DutyRef,
   ExpectedHours,
+  GroupPay,
   GroupRef,
   overlapShares,
   ScheduledGroup,
@@ -149,6 +150,45 @@ Deno.test('SettlementCalculator should count once a stretch covered by several o
     Money.cents(1000),
   );
   assertEquals(settlement.minutes, 180);
+});
+
+Deno.test('GroupPay should pay per hour or per session, in proportion to what counts', () => {
+  const hourly = GroupPay.of('hour', Money.cents(10000));
+  assertEquals(hourly.exactCents(90, 90), 15000, '1,5 h a 100 €/h');
+  const perSession = GroupPay.of('session', Money.cents(10000));
+  assertEquals(perSession.exactCents(90, 90), 10000, 'la sesión entera, dure lo que dure');
+  assertEquals(perSession.exactCents(45, 90), 5000, 'si solo cuenta la mitad, la mitad');
+  assertEquals(perSession.exactCents(0, 90), 0);
+  assertThrows(() => GroupPay.of('day', Money.cents(100)), InvalidValue);
+  assertThrows(() => GroupPay.of('hour', Money.cents(-1)), InvalidValue);
+});
+
+Deno.test('SettlementCalculator should pay a class with its own rate, by hour or by session', () => {
+  // Lucía cobra 15 €/h, pero «Rey A» se paga a 100 € la sesión y «Competición» a 20 €/h.
+  const lucia = TeacherRef.generate();
+  const rey = GroupRef.generate();
+  const competition = GroupRef.generate();
+  const settlement = new SettlementCalculator().settle(
+    [
+      entry(lucia, '2026-10-05', rey, 'Rey A', 1.5),
+      entry(lucia, '2026-10-12', rey, 'Rey A', 1.5),
+      entry(lucia, '2026-10-06', competition, 'Competición', 2),
+      entry(lucia, '2026-10-07', GroupRef.generate(), 'Iniciación A', 1),
+    ],
+    Money.cents(1500),
+    new Map([
+      [rey.value, GroupPay.of('session', Money.cents(10000))],
+      [competition.value, GroupPay.of('hour', Money.cents(2000))],
+    ]),
+  );
+  assertEquals(settlement.minutes, 90 + 90 + 120 + 60);
+  assertEquals(settlement.lines.map((l) => [l.label, l.minutes, l.amount.cents]), [
+    ['Rey A', 180, 20000],
+    ['Competición', 120, 4000],
+    ['Iniciación A', 60, 1500],
+  ]);
+  assertEquals(settlement.amount.cents, 25500);
+  assertEquals(settlement.rate.cents, 1500, 'la tarifa sigue siendo la del profesor');
 });
 
 Deno.test('ExpectedHours should count every class and duty of the month except holidays, overlaps once', () => {

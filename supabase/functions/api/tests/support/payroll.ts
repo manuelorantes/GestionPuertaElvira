@@ -5,6 +5,7 @@ import {
   type ClubDuty,
   DailyPlanner,
   type DutyRef,
+  GroupPay,
   GroupRef,
   MonthlySettlement,
   ScheduledGroup,
@@ -87,6 +88,12 @@ export class PayrollFixture
 
   all(): Promise<TeacherRate[]> {
     return Promise.resolve([...this.teachers.values()]);
+  }
+
+  groupPays(): Promise<Map<string, GroupPay>> {
+    return Promise.resolve(
+      new Map(this.scheduledGroups.flatMap((g) => g.pay ? [[g.id.value, g.pay] as const] : [])),
+    );
   }
 
   entry(id: TimesheetEntryId): Promise<TimesheetEntry | null> {

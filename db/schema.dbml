@@ -645,6 +645,14 @@ Ref: points_photo.student_id > students_student.id [delete: cascade]
 
 // ---- Actividades del club ----------------------------------------------------------------------
 
+Table payroll_group_pay {
+  group_id uuid [pk, note: 'referencia a classes_group.id; se borra con el grupo']
+  unit text [not null, note: 'hour | session']
+  amount_cents int [not null, note: 'lo que cobra quien la dé (su profesor o un sustituto) por hora o por sesión, en lugar de su tarifa']
+}
+
+Ref: payroll_group_pay.group_id > classes_group.id [delete: cascade]
+
 Table payroll_duty {
   id uuid [pk]
   teacher_id uuid [not null, note: 'encargado']

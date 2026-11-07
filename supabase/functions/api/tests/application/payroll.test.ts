@@ -5,6 +5,7 @@ import { InvalidValue, LocalDate, Money, YearMonth } from '../../src/domain/comm
 import {
   ClubDuty,
   DutyRef,
+  GroupPay,
   GroupRef,
   ScheduledGroup,
   SessionMinutes,
@@ -533,6 +534,29 @@ Deno.test('Substitutions should cover club duty shifts too, alone or with all th
   );
 });
 
+Deno.test('ExpectedPayroll should cost a class with its own pay at it, by session', async () => {
+  const { fx, duties, carlos } = setUp();
+  // «Adultos I» (los martes, 1,5 h) pasa a pagarse a 50 € la sesión: 4 martes en noviembre.
+  fx.scheduledGroups = fx.scheduledGroups.map((g) =>
+    g.name === 'Adultos I'
+      ? new ScheduledGroup(
+        g.id,
+        g.name,
+        g.teacher,
+        g.weekdays,
+        g.minutes,
+        g.start,
+        GroupPay.of('session', Money.cents(5000)),
+      )
+      : g
+  );
+  const november = (await new ExpectedPayroll(fx, duties, fx, fx).byTeacher(
+    YearMonth.fromString('2026-11'),
+    YearMonth.fromString('2026-11'),
+  )).get('2026-11') ?? [];
+  assertEquals(november.find((t) => t.teacherId === carlos)?.cents, 4 * 5000);
+});
+
 Deno.test('ExpectedPayroll should cost the expected hours of each month at the current rates', async () => {
   const { fx, duties, lucia, carlos } = setUp();
   await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
@@ -863,6 +887,7 @@ Deno.test('ListSessions should show the newest first, what each session counts a
     minutes,
     start,
     rateCents: 1500,
+    pay: null,
     fromSchedule: true,
     locked: false,
     substitution,
@@ -897,6 +922,7 @@ Deno.test('TeacherHours should show a teacher their sessions of a month and who 
     minutes,
     start: substitution ? 19 * 60 : 17 * 60,
     rateCents: 1600,
+    pay: null,
     fromSchedule: true,
     locked: false,
     substitution,
