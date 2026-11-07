@@ -601,6 +601,79 @@ describe('Clases', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows at the bottom of the group sheet who joined and left it, and why', async () => {
+    api({
+      'GET /api/admin/groups/g1': [200, { ...GROUP, students: [] }],
+      'GET /api/admin/groups/g1/history': [
+        200,
+        {
+          items: [
+            {
+              date: '2026-10-20',
+              movement: 'left',
+              studentId: 's2',
+              studentName: 'Pablo Gil Ruiz',
+              reason: 'moved_to',
+              otherGroup: 'Avanzado C',
+            },
+            {
+              date: '2026-10-10',
+              movement: 'left',
+              studentId: 's3',
+              studentName: 'Luis Mora Gil',
+              reason: 'withdrawn',
+              otherGroup: null,
+            },
+            {
+              date: '2026-10-01',
+              movement: 'joined',
+              studentId: 's2',
+              studentName: 'Pablo Gil Ruiz',
+              reason: 'moved_from',
+              otherGroup: 'Intermedio B',
+            },
+            {
+              date: '2026-09-15',
+              movement: 'joined',
+              studentId: 's1',
+              studentName: 'Ana Ruiz Gil',
+              reason: null,
+              otherGroup: null,
+            },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/clases?grupo=g1');
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    const history = within(sheet).getByRole('region', { name: 'Historial' });
+    const rows = await within(history).findAllByRole('listitem');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      '20/10/2026Sale · Pablo Gil Ruiz · pasa a Avanzado C',
+      '10/10/2026Sale · Luis Mora Gil · baja del club',
+      '01/10/2026Entra · Pablo Gil Ruiz · viene de Intermedio B',
+      '15/09/2026Entra · Ana Ruiz Gil',
+    ]);
+    expect(within(history).getByRole('link', { name: 'Ana Ruiz Gil' })).toBeInTheDocument();
+    // Es lo último de la ficha.
+    const sections = within(sheet).getAllByRole('heading', { level: 3 });
+    expect(sections.at(-1)).toHaveTextContent('Historial');
+  });
+
+  it('says so when nobody has joined or left the group yet', async () => {
+    api({
+      'GET /api/admin/groups/g1': [200, { ...GROUP, students: [] }],
+      'GET /api/admin/groups/g1/history': [200, { items: [] }],
+    });
+    renderApp('/panel/clases?grupo=g1');
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(
+      await within(sheet).findByText('Todavía no ha entrado ni salido nadie de este grupo.'),
+    ).toBeInTheDocument();
+  });
+
   it('opens the attendance of a group in the month of its link', async () => {
     const month = shiftMonth(MONTH, -1);
     api({
