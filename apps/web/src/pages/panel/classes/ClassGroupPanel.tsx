@@ -3,7 +3,17 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
-import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
+import { setSpecialClassPrice } from '@/features/billing/api';
+import { useBillingMutation } from '@/features/billing/hooks';
+import {
+  currentMonth,
+  formatCents,
+  monthLabel,
+  recalculationStartLabel,
+  shiftMonth,
+} from '@/features/billing/money';
+import { usePanelRole } from '@/features/auth/panelView';
+import { useSession } from '@/features/auth/useSession';
 import { classroomLabel } from '@/features/classes/classrooms';
 import type { ClassGroup } from '@/features/classes/api';
 import { useGroup } from '@/features/classes/hooks';
@@ -17,6 +27,7 @@ import { Card } from '@/shared/ui/Card';
 import { Combobox } from '@/shared/ui/Combobox';
 import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
+import { ConfirmedPriceField } from '../billing/ConfirmedPriceField';
 import { GroupAttendanceTable } from './GroupAttendanceTable';
 import { GroupClassComments } from './GroupClassComments';
 import { GroupHistory } from './GroupHistory';
@@ -46,6 +57,11 @@ export function ClassGroupPanel({ groupId, onClose, onEdit, month }: ClassGroupP
   const [error, setError] = useState<string | null>(null);
   const enrol = useStudentMutation(({ id, confirm }: { id: string; confirm: boolean }) =>
     addGroup(id, groupId, confirm),
+  );
+  // El precio de clase especial solo lo cambia superadministración (recalcula cuotas).
+  const isSuperadmin = usePanelRole(useSession().data) === 'superadministrator';
+  const savePrice = useBillingMutation((price: string | null) =>
+    setSpecialClassPrice(groupId, price),
   );
 
   if (!group.data) {
@@ -172,6 +188,26 @@ export function ClassGroupPanel({ groupId, onClose, onEdit, month }: ClassGroupP
             >
               Inscribir
             </Button>
+          </Card>
+        )}
+        {g.level !== 'private_lesson' && (
+          <Card className="p-4">
+            <h3 className="mb-2 text-xs font-semibold tracking-[0.06em] text-ink-muted uppercase">
+              Clase especial
+            </h3>
+            <ConfirmedPriceField
+              label="Precio de clase especial"
+              priceCents={g.specialPriceCents ?? null}
+              emptyText="Sin precio especial: se paga por horas"
+              canEdit={isSuperadmin}
+              confirmTitle="Precio de la clase especial"
+              describe={(cents) =>
+                cents === null
+                  ? `«${g.name}» dejará de ser clase especial: sus ${g.students.length} alumnos volverán a pagarla por horas desde ${recalculationStartLabel()}.`
+                  : `Los ${g.students.length} alumnos de «${g.name}» pagarán ${formatCents(cents)} al mes por esta clase (sin contar sus horas para el tramo) desde ${recalculationStartLabel()}. Se recalcularán sus cuotas.`
+              }
+              onSave={(price) => savePrice.mutateAsync(price)}
+            />
           </Card>
         )}
         <Card className="p-4">

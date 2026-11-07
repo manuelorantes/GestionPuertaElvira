@@ -1,5 +1,6 @@
 import { Pencil } from 'lucide-react';
 
+import { formatCents } from '@/features/billing/money';
 import type { ClassGroup } from '@/features/classes/api';
 import { classroomLabel } from '@/features/classes/classrooms';
 import { LEVELS, WEEKLY_PLAN_LABEL } from '@/features/classes/levels';
@@ -62,7 +63,14 @@ export function GroupsTable({
                     aria-hidden
                     className={`size-3 shrink-0 rounded-[4px] border ${LEVELS[group.level].className}`}
                   />
-                  {group.name}
+                  <span>
+                    {group.name}
+                    {group.specialPriceCents != null && (
+                      <span className="block text-xs font-normal text-ink-muted">
+                        Clase especial · {formatCents(group.specialPriceCents)}/mes
+                      </span>
+                    )}
+                  </span>
                 </span>
               </td>
               <td className="px-4 py-3 text-ink-soft">{LEVELS[group.level].label}</td>

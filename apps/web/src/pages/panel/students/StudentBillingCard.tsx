@@ -4,12 +4,25 @@ import { Link } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useCanManageClub } from '@/features/auth/useCanManageClub';
-import { updateAccount, type Account, type AccountCharge } from '@/features/billing/api';
+import {
+  setStudentPrice,
+  updateAccount,
+  type Account,
+  type AccountCharge,
+} from '@/features/billing/api';
 import { useAccount, useBillingMutation, usePayments } from '@/features/billing/hooks';
-import { centsFromText, formatCents, monthLabel } from '@/features/billing/money';
+import {
+  centsFromText,
+  formatCents,
+  monthLabel,
+  recalculationStartLabel,
+} from '@/features/billing/money';
+import { usePanelRole } from '@/features/auth/panelView';
+import { useSession } from '@/features/auth/useSession';
 import { formatDate } from '@/features/students/format';
 import { FEE_PARAM } from '@/features/students/links';
 import { BillingDialogs, type BillingDialog } from '@/pages/panel/billing/BillingPage';
+import { ConfirmedPriceField } from '@/pages/panel/billing/ConfirmedPriceField';
 import { Alert } from '@/shared/ui/Alert';
 import { Button } from '@/shared/ui/Button';
 import { AsteriskNote } from '@/shared/ui/AsteriskNote';
@@ -138,6 +151,10 @@ function AccountSummary({
   const toast = useToast();
   const error = save.error;
   const canManage = useCanManageClub();
+  // El precio fijado del alumno solo lo cambia superadministración (recalcula sus cuotas).
+  const isSuperadmin = usePanelRole(useSession().data) === 'superadministrator';
+  const fixPrice = useBillingMutation((price: string | null) => setStudentPrice(studentId, price));
+  const fixedCents = account.fixedPrice ? centsFromText(account.fixedPrice) : null;
 
   return (
     <div className="flex flex-col">
@@ -148,6 +165,23 @@ function AccountSummary({
       <Row label="Cuota mensual">
         {account.monthlyFeeCents > 0 ? formatCents(account.monthlyFeeCents) : '—'}
       </Row>
+      {(isSuperadmin || fixedCents !== null) && (
+        <div className="border-b border-line-soft py-2">
+          <ConfirmedPriceField
+            label="Precio fijado"
+            priceCents={fixedCents}
+            emptyText="Ninguno: paga según sus clases"
+            canEdit={isSuperadmin}
+            confirmTitle="Precio fijado del alumno"
+            describe={(cents) =>
+              cents === null
+                ? `Volverá a pagar según sus grupos, clases especiales y particulares desde ${recalculationStartLabel()}. Se recalcularán sus cuotas.`
+                : `Pagará ${formatCents(cents)} al mes, sin importar sus grupos, clases especiales o particulares (con sus descuentos de siempre), desde ${recalculationStartLabel()}. Se recalcularán sus cuotas.`
+            }
+            onSave={(price) => fixPrice.mutateAsync(price)}
+          />
+        </div>
+      )}
       <Row label="Descuento familiar">
         {account.familyDiscount ? 'Sí, por familia directa' : 'No'}
       </Row>
