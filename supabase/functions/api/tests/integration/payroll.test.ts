@@ -432,3 +432,72 @@ Deno.test({
     );
   },
 });
+
+Deno.test('only superadministration sets the pay of a class, by hour or by session, and settlements follow it', async () => {
+  await resetDatabase();
+  await createUser('junta@club.es');
+  await createUser('super@club.es', 'superadministrator');
+  const admin = new ApiClient();
+  await admin.logIn('junta@club.es');
+  const superadmin = new ApiClient();
+  await superadmin.logIn('super@club.es');
+  const teacher = await newTeacher(admin);
+  // Lucía cobra 15 €/h (la tarifa al darla de alta); su clase dura 1 h.
+  const group = await newGroup(admin, teacher);
+  assertEquals(
+    (await admin.json('POST', '/api/admin/payroll/sessions', {
+      teacherId: teacher,
+      date: today,
+      groupId: group,
+      hours: 1.5,
+    })).status,
+    201,
+  );
+  const settlement = async () =>
+    body<{ items: { amountCents: number; customRates: boolean }[] }>(
+      await admin.get(`/api/admin/payroll/settlements?month=${month}`),
+    ).items[0];
+  const cost = async () =>
+    body<{ items: { costCents: number }[] }>(
+      await admin.get(`/api/admin/payroll/sessions?month=${month}`),
+    ).items[0]?.costCents;
+  const pay = (client: ApiClient, payload: Record<string, unknown>) =>
+    client.json('PUT', `/api/admin/payroll/groups/${group}/pay`, payload);
+  assertEquals(await settlement(), {
+    ...(await settlement())!,
+    amountCents: 2250,
+    customRates: false,
+  });
+
+  assertError(await pay(admin, { unit: 'hour', amount: '100' }), 403, 'forbidden');
+  assertEquals((await pay(superadmin, { unit: 'hour', amount: '100' })).status, 204);
+  assertEquals((await settlement())?.amountCents, 15000, '1,5 h a 100 €/h');
+  assertEquals((await settlement())?.customRates, true);
+  assertEquals(await cost(), 15000);
+  const shown = body<{ teacherPay: unknown }>(await admin.get(`/api/admin/groups/${group}`));
+  assertEquals(shown.teacherPay, { unit: 'hour', amountCents: 10000 });
+
+  assertEquals((await pay(superadmin, { unit: 'session', amount: '100' })).status, 204);
+  assertEquals((await settlement())?.amountCents, 10000, 'la sesión entera');
+  assertEquals((await pay(superadmin, { amount: null })).status, 204);
+  assertEquals((await settlement())?.amountCents, 2250);
+
+  assertError(await pay(superadmin, { unit: 'day', amount: '10' }), 422, 'unprocessable');
+  assertError(await pay(superadmin, { unit: 'hour', amount: 'abc' }), 422, 'unprocessable');
+  assertError(
+    await superadmin.json(
+      'PUT',
+      '/api/admin/payroll/groups/01990000-0000-7000-8000-000000000000/pay',
+      { unit: 'hour', amount: '10' },
+    ),
+    404,
+    'not_found',
+  );
+  const history = body<{ items: { category: string; label: string }[] }>(
+    await superadmin.get('/api/admin/audit/actions'),
+  ).items;
+  assertEquals(
+    history.slice(0, 3).map((h) => [h.category, h.label]),
+    Array(3).fill(['teachers', 'Fijar la tarifa de una clase para el profesorado']),
+  );
+});

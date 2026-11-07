@@ -6,6 +6,7 @@ import {
   type DutyKind,
   dutyKindFromName,
   DutyRef,
+  GroupPay,
   GroupRef,
   MonthlySettlement,
   ScheduledGroup,
@@ -22,6 +23,7 @@ import type {
   ClassLoad,
   ClassLoadQuery,
   DutyRepository,
+  GroupPayRepository,
   HolidayCalendar,
   MonthlyFees,
   PayrollQuery,
@@ -328,6 +330,39 @@ export class SqlTeacherRates implements TeacherRates {
       active: row.bool('active'),
     }));
   }
+
+  async groupPays(): Promise<Map<string, GroupPay>> {
+    const rows = await this.sql`SELECT group_id, unit, amount_cents FROM payroll_group_pay`;
+    return new Map(
+      Row.all(rows).map((row) => [row.string('group_id'), toGroupPay(row)!]),
+    );
+  }
+}
+
+/** La tarifa propia de una fila con `unit` y `amount_cents` (null si no tiene). */
+function toGroupPay(row: Row): GroupPay | null {
+  const unit = row.nullableString('unit');
+  return unit === null ? null : GroupPay.of(unit, Money.cents(row.int('amount_cents')));
+}
+
+/** Tarifa propia de cada clase. */
+export class SqlGroupPayRepository implements GroupPayRepository {
+  constructor(private readonly sql: Sql) {}
+
+  async groupExists(groupId: string): Promise<boolean> {
+    const rows = await this.sql`SELECT 1 FROM classes_group WHERE id = ${groupId}`;
+    return rows.length > 0;
+  }
+
+  async setGroupPay(groupId: string, pay: GroupPay | null): Promise<void> {
+    if (pay === null) {
+      await this.sql`DELETE FROM payroll_group_pay WHERE group_id = ${groupId}`;
+      return;
+    }
+    await this.sql`INSERT INTO payroll_group_pay (group_id, unit, amount_cents)
+      VALUES (${groupId}, ${pay.unit}, ${pay.amount.cents})
+      ON CONFLICT (group_id) DO UPDATE SET unit = EXCLUDED.unit, amount_cents = EXCLUDED.amount_cents`;
+  }
 }
 
 /** Horario de Clases visto desde Payroll. */
@@ -336,7 +371,8 @@ export class SqlScheduleDirectory implements ScheduleDirectory {
 
   async groups(): Promise<ScheduledGroup[]> {
     const rows = await this
-      .sql`SELECT id, name, teacher_id, days, start_minutes, end_minutes FROM classes_group ORDER BY name`;
+      .sql`SELECT g.id, g.name, g.teacher_id, g.days, g.start_minutes, g.end_minutes, p.unit, p.amount_cents
+        FROM classes_group g LEFT JOIN payroll_group_pay p ON p.group_id = g.id ORDER BY g.name`;
     return Row.all(rows).map((row) =>
       new ScheduledGroup(
         GroupRef.fromString(row.string('id')),
@@ -345,6 +381,7 @@ export class SqlScheduleDirectory implements ScheduleDirectory {
         row.intList('days'),
         row.int('end_minutes') - row.int('start_minutes'),
         row.int('start_minutes'),
+        toGroupPay(row),
       )
     );
   }
@@ -359,6 +396,7 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
   async sessions(month: YearMonth, teacherId: string | null): Promise<SessionRow[]> {
     const rows = await this.sql`
       SELECT s.*, t.full_name, COALESCE(st.rate_cents, t.hourly_rate_cents) AS rate_cents, st.teacher_id IS NOT NULL AS locked,
+             gp.unit, gp.amount_cents,
              EXISTS (
                SELECT 1 FROM payroll_substitution sub
                 WHERE sub.teacher_id = s.teacher_id AND sub.substitution_date = s.session_date
@@ -367,6 +405,7 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
         FROM payroll_session s
         JOIN teachers_teacher t ON t.id = s.teacher_id
         LEFT JOIN payroll_settlement st ON st.teacher_id = s.teacher_id AND st.month = ${month.toString()}
+        LEFT JOIN payroll_group_pay gp ON gp.group_id = s.group_id
        WHERE s.session_date BETWEEN ${month.firstDay().toString()} AND ${month.lastDay().toString()}
          AND (${teacherId}::uuid IS NULL OR s.teacher_id = ${teacherId}::uuid)
        ORDER BY s.session_date, s.label`;
@@ -380,6 +419,7 @@ export class SqlPayrollQuery implements PayrollQuery, ClassLoadQuery {
       minutes: row.int('minutes'),
       start: row.nullableInt('start_minutes'),
       rateCents: row.int('rate_cents'),
+      pay: toGroupPay(row),
       fromSchedule: row.bool('from_schedule'),
       locked: row.bool('locked'),
       substitution: row.bool('substitution'),

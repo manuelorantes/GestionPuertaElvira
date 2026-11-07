@@ -166,6 +166,7 @@ export function titleOf(
         student(),
       );
     case 'billing_special_class_price':
+    case 'payroll_group_pay':
       return group();
     case 'billing_account':
     case 'students_past_membership':

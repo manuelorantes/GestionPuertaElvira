@@ -183,10 +183,12 @@ export class SqlClassQuery implements ClassQuery {
   private select() {
     return this.sql`
       SELECT g.id, g.name, g.custom_name, g.level, g.teacher_id, g.days, g.start_minutes, g.end_minutes, g.classroom, g.capacity,
-             t.full_name AS teacher_name, sp.monthly_price_cents AS special_price_cents
+             t.full_name AS teacher_name, sp.monthly_price_cents AS special_price_cents,
+             gp.unit AS pay_unit, gp.amount_cents AS pay_cents
         FROM classes_group g
         JOIN teachers_teacher t ON t.id = g.teacher_id
-        LEFT JOIN billing_special_class_price sp ON sp.group_id = g.id`;
+        LEFT JOIN billing_special_class_price sp ON sp.group_id = g.id
+        LEFT JOIN payroll_group_pay gp ON gp.group_id = g.id`;
   }
 
   /** Inscripciones vigentes de todos los grupos (o de uno), para contar plazas por día. */
@@ -305,5 +307,14 @@ function toSummary(row: Row, enrolments: readonly Enrolment[]): GroupSummary {
     ),
     weeklyPlan: d.weeklyPlan(),
     specialPriceCents: row.nullableInt('special_price_cents'),
+    teacherPay: payOf(row.nullableString('pay_unit'), row.nullableInt('pay_cents')),
   };
+}
+
+function payOf(
+  unit: string | null,
+  cents: number | null,
+): { unit: 'hour' | 'session'; amountCents: number } | null {
+  if (cents === null || (unit !== 'hour' && unit !== 'session')) return null;
+  return { unit, amountCents: cents };
 }
