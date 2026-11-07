@@ -15,6 +15,7 @@ import {
   type DutyKind,
   DutyRef,
   ExpectedHours,
+  GroupPay,
   GroupRef,
   MonthlySettlement,
   overlapShares,
@@ -47,6 +48,42 @@ export interface TeacherRate {
 
 export interface TeacherRates {
   all(): Promise<TeacherRate[]>;
+  /** Tarifas propias de las clases que tienen una, por id de grupo. */
+  groupPays(): Promise<Map<string, GroupPay>>;
+}
+
+/** Tarifa propia de cada clase para quien la dé (solo superadministración la cambia). */
+export interface GroupPayRepository {
+  groupExists(groupId: string): Promise<boolean>;
+  setGroupPay(groupId: string, pay: GroupPay | null): Promise<void>;
+}
+
+export class GroupNotFound extends Error {
+  constructor() {
+    super('Ese grupo no existe.');
+    this.name = 'GroupNotFound';
+  }
+}
+
+/**
+ * Pone (o quita, con null) la tarifa propia de una clase: quien la dé cobra esas horas a tanto por hora, o tanto por
+ * sesión, en lugar de su tarifa. Cambia las liquidaciones sin pagar, como cambiar la tarifa de un profesor.
+ */
+export class SetGroupPay {
+  constructor(private readonly pays: GroupPayRepository) {}
+
+  async execute(groupId: string, pay: { unit: string; amount: string } | null): Promise<void> {
+    const group = GroupRef.fromString(groupId);
+    if (!(await this.pays.groupExists(group.value))) throw new GroupNotFound();
+    if (pay === null) return this.pays.setGroupPay(group.value, null);
+    let amount: Money;
+    try {
+      amount = Money.fromDecimal(pay.amount);
+    } catch {
+      throw new InvalidValue('amount', 'La tarifa no es válida.');
+    }
+    await this.pays.setGroupPay(group.value, GroupPay.of(pay.unit, amount));
+  }
 }
 
 export interface ScheduleDirectory {
@@ -140,6 +177,8 @@ export interface SessionView {
 export type SessionRow = Omit<SessionView, 'countedMinutes' | 'overlapsWith' | 'costCents'> & {
   start: number | null;
   rateCents: number;
+  /** Tarifa propia de su clase, si tiene (manda sobre la del profesor). */
+  pay: GroupPay | null;
 };
 
 /**
@@ -158,12 +197,14 @@ export class ListSessions {
       substitution: r.substitution,
     }));
     return shares
-      .map(({ item: { start, rateCents, ...row }, minutes, overlappedBy }) => ({
+      .map(({ item: { start, rateCents, pay, ...row }, minutes, overlappedBy }) => ({
         ...row,
         start,
         countedMinutes: minutes,
         overlapsWith: overlappedBy.map((o) => o.label),
-        costCents: Math.round((rateCents * minutes) / 60),
+        costCents: Math.round(
+          pay ? pay.exactCents(minutes, row.minutes) : (rateCents * minutes) / 60,
+        ),
       }))
       .sort((a, b) =>
         b.date.localeCompare(a.date) || (a.start ?? 0) - (b.start ?? 0) ||
@@ -595,6 +636,8 @@ export interface SettlementView {
   minutes: number;
   rateCents: number;
   amountCents: number;
+  /** Incluye clases con tarifa propia: el importe no es horas × tarifa. */
+  customRates: boolean;
   /** Anticipos de ese mes, que se descuentan de lo que hay que pagarle. */
   advancesCents: number;
   /** Importe menos anticipos (negativo si se le adelantó más de lo que ha hecho). */
@@ -631,13 +674,14 @@ export class ListSettlements {
       advanced.set(a.teacher.value, (advanced.get(a.teacher.value) ?? 0) + a.amount.cents);
     }
     const views: SettlementView[] = [];
+    const pays = await this.teachers.groupPays();
     for (const teacher of await this.teachers.all()) {
       const settled = paid.get(teacher.id) ?? null;
       const entries = byTeacher.get(teacher.id) ?? [];
       const advances = advanced.get(teacher.id) ?? 0;
       if (settled === null && entries.length === 0 && advances === 0) continue;
       const settlement = settled?.settlement ??
-        new SettlementCalculator().settle(entries, teacher.rate);
+        new SettlementCalculator().settle(entries, teacher.rate, pays);
       views.push(view(teacher, period, settlement, settled?.paidOn.toString() ?? null, advances));
     }
     return views.sort((a, b) => a.teacherName.localeCompare(b.teacherName, 'es'));
@@ -658,6 +702,7 @@ function view(
     minutes: s.minutes,
     rateCents: s.rate.cents,
     amountCents: s.amount.cents,
+    customRates: !s.rate.times(s.minutes / 60).equals(s.amount),
     advancesCents: advances,
     toPayCents: s.amount.cents - advances,
     lines: s.lines.map((l) => ({
@@ -704,7 +749,7 @@ export class PaySettlement {
         new MonthlySettlement(
           teacher,
           period,
-          new SettlementCalculator().settle(entries, rate.rate),
+          new SettlementCalculator().settle(entries, rate.rate, await this.teachers.groupPays()),
           LocalDate.fromString(paidOn),
           method,
         ),
@@ -857,11 +902,13 @@ export class Profitability {
     const period = YearMonth.fromString(month);
     const past = period.isBefore(YearMonth.of(LocalDate.fromInstant(this.clock.now())));
     const holidays = await this.holidays.holidaysBetween(period.firstDay(), period.lastDay());
-    const expected = new ExpectedHours().ofMonth(
+    const teachers = await this.teachers.all();
+    const expected = new ExpectedHours().costsOfMonth(
       period,
       await this.schedule.groups(),
       await this.duties.all(),
       holidays,
+      new Map(teachers.map((t) => [t.id, t.rate])),
     );
     // La tarifa congelada si la liquidación ya está pagada; si no, la actual.
     const settled = new Map((await this.settlements.execute(month)).map((s) => [s.teacherId, s]));
@@ -877,14 +924,15 @@ export class Profitability {
       }
     }
     const rows: ProfitabilityRow[] = [];
-    for (const teacher of await this.teachers.all()) {
+    for (const teacher of teachers) {
       const settlement = settled.get(teacher.id) ?? null;
-      const minutes = past ? (settlement?.minutes ?? 0) : (expected.get(teacher.id) ?? 0);
+      const planned = expected.get(teacher.id) ?? { minutes: 0, cents: 0 };
+      const minutes = past ? (settlement?.minutes ?? 0) : planned.minutes;
       const seats = load.teachers.get(teacher.id) ?? null;
       const earned = Math.round(income.get(teacher.id) ?? 0);
       if (minutes === 0 && earned === 0 && seats === null) continue;
       const rate = settlement?.rateCents ?? teacher.rate.cents;
-      const cost = past ? (settlement?.amountCents ?? 0) : Math.round((rate * minutes) / 60);
+      const cost = past ? (settlement?.amountCents ?? 0) : planned.cents;
       rows.push({
         teacherId: teacher.id,
         teacherName: teacher.name,
@@ -951,16 +999,24 @@ export class ExpectedPayroll {
     const teachers = new Map((await this.teachers.all()).map((t) => [t.id, t]));
     const holidays = await this.holidays.holidaysBetween(first.firstDay(), last.lastDay());
     const hours = new ExpectedHours();
+    const rates = new Map([...teachers].map(([id, t]) => [id, t.rate]));
     const result = new Map<string, TeacherCost[]>();
     for (let month = first; !last.isBefore(month); month = month.next()) {
       const costs: TeacherCost[] = [];
-      for (const [teacher, minutes] of hours.ofMonth(month, groups, duties, holidays)) {
-        const known = teachers.get(teacher);
+      for (
+        const [teacher, { minutes, cents }] of hours.costsOfMonth(
+          month,
+          groups,
+          duties,
+          holidays,
+          rates,
+        )
+      ) {
         costs.push({
           teacherId: teacher,
-          teacherName: known?.name ?? '',
+          teacherName: teachers.get(teacher)?.name ?? '',
           minutes,
-          cents: known?.rate.times(minutes / 60).cents ?? 0,
+          cents: teachers.has(teacher) ? cents : 0,
         });
       }
       result.set(month.toString(), costs);

@@ -80,6 +80,7 @@ export class AuditLabels {
     'PUT /api/admin/payroll/settlements/:teacherId/:month/payment':
       'Cambiar la fecha de pago de una liquidación',
     'POST /api/admin/payroll/advances': 'Apuntar un anticipo a un profesor',
+    'PUT /api/admin/payroll/groups/:id/pay': 'Fijar la tarifa de una clase para el profesorado',
     'DELETE /api/admin/payroll/advances/:id': 'Quitar un anticipo',
     'POST /api/admin/students/:id/enrolments': 'Inscribir en grupo',
     'DELETE /api/admin/students/:id/enrolments/:groupId': 'Quitar de grupo',
@@ -172,6 +173,7 @@ export class AuditLabels {
     payroll_proposed_month: 'Mes de horas propuesto',
     payroll_holiday: 'Festivo',
     payroll_duty: 'Turno de encargado',
+    payroll_group_pay: 'Tarifa de una clase para el profesorado',
     payroll_substitution: 'Sustitución',
     payroll_advance: 'Anticipo a profesor',
     payroll_session: 'Sesión de profesor',

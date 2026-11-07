@@ -59,7 +59,8 @@ export function groupInput(body: JsonBody): GroupInput {
   };
 }
 
-function present(group: GroupSummary) {
+/** Lo que se paga a quien da cada clase no lo ve el profesorado (como las tarifas de los profesores). */
+function present(group: GroupSummary, scope: RequestScope) {
   return {
     id: group.id,
     name: group.name,
@@ -76,6 +77,7 @@ function present(group: GroupSummary) {
     occupancyByDay: group.occupancyByDay,
     weeklyPlan: group.weeklyPlan,
     specialPriceCents: group.specialPriceCents,
+    teacherPay: scope.user?.role === 'teacher' ? null : group.teacherPay,
   };
 }
 
@@ -117,7 +119,9 @@ export function registerClassRoutes(api: ApiApp): void {
   api.defineRoute(
     { method: 'GET', path: '/api/admin/groups', access: 'clubReader' },
     async (c, scope) => {
-      return c.json({ items: (await query(scope).groups(today(api))).map(present) });
+      return c.json({
+        items: (await query(scope).groups(today(api))).map((g) => present(g, scope)),
+      });
     },
   );
 
@@ -128,7 +132,7 @@ export function registerClassRoutes(api: ApiApp): void {
       const group = await query(scope).group(id, today(api));
       if (group === null) throw new ClassGroupNotFound();
       return c.json({
-        ...present(group),
+        ...present(group, scope),
         students: await query(scope).enrolledStudents(id, today(api)),
       });
     },

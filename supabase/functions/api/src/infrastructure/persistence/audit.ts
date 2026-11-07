@@ -586,7 +586,8 @@ export function auditTarget(
       return own('student');
     case 'classes_group':
       return own('group');
-    case 'billing_special_class_price': {
+    case 'billing_special_class_price':
+    case 'payroll_group_pay': {
       const id = text('group_id');
       return id === null ? null : { kind: 'group', id };
     }

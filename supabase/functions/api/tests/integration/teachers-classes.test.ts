@@ -80,6 +80,7 @@ Deno.test('groups should be created and shown in the schedule, then updated', as
       occupancyByDay: { mon: 0, wed: 0 },
       weeklyPlan: 'two_hours',
       specialPriceCents: null,
+      teacherPay: null,
     }],
   });
 
