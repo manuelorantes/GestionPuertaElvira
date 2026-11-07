@@ -754,3 +754,39 @@ Deno.test('a provisional member pays the membership fee but stays out of the lis
   });
   assertEquals(enrolled.status, 204, JSON.stringify(enrolled.body));
 });
+
+Deno.test('a group shows who joined and left it, and why', async () => {
+  const fx = await fixture();
+  const today = LocalDate.fromInstant(new Date());
+  const day = (offset: number) => today.plusDays(offset).toString();
+  // Alta hace 30 días en Iniciación A; hoy pasa a Peques B.
+  const id = await register(fx, { joinedOn: day(-30) });
+  assertEquals(
+    (await fx.client.json('POST', `/api/admin/students/${id}/enrolments/${fx.groupA}/move`, {
+      toGroupId: fx.tiny,
+    })).status,
+    204,
+  );
+
+  const history = async (groupId: string) =>
+    items((await fx.client.get(`/api/admin/groups/${groupId}/history`)).body).map((h) => [
+      h.date,
+      h.movement,
+      h.studentName,
+      h.reason,
+      h.otherGroup,
+    ]);
+  assertEquals(await history(fx.groupA), [
+    [day(0), 'left', 'Martina López Herrera', 'moved_to', 'Peques B'],
+    [day(-30), 'joined', 'Martina López Herrera', null, null],
+  ]);
+  assertEquals(await history(fx.tiny), [
+    [day(0), 'joined', 'Martina López Herrera', 'moved_from', 'Iniciación A'],
+  ]);
+  assertEquals(await history(fx.groupB), []);
+  assertError(
+    await fx.client.get('/api/admin/groups/00000000-0000-7000-8000-000000000000/history'),
+    404,
+    'not_found',
+  );
+});
