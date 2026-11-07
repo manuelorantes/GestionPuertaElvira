@@ -5,6 +5,7 @@ import {
   AlreadyEnrolled,
   Attendance,
   Capacity,
+  ClassGroupId,
   Classroom,
   ClassroomSchedule,
   Enrolment,
@@ -356,6 +357,7 @@ Deno.test('resolveSchedule should turn the hours a student attends into full or 
     start: HalfHour.fromString(start),
     end: HalfHour.fromString(end),
     classroom: classroom === null ? null : Classroom.fromString(classroom),
+    groupId: null,
   });
   const summary = (r: ReturnType<typeof resolveSchedule>) =>
     r.enrolments.map((
@@ -399,4 +401,27 @@ Deno.test('resolveSchedule should turn the hours a student attends into full or 
   const uneven = resolveSchedule([block(1, '17:00', '18:30'), block(3, '17:00', '18:00')], groups);
   assertEquals(uneven.enrolments, []);
   assertEquals(uneven.problems.length, 1);
+});
+
+Deno.test('resolveSchedule should let the student pick one of the groups sharing a classroom', () => {
+  const first = GroupFactory.group({ days: [2], start: '18:00', end: '19:00', name: 'Alfil A' });
+  const second = GroupFactory.group({ days: [2], start: '18:00', end: '19:00', name: 'Alfil B' });
+  const block = (groupId: ClassGroupId | null) => ({
+    day: 2 as Weekday,
+    start: HalfHour.fromString('18:00'),
+    end: HalfHour.fromString('19:00'),
+    classroom: Classroom.fromString('alfil'),
+    groupId,
+  });
+
+  const undecided = resolveSchedule([block(null)], [first, second]);
+  assertEquals(undecided.enrolments, []);
+  assertEquals(undecided.choices[0]?.groups.map((g) => g.details().name.value), [
+    'Alfil A',
+    'Alfil B',
+  ]);
+
+  const picked = resolveSchedule([block(second.id)], [first, second]);
+  assertEquals(picked.enrolments.map((e) => e.group.details().name.value), ['Alfil B']);
+  assertEquals(picked.choices, []);
 });
