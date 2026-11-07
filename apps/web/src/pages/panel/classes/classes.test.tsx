@@ -87,7 +87,7 @@ describe('Clases', () => {
     renderApp('/panel/clases');
 
     expect(await screen.findByRole('heading', { name: 'Clases' })).toBeVisible();
-    expect(await screen.findByText('Lunes a viernes · 3 aulas · 1 grupos')).toBeVisible();
+    expect(await screen.findByText('Lunes a viernes · 4 aulas · 1 grupos')).toBeVisible();
     const blocks = await screen.findAllByRole('button', { name: /iniciación a/i });
     expect(blocks).toHaveLength(2);
     expect(blocks[0]).toHaveTextContent('Lucía Moreno13/12 plazas');
@@ -109,8 +109,17 @@ describe('Clases', () => {
     expect(detailed[0]).toHaveTextContent('17:00–18:00');
     expect(detailed[0]).toHaveTextContent('Lucía Moreno Gil · 13/12');
 
+    const schedule = screen.getByRole('region', { name: 'Horario semanal' });
+    const shownDays = () =>
+      within(schedule)
+        .getAllByRole('group')
+        .map((day) => day.getAttribute('aria-label'));
+    const wholeWeek = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+    expect(shownDays()).toEqual(wholeWeek);
+
     await user.click(screen.getByRole('button', { name: 'Aula Peón' }));
     expect(screen.queryByRole('button', { name: /iniciación a/i })).not.toBeInTheDocument();
+    expect(shownDays()).toEqual(wholeWeek);
 
     await user.click(screen.getByRole('button', { name: 'Todas' }));
     expect(await screen.findAllByRole('button', { name: /iniciación a/i })).toHaveLength(2);
@@ -140,6 +149,35 @@ describe('Clases', () => {
     expect(within(wednesday).getByText('Alfil')).toBeVisible();
     expect(within(wednesday).queryByText('Peón')).not.toBeInTheDocument();
     expect(within(schedule).queryByRole('group', { name: 'Martes' })).not.toBeInTheDocument();
+  });
+
+  it('shows groups that share a classroom side by side under a single classroom heading', async () => {
+    api({
+      'GET /api/admin/groups': [
+        200,
+        {
+          items: [
+            GROUP,
+            { ...GROUP, id: 'g2', name: 'Intermedio B', days: ['mon'], start: '17:30' },
+            { ...GROUP, id: 'g3', name: 'Rey A', days: ['mon'], classroom: 'rey' },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel/clases');
+
+    const schedule = await screen.findByRole('region', { name: 'Horario semanal' });
+    const monday = within(schedule).getByRole('group', { name: 'Lunes' });
+    const [first] = await within(monday).findAllByRole('button', { name: /iniciación a/i });
+    const second = within(monday).getByRole('button', { name: /intermedio b/i });
+    const rey = within(monday).getByRole('button', { name: /rey a/i });
+    expect(within(monday).getAllByText('Alfil')).toHaveLength(1);
+    expect(within(monday).getByText('Alfil')).toHaveStyle({ gridColumn: '1 / span 2' });
+    expect(within(monday).getByText('Rey Batallador')).toHaveStyle({ gridColumn: '3 / span 1' });
+    expect(first).toHaveStyle({ gridColumn: '1' });
+    expect(second).toHaveStyle({ gridColumn: '2' });
+    expect(rey).toHaveStyle({ gridColumn: '3' });
+    expect(screen.getByRole('button', { name: 'Aula Rey Batallador' })).toBeVisible();
   });
 
   it('should list groups with level, schedule, plan and an over capacity warning', async () => {
@@ -218,22 +256,25 @@ describe('Clases', () => {
     );
   });
 
-  it('should create a group and report a classroom conflict without closing the dialog', async () => {
+  it('asks to confirm a classroom clash and creates the group sharing the classroom', async () => {
     const user = userEvent.setup();
     const fetchSpy = api({
       'POST /api/admin/groups': [
-        409,
-        {
-          error: {
-            code: 'classroom_conflict',
-            message: 'Coincide en el aula 1 con «Iniciación A» (Lun y Mié · 17:00–18:00).',
-            details: {
-              groupId: 'g1',
-              groupName: 'Iniciación A',
-              slotLabel: 'Lun y Mié · 17:00–18:00',
+        [
+          409,
+          {
+            error: {
+              code: 'classroom_conflict',
+              message: 'Coincide en el aula Alfil con «Iniciación A» (Lun y Mié · 17:00–18:00).',
+              details: {
+                groupId: 'g1',
+                groupName: 'Iniciación A',
+                slotLabel: 'Lun y Mié · 17:00–18:00',
+              },
             },
           },
-        },
+        ],
+        [201, { id: 'g9' }],
       ],
     });
     renderApp('/panel/clases');
@@ -246,16 +287,13 @@ describe('Clases', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Crear grupo' }));
 
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
-      'Coincide en el aula 1 con «Iniciación A»',
+      'Coincide en el aula Alfil con «Iniciación A» (Lun y Mié · 17:00–18:00). ¿Compartir el aula igualmente?',
     );
-    const body = JSON.parse(
-      String(
-        fetchSpy.mock.calls.find(
-          ([url, init]) => url === '/api/admin/groups' && init?.method === 'POST',
-        )?.[1]?.body,
-      ),
-    );
-    expect(body).toEqual({
+    const posts = () =>
+      fetchSpy.mock.calls
+        .filter(([url, init]) => url === '/api/admin/groups' && init?.method === 'POST')
+        .map(([, init]) => JSON.parse(String(init?.body)) as Record<string, unknown>);
+    expect(posts()[0]).toEqual({
       name: 'Iniciación F',
       level: 'beginner',
       teacherId: 't1',
@@ -265,6 +303,10 @@ describe('Clases', () => {
       classroom: 'alfil',
       capacity: 10,
     });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Crear igualmente' }));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+    expect(posts()[1]).toMatchObject({ name: 'Iniciación F', confirmClassroomShare: true });
   });
 
   it('should use the first active teacher even if teachers load after the dialog opens', async () => {
