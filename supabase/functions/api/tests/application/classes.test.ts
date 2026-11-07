@@ -51,7 +51,8 @@ function management() {
     capacity: 12,
     ...overrides,
   });
-  const create = (i: GroupInput) => new CreateClassGroup(groups, teachers).execute(i);
+  const create = (i: GroupInput, confirmClassroomShare = false) =>
+    new CreateClassGroup(groups, teachers).execute(i, confirmClassroomShare);
   return { groups, teachers, teacherId, input, create };
 }
 
@@ -63,7 +64,7 @@ Deno.test('CreateClassGroup should create a group from raw input', async () => {
   assertEquals(group?.details().weeklyPlan(), 'two_hours');
 });
 
-Deno.test('CreateClassGroup should reject a classroom clash naming the other group, but allow the other classroom', async () => {
+Deno.test('CreateClassGroup should ask to confirm a classroom clash naming the other group, but allow the other classroom', async () => {
   const { groups, input, create } = management();
   await create(input({ name: 'Intermedio A', start: '17:30', end: '19:00' }));
   const conflict = await assertRejects(() => create(input()), ClassroomConflict);
@@ -71,6 +72,38 @@ Deno.test('CreateClassGroup should reject a classroom clash naming the other gro
   assertEquals(conflict.details().slotLabel, 'Lun y Mié · 17:30–19:00');
   await create(input({ classroom: 'caballo' }));
   assertEquals((await groups.all()).length, 2);
+});
+
+Deno.test('CreateClassGroup should share a classroom with as many groups as confirmed', async () => {
+  const { groups, input, create } = management();
+  await create(input({ name: 'Intermedio A' }));
+  await create(input({ name: 'Intermedio B' }), true);
+  const conflict = await assertRejects(() => create(input()), ClassroomConflict);
+  assertEquals(
+    conflict.message,
+    'Coincide en el aula Alfil con «Intermedio A» (Lun y Mié · 17:00–18:00) y «Intermedio B» (Lun y Mié · 17:00–18:00).',
+  );
+  await create(input(), true);
+  assertEquals((await groups.all()).length, 3);
+});
+
+Deno.test('UpdateClassGroup should ask to confirm only the clashes the change adds', async () => {
+  const { groups, teachers, input, create } = management();
+  await create(input({ name: 'Intermedio A' }));
+  const shared = await create(input({ name: 'Intermedio B' }), true);
+  const update = new UpdateClassGroup(groups, teachers);
+  await update.execute(shared, input({ name: 'Intermedio B', capacity: 8 }));
+  const later = await create(input({ name: 'Avanzado A', start: '18:00', end: '19:00' }));
+  const conflict = await assertRejects(
+    () => update.execute(shared, input({ name: 'Intermedio B', end: '18:30' })),
+    ClassroomConflict,
+  );
+  assertEquals(conflict.details().groupName, 'Avanzado A');
+  await update.execute(shared, input({ name: 'Intermedio B', end: '18:30' }), true);
+  assertEquals(
+    (await groups.find(ClassGroupId.fromString(later)))?.details().name.value,
+    'Avanzado A',
+  );
 });
 
 Deno.test('CreateClassGroup should require an active teacher and report the invalid field', async () => {

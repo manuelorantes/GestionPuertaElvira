@@ -18,13 +18,14 @@ export class Capacity {
   }
 }
 
-/** Las tres aulas del club, con nombre de pieza. El orden es el de las columnas del horario. */
-export type ClassroomCode = 'alfil' | 'caballo' | 'peon';
-export const CLASSROOMS: readonly ClassroomCode[] = ['alfil', 'caballo', 'peon'];
+/** Las cuatro aulas del club, con nombre de pieza. El orden es el de las columnas del horario. */
+export type ClassroomCode = 'alfil' | 'caballo' | 'peon' | 'rey';
+export const CLASSROOMS: readonly ClassroomCode[] = ['alfil', 'caballo', 'peon', 'rey'];
 const CLASSROOM_NAMES: Record<ClassroomCode, string> = {
   alfil: 'Alfil',
   caballo: 'Caballo',
   peon: 'Peón',
+  rey: 'Rey Batallador',
 };
 
 export class Classroom {
@@ -32,12 +33,15 @@ export class Classroom {
 
   static fromString(code: string): Classroom {
     if (!(CLASSROOMS as readonly string[]).includes(code)) {
-      throw new InvalidValue('classroom', 'El club tiene las aulas Alfil, Caballo y Peón.');
+      throw new InvalidValue(
+        'classroom',
+        'El club tiene las aulas Alfil, Caballo, Peón y Rey Batallador.',
+      );
     }
     return new Classroom(code as ClassroomCode);
   }
 
-  /** «Alfil», «Caballo» o «Peón». */
+  /** «Alfil», «Caballo», «Peón» o «Rey Batallador». */
   name(): string {
     return CLASSROOM_NAMES[this.code];
   }
@@ -47,7 +51,7 @@ export class Classroom {
     return `Aula ${this.name()}`;
   }
 
-  /** Posición en el horario (0, 1, 2). */
+  /** Posición en el horario (0 a 3). */
   position(): number {
     return CLASSROOMS.indexOf(this.code);
   }
@@ -282,7 +286,7 @@ export class ClassGroup {
   }
 }
 
-/** Evita dos grupos en la misma aula a la misma hora. */
+/** Detecta grupos que coinciden en la misma aula a la misma hora (se permiten si se confirman). */
 export class ClassroomSchedule {
   /** Grupos (distintos del propuesto) que coinciden en aula, día y hora. */
   conflictsFor(

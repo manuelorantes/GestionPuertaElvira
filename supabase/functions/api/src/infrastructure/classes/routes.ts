@@ -138,7 +138,9 @@ export function registerClassRoutes(api: ApiApp): void {
         new SqlClassGroupRepository(scope.tx),
         new TeachersTeacherDirectory(scope.tx),
       );
-      return c.json({ id: await create.execute(groupInput(await JsonBody.from(c.req.raw))) }, 201);
+      const body = await JsonBody.from(c.req.raw);
+      const id = await create.execute(groupInput(body), body.bool('confirmClassroomShare'));
+      return c.json({ id }, 201);
     },
   );
 
@@ -149,12 +151,13 @@ export function registerClassRoutes(api: ApiApp): void {
         new SqlClassGroupRepository(scope.tx),
         new TeachersTeacherDirectory(scope.tx),
       );
-      const input = groupInput(await JsonBody.from(c.req.raw));
+      const body = await JsonBody.from(c.req.raw);
+      const input = groupInput(body);
       await recalculatingGroupFees(
         api,
         scope,
         param(c, 'id'),
-        () => update.execute(param(c, 'id'), input),
+        () => update.execute(param(c, 'id'), input, body.bool('confirmClassroomShare')),
       );
       return c.body(null, 204);
     },

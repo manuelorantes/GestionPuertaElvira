@@ -105,6 +105,20 @@ Deno.test('groups should reject classroom conflicts, invalid fields, unknown ids
     (conflict.body as { error: { details: { groupName: string } } }).error.details.groupName,
     'Intermedio A',
   );
+  const shared = await client.json(
+    'POST',
+    '/api/admin/groups',
+    groupPayload(teacherId, { classroom: 'alfil', confirmClassroomShare: true }),
+  );
+  assertEquals(shared.status, 201);
+  const sharedId = (shared.body as { id: string }).id;
+  const renamed = await client.json(
+    'PUT',
+    `/api/admin/groups/${sharedId}`,
+    groupPayload(teacherId, { name: 'Iniciación B' }),
+  );
+  assertEquals(renamed.status, 204);
+  await newGroup(client, teacherId, { name: 'Rey', classroom: 'rey' });
 
   const invalid = await client.json(
     'POST',
