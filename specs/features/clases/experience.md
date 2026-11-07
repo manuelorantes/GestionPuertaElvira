@@ -41,7 +41,8 @@
   Sin profesores: aviso en el diálogo (se añaden en Profesores → Equipo).
 
 Colocación en el horario: la fila de inicio es `(inicio − 16:00) / 30 min + 1` y la de fin, `(fin − 16:00) / 30 min + 1`;
-la columna es el aula (1 o 2) dentro de cada día.
+la columna es la posición del aula entre las que tienen algún grupo ese día
+(las aulas vacías todo el día y los días sin grupos no se dibujan).
 
 ## 4. Accessibility Behavior
 
