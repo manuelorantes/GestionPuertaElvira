@@ -541,12 +541,16 @@ export class EnrolmentPolicy {
   }
 }
 
-/** Un tramo del horario que hará un alumno: un día, de una hora a otra, y si se sabe, en qué aula. */
+/**
+ * Un tramo del horario que hará un alumno: un día, de una hora a otra y, si se sabe, en qué aula o en qué
+ * grupo (cuando varios grupos coinciden en la misma aula, elegir el aula no basta).
+ */
 export interface ScheduleBlock {
   day: Weekday;
   start: HalfHour;
   end: HalfHour;
   classroom: Classroom | null;
+  groupId: ClassGroupId | null;
 }
 
 export interface ResolvedEnrolment {
@@ -560,7 +564,7 @@ interface Slice {
   end: HalfHour;
 }
 
-/** Un tramo en el que hay varios grupos posibles (distintas aulas): hay que elegir. */
+/** Un tramo en el que hay varios grupos posibles: hay que elegir uno. */
 export interface ScheduleChoice extends Slice {
   groups: ClassGroup[];
 }
@@ -581,7 +585,7 @@ function sliceLabel(slice: Slice): string {
 /**
  * Traduce las horas que va a venir un alumno a inscripciones: en cada tramo, el grupo que da clase
  * a esa hora ese día; si solo cubre parte del grupo (o solo algunos de sus días), con horario
- * especial. Cuando dos grupos coinciden en el tramo (distintas aulas) hay que elegir el aula.
+ * especial. Cuando varios grupos coinciden en el tramo hay que elegir el aula o el grupo.
  */
 export function resolveSchedule(
   blocks: readonly ScheduleBlock[],
@@ -613,9 +617,11 @@ export function resolveSchedule(
     for (let i = 0; i < sorted.length - 1; i++) {
       const from = sorted[i]!;
       const to = sorted[i + 1]!;
-      const covering = candidates.filter((g) =>
+      const possible = candidates.filter((g) =>
         g.details().slot.start.minutes <= from && g.details().slot.end.minutes >= to
       );
+      const picked = possible.filter((g) => block.groupId !== null && g.id.equals(block.groupId));
+      const covering = picked.length === 1 ? picked : possible;
       const slice: Slice = {
         day: block.day,
         start: HalfHour.fromMinutes(from),
