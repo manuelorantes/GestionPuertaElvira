@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/shared/ui/ConfirmDialog';
 import { OccupancyBar } from '@/shared/ui/OccupancyBar';
 import { GroupAttendanceTable } from './GroupAttendanceTable';
 import { GroupClassComments } from './GroupClassComments';
+import { GroupHistory } from './GroupHistory';
 import { OccupancyByDay } from './OccupancyByDay';
 import { MonthNav } from '@/shared/ui/MonthNav';
 import { SidePanel } from '@/shared/ui/SidePanel';
@@ -187,6 +188,7 @@ export function ClassGroupPanel({ groupId, onClose, onEdit, month }: ClassGroupP
           <GroupAttendanceTable groupId={groupId} month={attendanceMonth} />
         </Card>
         <GroupClassComments groupId={groupId} month={attendanceMonth} className="p-4" />
+        <GroupHistory groupId={groupId} />
       </div>
       {overCapacity.message && (
         <ConfirmDialog

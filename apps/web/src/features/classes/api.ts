@@ -124,3 +124,18 @@ export interface ClassGroupDetail extends ClassGroup {
 export function fetchGroup(id: string): Promise<ClassGroupDetail> {
   return apiGet(`/api/admin/groups/${id}`);
 }
+
+/** Una entrada o salida de un alumno en un grupo y, si se sabe, por qué. */
+export interface GroupMovement {
+  date: string;
+  movement: 'joined' | 'left';
+  studentId: string;
+  studentName: string;
+  reason: 'moved_from' | 'moved_to' | 'withdrawn' | null;
+  otherGroup: string | null;
+}
+
+/** De la más reciente a la más antigua. */
+export function fetchGroupHistory(id: string): Promise<{ items: GroupMovement[] }> {
+  return apiGet(`/api/admin/groups/${id}/history`);
+}
