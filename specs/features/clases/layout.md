@@ -27,6 +27,7 @@ ClassesPage (/panel/clases)
 │   ├── Tarjeta «Alumnos inscritos»: fila por alumno «Nombre · N años» + «Ver ficha»
 │   ├── Tarjeta «Inscribir alumno»: desplegable con búsqueda (al abrirlo salen todos los alumnos activos no inscritos; al escribir se filtran por nombre o apellidos, sin tildes ni mayúsculas) + botón «Inscribir»
 │   ├── Tarjeta «Clase especial» (no en particulares): precio mensual o «Sin precio especial: se paga por horas»; superadministración puede ponerlo, cambiarlo o quitarlo, con confirmación (ver Cobros)
+│   ├── Tarjeta «Pago al profesor» (no la ve el profesorado): «Cobra: 100,00 € por sesión» o «La tarifa por hora de quien la dé»; superadministración ve además «Tarifa de la clase (€)» · «Se paga» (Por hora / Por sesión) · «Guardar tarifa» · «Quitar tarifa», con la confirmación «Tarifa de la clase» (ver Profesorado)
 │   ├── Tarjeta «Asistencia»: MonthNav (mes en curso) + GroupAttendanceTable
 │   ├── Tarjeta «Comentarios»: GroupClassComments
 │   └── Tarjeta «Historial» (la última): fila por movimiento «dd/mm/aaaa | Entra/Sale · Alumno (enlace) · motivo» («viene de X», «pasa a X», «baja del club»), lo más reciente arriba

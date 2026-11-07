@@ -23,7 +23,7 @@ Cuotas (cuotas, descuentos, avisos, datos de cobro, tarifas y ajustes, y precios
 Cobros (cobros, sus correcciones y facturas),
 Asistencia (listas, comentarios y clases o actividades dadas por buenas),
 Puntos (viernes, ajustes y fotos de torneo),
-Profesorado (profesores, horas, festivos, sustituciones y turnos de encargado),
+Profesorado (profesores, horas, festivos, sustituciones, turnos de encargado y tarifas propias de las clases),
 Nóminas (liquidaciones y anticipos),
 Contabilidad (movimientos, facturas de proveedor, gastos esperados, categorías, traspasos y cierres),
 Material (productos, pedidos y compras)
