@@ -14,7 +14,7 @@ const HOURS = Array.from({ length: 11 }, (_, i) => {
 });
 
 function blankBlock(): ScheduleBlock {
-  return { day: 'mon', start: '17:00', end: '18:00', classroom: null };
+  return { day: 'mon', start: '17:00', end: '18:00', classroom: null, groupId: null };
 }
 
 interface ScheduleEditorProps {
@@ -30,7 +30,7 @@ interface ScheduleEditorProps {
 
 /**
  * Las horas a las que va a venir el alumno. La API las traduce a grupos (completos o con horario
- * especial); si a una hora hay clase en varias aulas, se elige el aula del tramo.
+ * especial); si a una hora hay varios grupos posibles, se elige el grupo del tramo.
  */
 export function ScheduleEditor({
   blocks,
@@ -63,7 +63,7 @@ export function ScheduleEditor({
               options={WEEKDAYS.map((d) => ({ value: d.id, label: d.long }))}
               value={block.day}
               onChange={(day) =>
-                update(index, { day: day as ScheduleBlock['day'], classroom: null })
+                update(index, { day: day as ScheduleBlock['day'], classroom: null, groupId: null })
               }
             />
             <Select
@@ -93,20 +93,16 @@ export function ScheduleEditor({
             )}
             {choice && (
               <Select
-                label={`Aula para ${choice.label}`}
+                label={`Grupo para ${choice.label}`}
                 options={[
-                  { value: '', label: 'Elige el aula' },
+                  { value: '', label: 'Elige el grupo' },
                   ...choice.groups.map((g) => ({
-                    value: g.classroom,
+                    value: g.id,
                     label: `${classroomLabel(g.classroom)} · ${g.name}`,
                   })),
                 ]}
-                value={block.classroom ?? ''}
-                onChange={(classroom) =>
-                  update(index, {
-                    classroom: (classroom || null) as ScheduleBlock['classroom'],
-                  })
-                }
+                value={block.groupId ?? ''}
+                onChange={(groupId) => update(index, { groupId: groupId || null })}
               />
             )}
           </div>
