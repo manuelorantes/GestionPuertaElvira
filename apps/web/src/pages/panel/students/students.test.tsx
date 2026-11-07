@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 
 import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
 import { todayIso } from '@/features/students/format';
-import { ADMIN, mockApi, renderApp } from '@/test/render';
+import { ADMIN, SUPERADMIN, mockApi, renderApp } from '@/test/render';
 
 const GROUPS = [
   {
@@ -372,6 +372,56 @@ describe('Alumnos', () => {
       ),
       expect.stringContaining('Ha roto un reloj06/10/2026 · Iniciación A · Junta Pruebas'),
     ]);
+  });
+
+  it('lets superadministration fix the price of a student after confirming it, and shows it to everyone', async () => {
+    const user = userEvent.setup();
+    const account = {
+      preferredPlan: 'monthly',
+      member: false,
+      privateRate: null,
+      fixedPrice: null,
+      points: 0,
+      suggestedMonths: 1,
+      remainingMonths: 9,
+      weeklyHours: 2,
+      monthlyFeeCents: 4500,
+      familyDiscount: false,
+      familyPercent: 0,
+      hasPrivateLessons: false,
+      membershipPaid: true,
+      membershipFeeCents: 5000,
+      membershipCharge: null,
+      charges: [],
+      balanceCents: 0,
+      materialCharges: [],
+      totals: [],
+    };
+    const spy = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/billing/accounts/s1': [
+        [200, account],
+        [200, { ...account, fixedPrice: '60.00', monthlyFeeCents: 6000 }],
+      ],
+      'GET /api/admin/billing/payments?studentId=s1': [200, { items: [] }],
+      'PUT /api/admin/billing/accounts/s1/price': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    expect(await screen.findByText('Ninguno: paga según sus clases')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Precio fijado (€ al mes)'), '60');
+    await user.click(screen.getByRole('button', { name: 'Guardar precio' }));
+    const confirm = await screen.findByRole('dialog', { name: 'Precio fijado del alumno' });
+    expect(confirm).toHaveTextContent('Pagará 60,00 € al mes, sin importar sus grupos');
+    await user.click(within(confirm).getByRole('button', { name: 'Guardar precio' }));
+
+    await waitFor(() =>
+      expect(postBodyFor(spy, 'PUT', '/api/admin/billing/accounts/s1/price')).toEqual({
+        monthlyPrice: '60',
+      }),
+    );
+    expect(await screen.findByText('60,00 € al mes')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Quitar precio' })).toBeInTheDocument();
   });
 
   it('should show what the student pays and why, the points and the history on the card', async () => {

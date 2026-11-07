@@ -27,6 +27,8 @@ export interface ClassGroup {
   /** Plazas ocupadas cada día del grupo. */
   occupancyByDay: Partial<Record<CalendarDay, number>>;
   weeklyPlan: WeeklyPlan;
+  /** Precio mensual si es clase especial; null si no lo es. */
+  specialPriceCents: number | null;
 }
 
 export interface Teacher {
