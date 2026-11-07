@@ -33,6 +33,32 @@ La lista MUST mostrar cada profesor ordenado por nombre, con su tarifa por hora,
 ### Requirement: Tarifa por hora
 Cada profesor MUST tener una tarifa por hora (lo que el club le paga), de 15 €/h al darlo de alta, editable y nunca negativa.
 
+### Requirement: Tarifa propia de una clase
+Una clase MAY tener su propia tarifa para quien la dé, por hora o por sesión, que decide superadministración en cada caso
+([decisión](../../decisions/tarifa-propia-de-clases-para-el-profesorado.md)).
+Sin ella, quien la da la cobra a su tarifa por hora; con ella, sus sesiones se pagan con la de la clase,
+las dé su profesor o un sustituto.
+Por hora, se paga lo que cuenta de la sesión a ese precio; por sesión, el precio entero de cada sesión
+(o la parte que cuente, si se pisa con otra el mismo día).
+Se usa en la liquidación, en el coste de cada sesión del registro, en la rentabilidad y en lo previsto del resumen.
+
+Solo superadministración MUST poder ponerla, cambiarla o quitarla, desde la ficha del grupo y confirmándolo antes;
+la API rechaza a cualquier otro rol. Administración la ve sin poder cambiarla y el profesorado no la ve.
+Como al cambiar la tarifa de un profesor, cambian las liquidaciones sin pagar (también las de meses anteriores)
+y las pagadas no. Cada cambio queda en el historial, en Profesorado.
+
+#### Scenario: Clase pagada por sesión
+- **WHEN** Lucía cobra 15 €/h y su clase «Rey A», de 1,5 h, se paga a 100 € la sesión
+- **THEN** cada sesión de «Rey A» suma 100 € a su liquidación, y sus otras clases siguen a 15 €/h
+
+#### Scenario: Clase pagada por hora con un sustituto
+- **WHEN** «Competición» se paga a 20 €/h y un día la da Carlos, que cobra 18 €/h
+- **THEN** ese día Carlos cobra las horas de «Competición» a 20 €/h
+
+#### Scenario: Administración no puede
+- **WHEN** administración abre la ficha de un grupo
+- **THEN** ve lo que cobra quien la da, pero no puede cambiarlo, y la API le responde 403 si lo intenta
+
 ### Requirement: Horas apuntadas solas
 Las horas MUST apuntarse solas cada noche, con una tarea diaria que se ejecuta después del cierre del club: cada clase
 del día crea su sesión, con la duración y la hora de inicio del grupo, para quien la da ese día (el titular o quien le
@@ -126,7 +152,8 @@ apunta como mucho una vez por día.
 
 ### Requirement: Liquidación mensual
 La liquidación de cada profesor y mes MUST ser horas × tarifa, redondeada a céntimos, con el detalle por grupo o
-actividad. Las horas que se solapan el mismo día cuentan una sola vez y van a la sesión más corta: esta cuenta entera y
+actividad; las clases con tarifa propia se pagan con ella (ver «Tarifa propia de una clase»), y entonces la columna
+Tarifa lo indica («Y clases con tarifa propia»). Las horas que se solapan el mismo día cuentan una sola vez y van a la sesión más corta: esta cuenta entera y
 la más larga se queda con lo que le sobra. Si duran lo mismo, van a su clase antes que a una sustitución (y, si las dos
 son iguales en eso, a la que va antes).
 

@@ -21,7 +21,7 @@ TeachersPayPage (/panel/profesores)
 │   └── Tabla: Fecha | Profesor | Clase | Horas | Coste | acciones (Editar · Quitar); filas bloqueadas con candado «Pagada»
 ├── SettlementsTab
 │   ├── Tarjeta: «Liquidación de <mes>» + «Se paga a mes vencido, según las horas registradas.» | Total del mes | Pendiente · N | «Marcar todas como pagadas»
-│   └── Tabla: (desplegar) | Profesor | Horas | Tarifa | Importe | Estado (Pendiente/Pagada el dd/mm) | Imprimir · «Marcar como pagada» (pendiente) · lápiz «Editar» (pagada, solo superadministración)
+│   └── Tabla: (desplegar) | Profesor | Horas | Tarifa (+ «Y clases con tarifa propia» si las hay) | Importe | Estado (Pendiente/Pagada el dd/mm) | Imprimir · «Marcar como pagada» (pendiente) · lápiz «Editar» (pagada, solo superadministración)
 │       └── Detalle desplegado: líneas por grupo (nombre · horas · importe)
 ├── SessionDialog («Registrar horas» / «Editar sesión»): Profesor · Clase (grupo, actividad del club —propone su encargado y sus horas— u «Otra actividad» + descripción) · Fecha (DateField) · Horas (−/+ de 0,5) ·
 │   «Coste a 16,00 €/h: 24,00 €» · Cancelar | «Guardar horas»   (al editar: solo Profesor y Horas)
