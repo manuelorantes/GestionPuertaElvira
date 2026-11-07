@@ -502,6 +502,7 @@ export interface ScheduleBlockInput {
   start: string;
   end: string;
   classroom: string | null;
+  groupId: string | null;
 }
 
 export interface ResolvedEnrolmentView {
@@ -535,6 +536,7 @@ export class ResolveSchedule {
       start: HalfHour.fromString(b.start),
       end: HalfHour.fromString(b.end),
       classroom: b.classroom === null ? null : Classroom.fromString(b.classroom),
+      groupId: b.groupId === null ? null : ClassGroupId.fromString(b.groupId),
     }));
     const result = resolveSchedule(parsed, await this.groups.all());
     const label = (s: { day: Weekday; start: HalfHour; end: HalfHour }) =>

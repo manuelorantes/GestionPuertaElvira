@@ -93,6 +93,7 @@ export function registerClassRoutes(api: ApiApp): void {
         start: b.requiredString('start'),
         end: b.requiredString('end'),
         classroom: b.optionalString('classroom'),
+        groupId: b.optionalString('groupId'),
       }));
       return c.json(
         await new ResolveSchedule(new SqlClassGroupRepository(scope.tx)).execute(blocks),
