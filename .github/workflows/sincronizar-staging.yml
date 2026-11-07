@@ -1,0 +1,38 @@
+# Tras cada release (push a main), rebasa staging sobre main y lo sube con force-push
+# (ver specs/decisions/flujo-de-ramas-staging-y-main.md). Lo mismo que `make sync-staging`.
+# Sube con la deploy key del secret STAGING_SYNC_SSH_KEY, que es la excepción del ruleset de staging:
+# en un repositorio personal GitHub Actions no puede saltárselo con GITHUB_TOKEN.
+name: Sincronizar staging
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sync-staging
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Rebasar staging sobre main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: staging
+          fetch-depth: 0
+          ssh-key: ${{ secrets.STAGING_SYNC_SSH_KEY }}
+          persist-credentials: true
+      - name: Rebase y force-push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin main staging
+          git switch -C staging origin/staging
+          git rebase origin/main
+          git push --force-with-lease=staging:origin/staging origin staging
+          test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" \
+            || echo "::notice::staging conserva commits posteriores a la release: $(git log --oneline origin/main..HEAD | wc -l)"
