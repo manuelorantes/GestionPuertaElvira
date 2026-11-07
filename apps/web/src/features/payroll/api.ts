@@ -28,6 +28,8 @@ export interface Settlement {
   minutes: number;
   rateCents: number;
   amountCents: number;
+  /** Incluye clases con tarifa propia: el importe no es horas × tarifa. (Opcional en datos antiguos.) */
+  customRates?: boolean;
   /** Anticipos de ese mes, que se descuentan de lo que hay que pagarle. */
   advancesCents: number;
   /** Importe menos anticipos. */
@@ -353,4 +355,15 @@ export function changeSettlementPaymentDate(input: {
   return apiSend('PUT', `${BASE}/settlements/${input.teacherId}/${input.month}/payment`, {
     date: input.date,
   });
+}
+
+/** Cómo se paga una clase con tarifa propia a quien la dé. */
+export type PayUnit = 'hour' | 'session';
+
+/** Solo superadministración: pone (o quita, con null) la tarifa propia de una clase para quien la dé. */
+export function setGroupPay(
+  groupId: string,
+  pay: { unit: PayUnit; amount: string } | null,
+): Promise<void> {
+  return apiSend('PUT', `${BASE}/groups/${groupId}/pay`, pay ?? { amount: null });
 }

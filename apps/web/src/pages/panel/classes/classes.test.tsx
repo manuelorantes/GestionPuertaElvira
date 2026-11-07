@@ -714,6 +714,46 @@ describe('Clases', () => {
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({ monthlyPrice: '50' });
   });
 
+  it('lets superadministration set what the class pays its teacher, per session, after confirming it', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/groups/g1': [200, { ...GROUP, teacherPay: null, students: [] }],
+      'PUT /api/admin/payroll/groups/g1/pay': [204],
+    });
+    renderApp('/panel/clases?grupo=g1');
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(within(sheet).getByText('La tarifa por hora de quien la dé')).toBeInTheDocument();
+    await user.type(within(sheet).getByLabelText('Tarifa de la clase (€)'), '100');
+    await user.selectOptions(within(sheet).getByLabelText('Se paga'), 'session');
+    await user.click(within(sheet).getByRole('button', { name: 'Guardar tarifa' }));
+
+    const confirm = await screen.findByRole('dialog', { name: 'Tarifa de la clase' });
+    expect(confirm).toHaveTextContent('cobrará 100,00 € por sesión en lugar de su tarifa');
+    expect(spy.mock.calls.some(([url]) => url === '/api/admin/payroll/groups/g1/pay')).toBe(false);
+    await user.click(within(confirm).getByRole('button', { name: 'Guardar tarifa' }));
+
+    await waitFor(() => {
+      const call = spy.mock.calls.find(([url]) => url === '/api/admin/payroll/groups/g1/pay');
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({ unit: 'session', amount: '100' });
+    });
+  });
+
+  it('shows administration what the class pays its teacher without letting it change it', async () => {
+    api({
+      'GET /api/admin/groups/g1': [
+        200,
+        { ...GROUP, teacherPay: { unit: 'hour', amountCents: 2000 }, students: [] },
+      ],
+    });
+    renderApp('/panel/clases?grupo=g1');
+
+    const sheet = await screen.findByRole('dialog', { name: 'Iniciación A' });
+    expect(within(sheet).getByText('20,00 € por hora')).toBeInTheDocument();
+    expect(within(sheet).queryByRole('button', { name: 'Guardar tarifa' })).not.toBeInTheDocument();
+  });
+
   it('shows the price of a special class to administration without letting it change it', async () => {
     api({
       'GET /api/admin/groups': [200, { items: [{ ...GROUP, specialPriceCents: 5000 }] }],
