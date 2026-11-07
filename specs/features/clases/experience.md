@@ -6,7 +6,9 @@
    La pestaña elegida se refleja en la URL (`?pestana=grupos`) para poder compartirla y volver a ella.
 2. **Crear grupo:** «Nuevo grupo» → rellenar → «Crear grupo».
    - Si se guarda, el diálogo se cierra, el grupo aparece en el horario y en la tabla, y se muestra el aviso «Grupo «Nombre» creado».
-   - Si hay conflicto de aula, el diálogo sigue abierto con la alerta del grupo con el que coincide.
+   - Si coincide en aula y hora con otros grupos, el diálogo sigue abierto con la alerta de los grupos con los que coincide;
+     el botón principal pasa a «Crear igualmente» / «Guardar igualmente» y reenvía con `confirmClassroomShare: true`.
+     Cambiar cualquier dato del formulario descarta la alerta.
 3. **Editar grupo:** desde «Editar» en la tabla o pulsando un bloque del horario. Mismo diálogo, con «Guardar cambios».
 4. **Profesores:** añadir, renombrar, activar o desactivar.
    Si se intenta desactivar a uno con grupos, se muestra el motivo de la API
@@ -41,12 +43,13 @@
   Sin profesores: aviso en el diálogo (se añaden en Profesores → Equipo).
 
 Colocación en el horario: la fila de inicio es `(inicio − 16:00) / 30 min + 1` y la de fin, `(fin − 16:00) / 30 min + 1`;
-la columna es la posición del aula entre las que tienen algún grupo ese día
-(las aulas vacías todo el día y los días sin grupos no se dibujan).
+cada aula ocupa tantas columnas como grupos coinciden a la vez ese día (cada grupo va al primer carril libre a su hora),
+con una sola cabecera que las abarca. En «Todas», las aulas vacías todo el día y los días sin grupos no se dibujan;
+en la vista de un aula se dibujan de lunes a domingo.
 
 ## 4. Accessibility Behavior
 
 - Pestañas navegables con flechas izquierda y derecha, con activación automática.
 - Al abrir el diálogo, el foco va a «Nombre del grupo»; al cerrarlo, vuelve al botón que lo abrió (lo resuelve `Dialog`).
-- La alerta de conflicto se anuncia (`role="alert"`).
+- La alerta de coincidencia de aula se anuncia (`role="alert"`).
 - La rejilla del horario tiene scroll horizontal con foco de teclado (`tabindex="0"` y `aria-label="Horario semanal"`).

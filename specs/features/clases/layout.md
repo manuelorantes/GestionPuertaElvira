@@ -8,11 +8,11 @@ La pestaña «Ocupación por meses» queda fuera de esta entrega porque aún no 
 
 ```
 ClassesPage (/panel/clases)
-├── SectionHeader: antetítulo «Lunes a viernes · 3 aulas · N grupos», título «Clases», acción «Nuevo grupo» (icono plus)
+├── SectionHeader: antetítulo «Lunes a viernes · 4 aulas · N grupos», título «Clases», acción «Nuevo grupo» (icono plus)
 ├── Tabs: «Horario semanal» | «Grupos» | «Asistencia»
 ├── [Horario semanal] WeeklySchedule (tarjeta con scroll horizontal en pantallas estrechas)
 │   ├── Leyenda de niveles: Iniciación, Intermedio, Avanzado y competición, Particulares
-│   ├── Selector de aula: «Todas» (las tres aulas en columnas, vista resumida) | «Aula Alfil» | «Aula Caballo» | «Aula Peón» (solo esa aula, una columna por día, tarjetas con nombre, hora, profesor y ocupación); en ambas vistas, cada día solo muestra las aulas con algún grupo y los días sin grupos se ocultan
+│   ├── Selector de aula: «Todas» (las cuatro aulas en columnas, vista resumida; cada día solo muestra las aulas con algún grupo y los días sin grupos se ocultan) | «Aula Alfil» | «Aula Caballo» | «Aula Peón» | «Aula Rey Batallador» (solo esa aula, una columna por día de lunes a domingo, tarjetas con nombre, hora, profesor y ocupación); los grupos que coinciden en aula y hora van uno al lado del otro bajo una sola cabecera del aula
 │   ├── Columna de horas: 16:00, 17:00, 18:00, 19:00, 20:00
 │   └── Por día (Lunes…Viernes): cabecera con el día y «Alfil | Caballo | Peón», rejilla de medias horas 16:00–21:00
 │       └── ScheduleBlock por grupo (el color ya dice el nivel): **Profesor** en negrita y «9/10 plazas»; en particulares, **nombre** en negrita y «Profesor · 1/1» (borde discontinuo). Sin hora: la da la rejilla
@@ -34,9 +34,9 @@ ClassesPage (/panel/clases)
     ├── Nivel (select) | Profesor (select, solo activos)
     ├── Días: botones conmutables Lun Mar Mié Jue Vie
     ├── Empieza (select 16:00…20:30) | Termina (select 16:30…21:00)
-    ├── Aula: botones «Aula Alfil» «Aula Caballo» «Aula Peón» | Plazas: stepper − N plazas +
+    ├── Aula: botones «Aula Alfil» «Aula Caballo» «Aula Peón» «Aula Rey Batallador» | Plazas: stepper − N plazas +
     ├── Texto: «N h semanales. La cuota se asigna según las horas semanales.»
-    ├── Alert de conflicto (condicional): «Coincide en el aula Alfil con «Grupo» (Lun · 17:00–18:00). Cambia el aula o el horario.»
+    ├── Alert de coincidencia (condicional): «Coincide en el aula Alfil con «Grupo» (Lun · 17:00–18:00). ¿Compartir el aula igualmente?»; el botón principal pasa a «Crear igualmente» / «Guardar igualmente»
     └── Pie: «Cancelar» | «Crear grupo» o «Guardar cambios»
 ```
 
@@ -50,7 +50,7 @@ ClassesPage (/panel/clases)
 | Días | «Días» | botones conmutables (`aria-pressed`) | al menos uno | Lun–Vie |
 | Inicio | «Empieza» | select | sí | 16:00–20:30 cada 30 min |
 | Fin | «Termina» | select | sí | 16:30–21:00 cada 30 min |
-| Aula | «Aula» | tres botones (`aria-pressed`) | sí | Alfil, Caballo o Peón |
+| Aula | «Aula» | cuatro botones (`aria-pressed`) | sí | Alfil, Caballo, Peón o Rey Batallador |
 | Plazas | «Plazas» | stepper con botones «Quitar plaza» y «Añadir plaza» | sí | 1–30; 10 por defecto |
 | Profesor nuevo | «Nombre y apellidos» | texto | sí | — |
 | Activo | «Activo» | interruptor (`role="switch"`) | — | — |
