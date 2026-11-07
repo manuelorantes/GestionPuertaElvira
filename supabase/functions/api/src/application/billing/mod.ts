@@ -31,6 +31,7 @@ import {
   PrivateLesson,
   Quote,
   QuoteLine,
+  SpecialClass,
   SpecialDiscount,
   StudentAccount,
   StudentRef,
@@ -65,6 +66,8 @@ export interface BillingStudent {
   hasSiblings: boolean;
   regularWeeklyHours: number;
   privateLessons: PrivateEnrolment[];
+  /** Grupos con precio propio: no cuentan en `regularWeeklyHours`. */
+  specialClasses: { groupName: string; monthlyPrice: Money }[];
 }
 
 export interface StudentDirectory {
@@ -234,7 +237,13 @@ export function feeProfileOf(
       account?.privateRate() ?? settings.privateRateFor(e.teacherId),
     )
   );
-  return new FeeProfile(student.regularWeeklyHours, lessons, student.hasSiblings);
+  return new FeeProfile(
+    student.regularWeeklyHours,
+    lessons,
+    student.hasSiblings,
+    student.specialClasses.map((c) => new SpecialClass(c.groupName, c.monthlyPrice)),
+    account?.fixedPrice() ?? null,
+  );
 }
 
 export const decimal = (money: Money): string => (money.cents / 100).toFixed(2);
@@ -1263,6 +1272,8 @@ export interface AccountView {
   preferredPlan: string;
   member: boolean;
   privateRate: string | null;
+  /** Precio mensual fijado por superadministración, o null. */
+  fixedPrice: string | null;
   points: number;
   suggestedMonths: number;
   remainingMonths: number;
@@ -1322,6 +1333,7 @@ export class GetStudentAccount {
     if (student === null) throw new BillingStudentNotFound();
     const account = await this.accounts.account(ref);
     const rate = account?.privateRate() ?? null;
+    const fixed = account?.fixedPrice() ?? null;
     const settings = await this.settings.get();
     const profile = feeProfileOf(student, account, settings);
     const monthly = new FeeCalculator().quote(profile, settings, 1).total;
@@ -1350,6 +1362,7 @@ export class GetStudentAccount {
       preferredPlan: account?.preferredPlan() ?? 'monthly',
       member: account?.isMember() === true,
       privateRate: rate === null ? null : decimal(rate),
+      fixedPrice: fixed === null ? null : decimal(fixed),
       points: await this.quotes.availablePoints(studentId, YearMonth.of(today)),
       suggestedMonths: months.suggested,
       remainingMonths: months.remaining,
@@ -1389,6 +1402,70 @@ export class GetStudentAccount {
       })),
       totals,
     };
+  }
+}
+
+/** Importe tal como llega del formulario; vacío o null es «sin precio». */
+function optionalPrice(price: string | null): Money | null {
+  if (price === null || price.trim() === '') return null;
+  try {
+    return Money.fromDecimal(price);
+  } catch {
+    throw new InvalidValue('monthlyPrice', 'El precio no es válido.');
+  }
+}
+
+/** Precios de las clases especiales (grupos con precio mensual propio). */
+export interface SpecialClassPrices {
+  /** Nivel del grupo, o null si no existe. */
+  levelOf(groupId: string): Promise<string | null>;
+  /** Fija o (con null) quita el precio mensual del grupo. */
+  setPrice(groupId: string, price: Money | null): Promise<void>;
+}
+
+export class SpecialClassNotFound extends Error {
+  constructor() {
+    super('No existe ese grupo.');
+    this.name = 'SpecialClassNotFound';
+  }
+}
+
+/** Pone o quita el precio mensual de una clase especial; las particulares ya tienen precio por hora. */
+export class SetSpecialClassPrice {
+  constructor(private readonly prices: SpecialClassPrices) {}
+
+  async execute(groupId: string, monthlyPrice: string | null): Promise<void> {
+    const level = await this.prices.levelOf(groupId);
+    if (level === null) throw new SpecialClassNotFound();
+    const price = optionalPrice(monthlyPrice);
+    if (price !== null && level === 'private_lesson') {
+      throw new InvalidValue(
+        'monthlyPrice',
+        'Las particulares tienen precio por hora: no pueden ser clase especial.',
+      );
+    }
+    await this.prices.setPrice(
+      groupId,
+      price === null ? null : new SpecialClass(groupId, price).monthlyPrice,
+    );
+  }
+}
+
+/** Fija o quita el precio mensual de un alumno, que manda sobre sus grupos, clases especiales y particulares. */
+export class FixStudentPrice {
+  constructor(
+    private readonly directory: StudentDirectory,
+    private readonly accounts: StudentAccountRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string, monthlyPrice: string | null): Promise<void> {
+    const ref = StudentRef.fromString(studentId);
+    const today = LocalDate.fromInstant(this.clock.now());
+    if ((await this.directory.find(ref, today)) === null) throw new BillingStudentNotFound();
+    const account = (await this.accounts.account(ref)) ?? StudentAccount.open(ref);
+    account.fixPrice(optionalPrice(monthlyPrice));
+    await this.accounts.saveAccount(account);
   }
 }
 

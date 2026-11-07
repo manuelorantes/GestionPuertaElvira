@@ -20,6 +20,7 @@ import {
   PointsRedemption,
   PrivateLesson,
   QuoteLine,
+  SpecialClass,
   SpecialDiscount,
   StudentAccount,
   StudentRef,
@@ -58,6 +59,51 @@ Deno.test('FeeCalculator should add private lessons by monthly hours and rate, c
       .cents,
     4500 + 12000,
   );
+});
+
+Deno.test('FeeCalculator should add the price of special classes to the tier of the regular groups', () => {
+  const rey = new SpecialClass('Rey A', Money.euros(50));
+  const both = quote(new FeeProfile(1, [], false, [rey]), 1);
+  assertEquals(both.total.cents, 3500 + 5000);
+  assertEquals(both.lines.map((l) => [l.label, l.amount.cents]), [
+    ['1 h semanales · 1 mes', 3500],
+    ['Clase especial · Rey A', 5000],
+  ]);
+  // Solo la especial: sin tramo.
+  assertEquals(quote(new FeeProfile(0, [], false, [rey]), 1).total.cents, 5000);
+  // Con los descuentos de siempre: tres meses con familia directa, −20 %.
+  const prepaid = quote(new FeeProfile(0, [], true, [rey]), 3);
+  assertEquals(prepaid.gross.cents, 15000);
+  assertEquals(prepaid.total.cents, 12000);
+  assertEquals(prepaid.lines[0]?.label, 'Clase especial · Rey A · 3 meses');
+});
+
+Deno.test('FeeCalculator should charge the fixed price of a student instead of anything else, with the usual discounts', () => {
+  const profile = new FeeProfile(
+    3,
+    [new PrivateLesson('Particular', 1, Money.euros(30))],
+    true,
+    [new SpecialClass('Rey A', Money.euros(50))],
+    Money.euros(60),
+  );
+  const q = quote(profile, 1);
+  assertEquals(q.monthlyBase.cents, 6000);
+  assertEquals(q.total.cents, 5400);
+  assertEquals(q.lines.map((l) => [l.label, l.amount.cents]), [
+    ['Precio fijado del alumno', 6000],
+    ['Descuento familiar −10 %', -600],
+  ]);
+  assertEquals(quote(profile, 3).lines[0]?.label, 'Precio fijado del alumno · 3 meses');
+});
+
+Deno.test('StudentAccount should keep a fixed monthly price that can be removed, never negative', () => {
+  const account = StudentAccount.open(StudentRef.generate());
+  assertEquals(account.fixedPrice(), null);
+  account.fixPrice(Money.euros(60));
+  assertEquals(account.fixedPrice()?.cents, 6000);
+  account.fixPrice(null);
+  assertEquals(account.fixedPrice(), null);
+  assertThrows(() => account.fixPrice(Money.cents(-1)), InvalidValue);
 });
 
 Deno.test('FeeCalculator should add up discounts for siblings and prepayment', () => {

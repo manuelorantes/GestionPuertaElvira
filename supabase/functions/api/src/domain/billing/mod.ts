@@ -705,12 +705,29 @@ export class PrivateLesson {
   }
 }
 
-/** Lo que determina la cuota de un alumno: sus horas en grupos normales, sus particulares y si tiene hermanos. */
+/** Un grupo con precio mensual propio: quien está en él paga ese precio y sus horas no cuentan para el tramo. */
+export class SpecialClass {
+  constructor(
+    readonly groupName: string,
+    readonly monthlyPrice: Money,
+  ) {
+    if (monthlyPrice.isNegative()) {
+      throw new InvalidValue('monthlyPrice', 'El precio no puede ser negativo.');
+    }
+  }
+}
+
+/**
+ * Lo que determina la cuota de un alumno: sus horas en grupos normales, sus particulares, sus clases especiales,
+ * si tiene hermanos y, si se le ha fijado, su precio mensual, que manda sobre todo lo demás.
+ */
 export class FeeProfile {
   constructor(
     readonly regularWeeklyHours: number,
     readonly privateLessons: readonly PrivateLesson[],
     readonly hasSiblings: boolean,
+    readonly specialClasses: readonly SpecialClass[] = [],
+    readonly fixedPrice: Money | null = null,
   ) {}
 }
 
@@ -795,14 +812,52 @@ export class FeeCalculator {
       throw InvalidPaymentRequest.months();
     }
     const tariff = settings.tariff;
+    const { lines, monthlyBase } = profile.fixedPrice === null
+      ? this.baseLines(profile, tariff, months)
+      : {
+        lines: [
+          new QuoteLine(
+            `Precio fijado del alumno${months > 1 ? ` · ${monthsLabel(months)}` : ''}`,
+            profile.fixedPrice.times(months),
+          ),
+        ],
+        monthlyBase: profile.fixedPrice,
+      };
+    const gross = monthlyBase.times(months);
+    const discounts: [string, number][] = [];
+    if (profile.hasSiblings && tariff.familyPercent > 0) {
+      discounts.push(['Descuento familiar', tariff.familyPercent]);
+    }
+    const prepayment = tariff.prepaymentPercent(months);
+    if (prepayment > 0) discounts.push([prepaymentLabel(months), prepayment]);
+    return this.applyDiscounts(lines, gross, discounts, special, points, monthlyBase, monthlyBase);
+  }
+
+  /** Tramo por horas de grupos normales + clases especiales + particulares, una línea por cada cosa. */
+  private baseLines(
+    profile: FeeProfile,
+    tariff: Tariff,
+    months: number,
+  ): { lines: QuoteLine[]; monthlyBase: Money } {
     const tier = tariff.forWeeklyHours(profile.regularWeeklyHours);
-    const monthlyBase = profile.privateLessons.reduce((sum, l) => sum.plus(l.monthlyPrice()), tier);
+    const monthlyBase = [
+      ...profile.specialClasses.map((c) => c.monthlyPrice),
+      ...profile.privateLessons.map((l) => l.monthlyPrice()),
+    ].reduce((sum, price) => sum.plus(price), tier);
     const lines: QuoteLine[] = [];
     if (tier.cents > 0) {
       lines.push(
         new QuoteLine(
           `${hoursLabel(profile.regularWeeklyHours)} semanales · ${monthsLabel(months)}`,
           tier.times(months),
+        ),
+      );
+    }
+    for (const special of profile.specialClasses) {
+      lines.push(
+        new QuoteLine(
+          `Clase especial · ${special.groupName}${months > 1 ? ` · ${monthsLabel(months)}` : ''}`,
+          special.monthlyPrice.times(months),
         ),
       );
     }
@@ -816,14 +871,7 @@ export class FeeCalculator {
         ),
       );
     }
-    const gross = monthlyBase.times(months);
-    const discounts: [string, number][] = [];
-    if (profile.hasSiblings && tariff.familyPercent > 0) {
-      discounts.push(['Descuento familiar', tariff.familyPercent]);
-    }
-    const prepayment = tariff.prepaymentPercent(months);
-    if (prepayment > 0) discounts.push([prepaymentLabel(months), prepayment]);
-    return this.applyDiscounts(lines, gross, discounts, special, points, monthlyBase, monthlyBase);
+    return { lines, monthlyBase };
   }
 
   /**
@@ -1114,10 +1162,12 @@ export class StudentAccount {
     private rate: Money | null,
     /** Meses de la temporada en los que no se le cobra cuota mensual (p. ej. el de un alta a final de mes). */
     private unbilled: readonly YearMonth[],
+    /** Precio mensual fijado por superadministración: manda sobre sus grupos, clases especiales y particulares. */
+    private fixed: Money | null,
   ) {}
 
   static open(student: StudentRef): StudentAccount {
-    return new StudentAccount(student, 'monthly', false, null, []);
+    return new StudentAccount(student, 'monthly', false, null, [], null);
   }
 
   static restore(
@@ -1126,8 +1176,21 @@ export class StudentAccount {
     member: boolean,
     privateRate: Money | null,
     unbilledMonths: readonly YearMonth[] = [],
+    fixedPrice: Money | null = null,
   ): StudentAccount {
-    return new StudentAccount(student, plan, member, privateRate, unbilledMonths);
+    return new StudentAccount(student, plan, member, privateRate, unbilledMonths, fixedPrice);
+  }
+
+  /** Fija (o quita, con null) el precio mensual del alumno. */
+  fixPrice(price: Money | null): void {
+    if (price !== null && price.isNegative()) {
+      throw new InvalidValue('monthlyPrice', 'El precio no puede ser negativo.');
+    }
+    this.fixed = price;
+  }
+
+  fixedPrice(): Money | null {
+    return this.fixed;
   }
 
   update(plan: PreferredPlan, member: boolean, privateRate: Money | null): void {

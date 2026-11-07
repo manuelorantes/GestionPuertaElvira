@@ -75,6 +75,7 @@ function present(group: GroupSummary) {
     occupied: group.occupied,
     occupancyByDay: group.occupancyByDay,
     weeklyPlan: group.weeklyPlan,
+    specialPriceCents: group.specialPriceCents,
   };
 }
 

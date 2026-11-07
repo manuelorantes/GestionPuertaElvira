@@ -586,6 +586,10 @@ export function auditTarget(
       return own('student');
     case 'classes_group':
       return own('group');
+    case 'billing_special_class_price': {
+      const id = text('group_id');
+      return id === null ? null : { kind: 'group', id };
+    }
     case 'teachers_teacher':
       return own('teacher');
     case 'billing_account':
