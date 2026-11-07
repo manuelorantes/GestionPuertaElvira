@@ -96,6 +96,8 @@ export interface GroupSummary {
   /** Plazas ocupadas cada día (código del día → alumnos). */
   occupancyByDay: Record<string, number>;
   weeklyPlan: string;
+  /** Precio mensual si es clase especial (lo fija superadministración en Cobros); null si no lo es. */
+  specialPriceCents: number | null;
 }
 
 export interface EnrolledStudent {

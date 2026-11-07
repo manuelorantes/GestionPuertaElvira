@@ -183,9 +183,10 @@ export class SqlClassQuery implements ClassQuery {
   private select() {
     return this.sql`
       SELECT g.id, g.name, g.custom_name, g.level, g.teacher_id, g.days, g.start_minutes, g.end_minutes, g.classroom, g.capacity,
-             t.full_name AS teacher_name
+             t.full_name AS teacher_name, sp.monthly_price_cents AS special_price_cents
         FROM classes_group g
-        JOIN teachers_teacher t ON t.id = g.teacher_id`;
+        JOIN teachers_teacher t ON t.id = g.teacher_id
+        LEFT JOIN billing_special_class_price sp ON sp.group_id = g.id`;
   }
 
   /** Inscripciones vigentes de todos los grupos (o de uno), para contar plazas por día. */
@@ -303,5 +304,6 @@ function toSummary(row: Row, enrolments: readonly Enrolment[]): GroupSummary {
       [...byDay.entries()].map(([day, count]) => [weekdayCode(day), count]),
     ),
     weeklyPlan: d.weeklyPlan(),
+    specialPriceCents: row.nullableInt('special_price_cents'),
   };
 }

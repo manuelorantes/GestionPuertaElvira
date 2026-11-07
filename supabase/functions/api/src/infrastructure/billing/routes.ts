@@ -13,6 +13,7 @@ import {
   CorrectPaymentAmount,
   decimal,
   DeletePayment,
+  FixStudentPrice,
   GenerateMonthlyCharges,
   GetStudentAccount,
   IssueInvoice,
@@ -29,11 +30,12 @@ import {
   ReschedulePayment,
   ResetCharge,
   SetChargeDiscount,
+  SetSpecialClassPrice,
   UpdateBillingSettings,
   UpdateStudentAccount,
 } from '../../application/billing/mod.ts';
 import { type ApiApp, param, type RequestScope } from '../http/app.ts';
-import { recalculatingFees } from './recalculate.ts';
+import { recalculatingFees, recalculatingGroupFees } from './recalculate.ts';
 import { registerDomainErrors } from '../http/errors.ts';
 import { renameAuditAction } from '../audit/mod.ts';
 import { JsonBody } from '../http/json-body.ts';
@@ -44,6 +46,7 @@ import {
   SqlClosedPeriods,
   SqlDocumentSequence,
   SqlPaymentRepository,
+  SqlSpecialClassPrices,
   SqlStudentAccountRepository,
   SqlStudentDirectory,
 } from '../persistence/billing.ts';
@@ -140,6 +143,7 @@ export function registerBillingRoutes(api: ApiApp): void {
     PaymentNotFound: [404, 'not_found'],
     ChargeNotFound: [404, 'not_found'],
     BillingStudentNotFound: [404, 'not_found'],
+    SpecialClassNotFound: [404, 'not_found'],
     InvoiceAlreadyIssued: [409, 'invoice_already_issued'],
     InvoicedPaymentCannotBeDeleted: [409, 'payment_invoiced'],
   });
@@ -343,6 +347,46 @@ export function registerBillingRoutes(api: ApiApp): void {
       ));
     return c.body(null, 204);
   });
+
+  // Precios que solo fija superadministración; recalculan las cuotas de quienes afectan.
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/billing/accounts/:id/price', access: 'superadmin' },
+    async (c, scope) => {
+      const b = billing(api, scope);
+      const id = param(c, 'id');
+      const body = await JsonBody.from(c.req.raw);
+      await recalculatingFees(
+        api,
+        scope,
+        [id],
+        () =>
+          new FixStudentPrice(b.directory, b.accounts, api.deps.clock).execute(
+            id,
+            body.optionalString('monthlyPrice'),
+          ),
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/billing/groups/:id/price', access: 'superadmin' },
+    async (c, scope) => {
+      const id = param(c, 'id');
+      const body = await JsonBody.from(c.req.raw);
+      await recalculatingGroupFees(
+        api,
+        scope,
+        id,
+        () =>
+          new SetSpecialClassPrice(new SqlSpecialClassPrices(scope.tx)).execute(
+            id,
+            body.optionalString('monthlyPrice'),
+          ),
+      );
+      return c.body(null, 204);
+    },
+  );
 
   api.defineRoute(
     admin('PUT', '/api/admin/billing/accounts/:id/charges/:month'),

@@ -140,7 +140,15 @@ Table billing_account {
   member boolean [not null, note: 'socio: cuota de socio por temporada']
   private_rate_cents int [note: 'precio por hora pactado de sus particulares']
   unbilled_months jsonb [not null, default: '[]', note: 'meses (AAAA-MM) sin cuota mensual: alta tardía que empieza a pagar el mes siguiente']
+  fixed_price_cents int [note: 'precio mensual fijado por superadministración; manda sobre grupos, clases especiales y particulares']
 }
+
+Table billing_special_class_price {
+  group_id uuid [pk, note: 'referencia a classes_group.id; se borra con el grupo']
+  monthly_price_cents int [not null, note: 'precio mensual de la clase especial: lo paga cada alumno y sus horas no cuentan para el tramo']
+}
+
+Ref: billing_special_class_price.group_id > classes_group.id [delete: cascade]
 
 Table billing_charge {
   id uuid [pk, note: 'UUIDv7']
