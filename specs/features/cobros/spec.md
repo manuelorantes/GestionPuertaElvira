@@ -6,16 +6,31 @@ Decisión de diseño: [cuotas mensuales generadas y pago flexible](../../decisio
 
 ### Requirement: Cálculo de la cuota mensual
 La cuota mensual MUST ser el tramo por las horas semanales de los grupos normales del alumno
-más sus clases particulares:
+más el precio de cada clase especial en la que esté más sus clases particulares,
+salvo que el alumno tenga un precio fijado, que la sustituye entera
+([decisión](../../decisions/precio-de-clases-especiales-y-de-alumnos.md)):
 
 - tramos por defecto: 3 h o más, 55 €; 2 h o más, 45 €; 1 h y media o más, 40 €; menos, 35 €;
 - sin grupos normales, el tramo es 0 €;
 - cada particular suma horas semanales × 4 × precio por hora;
-- el precio por hora es el pactado con el alumno o, si no lo hay, el del profesor (30 €/h por defecto).
+- el precio por hora es el pactado con el alumno o, si no lo hay, el del profesor (30 €/h por defecto);
+- una clase especial (un grupo no de particulares con precio mensual propio) suma su precio,
+  y sus horas no cuentan para el tramo; con horario especial en ella se paga el precio entero;
+- el precio fijado del alumno es su cuota base, esté en los grupos, clases especiales o particulares que esté.
+
+Sobre cualquiera de ellos se aplican los descuentos de siempre.
 
 #### Scenario: Dos grupos que suman tres horas
 - **WHEN** un alumno está en dos grupos de 1 h y media semanales
 - **THEN** su tramo es el de 3 h o más (55 €)
+
+#### Scenario: Grupo normal y clase especial
+- **WHEN** un alumno está en un grupo normal de 1 h semanal y en una clase especial de 50 €
+- **THEN** su cuota es 35 € + 50 € = 85 €; si solo está en la clase especial, 50 €
+
+#### Scenario: Precio fijado
+- **WHEN** un alumno con 3 h en grupos normales, una particular y una clase especial tiene un precio fijado de 60 € y familia directa
+- **THEN** su cuota es 60 € con el 10 % familiar: 54 €
 
 #### Scenario: Particular con precio pactado
 - **WHEN** un alumno tiene una particular de 1 h y media semanal con un precio pactado de 35 €/h
@@ -143,7 +158,7 @@ y lo que cubrían sus cobros pasa a los meses siguientes, con el concepto del re
 
 ### Requirement: Recálculo de cuotas
 Cuando cambia lo que determina la cuota de un alumno (sus grupos o su horario especial, su familia directa, su precio
-de particulares o el horario de uno de sus grupos), sus cuotas MUST recalcularse con la tarifa nueva desde el mes
+de particulares, el horario de uno de sus grupos, el precio de una de sus clases especiales o su precio fijado), sus cuotas MUST recalcularse con la tarifa nueva desde el mes
 siguiente o, si es del día 1 al 10, desde el mes actual, hasta junio, estén cobradas o no. Las cuotas fijadas a mano
 no cambian. La diferencia queda como pendiente o como saldo a favor.
 
@@ -365,6 +380,25 @@ si ese mes aún no tiene cuota, MUST bajar hasta «Cuotas y cobros».
 #### Scenario: Llegar a una cuota de la ficha
 - **WHEN** administración sigue un enlace a la cuota de noviembre de un alumno
 - **THEN** ve su ficha con la cuota de noviembre a la vista y resaltada tres segundos
+
+### Requirement: Precio de clases especiales y de alumnos
+Solo superadministración MUST poder poner, cambiar o quitar el precio mensual de una clase especial (desde la ficha del grupo)
+y el precio fijado de un alumno (desde «Datos de cobro» de su ficha), y la aplicación MUST pedir confirmación antes,
+diciendo a quién afecta, cuánto pagará y desde qué mes. La API rechaza a cualquier otro rol.
+Administración y profesorado ven estos precios sin poder cambiarlos. Un grupo de particulares no puede ser clase especial.
+Cada cambio recalcula las cuotas de quienes afecta (ver «Recálculo de cuotas») y queda en el historial, en Cuotas.
+
+#### Scenario: Poner precio a una clase especial
+- **WHEN** superadministración pone 50 € a la clase «Rey A» y lo confirma
+- **THEN** sus alumnos pagan 50 € al mes por ella desde el mes del recálculo, y la lista de grupos la marca «Clase especial · 50,00 €/mes»
+
+#### Scenario: Sin confirmar no cambia nada
+- **WHEN** superadministración escribe un precio y cancela la confirmación
+- **THEN** el precio y las cuotas siguen como estaban
+
+#### Scenario: Administración no puede
+- **WHEN** administración abre la ficha de un grupo o de un alumno
+- **THEN** ve el precio, si lo hay, pero no puede cambiarlo, y la API le responde 403 si lo intenta
 
 ### Requirement: Tarifas y ajustes
 Administración MUST poder cambiar los tramos, la cuota de socio, los descuentos, el precio por hora de las particulares
