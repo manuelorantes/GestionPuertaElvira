@@ -132,15 +132,17 @@ function GroupForm({
             />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <fieldset>
+            {/* Las cuatro aulas no caben en media fila: el aula ocupa la fila entera y sus botones bajan si hace falta. */}
+            <fieldset className="sm:col-span-2">
               <legend className="mb-1.5 text-sm font-medium">Aula</legend>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 {CLASSROOMS.map((classroom) => (
                   <ToggleButton
                     key={classroom}
                     tone="ink"
                     pressed={form.values.classroom === classroom}
                     onClick={() => form.setClassroom(classroom)}
+                    className="whitespace-nowrap"
                   >
                     {classroomLabel(classroom)}
                   </ToggleButton>

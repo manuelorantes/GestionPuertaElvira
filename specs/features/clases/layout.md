@@ -34,7 +34,8 @@ ClassesPage (/panel/clases)
     ├── Nivel (select) | Profesor (select, solo activos)
     ├── Días: botones conmutables Lun Mar Mié Jue Vie
     ├── Empieza (select 16:00…20:30) | Termina (select 16:30…21:00)
-    ├── Aula: botones «Aula Alfil» «Aula Caballo» «Aula Peón» «Aula Rey Batallador» | Plazas: stepper − N plazas +
+    ├── Aula (fila entera, los botones bajan de línea si no caben): botones «Aula Alfil» «Aula Caballo» «Aula Peón» «Aula Rey Batallador»
+    ├── Plazas: stepper − N plazas +
     ├── Texto: «N h semanales. La cuota se asigna según las horas semanales.»
     ├── Alert de coincidencia (condicional): «Coincide en el aula Alfil con «Grupo» (Lun · 17:00–18:00). ¿Compartir el aula igualmente?»; el botón principal pasa a «Crear igualmente» / «Guardar igualmente»
     └── Pie: «Cancelar» | «Crear grupo» o «Guardar cambios»
