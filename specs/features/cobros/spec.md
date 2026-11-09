@@ -96,6 +96,8 @@ Cualquier alumno que no haya pagado la cuota de socio de la temporada MUST poder
 Al conciliar con el banco se MUST poder cobrar a cualquier alumno, también a un socio provisional, un **pago a cuenta**
 (concepto «Pago a cuenta»): un recibo de cuotas sin meses por el importe que se indique,
 que queda entero como saldo a favor y cubre sus próximas cuotas (para el dinero que llega sin saber aún a qué va).
+Desde la cabecera de Cobros, debajo de «Registrar cobro», administración MUST poder **añadir dinero a cuenta**
+de uno o varios alumnos activos, con importe, forma de pago y fecha (ver el requisito «Dinero a cuenta de varios alumnos»).
 Los pedidos de [material deportivo](../material/spec.md) con precio MUST generar un cobro que sale con las cuotas del
 mes en que se pidió (y de los meses siguientes mientras quede algo pendiente), con el producto como concepto, y se cobra
 con el concepto «Material» de «Registrar cobro» eligiendo el pedido. Ese cobro no se cancela desde «Cuotas»: se cancela
@@ -116,6 +118,40 @@ y el menú refleja el orden vigente (sin opción marcada cuando se ordena por co
 En los meses futuros, además de las cuotas ya cobradas por adelantado, MUST mostrarse como «Prevista» la cuota
 esperada de cada alumno activo ese mes que aún no la tenga (con la tarifa de hoy). Las previstas no se guardan: pasan a
 ser cuotas al cobrarlas o al llegar el mes.
+
+### Requirement: Dinero a cuenta de varios alumnos
+Al añadir dinero a cuenta, el importe MUST repartirse entre los alumnos elegidos según lo que debe cada uno
+hasta el mes de la fecha del cobro (su cuota de socio pendiente y sus cuotas mensuales de ese mes y anteriores):
+
+- si llega para todo, cada uno recibe lo que debe y lo que sobra se divide a partes iguales;
+- si no llega, se reparte en proporción a lo que debe cada uno (a partes iguales si deben lo mismo);
+- los céntimos que no se pueden partir van a quien más fracción tenía, de modo que las partes suman siempre el importe.
+
+De la parte de cada alumno se MUST pagar primero su cuota de socio pendiente y después sus cuotas mensuales,
+de la más antigua a la más reciente; lo que falte queda pendiente y lo que sobre queda como saldo a favor,
+que cubre sus siguientes cuotas.
+Cada alumno MUST recibir su propio recibo de pago a cuenta (sin meses) con la forma de pago y la fecha elegidas:
+«Pago a cuenta · cuota de socio» por lo que va a la cuota de socio y «Pago a cuenta» por el resto.
+Quien paga algo de la cuota de socio pasa a ser socio.
+Antes de guardar, el diálogo MUST mostrar el reparto: lo que debía cada alumno, cuánto va a su cuota de socio y a
+sus cuotas, y si le queda algo pendiente o a su favor.
+Sin alumnos, con un importe que no sea mayor que 0 € o en una temporada cerrada, no se guarda nada.
+
+#### Scenario: Llega justo para lo que deben
+- **WHEN** administración añade 100 € a cuenta de dos alumnos que deben 40 € y 60 €
+- **THEN** cada uno recibe un recibo «Pago a cuenta» de 40 € y 60 € y los dos quedan al día
+
+#### Scenario: Sobra dinero
+- **WHEN** administración añade 120 € a cuenta de dos alumnos que deben 40 € y 60 €
+- **THEN** reciben 50 € y 70 €, y a cada uno le quedan 10 € a su favor para la cuota siguiente
+
+#### Scenario: Falta dinero
+- **WHEN** administración añade 80 € a cuenta de dos alumnos que deben 40 € y 60 €
+- **THEN** reciben 32 € y 48 €, y les quedan 8 € y 12 € pendientes
+
+#### Scenario: Debe la cuota de socio
+- **WHEN** un alumno que debe la cuota de socio (50 €) y 40 € de octubre recibe 100 € a cuenta
+- **THEN** recibe un recibo «Pago a cuenta · cuota de socio» de 50 € y otro «Pago a cuenta» de 50 €, y le quedan 10 € a su favor
 
 ### Requirement: Cuota del mes de un alta tardía
 Al dar de alta (o de alta de nuevo) a un alumno con clases con fecha del día 16 en adelante del mes en curso

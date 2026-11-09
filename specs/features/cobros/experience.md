@@ -19,6 +19,14 @@ Solo administración (ruta dentro de `/panel`). Las peticiones `/api/admin/billi
      y «Guardar cobro» queda desactivado.
    - Al guardar se refrescan cuotas, cobros y la ficha, aparece el toast «Cobro registrado · R-2026-0001 · 45,00 €»
      y se abre el recibo.
+2a. **Añadir dinero a cuenta.**
+   - Se abre desde la cabecera, con el botón «Añadir dinero a cuenta» bajo «Registrar cobro».
+   - Los alumnos se añaden de uno en uno desde el buscador; cada uno sale como chip y se quita con su «×».
+   - Con importe, fecha y al menos un alumno se pide el reparto (`POST payments/on-account/quote`, 250 ms de retardo);
+     cambiar solo la forma de pago no lo vuelve a pedir. Mientras llega se lee «Calculando…»; sus errores van en un `Alert`
+     y «Añadir a cuenta» queda desactivado.
+   - Al guardar (`POST payments/on-account`) se refrescan cuotas, cobros, fichas y contabilidad, se cierra el diálogo
+     y aparece el toast «Dinero a cuenta añadido · 150,00 €».
 2b. **Editar una cuota desde la ficha.**
    - Si el importe nuevo es menor que lo que la cuota tiene cubierto, «Guardar» abre `ConfirmChangesDialog` con la
      casilla «Cambiar la cantidad pagada» marcada; el texto bajo la casilla cambia al desmarcarla. «Confirmar» envía
