@@ -161,6 +161,89 @@ describe('Cobros y cuotas', () => {
     });
   });
 
+  it('adds money on account to several students, showing how it is shared before saving', async () => {
+    const students = {
+      items: [
+        {
+          id: 's1',
+          fullName: 'Martina López Herrera',
+          age: 12,
+          status: 'active',
+          groups: [],
+          hasSiblings: false,
+        },
+        {
+          id: 's2',
+          fullName: 'Hugo Martín Castillo',
+          age: 10,
+          status: 'active',
+          groups: [],
+          hasSiblings: false,
+        },
+      ],
+      total: 2,
+    };
+    const shares = [
+      {
+        studentId: 's1',
+        name: 'Martina López Herrera',
+        owedCents: 4000,
+        membershipCents: 0,
+        monthlyCents: 4500,
+      },
+      {
+        studentId: 's2',
+        name: 'Hugo Martín Castillo',
+        owedCents: 11000,
+        membershipCents: 5000,
+        monthlyCents: 5500,
+      },
+    ];
+    const fetch = api({
+      'GET /api/admin/students?filter=active': [200, students],
+      'POST /api/admin/billing/payments/on-account/quote': [200, { items: shares }],
+      'POST /api/admin/billing/payments/on-account': [
+        201,
+        { items: shares, paymentIds: ['p1', 'p2', 'p3'] },
+      ],
+    });
+    renderApp('/panel/cobros?mes=2026-10');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Añadir dinero a cuenta' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Añadir dinero a cuenta' });
+    await userEvent.type(within(dialog).getByLabelText('Importe (€)'), '150');
+    await userEvent.click(within(dialog).getByRole('button', { name: /Transferencia/ }));
+    for (const name of ['Martina', 'Hugo']) {
+      await userEvent.type(within(dialog).getByRole('combobox', { name: 'Alumnos' }), name);
+      await userEvent.click(await within(dialog).findByRole('option', { name: new RegExp(name) }));
+    }
+    const chosen = within(dialog).getByRole('list', { name: 'Alumnos elegidos' });
+    expect(within(chosen).getAllByRole('listitem')).toHaveLength(2);
+
+    const preview = await within(dialog).findByRole('list', { name: 'Reparto' });
+    expect(within(preview).getByText('Quedan 5,00 € a su favor')).toBeInTheDocument();
+    expect(within(preview).getByText(/50,00 € a la cuota de socio/)).toBeInTheDocument();
+    const save = within(dialog).getByRole('button', { name: 'Añadir a cuenta' });
+    await waitFor(() => expect(save).toBeEnabled());
+    await userEvent.click(save);
+
+    await waitFor(() => {
+      const sent = fetch.mock.calls.find(
+        ([url]) => url === '/api/admin/billing/payments/on-account',
+      );
+      expect(JSON.parse(String(sent?.[1]?.body))).toEqual({
+        studentIds: ['s1', 's2'],
+        amountCents: 15000,
+        method: 'transfer',
+        date: expect.any(String),
+      });
+    });
+    expect(await screen.findByText('Dinero a cuenta añadido · 150,00 €')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('dialog', { name: 'Añadir dinero a cuenta' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('disables the whole year when fewer than 9 months are left', async () => {
     api({ 'GET /api/admin/billing/accounts/s1': [200, { ...ACCOUNT, remainingMonths: 8 }] });
     renderApp('/panel/cobros?mes=2026-10');

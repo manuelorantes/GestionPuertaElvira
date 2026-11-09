@@ -194,6 +194,34 @@ export async function registerPayment(request: PaymentRequest): Promise<string> 
   return (await apiSend<{ id: string }>('POST', `${BASE}/payments`, request)).id;
 }
 
+export interface OnAccountRequest {
+  studentIds: string[];
+  amountCents: number;
+  method: PaymentMethod;
+  date: string;
+}
+
+/** Lo que le toca a un alumno de un dinero a cuenta: a su cuota de socio y a sus cuotas (con el sobrante). */
+export interface OnAccountShare {
+  studentId: string;
+  name: string;
+  /** Lo que debía hasta el mes del cobro (cuota de socio y cuotas de ese mes y anteriores). */
+  owedCents: number;
+  membershipCents: number;
+  monthlyCents: number;
+}
+
+export async function quoteOnAccount(request: OnAccountRequest): Promise<OnAccountShare[]> {
+  return (
+    await apiSend<{ items: OnAccountShare[] }>('POST', `${BASE}/payments/on-account/quote`, request)
+  ).items;
+}
+
+export async function addOnAccount(request: OnAccountRequest): Promise<string[]> {
+  return (await apiSend<{ paymentIds: string[] }>('POST', `${BASE}/payments/on-account`, request))
+    .paymentIds;
+}
+
 export async function fetchPayments(studentId?: string): Promise<PaymentSummary[]> {
   const query = studentId ? `?studentId=${studentId}` : '';
   return (await apiGet<{ items: PaymentSummary[] }>(`${BASE}/payments${query}`)).items;
