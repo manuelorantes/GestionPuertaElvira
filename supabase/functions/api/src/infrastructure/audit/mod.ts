@@ -43,6 +43,7 @@ export class AuditLabels {
     'POST /api/admin/billing/charges/:id/cancel': 'Cancelar cuota',
     'POST /api/admin/billing/charges/:id/reactivate': 'Reactivar cuota',
     'POST /api/admin/billing/payments': 'Registrar cobro',
+    'POST /api/admin/billing/payments/on-account': 'Añadir dinero a cuenta',
     'POST /api/admin/billing/payments/:id/invoice': 'Emitir factura',
     'PUT /api/admin/billing/payments/:id/date': 'Cambiar la fecha de un cobro',
     'PUT /api/admin/billing/payments/:id/amount': 'Cambiar el importe de un cobro',
