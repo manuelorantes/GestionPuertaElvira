@@ -10,6 +10,7 @@ const NOT_CHANGING_DATA = [
   'POST /api/auth/logout',
   'POST /api/admin/groups/resolve-schedule',
   'POST /api/admin/billing/quote',
+  'POST /api/admin/billing/payments/on-account/quote',
   'POST /api/admin/import/preview',
   'POST /api/admin/accounting/reconciliation',
   'POST /api/admin/audit/actions/:id/undo',

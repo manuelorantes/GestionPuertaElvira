@@ -20,6 +20,7 @@ import {
   PointsRedemption,
   PrivateLesson,
   QuoteLine,
+  shareOnAccountMoney,
   SpecialClass,
   SpecialDiscount,
   StudentAccount,
@@ -629,5 +630,40 @@ Deno.test('Charge should cancel only what is pending when part of it is paid, an
     () => monthly('2026-10', 40).cancel(Money.cents(4000), today),
     InvalidValue,
     'cobrada',
+  );
+});
+
+Deno.test('shareOnAccountMoney should pay each debt in full and split what is left over equally', () => {
+  const shares = shareOnAccountMoney(Money.euros(100), [Money.euros(40), Money.euros(60)]);
+  assertEquals(shares.map((s) => s.cents), [4000, 6000]);
+  const extra = shareOnAccountMoney(Money.euros(120), [Money.euros(40), Money.euros(60)]);
+  assertEquals(extra.map((s) => s.cents), [5000, 7000]);
+  // Un céntimo que no se puede partir va al primero.
+  const odd = shareOnAccountMoney(Money.cents(101), [Money.zero(), Money.zero()]);
+  assertEquals(odd.map((s) => s.cents), [51, 50]);
+});
+
+Deno.test('shareOnAccountMoney should split money that falls short in proportion to what each one owes', () => {
+  const short = shareOnAccountMoney(Money.euros(80), [Money.euros(40), Money.euros(60)]);
+  assertEquals(short.map((s) => s.cents), [3200, 4800]);
+  const equal = shareOnAccountMoney(Money.euros(50), [Money.euros(40), Money.euros(40)]);
+  assertEquals(equal.map((s) => s.cents), [2500, 2500]);
+  // Los céntimos que sobran del redondeo van a quien más fracción tenía: el total siempre cuadra.
+  const thirds = shareOnAccountMoney(Money.cents(100), [
+    Money.euros(10),
+    Money.euros(10),
+    Money.euros(10),
+  ]);
+  assertEquals(thirds.map((s) => s.cents), [34, 33, 33]);
+  const nobody = shareOnAccountMoney(Money.euros(30), [Money.euros(30), Money.zero()]);
+  assertEquals(nobody.map((s) => s.cents), [3000, 0]);
+});
+
+Deno.test('shareOnAccountMoney should reject no students and amounts that are not positive', () => {
+  assertThrows(() => shareOnAccountMoney(Money.euros(10), []), InvalidValue, 'alumno');
+  assertThrows(
+    () => shareOnAccountMoney(Money.zero(), [Money.euros(10)]),
+    InvalidValue,
+    'mayor que cero',
   );
 });

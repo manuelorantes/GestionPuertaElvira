@@ -6,6 +6,7 @@ import {
   StudentRef,
 } from '../../domain/billing/mod.ts';
 import {
+  AddOnAccountMoney,
   AdjustCharge,
   BillingStudentNotFound,
   CancelCharge,
@@ -20,6 +21,7 @@ import {
   ListCancelledCharges,
   ListMonthlyCharges,
   MarkReminded,
+  type OnAccountRequest,
   paidChargePolicyFrom,
   PaymentNotFound,
   type PaymentRequest,
@@ -115,6 +117,16 @@ export function billing(api: ApiApp, scope: RequestScope) {
       closed,
       locks,
     ),
+    onAccount: new AddOnAccountMoney(
+      directory,
+      charges,
+      payments,
+      sequence,
+      transactions,
+      closed,
+      locks,
+      accounts,
+    ),
     issueInvoice: new IssueInvoice(payments, sequence, transactions, clock, locks),
     getAccount: new GetStudentAccount(directory, accounts, quotes, clock, settings, charges),
     today: () => LocalDate.fromInstant(clock.now()),
@@ -134,6 +146,15 @@ function paymentRequest(body: JsonBody): PaymentRequest {
     specialConcept: special?.requiredString('concept') ?? null,
     redeemPoints: body.optionalInt('redeemPoints') ?? 0,
     chargeId: body.optionalString('chargeId'),
+  };
+}
+
+function onAccountRequest(body: JsonBody): OnAccountRequest {
+  return {
+    studentIds: body.stringList('studentIds'),
+    amountCents: body.requiredInt('amountCents'),
+    method: body.requiredString('method'),
+    date: body.requiredString('date'),
   };
 }
 
@@ -228,6 +249,24 @@ export function registerBillingRoutes(api: ApiApp): void {
       paymentRequest(await JsonBody.from(c.req.raw)),
     );
     return c.json({ id }, 201);
+  });
+
+  // Añadir dinero a cuenta de uno o varios alumnos: primero el reparto (sin guardar) y luego los cobros.
+  api.defineRoute(
+    admin('POST', '/api/admin/billing/payments/on-account/quote'),
+    async (c, scope) => {
+      const items = await billing(api, scope).onAccount.quote(
+        onAccountRequest(await JsonBody.from(c.req.raw)),
+      );
+      return c.json({ items });
+    },
+  );
+
+  api.defineRoute(admin('POST', '/api/admin/billing/payments/on-account'), async (c, scope) => {
+    const result = await billing(api, scope).onAccount.execute(
+      onAccountRequest(await JsonBody.from(c.req.raw)),
+    );
+    return c.json({ items: result.shares, paymentIds: result.paymentIds }, 201);
   });
 
   api.defineRoute(clubReader('/api/admin/billing/payments'), async (c, scope) => {

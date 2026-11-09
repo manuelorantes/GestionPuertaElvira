@@ -31,6 +31,7 @@ import {
   PrivateLesson,
   Quote,
   QuoteLine,
+  shareOnAccountMoney,
   SpecialClass,
   SpecialDiscount,
   StudentAccount,
@@ -1058,28 +1059,179 @@ export class RegisterCreditPayment {
         throw new InvalidValue('amountCents', 'El importe a cuenta debe ser mayor que cero.');
       }
       await PeriodClosed.guard(this.closed, date);
-      const season = Season.containing(YearMonth.of(date));
-      const amount = Money.cents(request.amountCents);
-      const payment = Payment.register({
-        id: PaymentId.generate(),
+      const payment = await creditPayment(this.sequence, {
         student: ref,
-        paidOn: date,
-        method: paymentMethodFromName(request.method),
-        receipt: DocumentNumber.receipt(
-          season.startYear,
-          await this.sequence.next('R', season.startYear),
-        ),
+        date,
+        method: request.method,
         kind: 'monthly',
         concept: RegisterCreditPayment.CONCEPT,
-        lines: [new QuoteLine(RegisterCreditPayment.CONCEPT, amount)],
-        total: amount,
-        periods: [],
-        credit: amount,
+        amount: Money.cents(request.amountCents),
       });
       await this.payments.savePayment(payment);
       return payment.id.value;
     });
   }
+}
+
+/** Un recibo sin meses por ese importe: todo lo que cubre queda como saldo a favor de las cuotas de su tipo. */
+async function creditPayment(
+  sequence: DocumentSequence,
+  fields: {
+    student: StudentRef;
+    date: LocalDate;
+    method: string;
+    kind: 'monthly' | 'membership';
+    concept: string;
+    amount: Money;
+  },
+): Promise<Payment> {
+  const season = Season.containing(YearMonth.of(fields.date));
+  return Payment.register({
+    id: PaymentId.generate(),
+    student: fields.student,
+    paidOn: fields.date,
+    method: paymentMethodFromName(fields.method),
+    receipt: DocumentNumber.receipt(season.startYear, await sequence.next('R', season.startYear)),
+    kind: fields.kind,
+    concept: fields.concept,
+    lines: [new QuoteLine(fields.concept, fields.amount)],
+    total: fields.amount,
+    periods: [],
+    credit: fields.amount,
+  });
+}
+
+export interface OnAccountRequest {
+  studentIds: string[];
+  amountCents: number;
+  method: string;
+  date: string;
+}
+
+/** Lo que le toca a un alumno de un dinero a cuenta: a su cuota de socio y a sus cuotas mensuales (con el sobrante). */
+export interface OnAccountShare {
+  studentId: string;
+  name: string;
+  /** Lo que debía hasta el mes del cobro: cuota de socio y cuotas mensuales de ese mes y anteriores. */
+  owedCents: number;
+  membershipCents: number;
+  monthlyCents: number;
+}
+
+/**
+ * Añadir dinero a cuenta de uno o varios alumnos: se reparte según lo que debe cada uno (ver `shareOnAccountMoney`) y
+ * cada uno recibe un pago a cuenta. De su parte se paga primero la cuota de socio pendiente y el resto va a sus cuotas
+ * mensuales, de la más antigua a la más reciente; lo que sobra queda como saldo a favor para las siguientes.
+ */
+export class AddOnAccountMoney {
+  static readonly MEMBERSHIP_CONCEPT = 'Pago a cuenta · cuota de socio';
+
+  constructor(
+    private readonly directory: StudentDirectory,
+    private readonly charges: ChargeRepository,
+    private readonly payments: PaymentRepository,
+    private readonly sequence: DocumentSequence,
+    private readonly transactions: TransactionRunner,
+    private readonly closed: ClosedPeriods,
+    private readonly locks: Locks,
+    private readonly accounts: StudentAccountRepository,
+  ) {}
+
+  /** El reparto que se haría, sin guardar nada. */
+  quote(request: OnAccountRequest): Promise<OnAccountShare[]> {
+    return this.shares(request);
+  }
+
+  execute(request: OnAccountRequest): Promise<{ shares: OnAccountShare[]; paymentIds: string[] }> {
+    return this.transactions.run(async () => {
+      // Siempre en el mismo orden, para que dos repartos a la vez no se bloqueen entre sí.
+      for (const id of [...uniqueStudents(request.studentIds)].sort()) {
+        await this.locks.acquire(`billing:student:${id}`);
+      }
+      const date = LocalDate.fromString(request.date);
+      await PeriodClosed.guard(this.closed, date);
+      const shares = await this.shares(request);
+      const paymentIds: string[] = [];
+      for (const share of shares) {
+        const student = StudentRef.fromString(share.studentId);
+        const parts = [
+          {
+            kind: 'membership',
+            concept: AddOnAccountMoney.MEMBERSHIP_CONCEPT,
+            cents: share.membershipCents,
+          },
+          { kind: 'monthly', concept: RegisterCreditPayment.CONCEPT, cents: share.monthlyCents },
+        ] as const;
+        for (const part of parts.filter((p) => p.cents > 0)) {
+          const payment = await creditPayment(this.sequence, {
+            student,
+            date,
+            method: request.method,
+            kind: part.kind,
+            concept: part.concept,
+            amount: Money.cents(part.cents),
+          });
+          await this.payments.savePayment(payment);
+          paymentIds.push(payment.id.value);
+        }
+        // Como al cobrar la cuota de socio desde «Registrar cobro»: quien la paga es socio.
+        if (share.membershipCents > 0) await this.makeMember(student);
+      }
+      return { shares, paymentIds };
+    });
+  }
+
+  private async shares(request: OnAccountRequest): Promise<OnAccountShare[]> {
+    if (!Number.isInteger(request.amountCents)) {
+      throw new InvalidValue('amountCents', 'El importe a cuenta no es válido.');
+    }
+    const date = LocalDate.fromString(request.date);
+    const month = YearMonth.of(date);
+    const debts = [];
+    for (const id of uniqueStudents(request.studentIds)) {
+      const ref = StudentRef.fromString(id);
+      const student = await this.directory.find(ref, date);
+      if (student === null) throw new BillingStudentNotFound();
+      const membership = sumPending(await pendingCharges(this.charges, ref, 'membership'));
+      const monthly = sumPending(
+        (await pendingCharges(this.charges, ref, 'monthly')).filter((p) =>
+          !month.isBefore(p.charge.period)
+        ),
+      );
+      debts.push({ student, membership, owed: membership.plus(monthly) });
+    }
+    const split = shareOnAccountMoney(
+      Money.cents(request.amountCents),
+      debts.map((d) => d.owed),
+    );
+    return debts.map((debt, i) => {
+      const share = split[i]!;
+      const membershipCents = Math.min(share.cents, debt.membership.cents);
+      return {
+        studentId: debt.student.id,
+        name: debt.student.name,
+        owedCents: debt.owed.cents,
+        membershipCents,
+        monthlyCents: share.cents - membershipCents,
+      };
+    });
+  }
+
+  private async makeMember(student: StudentRef): Promise<void> {
+    const account = (await this.accounts.account(student)) ?? StudentAccount.open(student);
+    if (account.isMember()) return;
+    account.update(account.preferredPlan(), true, account.privateRate());
+    await this.accounts.saveAccount(account);
+  }
+}
+
+/** Los alumnos elegidos, cada uno una vez y en el orden en que se eligieron. */
+function uniqueStudents(ids: readonly string[]): string[] {
+  return [...new Set(ids.map((id) => StudentRef.fromString(id).value))];
+}
+
+function sumPending(pending: readonly { pending: Money }[]): Money {
+  return pending.reduce((sum, p) => sum.plus(p.pending), Money.zero());
 }
 
 /**
