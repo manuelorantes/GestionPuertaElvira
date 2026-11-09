@@ -15,7 +15,7 @@ Cambios respecto al diseño, por decisiones de la spec:
 
 ```
 BillingPage (/panel/cobros)
-├── SectionHeader: «Plazo: del 1 al 5 de <mes>» | «Cobros y cuotas» | acción «Registrar cobro» (icono wallet)
+├── SectionHeader: «Plazo: del 1 al 5 de <mes>» | «Cobros y cuotas» | acción «Registrar cobro» (icono wallet) y, debajo, «Añadir dinero a cuenta» (secundaria, icono piggy-bank)
 ├── Tabs: «Cuotas» · «Material deportivo» · «Cobros registrados» · «Tarifas y ajustes» (?pestana=cuotas|material|registro|tarifas; Material en ../material/layout.md)
 ├── ChargesTab
 │   ├── Botones «Cuotas de socio · Sep · Oct · … · Jun» de la temporada (?mes=socio | ?mes=AAAA-MM; el mes en curso subrayado)
@@ -44,6 +44,13 @@ BillingPage (/panel/cobros)
 │   ├── Desglose (fondo arena): líneas de la cotización + «Total a cobrar» grande; «Cubre: septiembre – noviembre 2026»
 │   ├── Nota: «El cobro se hace fuera de la aplicación. Aquí solo queda anotado.»
 │   └── Pie: Cancelar | «Guardar cobro»
+├── OnAccountDialog («Añadir dinero a cuenta»)
+│   ├── TextField «Importe (€)» | Forma de pago (Efectivo / Datáfono / Transferencia) | DateField «Fecha»
+│   ├── Combobox «Alumnos» (alumnos activos aún no elegidos) + lista «Alumnos elegidos» con chips y botón «Quitar a <nombre>»
+│   ├── «Reparto» (fondo arena), una fila por alumno: nombre + total; «Debía X · Y a la cuota de socio · Z a sus cuotas»;
+│   │   «Le quedan X pendientes» / «Quedan X a su favor» / «Queda al día»
+│   ├── Nota: se reparte según lo que debe cada uno; lo que sobra queda a su favor; cada alumno recibe su recibo
+│   └── Pie: Cancelar | «Añadir a cuenta»
 ├── ReceiptDialog («Recibo»)
 │   ├── Hoja imprimible: logo + «Club Ajedrez Puerta Elvira» + «Recibo R-2026-0001 · 3 oct 2026» + NIF del club;
 │   │   Alumno · Pagado por · Concepto; líneas; Total; «Forma de pago: Transferencia» (y, si está conciliado, «Conciliado con el banco…», sin Editar ni Borrar)
