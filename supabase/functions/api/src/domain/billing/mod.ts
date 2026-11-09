@@ -641,6 +641,37 @@ export function allocateCredit(charges: readonly Charge[], credit: Money): Credi
 }
 
 /**
+ * Reparte un dinero a cuenta entre varios alumnos según lo que debe cada uno (`debts`, en el mismo orden): si llega
+ * para todo, cada uno recibe lo suyo y lo que sobra se divide a partes iguales; si no llega, se reparte en proporción
+ * a lo que debe. Los céntimos que no se pueden partir van a quien más fracción tenía (y, a igualdad, al primero), así
+ * que las partes siempre suman el total.
+ */
+export function shareOnAccountMoney(amount: Money, debts: readonly Money[]): Money[] {
+  if (debts.length === 0) throw new InvalidValue('studentIds', 'Elige al menos un alumno.');
+  if (amount.cents <= 0) {
+    throw new InvalidValue('amountCents', 'El importe a cuenta debe ser mayor que cero.');
+  }
+  const owed = debts.map((d) => Math.max(0, d.cents));
+  const totalOwed = owed.reduce((sum, d) => sum + d, 0);
+  if (amount.cents >= totalOwed) {
+    return owed.map((d, i) => Money.cents(d + spread(amount.cents - totalOwed, owed.length, i)));
+  }
+  const exact = owed.map((d) => (amount.cents * d) / totalOwed);
+  const shares = exact.map(Math.floor);
+  const left = amount.cents - shares.reduce((sum, s) => sum + s, 0);
+  const byFraction = exact
+    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
+    .sort((a, b) => b.fraction - a.fraction || a.index - b.index);
+  for (const { index } of byFraction.slice(0, left)) shares[index]! += 1;
+  return shares.map((s) => Money.cents(s));
+}
+
+/** La parte `index` de repartir `cents` a partes iguales entre `parts`: el resto, de uno en uno a los primeros. */
+function spread(cents: number, parts: number, index: number): number {
+  return Math.floor(cents / parts) + (index < cents % parts ? 1 : 0);
+}
+
+/**
  * Año completo: la temporada son 10 meses (septiembre a junio). El 20 % es por pagar todo lo que queda, y solo
  * se ofrece si quedan 9 o 10 meses; con menos, el máximo es el de 6 meses.
  */

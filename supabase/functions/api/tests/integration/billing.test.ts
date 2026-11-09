@@ -968,3 +968,87 @@ Deno.test({
     ]);
   },
 });
+
+Deno.test({
+  name: 'billing should add money on account to several students, sharing it by what each one owes',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const group = body<{ groups: { id: string }[] }>(
+      await fx.client.get(`/api/admin/students/${fx.student}`),
+    ).groups[0]!.id;
+    const pablo = body<{ id: string }>(
+      await fx.client.json('POST', '/api/admin/students', {
+        fullName: 'Pablo Ruiz Molina',
+        birthDate: '2015-05-20',
+        guardians: [{ name: 'Elena Molina', phone: '613000000' }],
+        imageConsent: true,
+        groupIds: [group],
+      }),
+    ).id;
+    // Cada uno debe la cuota de socio (50 €) y la del mes (45 €): 200 € son 100 € para cada uno.
+    const request = {
+      studentIds: [fx.student, pablo],
+      amountCents: 20000,
+      method: 'cash',
+      date: today,
+    };
+    const quote = await fx.client.json(
+      'POST',
+      '/api/admin/billing/payments/on-account/quote',
+      request,
+    );
+    assertEquals(quote.status, 200);
+    assertEquals(
+      body<
+        {
+          items: {
+            name: string;
+            owedCents: number;
+            membershipCents: number;
+            monthlyCents: number;
+          }[];
+        }
+      >(
+        quote,
+      ).items.map((s) => [s.name, s.owedCents, s.membershipCents, s.monthlyCents]),
+      [['Martina López Herrera', 9500, 5000, 5000], ['Pablo Ruiz Molina', 9500, 5000, 5000]],
+    );
+    assertEquals(
+      body<{ items: unknown[] }>(
+        await fx.client.get(`/api/admin/billing/payments?studentId=${pablo}`),
+      )
+        .items.length,
+      0,
+    );
+
+    const added = await fx.client.json('POST', '/api/admin/billing/payments/on-account', request);
+    assertEquals(added.status, 201);
+    assertEquals(body<{ paymentIds: string[] }>(added).paymentIds.length, 4);
+    const account = body<
+      { balanceCents: number; totals: { kind: string; pendingCents: number }[] }
+    >(
+      await fx.client.get(`/api/admin/billing/accounts/${pablo}`),
+    );
+    assertEquals(account.balanceCents, 500);
+    assertEquals(account.totals.map((t) => [t.kind, t.pendingCents]), [
+      ['monthly', 0],
+      ['membership', 0],
+      ['material', 0],
+    ]);
+    assertEquals(
+      body<{ items: { concept: string }[] }>(
+        await fx.client.get(`/api/admin/billing/payments?studentId=${pablo}`),
+      ).items.map((p) => p.concept).sort(),
+      ['Pago a cuenta', 'Pago a cuenta · cuota de socio'],
+    );
+    assertError(
+      await fx.client.json('POST', '/api/admin/billing/payments/on-account', {
+        ...request,
+        studentIds: [],
+      }),
+      422,
+      'unprocessable',
+    );
+  },
+});
