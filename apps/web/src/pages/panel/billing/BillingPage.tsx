@@ -1,4 +1,4 @@
-import { Wallet } from 'lucide-react';
+import { PiggyBank, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -10,6 +10,7 @@ import { Tabs } from '@/shared/ui/Tabs';
 import { CancelChargeDialog } from './CancelChargeDialog';
 import { ChargesTab, type ChargesView } from './ChargesTab';
 import { MaterialTab } from './material/MaterialTab';
+import { OnAccountDialog } from './OnAccountDialog';
 import { PaymentDialog } from './PaymentDialog';
 import { PaymentsTab } from './PaymentsTab';
 import { ReceiptDialog } from './ReceiptDialog';
@@ -18,6 +19,7 @@ import { WhatsAppDialog } from './WhatsAppDialog';
 
 export type BillingDialog =
   | { type: 'payment'; studentId?: string; kind?: ChargeKind; chargeId?: string }
+  | { type: 'onAccount' }
   | { type: 'receipt'; paymentId: string }
   | { type: 'whatsapp'; charge: Charge }
   | { type: 'cancel'; charge: Charge }
@@ -82,6 +84,11 @@ export function BillingPage() {
           icon: <Wallet aria-hidden size={18} />,
           onClick: () => setDialog({ type: 'payment' }),
         }}
+        secondaryAction={{
+          label: 'Añadir dinero a cuenta',
+          icon: <PiggyBank aria-hidden size={18} />,
+          onClick: () => setDialog({ type: 'onAccount' }),
+        }}
       />
       <Tabs
         label="Vistas de cobros"
@@ -114,6 +121,7 @@ export function BillingDialogs({
         onSaved={(paymentId) => onChange({ type: 'receipt', paymentId })}
       />
     );
+  if (dialog?.type === 'onAccount') return <OnAccountDialog onClose={() => onChange(null)} />;
   if (dialog?.type === 'receipt')
     return <ReceiptDialog paymentId={dialog.paymentId} onClose={() => onChange(null)} />;
   if (dialog?.type === 'whatsapp')

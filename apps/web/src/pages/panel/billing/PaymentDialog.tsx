@@ -1,4 +1,3 @@
-import { Banknote, CreditCard, Landmark } from 'lucide-react';
 import type { FormEvent } from 'react';
 
 import type { ChargeKind } from '@/features/billing/api';
@@ -14,6 +13,8 @@ import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
 import { useToast } from '@/shared/ui/Toast';
 import { ToggleButton } from '@/shared/ui/ToggleButton';
+
+import { PaymentMethodPicker } from './PaymentMethodPicker';
 
 interface PaymentDialogProps {
   initialStudentId: string | undefined;
@@ -123,35 +124,7 @@ export function PaymentDialog({
             />
           )}
           <div className="flex flex-col gap-4">
-            <fieldset className="flex flex-col gap-1.5">
-              <legend className="mb-1.5 text-sm font-medium">Forma de pago</legend>
-              <div className="grid grid-cols-3 gap-2">
-                <ToggleButton
-                  pressed={form.method === 'cash'}
-                  onClick={() => form.setMethod('cash')}
-                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] sm:text-sm"
-                >
-                  <Banknote aria-hidden size={16} />
-                  Efectivo
-                </ToggleButton>
-                <ToggleButton
-                  pressed={form.method === 'card'}
-                  onClick={() => form.setMethod('card')}
-                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] sm:text-sm"
-                >
-                  <CreditCard aria-hidden size={16} />
-                  Datáfono
-                </ToggleButton>
-                <ToggleButton
-                  pressed={form.method === 'transfer'}
-                  onClick={() => form.setMethod('transfer')}
-                  className="inline-flex h-11 min-w-0 items-center justify-center gap-1.5 px-2 text-[13px] sm:text-sm"
-                >
-                  <Landmark aria-hidden size={16} />
-                  Transferencia
-                </ToggleButton>
-              </div>
-            </fieldset>
+            <PaymentMethodPicker value={form.method} onChange={form.setMethod} />
             <DateField
               label="Fecha"
               value={form.date}
