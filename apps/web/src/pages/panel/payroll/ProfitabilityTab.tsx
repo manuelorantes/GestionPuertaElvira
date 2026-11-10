@@ -34,7 +34,11 @@ const COLUMNS: Record<Column, SortColumn<ProfitabilityRow>> = {
   students: { label: 'Alumnos', name: 'alumnos', value: (r) => r.students },
   income: { label: 'Ingresos', name: 'ingresos', value: (r) => r.incomeCents },
   margin: { label: 'Margen', name: 'margen', value: (r) => r.marginCents },
-  perHour: { label: '€ por hora', name: '€ por hora', value: (r) => r.incomePerHourCents },
+  perHour: {
+    label: 'Margen por hora',
+    name: 'margen por hora',
+    value: (r) => r.marginPerHourCents,
+  },
   occupancy: { label: 'Ocupación', name: 'ocupación', value: occupancy },
 };
 
@@ -157,8 +161,10 @@ export function ProfitabilityTab({ month }: { month: string }) {
                     </span>
                   </span>
                 </td>
-                <td className="px-5 py-3.5">
-                  {row.incomePerHourCents === null ? '—' : formatCents(row.incomePerHourCents)}
+                <td
+                  className={`px-5 py-3.5 ${(row.marginPerHourCents ?? 0) < 0 ? 'text-danger-fg' : ''}`}
+                >
+                  {row.marginPerHourCents === null ? '—' : formatCents(row.marginPerHourCents)}
                 </td>
                 <td className="px-5 py-3.5" title={`${row.occupied} de ${row.capacity} plazas`}>
                   {occupancy(row)} %

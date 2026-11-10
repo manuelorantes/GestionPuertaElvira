@@ -52,7 +52,7 @@ export interface ProfitabilityRow {
   costCents: number;
   incomeCents: number;
   marginCents: number;
-  incomePerHourCents: number | null;
+  marginPerHourCents: number | null;
   occupied: number;
   capacity: number;
   /** Alumnos de sus grupos ese mes (sin las clases que da como sustituto). */
