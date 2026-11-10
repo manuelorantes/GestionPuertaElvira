@@ -473,10 +473,12 @@ Deno.test('Profitability should compare the expected hours of the month with the
       r.occupied,
       r.capacity,
       r.students,
+      r.marginPerHourCents,
     ]),
     [
-      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20, 3],
-      ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10, 1],
+      // Margen por hora: (ingresos − coste) / horas, negativo si pierde.
+      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20, 3, -321],
+      ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10, 1, -1300],
     ],
   );
   // Ana va con los dos: cuenta una vez en el total y sale entre los compartidos; Rosa ya no va con Carlos.

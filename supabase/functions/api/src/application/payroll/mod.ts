@@ -857,7 +857,8 @@ export interface ProfitabilityRow {
   costCents: number;
   incomeCents: number;
   marginCents: number;
-  incomePerHourCents: number | null;
+  /** (ingresos − coste) por hora; negativo si el profesor da pérdidas, `null` sin horas. */
+  marginPerHourCents: number | null;
   occupied: number;
   capacity: number;
   /** Alumnos de sus grupos el día de referencia del mes (sin las clases que da como sustituto). */
@@ -942,7 +943,7 @@ export class Profitability {
         costCents: cost,
         incomeCents: earned,
         marginCents: earned - cost,
-        incomePerHourCents: minutes > 0 ? Math.round((earned * 60) / minutes) : null,
+        marginPerHourCents: minutes > 0 ? Math.round(((earned - cost) * 60) / minutes) : null,
         occupied: seats?.occupied ?? 0,
         capacity: seats?.capacity ?? 0,
         students: [...load.teachersOn.values()].filter((teachers) => teachers.has(teacher.id))
