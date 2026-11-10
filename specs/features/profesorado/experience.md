@@ -1,7 +1,7 @@
 # Experience — Profesorado
 
 - Solo administración. Al consultar un mes (hasta el actual) el servidor propone sus sesiones la primera vez.
-- **Rentabilidad:** orden por margen por defecto; el primero por margen lleva «Más rentable». € por hora = «—» sin horas. Ocupación = ocupadas/plazas en %.
+- **Rentabilidad:** orden por margen por defecto; el primero por margen lleva «Más rentable». Margen por hora = (ingresos − coste) / horas, en rojo si es negativo, como la ganancia o pérdida por hora del pie; «—» sin horas. Ocupación = ocupadas/plazas en %.
 - **Registro de horas:** filtrar por profesor recarga la lista. «Quitar» pide confirmación (ConfirmDialog). Editar y quitar no se muestran en sesiones de liquidaciones pagadas («Pagada» con candado).
   Errores del servidor (`settlement_paid`, validación de horas) en `Alert` dentro del diálogo. Toasts: «Horas registradas», «Sesión actualizada», «Sesión quitada», «Festivo marcado: N sesiones quitadas».
 - **Liquidación:** «Marcar como pagada» usa la fecha de hoy y muestra el toast «Liquidación de <profesor> pagada»; «Marcar todas como pagadas» pide confirmación y muestra «N liquidaciones pagadas».

@@ -203,7 +203,7 @@ Antes de guardar MUST pedirse confirmación con el cambio («Fecha de pago: 02/1
 - **THEN** la liquidación sale «Pagada el 05/10/2026» y su movimiento de Contabilidad pasa a ese día
 
 ### Requirement: Rentabilidad
-Para cada mes, el sistema MUST mostrar por profesor: alumnos, horas, tarifa, coste, ingresos atribuidos, margen, € por hora y ocupación de sus grupos,
+Para cada mes, el sistema MUST mostrar por profesor: alumnos, horas, tarifa, coste, ingresos atribuidos, margen, margen por hora y ocupación de sus grupos,
 con los totales del mes. La tabla MUST poder ordenarse desde las cabeceras por cualquiera de esas columnas, en ambos
 sentidos; por defecto, de mayor a menor margen.
 - Horas y coste: en el mes en curso y los futuros, las horas esperadas según el horario (todas sus clases y turnos salvo
@@ -213,6 +213,8 @@ sentidos; por defecto, de mayor a menor margen.
   cobradas o por cobrar y, en meses futuros, las previstas; sin cuotas de socio. Si un alumno va con varios profesores,
   su cuota se reparte según las horas semanales con cada uno.
 - Ocupación: plazas ocupadas de todas sus clases frente a las totales, contando cada día de clase.
+- Margen por hora: el margen entre sus horas, negativo si da pérdidas (en rojo), como la ganancia o pérdida por hora
+  del pie; sin horas, «—».
 - Alumnos: los inscritos en los grupos de los que es titular el mismo día de referencia que la ocupación (hoy en el mes
   en curso, el último día en un mes pasado, el primero en uno futuro); quien cambió de grupo a mitad de mes cuenta solo
   con el profesor nuevo, y las clases que da como sustituto no cuentan. En
@@ -227,6 +229,10 @@ sentidos; por defecto, de mayor a menor margen.
 #### Scenario: Alumno con dos profesores
 - **WHEN** un alumno que paga 70 € va 2 horas semanales con una profesora y 1,5 con otro
 - **THEN** a ella se le atribuyen 40 € y a él 30 €
+
+#### Scenario: Profesor que da pérdidas
+- **WHEN** un profesor da 6 horas en el mes a 25 €/h (200 €) y se le atribuyen 74,25 € de ingresos
+- **THEN** su margen es −125,75 € y su margen por hora −20,96 €, en rojo
 El de mayor margen positivo se destaca como «Más rentable».
 Al pie MUST mostrarse los totales del mes: horas, tarifa media (ponderada por las horas de cada profesor), coste en
 profesores, ingresos, margen, ganancia o pérdida por hora y ocupación media de todas las clases.
