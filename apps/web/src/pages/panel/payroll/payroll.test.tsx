@@ -91,7 +91,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             costCents: 12800,
             incomeCents: 45000,
             marginCents: 32200,
-            incomePerHourCents: 5625,
+            marginPerHourCents: 4025,
             occupied: 10,
             occupancyByDay: {},
             capacity: 12,
@@ -106,7 +106,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             costCents: 10800,
             incomeCents: 20000,
             marginCents: 9200,
-            incomePerHourCents: 3333,
+            marginPerHourCents: 1533,
             occupied: 6,
             occupancyByDay: {},
             capacity: 12,
@@ -211,9 +211,11 @@ describe('Profesorado', () => {
       'Alumnos',
       'Ingresos',
       'Margen',
-      '€ por hora',
+      'Margen por hora',
       'Ocupación',
     ]);
+    // El margen por hora de cada fila, como el del pie: (ingresos − coste) / horas.
+    expect(within(lucia).getAllByRole('cell')[7]).toHaveTextContent('40,25 €');
     const students = within(totals).getAllByRole('cell')[3] as HTMLElement;
     expect(students).toHaveTextContent('15');
     await userEvent.click(
@@ -1319,7 +1321,7 @@ describe('Profesorado', () => {
     expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
     await sortBy('tarifa');
     expect(links(table)).toEqual(['Lucía Moreno Gil', 'Carlos Ruiz Márquez']);
-    await sortBy('€ por hora');
+    await sortBy('margen por hora');
     expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
     await sortBy('ocupación');
     expect(links(table)).toEqual(['Carlos Ruiz Márquez', 'Lucía Moreno Gil']);
