@@ -75,6 +75,8 @@ export interface StudentGroup {
   attendance: { days: string[]; start: string; end: string } | null;
   /** «Lun · 18:30–19:00», o null si va a todo el grupo. */
   attendanceLabel: string | null;
+  /** Cuándo va de verdad: su horario especial o, si no lo tiene, el del grupo. */
+  schedule: { days: string[]; start: string; end: string };
   /** Desde cuándo está en el grupo. */
   since: string;
 }
