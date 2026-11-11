@@ -248,17 +248,25 @@ cambia y el mes de la baja se queda como estaba).
 Administración MUST poder emitir desde la ficha de un alumno de alta («Emitir certificado», junto a «Editar») un
 certificado de matrícula listo para imprimir, como papel oficial del club: arriba el logo, el nombre, el NIF y la
 dirección del club, sin sello.
-El certificado MUST decir que el alumno, con su DNI o NIE, tiene matrícula en el club para el curso, en su horario de
-clase, y desde qué día pertenece al club (su última alta), con el lugar y la fecha, y quién lo firma con su cargo.
-Al abrirlo se MUST proponer: su DNI o NIE de la ficha, el curso de hoy con los dos años completos («2026/2027»), el
-horario de sus grupos de hoy (su horario especial si lo tiene, p. ej. «los viernes de 17:00 a 18:30 horas»), Granada,
-hoy y el firmante por defecto; todo se puede cambiar antes de emitirlo.
-Sin DNI o NIE no se MUST emitir; si no consta en la ficha (o se corrige), el que se escribe MUST guardarse también en
-ella.
+El certificado MUST decir que el alumno, con su DNI o NIE, tiene matrícula en el club para el curso (o durante el año),
+en su horario de clase, y desde qué día pertenece al club (su última alta), con el lugar y la fecha, y quién lo firma
+con su cargo.
+Se MUST poder elegir si certifica un curso («para el curso 2026/2027») o un año natural («durante el año 2026»).
+Al abrirlo se MUST proponer: su DNI o NIE de la ficha, el curso de hoy con los dos años completos («2026/2027») o, por
+año, el de hoy, el horario de sus grupos de hoy (su horario especial si lo tiene, p. ej. «los viernes de 17:00 a 18:30
+horas»), Granada, hoy y el firmante por defecto; el horario, el lugar, la fecha y el firmante se pueden cambiar antes de
+emitirlo.
+Los datos del club están en la aplicación desde el curso 2026/2027, así que el curso o el año propuestos MUST poder
+cambiarse solo tras confirmar un aviso de que la matrícula, el horario y la fecha de alta de otro curso o año no se
+pueden comprobar; al confirmarlo también se MUST poder cambiar desde qué día pertenece al club, sin tocar su ficha.
+Ese día no MUST ser posterior a la fecha del certificado ni al final de lo que certifica (el 30 de junio para un curso,
+el 31 de diciembre para un año).
+El DNI o NIE es opcional: si no se escribe, el certificado MUST omitir «, con DNI …,»; si se escribe y no consta en la
+ficha (o es otro), MUST guardarse también en ella.
 Se MUST poder elegir si sale con la firma escaneada o con el hueco para firmarlo a mano; la firma escaneada MUST usarse
 solo con el firmante por defecto y si se ha subido; con cualquier otro firmante, se firma a mano.
 Cada certificado emitido MUST quedar registrado tal como se emitió (aunque luego cambie la ficha): la ficha MUST
-mostrar «Certificados emitidos», del último al primero, con el curso, la fecha, quién firma, si lleva la firma
+mostrar «Certificados emitidos», del último al primero, con el curso o el año, la fecha, quién firma, si lleva la firma
 escaneada y quién lo emitió, y cada uno se MUST poder volver a abrir para imprimirlo.
 
 #### Scenario: Certificado de un alumno sin DNI en la ficha
@@ -272,6 +280,16 @@ escaneada y quién lo emitió, y cada uno se MUST poder volver a abrir para impr
 #### Scenario: Firma otra persona
 - **WHEN** al emitirlo se cambia el firmante por «Lucía Moreno Gil, Secretaria»
 - **THEN** no se puede elegir la firma escaneada y el certificado sale con el hueco para firmarlo a mano
+
+#### Scenario: Certificado de un año anterior
+- **WHEN** administración elige «Año», pulsa «Cambiar», confirma el aviso, escribe 2025 y que pertenece al club desde
+  el 15 de septiembre de 2024
+- **THEN** sale «… tiene matrícula en el Club Ajedrez Puerta Elvira durante el año 2025, en horario de clase …, y
+  pertenece al club desde el 15 de septiembre de 2024.» y su fecha de alta en la ficha no cambia
+
+#### Scenario: Certificado sin DNI
+- **WHEN** administración emite el certificado de un alumno sin DNI y deja el campo vacío
+- **THEN** sale «Que <alumno> tiene matrícula en …», sin mención al DNI, y su ficha sigue sin DNI
 
 ### Requirement: Firmante de los certificados
 Administración MUST poder cambiar en «Tarifas y ajustes» de Cobros el firmante por defecto de los certificados (nombre
