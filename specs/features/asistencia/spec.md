@@ -14,6 +14,12 @@ mes y de la más reciente a la más antigua), pero al guardar MUST confirmar «�
 de una clase pasada?». Cambiar una lista pasada no apunta horas (administración ya decidió sobre ellas en «Listas sin
 pasar»).
 
+Cuando acaba el plazo de una de sus clases apuntadas en las horas sin que se pasara su lista (ni se diera por buena),
+el profesor MUST verla en un aviso en rojo debajo de «Mis clases» («Tienes 1 clase sin pasar lista»), con el día, la
+clase y la hora, y cada una MUST llevar directamente a su lista para pasarla tarde. Cuentan las mismas que en «Listas
+sin pasar» (desde que se vinculó su cuenta y se activó la asistencia; si administración quita la sesión, deja de
+salir); las de hoy y ayer no salen, porque aún están en plazo. Al pasarla, deja de salir.
+
 #### Scenario: Al acabar la clase
 - **WHEN** Lucía abre la lista de su clase del martes a las 18:00, marca a todos menos a Pablo y la guarda
 - **THEN** la lista queda pasada con Pablo ausente y el resto presentes, y su clase sale «Lista pasada»
@@ -25,6 +31,11 @@ pasar»).
 #### Scenario: Una lista pasada
 - **WHEN** Lucía corrige el jueves la lista del martes
 - **THEN** se le pide que confirme que cambia la asistencia de una clase pasada; si confirma, se guarda, y si no, no
+
+#### Scenario: Una lista que se le pasó
+- **WHEN** Lucía no pasó la lista de su clase del martes y entra el jueves
+- **THEN** ve en rojo debajo de «Mis clases» «Tienes 1 clase sin pasar lista» con «Martes dd/mm · <clase> · hh:mm–hh:mm»;
+  al pulsarla abre esa lista, y al guardarla (confirmando que es una clase pasada) el aviso desaparece
 
 #### Scenario: Una clase que no es suya
 - **WHEN** Lucía intenta pasar la lista de una clase que ese día da otro profesor
