@@ -117,7 +117,9 @@ export function registerCertificateRoutes(api: ApiApp, storage: SignatureStorage
       studentId,
       {
         nationalId: body.optionalString('nationalId'),
-        season: body.requiredString('season'),
+        periodKind: body.requiredString('periodKind'),
+        period: body.requiredString('period'),
+        memberSince: body.optionalString('memberSince'),
         schedule: body.requiredString('schedule'),
         place: body.requiredString('place'),
         issuedOn: body.requiredString('issuedOn'),
