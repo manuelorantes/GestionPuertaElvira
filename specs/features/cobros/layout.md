@@ -35,7 +35,8 @@ BillingPage (/panel/cobros)
 │   ├── Tarjeta «Descuentos»: Familiar % · Pago adelantado 3 meses % · 6 meses % · Todo el año (septiembre a junio) %
 │   │   └── nota: «Los descuentos se suman sobre la cuota base…»
 │   ├── Tarjeta «Clases particulares»: precio por hora por defecto + uno por profesor activo (€/h, vacío = el de por defecto)
-│   └── Tarjeta «Datos fiscales del club»: Nombre · NIF · Dirección (salen en recibos y facturas)
+│   ├── Tarjeta «Datos fiscales del club»: Nombre · NIF · Dirección (salen en recibos y facturas)
+│   └── Tarjeta «Certificados de matrícula» (fuera del formulario, con sus propios botones): Nombre de quien firma · Cargo · «Guardar firmante» (aviso si cambia la persona y hay firma: se quita); «Firma escaneada» con la imagen o «Sin firma subida…», «Subir firma»/«Cambiar firma» · «Quitar firma»
 ├── PaymentDialog («Registrar cobro»)
 │   ├── Select «Alumno» (alumnos activos) + texto con sus grupos
 │   ├── Chips «Concepto»: Mes · 3 meses · 6 meses · Todo el año (solo con 9 o 10 meses por pagar; cobra todos los que quedan) · Cuota de socio (propuesto según la preferencia de la ficha) · Material (solo si tiene pedidos de material pendientes; añade el select «Pedido de material»)

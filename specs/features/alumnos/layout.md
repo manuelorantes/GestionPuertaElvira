@@ -21,11 +21,14 @@ StudentsPage (/panel/alumnos)
 │   └── Fila (botón): nº de socio | avatar con iniciales + nombre + «12 años» | grupos (nombre y horario) | badge Activo/De baja (+ «Hermanos»)
 ├── Estado vacío: «No hay alumnos que coincidan con la búsqueda.»
 ├── StudentPanel (ficha: panel lateral derecho en escritorio; ruta /panel/alumnos/:id en pantalla completa en móvil)
-│   ├── Cabecera: avatar, nombre, «12 años · Iniciación A», badge de estado, cerrar, acciones «Editar» y «Dar de baja»
+│   ├── Cabecera: avatar, nombre, «12 años · Iniciación A», badge de estado, cerrar, acciones «Editar», «Emitir certificado» (icono file-badge; no si está de baja) y «Dar de baja»
 │   ├── Tarjeta «Grupos»: por grupo, nombre, horario, «Aula N · Profesor», acciones «Mover» y «Quitar»; «Añadir grupo»
 │   ├── Tarjeta «Datos personales»: fecha de nacimiento, DNI, email, federado (licencia), autorización de imagen, alta, baja
 │   ├── Tarjeta «Contacto»: tutores con teléfono (enlace tel:) y teléfono propio
-│   └── Tarjeta «Familia directa en el club»: cada familiar con «Abrir» y «Quitar»; «Añadir familia directa»
+│   ├── Tarjeta «Familia directa en el club»: cada familiar con «Abrir» y «Quitar»; «Añadir familia directa»
+│   └── Tarjeta «Certificados emitidos» (solo administración): por certificado, «Matrícula 2026/2027 · dd/mm/aaaa» y «Firmante (cargo) · con firma escaneada | para firmar a mano · emitido por X»; abre la hoja para imprimirla otra vez; vacía: «Sin certificados emitidos.»
+├── CertificateDialog «Certificado de matrícula»: «De <nombre>, en el club desde el dd/mm/aaaa.», DNI o NIE (ayuda: «No consta en su ficha: se guardará en ella.» o «Si lo cambias, también se cambia en su ficha.») · Curso · Lugar · Horario de clase · DateField «Fecha del certificado» · Firma · Cargo · Switch «Con la firma escaneada» (desactivado sin firma subida o con otro firmante, con el porqué) | Cancelar | «Emitir certificado»
+├── Hoja del certificado (diálogo grande, «Certificado de <nombre>»; al imprimir solo sale la hoja): logo, nombre del club y «NIF · dirección» con filete de marca; título «Certificado de matrícula»; «<Firmante>, <cargo> del <club>,» «CERTIFICA:» «Que <alumno>, con DNI <dni>, tiene matrícula en el <club> para el curso <curso>, en horario de clase <horario>, y pertenece al club desde el <fecha larga>.» «En <lugar>, a <fecha larga>.»; a la derecha, la firma escaneada o el hueco, «Fdo.: <firmante>» y el cargo | Cerrar | «Imprimir»
 ├── StudentDialog («Nuevo alumno» / «Editar alumno»)
 │   ├── Sección «Datos del alumno»: Nombre y apellidos · Fecha de nacimiento (DateField) · DNI (opcional) · Email de contacto (opcional)
 │   ├── Nota: «Solo el nombre es obligatorio…» con lo que quedará pendiente
