@@ -3,6 +3,7 @@ import {
   CalendarDays,
   ChevronRight,
   Clock,
+  FileBadge,
   Pencil,
   Plus,
   UserMinus,
@@ -41,6 +42,8 @@ import { StudentCommentsCard } from './StudentCommentsCard';
 import { StudentHistoryCard } from './StudentHistoryCard';
 import { StudentPointsCard } from './StudentPointsCard';
 import { StudentBillingCard } from './StudentBillingCard';
+import { StudentCertificatesCard } from './StudentCertificatesCard';
+import { CertificateDialog } from './CertificateDialog';
 import { StudentMaterialCard } from './StudentMaterialCard';
 import { EnrolmentDialog } from './EnrolmentDialog';
 import { PickerDialog } from './PickerDialog';
@@ -54,6 +57,7 @@ type Action =
   | { kind: 'edit' }
   | { kind: 'confirm' }
   | { kind: 'withdraw' }
+  | { kind: 'certificate' }
   | { kind: 'rejoin' }
   | { kind: 'addGroup' }
   | { kind: 'attendance'; groupId: string }
@@ -245,6 +249,12 @@ export function StudentSheet({
               <Pencil aria-hidden size={16} />
               Editar
             </Button>
+            {!isWithdrawn && (
+              <Button variant="secondary" onClick={() => setAction({ kind: 'certificate' })}>
+                <FileBadge aria-hidden size={16} />
+                Emitir certificado
+              </Button>
+            )}
             {isProvisional && (
               <Button onClick={() => ask({ kind: 'confirm' })}>
                 <UserCheck aria-hidden size={16} />
@@ -458,6 +468,12 @@ export function StudentSheet({
         </Card>
         <StudentBillingCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentMaterialCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
+        {canManage && (
+          <StudentCertificatesCard
+            studentId={s.id}
+            title={(text) => <CardTitle>{text}</CardTitle>}
+          />
+        )}
         <StudentAttendanceCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentCommentsCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
         <StudentPointsCard studentId={s.id} title={(text) => <CardTitle>{text}</CardTitle>} />
@@ -466,6 +482,9 @@ export function StudentSheet({
         )}
       </div>
 
+      {action?.kind === 'certificate' && (
+        <CertificateDialog studentId={s.id} onClose={() => setAction(null)} />
+      )}
       {action?.kind === 'edit' && (
         <StudentDialog detail={s} onClose={() => setAction(null)} onSaved={() => setAction(null)} />
       )}
