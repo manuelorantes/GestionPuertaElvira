@@ -29,6 +29,7 @@ const DRAFT = {
   nationalId: null,
   memberSince: '2025-09-15',
   season: '2026/2027',
+  year: '2026',
   schedule: 'los viernes de 17:00 a 18:30 horas',
   place: 'Granada',
   issuedOn: '2026-11-11',
@@ -42,7 +43,8 @@ const ISSUED = {
   id: 'c1',
   studentName: 'Santiago Fernández Hernández',
   nationalId: '12345678Z',
-  season: '2026/2027',
+  periodKind: 'season',
+  period: '2026/2027',
   schedule: 'los viernes de 17:00 a 18:30 horas',
   memberSince: '2025-09-15',
   place: 'Granada',
@@ -89,21 +91,25 @@ describe('Certificados de matrícula', () => {
       'los viernes de 17:00 a 18:30 horas',
     );
     expect(within(dialog).getByLabelText('Lugar')).toHaveValue('Granada');
-    expect(within(dialog).getByText('No consta en su ficha: se guardará en ella.')).toBeVisible();
+    expect(
+      within(dialog).getByText(
+        'No consta en su ficha: si lo escribes, se guardará en ella. Vacío, no sale en el certificado.',
+      ),
+    ).toBeVisible();
+    // El curso de hoy sale fijo.
+    expect(within(dialog).getByLabelText('Curso')).toHaveAttribute('readonly');
     // Con el firmante por defecto y su firma subida, sale firmado.
     const signature = within(dialog).getByRole('switch', { name: 'Con la firma escaneada' });
     expect(signature).toBeChecked();
-
-    // Sin DNI no se emite.
-    await user.click(within(dialog).getByRole('button', { name: 'Emitir certificado' }));
-    expect(spy.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
 
     await user.type(within(dialog).getByLabelText(/DNI o NIE/), '12345678Z');
     await user.click(within(dialog).getByRole('button', { name: 'Emitir certificado' }));
     await waitFor(() =>
       expect(sentBody(spy, 'POST', '/api/admin/students/s1/certificates')).toEqual({
         nationalId: '12345678Z',
-        season: '2026/2027',
+        periodKind: 'season',
+        period: '2026/2027',
+        memberSince: '2025-09-15',
         schedule: 'los viernes de 17:00 a 18:30 horas',
         place: 'Granada',
         issuedOn: '2026-11-11',
@@ -127,6 +133,56 @@ describe('Certificados de matrícula', () => {
     ).toBeVisible();
     expect(within(sheet).getByRole('img', { name: 'Club Ajedrez Puerta Elvira' })).toBeVisible();
     expect(within(printable).getByRole('button', { name: 'Imprimir' })).toBeEnabled();
+  });
+
+  it('certifies an earlier year after confirming, with the date given and without a DNI', async () => {
+    const user = userEvent.setup();
+    const spy = api({
+      'POST /api/admin/students/s1/certificates': [
+        201,
+        {
+          ...ISSUED,
+          nationalId: null,
+          periodKind: 'year',
+          period: '2025',
+          memberSince: '2024-09-16',
+          club: CLUB,
+        },
+      ],
+    });
+    renderApp('/panel/alumnos/s1');
+
+    const card = await screen.findByRole('dialog', { name: 'Santiago Fernández Hernández' });
+    await user.click(await within(card).findByRole('button', { name: 'Emitir certificado' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Certificado de matrícula' });
+    await user.click(within(dialog).getByRole('button', { name: 'Año' }));
+    const period = within(dialog).getByRole('textbox', { name: 'Año' });
+    expect(period).toHaveValue('2026');
+
+    // Cambiarlo pide confirmar: lo de antes de la aplicación no se puede comprobar.
+    await user.click(within(dialog).getByRole('button', { name: 'Cambiar' }));
+    expect(within(dialog).getByText(/no se pueden comprobar/)).toBeVisible();
+    expect(period).toHaveAttribute('readonly');
+    await user.click(within(dialog).getByRole('button', { name: 'Cambiar igualmente' }));
+    expect(period).not.toHaveAttribute('readonly');
+    await user.clear(period);
+    await user.type(period, '2025');
+    expect(within(dialog).getByRole('group', { name: 'En el club desde' })).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Emitir certificado' }));
+
+    await waitFor(() =>
+      expect(sentBody(spy, 'POST', '/api/admin/students/s1/certificates')).toMatchObject({
+        nationalId: '',
+        periodKind: 'year',
+        period: '2025',
+      }),
+    );
+    const sheet = await screen.findByRole('article', { name: 'Certificado' });
+    expect(sheet).toHaveTextContent(
+      'Que Santiago Fernández Hernández tiene matrícula en el Club Ajedrez Puerta Elvira durante el año 2025, en horario de clase',
+    );
+    expect(sheet).not.toHaveTextContent('DNI');
+    expect(sheet).toHaveTextContent('pertenece al club desde el 16 de septiembre de 2024.');
   });
 
   it('signs by hand when another person signs', async () => {
@@ -178,7 +234,7 @@ describe('Certificados de matrícula', () => {
     renderApp('/panel/alumnos/s1');
 
     const list = await screen.findByRole('list', { name: 'Certificados emitidos' });
-    const item = within(list).getByRole('button', { name: /Matrícula 2026\/2027 · 11\/11\/2026/ });
+    const item = within(list).getByRole('button', { name: /Curso 2026\/2027 · 11\/11\/2026/ });
     expect(item).toHaveTextContent('con firma escaneada · emitido por Lucía Moreno Gil');
     await user.click(item);
     expect(

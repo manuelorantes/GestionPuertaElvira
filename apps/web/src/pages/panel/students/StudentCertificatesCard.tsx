@@ -1,7 +1,7 @@
 import { FileText } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
-import { useCertificates } from '@/features/students/certificates';
+import { periodLabel, useCertificates } from '@/features/students/certificates';
 import { formatDate } from '@/features/students/format';
 import { Card } from '@/shared/ui/Card';
 
@@ -41,7 +41,7 @@ export function StudentCertificatesCard({
                 <FileText aria-hidden size={16} className="shrink-0 text-ink-muted" />
                 <span className="min-w-0 flex-1">
                   <span className="block font-medium">
-                    Matrícula {c.season} · {formatDate(c.issuedOn)}
+                    {periodLabel(c)} · {formatDate(c.issuedOn)}
                   </span>
                   <span className="block text-[12px] text-ink-muted">
                     {c.signer.name} ({c.signer.role}) ·{' '}

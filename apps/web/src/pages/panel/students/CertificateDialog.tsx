@@ -8,6 +8,7 @@ import {
   useCertificateDraft,
   useIssueCertificate,
   type CertificateDraft,
+  type CertificatePeriodKind,
   type PrintableCertificate,
 } from '@/features/students/certificates';
 import { formatDate } from '@/features/students/format';
@@ -17,11 +18,15 @@ import { DateField } from '@/shared/ui/DateField';
 import { Dialog } from '@/shared/ui/Dialog';
 import { Switch } from '@/shared/ui/Switch';
 import { TextField } from '@/shared/ui/TextField';
+import { ToggleButton } from '@/shared/ui/ToggleButton';
 
 import { CertificateSheet } from './CertificateSheet';
 
+/** Desde cuándo están los datos del club en la aplicación: lo anterior no se puede comprobar. */
+const DATA_SINCE = '2026/2027';
+
 /**
- * Emitir un certificado de matrícula: se propone todo desde la ficha (DNI, curso, horario, lugar, fecha y firmante) y,
+ * Emitir un certificado de matrícula: se propone todo desde la ficha (DNI, curso o año, horario, lugar, fecha y firmante) y,
  * al emitirlo, queda registrado y sale la hoja lista para imprimir.
  */
 export function CertificateDialog({
@@ -66,7 +71,9 @@ function CertificateForm({
   const issue = useIssueCertificate(studentId);
   const [values, setValues] = useState({
     nationalId: draft.nationalId ?? '',
-    season: draft.season,
+    periodKind: 'season' as CertificatePeriodKind,
+    period: draft.season,
+    memberSince: draft.memberSince,
     schedule: draft.schedule,
     place: draft.place,
     issuedOn: draft.issuedOn,
@@ -74,6 +81,8 @@ function CertificateForm({
     signerRole: draft.signer.role,
   });
   const [wantsSignature, setWantsSignature] = useState(draft.signatureAvailable);
+  // El curso o año de hoy salen fijos: cambiarlos (y la fecha de alta) pide confirmar antes.
+  const [periodStage, setPeriodStage] = useState<'proposed' | 'confirming' | 'open'>('proposed');
   const [error, setError] = useState<string | null>(null);
   const set = (key: keyof typeof values) => (value: string) =>
     setValues((current) => ({ ...current, [key]: value }));
@@ -84,10 +93,18 @@ function CertificateForm({
   const canSign = draft.signatureAvailable && isDefaultSigner;
   const signed = canSign && wantsSignature;
   const year = Number(draft.issuedOn.slice(0, 4));
+  const isYear = values.periodKind === 'year';
+
+  function choosePeriodKind(kind: CertificatePeriodKind) {
+    setValues((current) => ({
+      ...current,
+      periodKind: kind,
+      period: kind === 'year' ? draft.year : draft.season,
+    }));
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (values.nationalId.trim() === '') return setError('Escribe el DNI o NIE del alumno.');
     setError(null);
     try {
       onIssued(await issue.mutateAsync({ ...values, signed }));
@@ -114,18 +131,40 @@ function CertificateForm({
         onChange={(e) => set('nationalId')(e.target.value)}
         help={
           draft.nationalId === null
-            ? 'No consta en su ficha: se guardará en ella.'
-            : 'Si lo cambias, también se cambia en su ficha.'
+            ? 'No consta en su ficha: si lo escribes, se guardará en ella. Vacío, no sale en el certificado.'
+            : 'Si lo cambias, también se cambia en su ficha. Vacío, no sale en el certificado.'
         }
-        required
       />
+      <div className="flex flex-col gap-1.5">
+        <p id="certificate-period-kind" className="text-sm font-semibold text-ink-soft">
+          Certifica
+        </p>
+        <div role="group" aria-labelledby="certificate-period-kind" className="flex gap-2">
+          <ToggleButton pressed={!isYear} onClick={() => choosePeriodKind('season')}>
+            Curso
+          </ToggleButton>
+          <ToggleButton pressed={isYear} onClick={() => choosePeriodKind('year')}>
+            Año
+          </ToggleButton>
+        </div>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="Curso"
-          value={values.season}
-          onChange={(e) => set('season')(e.target.value)}
-          required
-        />
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1">
+            <TextField
+              label={isYear ? 'Año' : 'Curso'}
+              value={values.period}
+              onChange={(e) => set('period')(e.target.value)}
+              readOnly={periodStage !== 'open'}
+              required
+            />
+          </div>
+          {periodStage !== 'open' && (
+            <Button type="button" variant="secondary" onClick={() => setPeriodStage('confirming')}>
+              Cambiar
+            </Button>
+          )}
+        </div>
         <TextField
           label="Lugar"
           value={values.place}
@@ -133,6 +172,32 @@ function CertificateForm({
           required
         />
       </div>
+      {periodStage === 'confirming' && (
+        <Alert tone="warning">
+          <p>
+            Los datos del club están en la aplicación desde el curso {DATA_SINCE}: la matrícula, el
+            horario y la fecha de alta de otro {isYear ? 'año' : 'curso'} no se pueden comprobar.
+            Revisa que sean los de entonces.
+          </p>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setPeriodStage('proposed')}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={() => setPeriodStage('open')}>
+              Cambiar igualmente
+            </Button>
+          </div>
+        </Alert>
+      )}
+      {periodStage === 'open' && (
+        <DateField
+          label="En el club desde"
+          value={values.memberSince}
+          onChange={set('memberSince')}
+          fromYear={year - 30}
+          toYear={year + 1}
+        />
+      )}
       <TextField
         label="Horario de clase"
         value={values.schedule}
