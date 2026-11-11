@@ -209,6 +209,21 @@ export class Student {
     this.current = details;
   }
 
+  /** Su DNI o NIE, sin tocar el resto de su ficha (p. ej. al emitirle un certificado). */
+  changeNationalId(id: NationalId): void {
+    const d = this.current;
+    this.current = new StudentDetails(
+      d.fullName,
+      d.birthDate,
+      id,
+      d.contactEmail,
+      d.guardians,
+      d.ownPhone,
+      d.federationLicence,
+      d.imageConsent,
+    );
+  }
+
   withdraw(on: LocalDate, today: LocalDate): void {
     this.assertNotProvisional();
     if (on.isBefore(this.joinedOn)) {
@@ -356,3 +371,5 @@ export class MemberRenumbering {
     return new Map(this.assignments);
   }
 }
+
+export * from './certificate.ts';

@@ -93,6 +93,10 @@ export class AuditLabels {
     'POST /api/admin/students': 'Dar de alta alumno',
     'PUT /api/admin/students/:id': 'Editar alumno',
     'POST /api/admin/students/:id/withdrawal': 'Dar de baja alumno',
+    'POST /api/admin/students/:id/certificates': 'Emitir certificado de matrícula',
+    'PUT /api/admin/students/certificate-settings': 'Cambiar el firmante de los certificados',
+    'POST /api/admin/students/certificate-signature': 'Subir la firma de los certificados',
+    'DELETE /api/admin/students/certificate-signature': 'Quitar la firma de los certificados',
     'POST /api/admin/students/:id/rejoin': 'Dar de alta de nuevo a un alumno',
     'POST /api/admin/students/:id/confirmation': 'Pasar a socio a un socio provisional',
     'PUT /api/admin/students/:id/joined-on': 'Cambiar la fecha de alta de un alumno',
@@ -181,6 +185,8 @@ export class AuditLabels {
     payroll_settlement: 'Liquidación',
     students_student: 'Alumno',
     students_past_membership: 'Alta y baja anterior de un alumno',
+    students_certificate: 'Certificado de matrícula',
+    students_certificate_settings: 'Firmante de los certificados',
     teachers_teacher: 'Profesor',
   };
 
