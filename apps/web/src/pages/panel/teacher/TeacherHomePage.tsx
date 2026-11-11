@@ -1,4 +1,6 @@
+import { ChevronRight } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
 import { useSession } from '@/features/auth/useSession';
@@ -6,7 +8,7 @@ import { todayIso } from '@/features/students/format';
 import type { TeacherClass } from '@/features/teacher-space/api';
 import { currentMonth, monthLabel, shiftMonth } from '@/features/billing/money';
 import { addDays, dayLabel, weekOf } from '@/features/teacher-space/dates';
-import { useTeacherClasses } from '@/features/teacher-space/hooks';
+import { useOverdueRollCalls, useTeacherClasses } from '@/features/teacher-space/hooks';
 import { Alert } from '@/shared/ui/Alert';
 import { Card } from '@/shared/ui/Card';
 import { MonthNav } from '@/shared/ui/MonthNav';
@@ -38,6 +40,7 @@ export function TeacherHomePage() {
           Mis clases
         </h1>
       </div>
+      {user?.teacherId && <OverdueRollCalls />}
       {user?.teacherId ? (
         <Tabs label="Periodo" tabs={TABS} value={tab} onChange={setTab}>
           {tab === 'hoy' ? <Today /> : tab === 'semana' ? <Week /> : <Past />}
@@ -51,6 +54,42 @@ export function TeacherHomePage() {
         </Card>
       )}
     </main>
+  );
+}
+
+/**
+ * Aviso en rojo de las clases cuyo plazo para pasar lista acabó (el final del día siguiente) sin pasarla: cada una lleva
+ * a su lista para pasarla tarde. Las de hoy y ayer no salen: aún están en plazo.
+ */
+function OverdueRollCalls() {
+  const overdue = useOverdueRollCalls();
+  const items = overdue.data ?? [];
+  if (items.length === 0) return null;
+  return (
+    <Alert>
+      <p className="font-semibold">
+        {items.length === 1
+          ? 'Tienes 1 clase sin pasar lista'
+          : `Tienes ${items.length} clases sin pasar lista`}
+      </p>
+      <ul aria-label="Clases sin pasar lista" className="mt-1.5 flex flex-col">
+        {items.map((item) => (
+          <li key={`${item.groupId}-${item.date}`}>
+            <Link
+              to={`/panel/lista/${item.groupId}/${item.date}`}
+              aria-label={`Pasar lista de ${item.label} del ${dayLabel(item.date)}`}
+              className="flex min-h-11 items-center gap-2 font-normal text-danger-fg underline-offset-2 hover:underline"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="font-semibold">{dayLabel(item.date)}</span> · {item.label} ·{' '}
+                {item.start}–{item.end}
+              </span>
+              <ChevronRight aria-hidden size={18} className="shrink-0" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Alert>
   );
 }
 

@@ -406,6 +406,47 @@ describe('Pasar lista', () => {
     );
   });
 
+  it('warns in red about the classes whose roll call is overdue, each one leading to its list', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      [`GET /api/teacher/classes?from=${today}&to=${today}`]: [200, { items: [] }],
+      'GET /api/teacher/overdue-roll-calls': [
+        200,
+        {
+          items: [
+            {
+              groupId: 'g1',
+              date: '2026-11-04',
+              label: 'Iniciación A',
+              start: '17:00',
+              end: '18:00',
+            },
+            { groupId: 'g2', date: '2026-11-03', label: 'Adultos I', start: '19:00', end: '20:30' },
+          ],
+        },
+      ],
+    });
+    renderApp('/panel');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Tienes 2 clases sin pasar lista');
+    const links = within(alert).getAllByRole('link');
+    expect(links.map((l) => [l.textContent, l.getAttribute('href')])).toEqual([
+      ['Miércoles 04/11 · Iniciación A · 17:00–18:00', '/panel/lista/g1/2026-11-04'],
+      ['Martes 03/11 · Adultos I · 19:00–20:30', '/panel/lista/g2/2026-11-03'],
+    ]);
+  });
+
+  it('shows no warning when every roll call is in time', async () => {
+    mockApi({
+      'GET /api/auth/me': [200, { user: TEACHER }],
+      [`GET /api/teacher/classes?from=${today}&to=${today}`]: [200, { items: [] }],
+      'GET /api/teacher/overdue-roll-calls': [200, { items: [] }],
+    });
+    renderApp('/panel');
+    expect(await screen.findByText('Hoy no tienes clases.')).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('lists the past classes month by month to see or change their list', async () => {
     const month = shiftMonth(currentMonth(), -1);
     const last = addDays(`${currentMonth()}-01`, -1);

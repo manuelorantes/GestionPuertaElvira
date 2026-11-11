@@ -69,6 +69,19 @@ export interface TeacherGroupComments {
 
 const BASE = '/api/teacher';
 
+/** Una clase suya cuyo plazo para pasar lista acabó sin pasarla. */
+export interface OverdueRollCall {
+  groupId: string;
+  date: string;
+  label: string;
+  start: string;
+  end: string;
+}
+
+export async function fetchOverdueRollCalls(): Promise<OverdueRollCall[]> {
+  return (await apiGet<{ items: OverdueRollCall[] }>(`${BASE}/overdue-roll-calls`)).items;
+}
+
 export async function fetchClasses(from: string, to: string): Promise<TeacherClass[]> {
   return (await apiGet<{ items: TeacherClass[] }>(`${BASE}/classes?from=${from}&to=${to}`)).items;
 }

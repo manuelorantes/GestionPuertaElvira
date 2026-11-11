@@ -9,6 +9,11 @@ export function useTeacherClasses(from: string, to: string) {
   });
 }
 
+/** Sus clases con el plazo acabado sin lista (el aviso en rojo de «Mis clases»). */
+export function useOverdueRollCalls() {
+  return useQuery({ queryKey: ['teacher-classes', 'overdue'], queryFn: api.fetchOverdueRollCalls });
+}
+
 export function useTeacherGroups() {
   return useQuery({ queryKey: ['teacher-groups'], queryFn: api.fetchGroups });
 }
