@@ -13,6 +13,7 @@ interface Draft {
   nationalId: string | null;
   memberSince: string;
   season: string;
+  year: string;
   schedule: string;
   place: string;
   issuedOn: string;
@@ -23,8 +24,9 @@ interface Draft {
 interface Certificate {
   id: string;
   studentName: string;
-  nationalId: string;
-  season: string;
+  nationalId: string | null;
+  periodKind: 'season' | 'year';
+  period: string;
   schedule: string;
   memberSince: string;
   place: string;
@@ -72,6 +74,7 @@ Deno.test('An enrolment certificate should be proposed from the student, issued 
       nationalId: null,
       memberSince: '2025-09-15',
       season: '2026/2027',
+      year: '2026',
       schedule: 'los viernes de 17:00 a 18:30 horas',
       place: 'Granada',
       issuedOn: '2026-11-11',
@@ -80,7 +83,8 @@ Deno.test('An enrolment certificate should be proposed from the student, issued 
     });
 
     const request = {
-      season: draft.season,
+      periodKind: 'season',
+      period: draft.season,
       schedule: draft.schedule,
       place: draft.place,
       issuedOn: draft.issuedOn,
@@ -88,11 +92,17 @@ Deno.test('An enrolment certificate should be proposed from the student, issued 
       signerRole: draft.signer.role,
       signed: false,
     };
-    // Sin DNI no hay certificado; el que se escribe al emitirlo se queda en su ficha.
-    assertError(
-      await client.json('POST', `/api/admin/students/${ana}/certificates`, request),
-      422,
-      'unprocessable',
+    // Sin DNI, el certificado no lo menciona y su ficha sigue sin él.
+    const withoutId = await client.json('POST', `/api/admin/students/${ana}/certificates`, {
+      ...request,
+      nationalId: '',
+    });
+    assertEquals(withoutId.status, 201, JSON.stringify(withoutId.body));
+    assertEquals(body<Certificate>(withoutId).nationalId, null);
+    assertEquals(
+      body<{ nationalId: string | null }>(await client.get(`/api/admin/students/${ana}`))
+        .nationalId,
+      null,
     );
     // La firma escaneada aún no se ha subido.
     assertError(
@@ -111,6 +121,8 @@ Deno.test('An enrolment certificate should be proposed from the student, issued 
     assertEquals(issued.status, 201, JSON.stringify(issued.body));
     const certificate = body<Certificate>(issued);
     assertEquals(certificate.nationalId, '12345678Z');
+    assertEquals(certificate.periodKind, 'season');
+    assertEquals(certificate.period, '2026/2027');
     assertEquals(certificate.memberSince, '2025-09-15');
     assertEquals(certificate.signed, false);
     assertEquals(certificate.club.name.length > 0, true);
@@ -161,7 +173,7 @@ Deno.test('An enrolment certificate should be proposed from the student, issued 
     const list = body<{ items: Certificate[] }>(
       await client.get(`/api/admin/students/${ana}/certificates`),
     );
-    assertEquals(list.items.map((c) => c.signed), [true, false]);
+    assertEquals(list.items.map((c) => c.signed), [true, false, false]);
     assertEquals(list.items[0]?.issuedByName !== null, true);
     const again = body<Certificate>(
       await client.get(`/api/admin/students/${ana}/certificates/${certificate.id}`),
@@ -191,6 +203,55 @@ Deno.test('An enrolment certificate should be proposed from the student, issued 
       (await client.raw('GET', '/api/admin/students/certificate-signature')).status,
       404,
     );
+  });
+});
+
+Deno.test('A certificate should certify a whole year, also one from before the app, with the date given', async () => {
+  await atTime(NOVEMBER_11, async () => {
+    const { client, ana } = await fixture();
+    const request = {
+      nationalId: '12345678Z',
+      periodKind: 'year',
+      period: '2025',
+      memberSince: '2024-09-16',
+      schedule: 'los viernes de 17:00 a 18:30 horas',
+      place: 'Granada',
+      issuedOn: '2026-11-11',
+      signerName: 'Manuel Orantes Taboada',
+      signerRole: 'Presidente',
+      signed: false,
+    };
+    const issued = await client.json('POST', `/api/admin/students/${ana}/certificates`, request);
+    assertEquals(issued.status, 201, JSON.stringify(issued.body));
+    const certificate = body<Certificate>(issued);
+    assertEquals(
+      [certificate.periodKind, certificate.period, certificate.memberSince],
+      ['year', '2025', '2024-09-16'],
+    );
+    // Su alta en la ficha no cambia.
+    assertEquals(
+      body<{ joinedOn: string }>(await client.get(`/api/admin/students/${ana}`)).joinedOn,
+      '2025-09-15',
+    );
+    for (
+      const wrong of [
+        { period: '25' },
+        { periodKind: 'month' },
+        { periodKind: 'season', period: '2025' },
+        { memberSince: '2026-12-01' },
+        // Pertenecer desde después del año que certifica.
+        { memberSince: '2026-01-10' },
+      ]
+    ) {
+      assertError(
+        await client.json('POST', `/api/admin/students/${ana}/certificates`, {
+          ...request,
+          ...wrong,
+        }),
+        422,
+        'unprocessable',
+      );
+    }
   });
 });
 

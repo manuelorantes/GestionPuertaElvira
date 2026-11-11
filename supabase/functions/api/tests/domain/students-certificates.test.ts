@@ -2,6 +2,7 @@ import { assertEquals, assertThrows } from '@std/assert';
 
 import { InvalidValue, LocalDate } from '../../src/domain/common/mod.ts';
 import {
+  CertificatePeriod,
   CertificateSigner,
   classSchedulePhrase,
   EnrolmentCertificate,
@@ -18,7 +19,7 @@ function issue(overrides: Partial<Parameters<typeof EnrolmentCertificate.issue>[
     studentId: STUDENT,
     studentName: 'Ana Pérez Gil',
     nationalId: NationalId.fromString('12345678Z'),
-    season: '2026/2027',
+    period: CertificatePeriod.of('season', '2026/2027'),
     schedule: 'los viernes de 17:00 a 18:30 horas',
     memberSince: LocalDate.fromString('2025-09-15'),
     place: 'Granada',
@@ -56,8 +57,8 @@ Deno.test('seasonFullLabel should name the season with both years in full', () =
 Deno.test('EnrolmentCertificate should keep what it certifies, as it was on the day it was issued', () => {
   const certificate = issue({ signed: true });
   assertEquals(certificate.studentName, 'Ana Pérez Gil');
-  assertEquals(certificate.nationalId.value, '12345678Z');
-  assertEquals(certificate.season, '2026/2027');
+  assertEquals(certificate.nationalId?.value, '12345678Z');
+  assertEquals(certificate.period.label, '2026/2027');
   assertEquals(certificate.signed, true);
 });
 
@@ -89,9 +90,44 @@ Deno.test('EnrolmentCertificate should only carry the scanned signature of the d
   );
 });
 
-Deno.test('EnrolmentCertificate should need a season, a schedule, a place and a signer', () => {
-  assertThrows(() => issue({ season: '2026/2028' }), InvalidValue);
-  assertThrows(() => issue({ season: '2026-27' }), InvalidValue);
+Deno.test('CertificatePeriod should be a season with both years or a calendar year', () => {
+  assertEquals(CertificatePeriod.of('year', ' 2025 ').label, '2025');
+  assertEquals(CertificatePeriod.of('season', '2025/2026').kind, 'season');
+  assertThrows(() => CertificatePeriod.of('season', '2026/2028'), InvalidValue);
+  assertThrows(() => CertificatePeriod.of('season', '2026-27'), InvalidValue);
+  assertThrows(() => CertificatePeriod.of('year', '2026/2027'), InvalidValue);
+  assertThrows(() => CertificatePeriod.of('month', '2026'), InvalidValue);
+  assertEquals(CertificatePeriod.of('season', '2025/2026').lastDay().toString(), '2026-06-30');
+  assertEquals(CertificatePeriod.of('year', '2025').lastDay().toString(), '2025-12-31');
+});
+
+Deno.test('EnrolmentCertificate should not mention a DNI it does not have', () => {
+  assertEquals(issue({ nationalId: null }).nationalId, null);
+});
+
+Deno.test('EnrolmentCertificate should need a schedule, a place, a signer and membership before the date', () => {
+  assertThrows(
+    () => issue({ memberSince: LocalDate.fromString('2026-11-12') }),
+    InvalidValue,
+    'no puede ser posterior',
+  );
+  // Ni pertenecer al club desde después de lo que certifica.
+  assertThrows(
+    () =>
+      issue({
+        period: CertificatePeriod.of('year', '2025'),
+        memberSince: LocalDate.fromString('2026-01-01'),
+      }),
+    InvalidValue,
+    'desde después del año',
+  );
+  assertEquals(
+    issue({
+      period: CertificatePeriod.of('season', '2025/2026'),
+      memberSince: LocalDate.fromString('2026-06-30'),
+    }).memberSince.toString(),
+    '2026-06-30',
+  );
   assertThrows(() => issue({ schedule: '  ' }), InvalidValue);
   assertThrows(() => issue({ place: '' }), InvalidValue);
   assertThrows(() => new CertificateSigner('', 'Presidente'), InvalidValue);

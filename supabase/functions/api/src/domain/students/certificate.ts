@@ -118,12 +118,45 @@ export function seasonFullLabel(day: LocalDate): string {
   return `${start}/${start + 1}`;
 }
 
+export type CertificatePeriodKind = 'season' | 'year';
+
+/** Lo que certifica: un curso («2026/2027», los dos años completos) o un año natural («2026»). */
+export class CertificatePeriod {
+  private constructor(readonly kind: CertificatePeriodKind, readonly label: string) {}
+
+  static of(kind: string, label: string): CertificatePeriod {
+    const text = label.trim();
+    if (kind === 'season') {
+      const season = /^(\d{4})\/(\d{4})$/.exec(text);
+      if (season === null || Number(season[2]) !== Number(season[1]) + 1) {
+        throw new InvalidValue('period', 'El curso se escribe como 2026/2027.');
+      }
+      return new CertificatePeriod('season', text);
+    }
+    if (kind === 'year') {
+      if (!/^(19|20)\d{2}$/.test(text)) {
+        throw new InvalidValue('period', 'El año se escribe con sus cuatro cifras, como 2026.');
+      }
+      return new CertificatePeriod('year', text);
+    }
+    throw new InvalidValue('periodKind', 'Elige si certifica un curso o un año.');
+  }
+
+  /** Su último día: el 30 de junio para un curso (julio y agosto son ya del siguiente), el 31 de diciembre para un año. */
+  lastDay(): LocalDate {
+    const year = Number(this.label.slice(0, 4));
+    return this.kind === 'season'
+      ? Season.startingIn(year).lastMonth().lastDay()
+      : LocalDate.fromString(`${this.label}-12-31`);
+  }
+}
+
 export interface CertificateRequest {
   studentId: StudentId;
   studentName: string;
-  nationalId: NationalId;
-  /** «2026/2027». */
-  season: string;
+  /** Sin DNI ni NIE, el certificado no lo menciona. */
+  nationalId: NationalId | null;
+  period: CertificatePeriod;
   schedule: string;
   memberSince: LocalDate;
   place: string;
@@ -137,7 +170,7 @@ export interface CertificateRequest {
 }
 
 /**
- * Certificado de matrícula de un alumno, tal como se emitió: guarda lo certificado (nombre, DNI, curso, horario…) para
+ * Certificado de matrícula de un alumno, tal como se emitió: guarda lo certificado (nombre, DNI, curso o año, horario…) para
  * poder volver a imprimirlo igual aunque luego cambie su ficha.
  */
 export class EnrolmentCertificate {
@@ -145,8 +178,8 @@ export class EnrolmentCertificate {
     readonly id: CertificateId,
     readonly studentId: StudentId,
     readonly studentName: string,
-    readonly nationalId: NationalId,
-    readonly season: string,
+    readonly nationalId: NationalId | null,
+    readonly period: CertificatePeriod,
     readonly schedule: string,
     readonly memberSince: LocalDate,
     readonly place: string,
@@ -157,9 +190,21 @@ export class EnrolmentCertificate {
   ) {}
 
   static issue(request: CertificateRequest): EnrolmentCertificate {
-    const season = /^(\d{4})\/(\d{4})$/.exec(request.season.trim());
-    if (season === null || Number(season[2]) !== Number(season[1]) + 1) {
-      throw new InvalidValue('season', 'El curso se escribe como 2026/2027.');
+    if (request.issuedOn.isBefore(request.memberSince)) {
+      throw new InvalidValue(
+        'memberSince',
+        'La fecha desde la que pertenece al club no puede ser posterior a la del certificado.',
+      );
+    }
+    if (request.period.lastDay().isBefore(request.memberSince)) {
+      throw new InvalidValue(
+        'memberSince',
+        `Pertenece al club desde después ${
+          request.period.kind === 'season' ? 'del curso' : 'del año'
+        } que certifica: cambia la fecha de alta o el ${
+          request.period.kind === 'season' ? 'curso' : 'año'
+        }.`,
+      );
     }
     if (
       request.signed &&
@@ -172,7 +217,7 @@ export class EnrolmentCertificate {
       request.studentId,
       request.studentName,
       request.nationalId,
-      season[0],
+      request.period,
       requiredText('schedule', request.schedule, 300, 'Escribe el horario de clase.'),
       request.memberSince,
       requiredText('place', request.place, 80, 'Escribe el lugar del certificado.'),
@@ -187,8 +232,8 @@ export class EnrolmentCertificate {
     id: CertificateId,
     studentId: StudentId,
     studentName: string,
-    nationalId: NationalId,
-    season: string,
+    nationalId: NationalId | null,
+    period: CertificatePeriod,
     schedule: string,
     memberSince: LocalDate,
     place: string,
@@ -202,7 +247,7 @@ export class EnrolmentCertificate {
       studentId,
       studentName,
       nationalId,
-      season,
+      period,
       schedule,
       memberSince,
       place,

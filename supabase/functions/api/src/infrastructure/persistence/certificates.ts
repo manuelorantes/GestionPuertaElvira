@@ -23,8 +23,9 @@ export class SqlCertificateRepository implements CertificateRepository {
         id: c.id.value,
         student_id: c.studentId.value,
         student_name: c.studentName,
-        national_id: c.nationalId.value,
-        season: c.season,
+        national_id: c.nationalId?.value ?? null,
+        period_kind: c.period.kind,
+        period: c.period.label,
         schedule: c.schedule,
         member_since: c.memberSince.toString(),
         place: c.place,
@@ -40,7 +41,8 @@ export class SqlCertificateRepository implements CertificateRepository {
 
 type StoredCertificate = Omit<CertificateView, 'club'>;
 
-const COLUMNS = `c.id::text AS id, c.student_name, c.national_id, c.season, c.schedule,
+const COLUMNS =
+  `c.id::text AS id, c.student_name, c.national_id, c.period_kind, c.period, c.schedule,
   c.member_since::text AS member_since, c.place, c.issued_on::text AS issued_on, c.signer_name, c.signer_role,
   c.signed, c.created_at, u.full_name AS issued_by_name`;
 
@@ -67,8 +69,9 @@ function toView(row: Row): StoredCertificate {
   return {
     id: row.string('id'),
     studentName: row.string('student_name'),
-    nationalId: row.string('national_id'),
-    season: row.string('season'),
+    nationalId: row.nullableString('national_id'),
+    periodKind: row.string('period_kind') === 'year' ? 'year' : 'season',
+    period: row.string('period'),
     schedule: row.string('schedule'),
     memberSince: row.string('member_since'),
     place: row.string('place'),
