@@ -1,6 +1,8 @@
-import { type Clock, InvalidValue, LocalDate } from '../../domain/common/mod.ts';
+import { type Clock, LocalDate } from '../../domain/common/mod.ts';
 import {
   type CertificateId,
+  CertificatePeriod,
+  type CertificatePeriodKind,
   CertificateSettings,
   CertificateSigner,
   classSchedulePhrase,
@@ -36,8 +38,10 @@ export interface ClubLetterhead {
 export interface CertificateView {
   id: string;
   studentName: string;
-  nationalId: string;
-  season: string;
+  nationalId: string | null;
+  periodKind: CertificatePeriodKind;
+  /** «2026/2027» o «2026». */
+  period: string;
   schedule: string;
   memberSince: string;
   place: string;
@@ -76,7 +80,9 @@ export interface CertificateDraft {
   studentName: string;
   nationalId: string | null;
   memberSince: string;
+  /** El curso de hoy («2026/2027») y el año de hoy («2026»): se elige uno. */
   season: string;
+  year: string;
   schedule: string;
   place: string;
   issuedOn: string;
@@ -84,7 +90,7 @@ export interface CertificateDraft {
   signatureAvailable: boolean;
 }
 
-/** Lo que se propone para el certificado de un alumno: sus datos, el curso y su horario de hoy, y el firmante por defecto. */
+/** Lo que se propone para el certificado de un alumno: sus datos, el curso o el año y su horario de hoy, y el firmante por defecto. */
 export class DraftCertificate {
   constructor(
     private readonly students: StudentQuery,
@@ -102,6 +108,7 @@ export class DraftCertificate {
       nationalId: student.nationalId,
       memberSince: student.joinedOn,
       season: seasonFullLabel(today),
+      year: String(today.year),
       schedule: classSchedulePhrase(student.groups.map((g) => g.schedule)),
       place: DEFAULT_PLACE,
       issuedOn: today.toString(),
@@ -112,9 +119,12 @@ export class DraftCertificate {
 }
 
 export interface CertificateInput {
-  /** Su DNI o NIE si no consta en la ficha (o para corregirlo): se guarda también en ella. */
+  /** Su DNI o NIE si no consta en la ficha (o para corregirlo): se guarda también en ella. Vacío, no se menciona. */
   nationalId: string | null;
-  season: string;
+  periodKind: string;
+  period: string;
+  /** Desde cuándo pertenece al club si no es su última alta (p. ej. de antes de tener la aplicación). */
+  memberSince: string | null;
   schedule: string;
   place: string;
   issuedOn: string;
@@ -123,7 +133,7 @@ export interface CertificateInput {
   signed: boolean;
 }
 
-/** Emite un certificado de matrícula y lo deja registrado. Sin DNI o NIE no se puede. */
+/** Emite un certificado de matrícula y lo deja registrado. Sin DNI ni NIE, el certificado no lo menciona. */
 export class IssueCertificate {
   constructor(
     private readonly students: StudentRepository,
@@ -145,18 +155,15 @@ export class IssueCertificate {
         await this.students.save(student);
       }
     }
-    const nationalId = student.details().nationalId;
-    if (nationalId === null) {
-      throw new InvalidValue('nationalId', 'Escribe el DNI o NIE del alumno.');
-    }
+    const nationalId = input.nationalId?.trim() ? student.details().nationalId : null;
     const settings = await this.settings.get();
     const certificate = EnrolmentCertificate.issue({
       studentId: student.id,
       studentName: student.details().fullName.value,
       nationalId,
-      season: input.season,
+      period: CertificatePeriod.of(input.periodKind, input.period),
       schedule: input.schedule,
-      memberSince: student.joinedOn,
+      memberSince: input.memberSince ? LocalDate.fromString(input.memberSince) : student.joinedOn,
       place: input.place,
       issuedOn: LocalDate.fromString(input.issuedOn),
       signer: new CertificateSigner(input.signerName, input.signerRole),

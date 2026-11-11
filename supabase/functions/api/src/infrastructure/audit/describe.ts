@@ -177,7 +177,7 @@ export function titleOf(
     case 'students_certificate':
       return join(
         text(row, 'student_name'),
-        text(row, 'season'),
+        text(row, 'period'),
         dateLabel(text(row, 'issued_on')),
       );
     case 'students_certificate_settings':
