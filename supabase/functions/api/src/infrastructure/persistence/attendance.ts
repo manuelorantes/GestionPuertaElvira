@@ -8,6 +8,8 @@ import type {
   MissedRollCall,
   MissedRollCallQuery,
   MissedRollCallReviews,
+  OverdueRollCall,
+  OverdueRollCallQuery,
   RosterStudent,
   StudentAttendanceQuery,
   StudentAttendanceSummary,
@@ -166,6 +168,43 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
       validation: r.bool('validated')
         ? { by: r.nullableString('validated_by'), on: r.string('validated_on') }
         : null,
+    }));
+  }
+}
+
+const clock = (minutes: number) =>
+  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+/** Las clases de un profesor con el plazo acabado y sin lista (su aviso en «Mis clases»). */
+export class SqlOverdueRollCallQuery implements OverdueRollCallQuery {
+  constructor(private readonly sql: Sql) {}
+
+  since(): Promise<LocalDate> {
+    return new SqlMissedRollCallQuery(this.sql).since();
+  }
+
+  async overdueFor(
+    teacherId: string,
+    from: LocalDate,
+    until: LocalDate,
+  ): Promise<OverdueRollCall[]> {
+    const rows = await this.sql`
+      SELECT s.group_id, s.session_date::text AS date, g.name AS label, g.start_minutes, g.end_minutes
+        FROM payroll_session s
+        JOIN classes_group g ON g.id = s.group_id
+        JOIN identity_user u ON u.teacher_id = s.teacher_id AND u.status = 'active'
+       WHERE s.teacher_id = ${teacherId}
+         AND s.session_date BETWEEN ${from.toString()} AND ${until.toString()}
+         AND s.session_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
+         AND NOT EXISTS (SELECT 1 FROM attendance_roll_call r
+                          WHERE r.group_id = s.group_id AND r.roll_date = s.session_date)
+       ORDER BY s.session_date DESC, g.start_minutes`;
+    return Row.all(rows).map((r) => ({
+      groupId: r.string('group_id'),
+      date: r.string('date'),
+      label: r.string('label'),
+      start: clock(r.int('start_minutes')),
+      end: clock(r.int('end_minutes')),
     }));
   }
 }
