@@ -101,3 +101,48 @@ Deno.test('superadministration should take the roll call of any class any day an
     assertError(await admin.json('PUT', url('2026-10-13'), { absent: [] }), 403, 'forbidden');
   });
 });
+
+Deno.test('a teacher should see the classes whose roll call is overdue until taking it late', async () => {
+  const { admin, carlos, group, student } = await atTime('2026-10-01T10:00:00+02:00', fixture);
+  const record = (date: string) =>
+    admin.json('POST', '/api/admin/payroll/sessions', {
+      teacherId: carlos,
+      groupId: group,
+      date,
+      hours: 1,
+    });
+  await atTime('2026-10-14T12:00:00+02:00', async () => {
+    await admin.logIn('junta@club.es');
+    for (const date of ['2026-10-06', '2026-10-13']) {
+      assertEquals((await record(date)).status, 201);
+    }
+    const teacher = new ApiClient();
+    await teacher.logIn('carlos@club.es');
+    const overdue = async () =>
+      body<
+        { items: { groupId: string; date: string; label: string; start: string; end: string }[] }
+      >(
+        await teacher.get('/api/teacher/overdue-roll-calls'),
+      ).items;
+
+    // La del 13 (ayer) aún está en plazo: solo sale la del 6.
+    assertEquals(await overdue(), [{
+      groupId: group,
+      date: '2026-10-06',
+      label: 'Martes 19:00',
+      start: '19:00',
+      end: '20:00',
+    }]);
+
+    // La pasa tarde (confirmándolo) y deja de salir.
+    const taken = await teacher.json('PUT', `/api/teacher/roll-calls/${group}/2026-10-06`, {
+      absent: [student],
+      guests: [],
+      past: true,
+    });
+    assertEquals(taken.status, 204, JSON.stringify(taken.body));
+    assertEquals(await overdue(), []);
+    // Administración no la ve.
+    assertEquals((await admin.get('/api/teacher/overdue-roll-calls')).status, 403);
+  });
+});
