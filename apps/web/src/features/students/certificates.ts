@@ -11,12 +11,15 @@ export interface CertificateSigner {
   role: string;
 }
 
-/** Lo que se propone al emitir: sus datos, el curso y el horario de hoy, Granada y el firmante por defecto. */
+export type CertificatePeriodKind = 'season' | 'year';
+
+/** Lo que se propone al emitir: sus datos, el curso o el año y el horario de hoy, Granada y el firmante por defecto. */
 export interface CertificateDraft {
   studentName: string;
   nationalId: string | null;
   memberSince: string;
   season: string;
+  year: string;
   schedule: string;
   place: string;
   issuedOn: string;
@@ -26,7 +29,9 @@ export interface CertificateDraft {
 
 export interface CertificatePayload {
   nationalId: string;
-  season: string;
+  periodKind: CertificatePeriodKind;
+  period: string;
+  memberSince: string;
   schedule: string;
   place: string;
   issuedOn: string;
@@ -39,8 +44,9 @@ export interface CertificatePayload {
 export interface IssuedCertificate {
   id: string;
   studentName: string;
-  nationalId: string;
-  season: string;
+  nationalId: string | null;
+  periodKind: CertificatePeriodKind;
+  period: string;
   schedule: string;
   memberSince: string;
   place: string;
@@ -62,6 +68,11 @@ export interface CertificateSettings {
 }
 
 const base = (studentId: string) => `/api/admin/students/${studentId}/certificates`;
+
+/** «Curso 2026/2027» o «Año 2026». */
+export function periodLabel(c: { periodKind: CertificatePeriodKind; period: string }): string {
+  return `${c.periodKind === 'year' ? 'Año' : 'Curso'} ${c.period}`;
+}
 
 /** El mismo firmante sin mirar espacios ni mayúsculas (como la API). */
 export function sameSigner(a: CertificateSigner, b: CertificateSigner): boolean {
