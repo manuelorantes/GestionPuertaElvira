@@ -442,6 +442,42 @@ export class MissedRollCalls {
   }
 }
 
+/** Una clase suya cuyo plazo para pasar lista acabó sin pasarla (para avisar al profesor). */
+export interface OverdueRollCall {
+  groupId: string;
+  date: string;
+  label: string;
+  start: string;
+  end: string;
+}
+
+export interface OverdueRollCallQuery {
+  /** Primer día que cuenta (el día en que se activó la asistencia). */
+  since(): Promise<LocalDate>;
+  /**
+   * Clases apuntadas en sus horas entre esas fechas, desde que se vinculó su cuenta, sin lista (ni pasada ni dada por
+   * buena), de la más reciente a la más antigua.
+   */
+  overdueFor(teacherId: string, from: LocalDate, until: LocalDate): Promise<OverdueRollCall[]>;
+}
+
+/**
+ * Las listas que el profesor pasa tarde: sus clases cuyo plazo acabó (el final del día siguiente) sin lista. Las de hoy
+ * y ayer aún están en plazo y no salen.
+ */
+export class TeacherOverdueRollCalls {
+  constructor(
+    private readonly query: OverdueRollCallQuery,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(teacherId: string): Promise<OverdueRollCall[]> {
+    const until = lastClosedDay(this.clock.now());
+    const since = await this.query.since();
+    return until.isBefore(since) ? [] : await this.query.overdueFor(teacherId, since, until);
+  }
+}
+
 /** Aún se puede pasar la lista: no se puede dar por buena todavía. */
 export class RollCallStillOpen extends Error {
   constructor() {

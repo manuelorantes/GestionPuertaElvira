@@ -29,6 +29,7 @@ import {
   TeacherGroupAttendance,
   TeacherGroupComments,
   TeacherGroups,
+  TeacherOverdueRollCalls,
 } from '../../application/attendance/mod.ts';
 import {
   GroupTeacherOn,
@@ -51,6 +52,7 @@ import {
   SqlGroupAttendanceQuery,
   SqlMissedRollCallQuery,
   SqlMissedRollCallReviews,
+  SqlOverdueRollCallQuery,
   SqlStudentAttendanceQuery,
   SqlTeacherRosterQuery,
 } from '../persistence/attendance.ts';
@@ -215,6 +217,17 @@ export function registerAttendanceRoutes(api: ApiApp): void {
         from,
         to,
       ),
+    });
+  });
+
+  // Sus clases con el plazo acabado sin lista: el aviso en rojo de «Mis clases».
+  api.defineRoute(teacher('GET', '/api/teacher/overdue-roll-calls'), async (c, scope) => {
+    return c.json({
+      items: await new TeacherOverdueRollCalls(
+        new SqlOverdueRollCallQuery(scope.tx),
+        api.deps.clock,
+      )
+        .execute(sessionTeacher(scope)),
     });
   });
 
