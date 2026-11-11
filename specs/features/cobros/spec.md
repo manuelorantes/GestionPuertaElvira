@@ -440,3 +440,5 @@ Cada cambio recalcula las cuotas de quienes afecta (ver «Recálculo de cuotas»
 Administración MUST poder cambiar los tramos, la cuota de socio, los descuentos, el precio por hora de las particulares
 (por defecto y por profesor) y los datos fiscales del club.
 Los cambios MUST afectar solo a las cuotas y cobros nuevos.
+En la misma pestaña está el firmante de los certificados de matrícula y su firma escaneada (ver
+[Firmante de los certificados](../alumnos/spec.md)).

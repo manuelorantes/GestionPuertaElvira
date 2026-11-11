@@ -244,6 +244,46 @@ cambia y el mes de la baja se queda como estaba).
 - **WHEN** la fecha de baja es futura
 - **THEN** el alumno sigue activo y ocupando plaza hasta ese día
 
+### Requirement: Certificado de matrícula
+Administración MUST poder emitir desde la ficha de un alumno de alta («Emitir certificado», junto a «Editar») un
+certificado de matrícula listo para imprimir, como papel oficial del club: arriba el logo, el nombre, el NIF y la
+dirección del club, sin sello.
+El certificado MUST decir que el alumno, con su DNI o NIE, tiene matrícula en el club para el curso, en su horario de
+clase, y desde qué día pertenece al club (su última alta), con el lugar y la fecha, y quién lo firma con su cargo.
+Al abrirlo se MUST proponer: su DNI o NIE de la ficha, el curso de hoy con los dos años completos («2026/2027»), el
+horario de sus grupos de hoy (su horario especial si lo tiene, p. ej. «los viernes de 17:00 a 18:30 horas»), Granada,
+hoy y el firmante por defecto; todo se puede cambiar antes de emitirlo.
+Sin DNI o NIE no se MUST emitir; si no consta en la ficha (o se corrige), el que se escribe MUST guardarse también en
+ella.
+Se MUST poder elegir si sale con la firma escaneada o con el hueco para firmarlo a mano; la firma escaneada MUST usarse
+solo con el firmante por defecto y si se ha subido; con cualquier otro firmante, se firma a mano.
+Cada certificado emitido MUST quedar registrado tal como se emitió (aunque luego cambie la ficha): la ficha MUST
+mostrar «Certificados emitidos», del último al primero, con el curso, la fecha, quién firma, si lleva la firma
+escaneada y quién lo emitió, y cada uno se MUST poder volver a abrir para imprimirlo.
+
+#### Scenario: Certificado de un alumno sin DNI en la ficha
+- **WHEN** administración emite el certificado de Santiago, que va los viernes de 17:00 a 18:30, escribe su DNI
+  13468404H y deja el firmante por defecto con la firma escaneada
+- **THEN** sale «Manuel Orantes Taboada, Presidente del Club Ajedrez Puerta Elvira, CERTIFICA: Que Santiago Fernández
+  Hernández, con DNI 13468404H, tiene matrícula en el Club Ajedrez Puerta Elvira para el curso 2026/2027, en horario de
+  clase los viernes de 17:00 a 18:30 horas, y pertenece al club desde el …», «En Granada, a 11 de noviembre de 2026.»
+  y la firma; su ficha pasa a tener ese DNI y el certificado aparece en «Certificados emitidos»
+
+#### Scenario: Firma otra persona
+- **WHEN** al emitirlo se cambia el firmante por «Lucía Moreno Gil, Secretaria»
+- **THEN** no se puede elegir la firma escaneada y el certificado sale con el hueco para firmarlo a mano
+
+### Requirement: Firmante de los certificados
+Administración MUST poder cambiar en «Tarifas y ajustes» de Cobros el firmante por defecto de los certificados (nombre
+y cargo; al principio, Manuel Orantes Taboada, Presidente) y subir, cambiar o quitar su firma escaneada (PNG o JPEG de
+hasta 2 MB), que solo ve quien gestiona el club. La firma es de esa persona: al guardar a otra persona como firmante
+por defecto, la firma escaneada MUST quitarse (avisando antes).
+
+#### Scenario: Cambiar el firmante por defecto
+- **WHEN** administración cambia el firmante por defecto de Manuel Orantes Taboada a Lucía Moreno Gil
+- **THEN** se avisa de que la firma escaneada se quita, y desde entonces los certificados salen para firmar a mano
+  hasta que se suba la de Lucía
+
 ### Requirement: Volver a darse de alta
 Un alumno de baja (con su baja ya llegada) MUST poder volver a darse de alta, tantas veces como haga falta, con
 «Dar de alta de nuevo» en su ficha: fecha de alta (por defecto hoy, nunca futura ni anterior a su última baja) y los
