@@ -51,9 +51,15 @@ export function CertificateSheet({ certificate: c }: { certificate: PrintableCer
       </p>
       <p className="my-5 font-bold tracking-[0.08em]">CERTIFICA:</p>
       <p className="text-justify">
-        Que <strong>{c.studentName}</strong>, con DNI <strong>{c.nationalId}</strong>, tiene
-        matrícula en el {c.club.name} para el curso <strong>{c.season}</strong>, en horario de clase{' '}
-        {c.schedule}, y pertenece al club desde el {longDate(c.memberSince)}.
+        Que <strong>{c.studentName}</strong>
+        {c.nationalId && (
+          <>
+            , con DNI <strong>{c.nationalId}</strong>,
+          </>
+        )}{' '}
+        tiene matrícula en el {c.club.name}{' '}
+        {c.periodKind === 'year' ? 'durante el año' : 'para el curso'} <strong>{c.period}</strong>,
+        en horario de clase {c.schedule}, y pertenece al club desde el {longDate(c.memberSince)}.
       </p>
       <p className="mt-8">
         En {c.place}, a {longDate(c.issuedOn)}.
