@@ -174,6 +174,14 @@ export function titleOf(
       return join(student(), dateLabel(text(row, 'taken_on')));
     case 'points_movement':
       return join(student(), dateLabel(text(row, 'movement_date')));
+    case 'students_certificate':
+      return join(
+        text(row, 'student_name'),
+        text(row, 'season'),
+        dateLabel(text(row, 'issued_on')),
+      );
+    case 'students_certificate_settings':
+      return join(text(row, 'signer_name'), text(row, 'signer_role'));
     case 'classes_enrolment':
       return join(student(), group());
     case 'equipment_order':

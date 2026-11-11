@@ -340,6 +340,7 @@ export class SqlStudentQuery implements StudentQuery {
           HalfHour.fromString(attendance.start),
           HalfHour.fromString(attendance.end),
         ).label(),
+        schedule: attendance ?? { days: [...group.days], start: group.start, end: group.end },
         since: row.string('since'),
       });
       byStudent.set(row.string('student_id'), list);

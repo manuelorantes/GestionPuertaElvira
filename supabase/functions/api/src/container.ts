@@ -20,6 +20,7 @@ import { registerImportRoutes } from './infrastructure/import/routes.ts';
 import { registerPayrollRoutes } from './infrastructure/payroll/routes.ts';
 import { registerPointsRoutes } from './infrastructure/points/routes.ts';
 import { registerAuthRoutes } from './infrastructure/identity/routes.ts';
+import { registerCertificateRoutes } from './infrastructure/students/certificates.ts';
 import { registerStudentRoutes } from './infrastructure/students/routes.ts';
 import { registerSystemRoutes } from './infrastructure/system/routes.ts';
 import { registerTeacherRoutes } from './infrastructure/teachers/routes.ts';
@@ -98,10 +99,6 @@ export function buildApp(
   registerAuthRoutes(api);
   registerTeacherRoutes(api);
   registerClassRoutes(api);
-  registerStudentRoutes(api);
-  registerBillingRoutes(api);
-  registerEquipmentRoutes(api);
-  registerPayrollRoutes(api);
   const storage = config.documents.kind === 'local'
     ? new LocalDocumentStorage(config.documents.directory)
     : new SupabaseDocumentStorage(
@@ -109,6 +106,12 @@ export function buildApp(
       config.documents.serviceKey,
       config.documents.bucket,
     );
+  // Antes que las de alumnado, para que «certificate-settings» no se tome por el id de un alumno.
+  registerCertificateRoutes(api, storage);
+  registerStudentRoutes(api);
+  registerBillingRoutes(api);
+  registerEquipmentRoutes(api);
+  registerPayrollRoutes(api);
   registerAccountingRoutes(api, storage);
   registerReconciliationRoutes(api);
   registerAuditRoutes(api);
