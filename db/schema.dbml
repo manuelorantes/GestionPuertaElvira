@@ -285,10 +285,6 @@ Table payroll_settlement {
   Note: 'Solo existe cuando la liquidación está pagada; bloquea las sesiones de ese profesor y mes'
 }
 
-Table payroll_proposed_month {
-  month varchar(7) [pk, note: 'meses ya propuestos desde el horario']
-}
-
 // --- Contabilidad (Accounting) ---------------------------------------------
 
 Table accounting_entry {
@@ -697,3 +693,21 @@ Table attendance_missed_review {
 Ref: attendance_missed_review.user_id > identity_user.id [delete: cascade]
 Ref: attendance_missed_review.group_id > classes_group.id [delete: cascade]
 Ref: attendance_missed_review.duty_id > payroll_duty.id [delete: cascade]
+
+Table attendance_not_given {
+  id uuid [pk]
+  group_id uuid [note: 'la clase (o null si es una actividad del club)']
+  duty_id uuid [note: 'la actividad del club (o null si es una clase)']
+  class_date date [not null]
+  marked_by_user uuid [note: 'cuenta de administración que dijo que no se dio']
+  marked_at timestamptz [not null]
+
+  indexes {
+    (`COALESCE(group_id, duty_id)`, class_date) [unique, name: 'attendance_not_given_once']
+  }
+  Note: '«No se dio» de «Listas sin pasar»: no cuenta horas y no vuelve a salir en el aviso de nadie.'
+}
+
+Ref: attendance_not_given.group_id > classes_group.id [delete: cascade]
+Ref: attendance_not_given.duty_id > payroll_duty.id [delete: cascade]
+Ref: attendance_not_given.marked_by_user > identity_user.id [delete: set null]

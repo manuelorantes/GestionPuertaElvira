@@ -116,13 +116,8 @@ Deno.test('the Friday activity manager takes the Friday attendance and other act
 
 Deno.test('activities without confirmation from their manager should show up in the missed roll calls', async () => {
   const fx = await atTime(FRIDAY, fixture);
-  // Sesiones apuntadas del viernes 9 (como las apunta la tarea de cada noche).
-  const session = (teacherId: string, duty: string, label: string, start: number) =>
-    db()`INSERT INTO payroll_session (id, teacher_id, session_date, group_id, label, minutes, from_schedule,
-                                      start_minutes, source)
-         VALUES (gen_random_uuid(), ${teacherId}, '2026-10-09', NULL, ${label}, 60, true, ${start}, ${`duty:${duty}`})`;
-  await session(fx.angel, fx.fridays, 'Viernes', 17 * 60);
-  await session(fx.lucia, fx.shift, 'Encargado del club', 20 * 60);
+  // Solo cuenta desde el lunes 5: el aviso sale del horario (los viernes de Ángel y el turno de Lucía del 9).
+  await db()`UPDATE attendance_settings SET since = '2026-10-05'`;
 
   await atTime('2026-10-12T10:00:00+02:00', async () => {
     await fx.admin.logIn('junta@club.es');
@@ -131,12 +126,12 @@ Deno.test('activities without confirmation from their manager should show up in 
       present: true,
     });
     const pending = async () =>
-      body<{ items: { label: string; dutyId: string | null; teacherName: string }[] }>(
+      body<{ items: { date: string; label: string; teacherName: string }[] }>(
         await fx.admin.get('/api/admin/attendance/pending'),
-      ).items.map((p) => [p.label, p.teacherName]);
+      ).items.map((p) => [p.date, p.label, p.teacherName]);
     assertEquals(await pending(), [
-      ['Viernes', 'Ángel Castillo Rodriguez'],
-      ['Encargado del club', 'Lucía Moreno Gil'],
+      ['2026-10-09', 'Viernes', 'Ángel Castillo Rodriguez'],
+      ['2026-10-09', 'Encargado del club', 'Lucía Moreno Gil'],
     ]);
     assertEquals(
       (await fx.admin.json(
@@ -147,7 +142,13 @@ Deno.test('activities without confirmation from their manager should show up in 
         .status,
       204,
     );
-    assertEquals(await pending(), [['Encargado del club', 'Lucía Moreno Gil']]);
+    assertEquals(await pending(), [['2026-10-09', 'Encargado del club', 'Lucía Moreno Gil']]);
+    // «Se dio» apunta la sesión de los viernes de Ángel.
+    assertEquals(
+      (await db()`SELECT COUNT(*)::int AS n FROM payroll_session
+                   WHERE teacher_id = ${fx.angel} AND session_date = '2026-10-09'`)[0]?.n,
+      1,
+    );
 
     // Otra cuenta de administración la sigue viendo, con quién la dio por buena, hasta que la revisa ella.
     await createUser('tesoreria@club.es');

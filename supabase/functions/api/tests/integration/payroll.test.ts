@@ -3,8 +3,6 @@ import { assert, assertEquals } from '@std/assert';
 import { LocalDate, Season, YearMonth } from '../../src/domain/common/mod.ts';
 import { newGroup, newTeacher } from '../support/classes-http.ts';
 import { ApiClient, assertError, createUser, db, resetDatabase } from '../support/http.ts';
-import { inTransaction } from '../../src/infrastructure/persistence/sql.ts';
-import { runCommand } from '../../scripts/console.ts';
 
 const today = LocalDate.fromInstant(new Date()).toString();
 const month = today.slice(0, 7);
@@ -18,7 +16,7 @@ const noPastWeekdayYet = (() => {
   return true;
 })();
 
-async function fixture(): Promise<{ client: ApiClient; teacher: string }> {
+async function fixture(): Promise<{ client: ApiClient; teacher: string; group: string }> {
   await resetDatabase();
   await createUser('junta@club.es');
   const client = new ApiClient();
@@ -32,28 +30,39 @@ async function fixture(): Promise<{ client: ApiClient; teacher: string }> {
     })).status,
     204,
   );
-  await newGroup(client, teacher, { days: ['mon', 'tue', 'wed', 'thu', 'fri'] });
-  return { client, teacher };
+  const group = await newGroup(client, teacher, { days: ['mon', 'tue', 'wed', 'thu', 'fri'] });
+  return { client, teacher, group };
 }
 
 const body = <T>(response: { body: unknown }) => response.body as T;
 
-/** La tarea de cada noche: apunta las horas automáticas que falten. */
-const proposeSessions = () =>
-  inTransaction(db(), (tx) => runCommand(tx, 4, ['app:payroll:propose-sessions']));
+/** Administración da por dadas las clases del grupo de este mes que ya pasaron (de lunes a viernes). */
+async function recordPastClasses(client: ApiClient, teacher: string, group: string) {
+  const end = LocalDate.fromString(today);
+  for (let day = end.startOfMonth(); day.isBefore(end); day = day.plusDays(1)) {
+    if (day.isoWeekday() > 5) continue;
+    const response = await client.json('POST', '/api/admin/payroll/sessions', {
+      teacherId: teacher,
+      groupId: group,
+      date: day.toString(),
+      hours: 1,
+    });
+    assertEquals(response.status, 201, JSON.stringify(response.body));
+  }
+}
 
 Deno.test({
   name: 'payroll should propose, edit and settle the sessions of the month',
   ignore: outsideSeason || noPastWeekdayYet,
   async fn() {
-    const { client, teacher } = await fixture();
+    const { client, teacher, group } = await fixture();
     const list = async () =>
       body<{ items: Record<string, unknown>[] }>(
         await client.get(`/api/admin/payroll/sessions?month=${month}`),
       ).items;
-    // Consultar no apunta nada: las horas automáticas las apunta la tarea de cada noche.
+    // Consultar no apunta nada: las horas se apuntan cuando alguien confirma que la clase se dio.
     assertEquals(await list(), []);
-    assertEquals(await proposeSessions(), 0);
+    await recordPastClasses(client, teacher, group);
     const sessions = await list();
     assert(sessions.length > 0);
     // Lo más reciente primero.

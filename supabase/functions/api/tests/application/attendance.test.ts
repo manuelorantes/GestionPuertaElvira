@@ -17,22 +17,29 @@ import {
   ClassNotGiven,
   type ClassOnDay,
   type ClassRoster,
+  type ClassSubject,
   type ClassTeachers,
   CommentClass,
   ConfirmWithoutRollCall,
   EditClassComment,
+  type ExpectedClass,
+  type ExpectedClasses,
   GroupAttendance,
   type GroupAttendanceData,
   type GroupAttendanceQuery,
   GroupNotYours,
+  MarkNotGiven,
   type MissedRollCallQuery,
   type MissedRollCallReviews,
   MissedRollCalls,
+  type NotGivenClasses,
   NotYourComment,
   OpenRollCall,
   OpenRollCallAsStaff,
+  type OverdueRollCallQuery,
   type RollCallRepository,
   RollCallStillOpen,
+  type SessionRecorder,
   StudentAttendance,
   TakeRollCall,
   TakeRollCallAsStaff,
@@ -41,6 +48,7 @@ import {
   TeacherGroupAttendance,
   TeacherGroupComments,
   TeacherGroups,
+  TeacherOverdueRollCalls,
   type TeacherRosterQuery,
 } from '../../src/application/attendance/mod.ts';
 import { FrozenClock } from '../support/identity.ts';
@@ -169,7 +177,10 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, n
   // Pasada: se cambia solo confirmándolo, y no apunta horas.
   const late = new FrozenClock('2026-10-15T09:00:00+02:00');
   const recorded: string[] = [];
-  const recorder = { record: (item: ClassOnDay) => Promise.resolve(void recorded.push(item.date)) };
+  const recorder = {
+    record: (item: ClassSubject) => Promise.resolve(void recorded.push(item.date)),
+    remove: () => Promise.resolve(),
+  };
   const lateTake = (past: boolean) =>
     new TakeRollCall(agenda, roster, rolls, late, recorder).execute(
       't1',
@@ -202,7 +213,10 @@ Deno.test('Superadministration should take the roll call of any class any day on
   const rolls = new InMemoryRollCalls();
   const agenda = assignments([class_({}), class_({ date: '2026-10-15' })]);
   const recorded: string[] = [];
-  const recorder = { record: (item: ClassOnDay) => Promise.resolve(void recorded.push(item.date)) };
+  const recorder = {
+    record: (item: ClassSubject) => Promise.resolve(void recorded.push(item.date)),
+    remove: () => Promise.resolve(),
+  };
   const late = new FrozenClock('2026-11-20T09:00:00+01:00');
   const open = (date: string, clock = late) =>
     new OpenRollCallAsStaff(classTeachers, agenda, roster, rolls, clock).execute('g1', date);
@@ -240,33 +254,83 @@ Deno.test('Superadministration should take the roll call of any class any day on
 });
 
 const MISSED = {
-  sessionId: 'p1',
   groupId: 'g1',
   dutyId: null,
   date: '2026-10-13',
   label: 'Martes y jueves 17:00 · Intermedio · Alfil',
   teacherName: 'Lucía Moreno Gil',
-  locked: false,
   validation: null,
 };
 
-Deno.test('MissedRollCalls should list the recorded classes without a roll call once the deadline is over', async () => {
+const expected = (overrides: Partial<ExpectedClass>): ExpectedClass => ({
+  ...class_({}),
+  teacherId: 't1',
+  ...overrides,
+});
+
+/** La agenda del club: devuelve esas clases y apunta qué periodo se le pidió. */
+const agendaOf = (items: ExpectedClass[], asked: string[]): ExpectedClasses => ({
+  between: (from, to) => {
+    asked.push(`${from.toString()}…${to.toString()}`);
+    return Promise.resolve(items);
+  },
+});
+
+/** Las horas de nómina: apunta lo que se apunta y lo que se quita. */
+class RecordingSessions implements SessionRecorder {
+  log: string[] = [];
+  record(item: ClassSubject) {
+    this.log.push(`+ ${item.groupId ?? item.dutyId} ${item.date}`);
+    return Promise.resolve();
+  }
+  remove(item: ClassSubject) {
+    this.log.push(`- ${item.groupId ?? item.dutyId} ${item.date}`);
+    return Promise.resolve();
+  }
+}
+
+Deno.test('MissedRollCalls should check what the schedule expected, not what was recorded, once the deadline is over', async () => {
   const asked: string[] = [];
+  const classes = [expected({}), expected({ groupId: null, dutyId: 'd1', activity: 'fridays' })];
   const query: MissedRollCallQuery = {
     since: () => Promise.resolve(LocalDate.fromString('2026-10-10')),
-    missed: (from, until, userId) => {
-      asked.push(`${from.toString()}…${until.toString()} ${userId}`);
+    missed: (items, userId) => {
+      asked.push(`${items.length} ${userId}`);
       return Promise.resolve([MISSED]);
     },
   };
-  const clock = new FrozenClock('2026-10-16T09:00:00+02:00');
-  assertEquals(await new MissedRollCalls(query, clock).execute('u1'), [MISSED]);
-  // El plazo del 14 acaba el 15 a medianoche: el 16 se avisa hasta el 14, a cada cuenta lo que no revisó.
-  assertEquals(asked, ['2026-10-10…2026-10-14 u1']);
+  const at = (now: string) =>
+    new MissedRollCalls(query, agendaOf(classes, asked), new FrozenClock(now)).execute('u1');
+
+  assertEquals(await at('2026-10-16T09:00:00+02:00'), [MISSED]);
+  // El plazo del 14 acaba el 15 a medianoche: el 16 se mira lo esperado hasta el 14, a cada cuenta lo que no revisó.
+  assertEquals(asked, ['2026-10-10…2026-10-14', '2 u1']);
+  assertEquals(await at('2026-10-11T09:00:00+02:00'), [], 'aún no ha acabado ningún plazo');
 });
 
-Deno.test('ConfirmWithoutRollCall should keep a missed class only once its deadline is over and without a list', async () => {
+Deno.test('TeacherOverdueRollCalls should only look at the classes the teacher was expected to give', async () => {
+  const asked: string[] = [];
+  const mine = expected({ teacherId: 't1' });
+  const classes = [mine, expected({ teacherId: 't2' }), expected({ groupId: null, dutyId: 'd1' })];
+  const passed: ExpectedClass[][] = [];
+  const query: OverdueRollCallQuery = {
+    since: () => Promise.resolve(LocalDate.fromString('2026-10-10')),
+    overdueFor: (_teacher, items) => {
+      passed.push([...items]);
+      return Promise.resolve([]);
+    },
+  };
+  await new TeacherOverdueRollCalls(
+    query,
+    agendaOf(classes, asked),
+    new FrozenClock('2026-10-16T09:00:00+02:00'),
+  ).execute('t1');
+  assertEquals(passed, [[mine]], 'ni las de otros ni las actividades del club');
+});
+
+Deno.test('ConfirmWithoutRollCall should record a missed class once its deadline is over, only the first time', async () => {
   const rolls = new InMemoryRollCalls();
+  const sessions = new RecordingSessions();
   const reviewed: string[] = [];
   const reviews: MissedRollCallReviews = {
     markReviewed: (user, subject, date) => {
@@ -277,7 +341,7 @@ Deno.test('ConfirmWithoutRollCall should keep a missed class only once its deadl
     },
   };
   const confirm = (now: string, user = 'u1') =>
-    new ConfirmWithoutRollCall(rolls, reviews, new FrozenClock(now)).execute(
+    new ConfirmWithoutRollCall(rolls, reviews, sessions, new FrozenClock(now)).execute(
       'g1',
       '2026-10-13',
       user,
@@ -287,10 +351,33 @@ Deno.test('ConfirmWithoutRollCall should keep a missed class only once its deadl
   await confirm('2026-10-15T09:00:00+02:00');
   const roll = await rolls.find('g1', LocalDate.fromString('2026-10-13'));
   assertEquals([roll?.kind(), roll?.takenBy().user], ['confirmed', 'u1']);
+  assertEquals(sessions.log, ['+ g1 2026-10-13'], '«Se dio» apunta la sesión');
   // Otra cuenta la ve ya dada por buena: solo la revisa, no la vuelve a confirmar.
   await confirm('2026-10-15T10:00:00+02:00', 'u2');
   assertEquals(rolls.saved.size, 1, 'darla por buena dos veces no cambia nada');
+  assertEquals(sessions.log.length, 1);
   assertEquals(reviewed, ['u1 g1 2026-10-13', 'u2 g1 2026-10-13']);
+});
+
+Deno.test('MarkNotGiven should remove the session of a class or activity and remember it was not given', async () => {
+  const sessions = new RecordingSessions();
+  const marked: string[] = [];
+  const notGiven: NotGivenClasses = {
+    mark: (subject, date, user) => {
+      marked.push(
+        `${'group' in subject ? subject.group : subject.duty} ${date.toString()} ${user}`,
+      );
+      return Promise.resolve();
+    },
+  };
+  const mark = (subject: { group: string } | { duty: string }, now: string) =>
+    new MarkNotGiven(notGiven, sessions, new FrozenClock(now)).execute(subject, '2026-10-13', 'u1');
+
+  await assertRejects(() => mark({ group: 'g1' }, '2026-10-14T20:00:00+02:00'), RollCallStillOpen);
+  await mark({ group: 'g1' }, '2026-10-15T09:00:00+02:00');
+  await mark({ duty: 'd1' }, '2026-10-15T09:00:00+02:00');
+  assertEquals(sessions.log, ['- g1 2026-10-13', '- d1 2026-10-13']);
+  assertEquals(marked, ['g1 2026-10-13 u1', 'd1 2026-10-13 u1']);
 });
 
 Deno.test('StudentAttendance should summarise the season so far', async () => {

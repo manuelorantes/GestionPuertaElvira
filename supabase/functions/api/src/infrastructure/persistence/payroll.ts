@@ -27,7 +27,6 @@ import type {
   HolidayCalendar,
   MonthlyFees,
   PayrollQuery,
-  ProposalLog,
   ScheduleDirectory,
   SessionRow,
   SettlementRepository,
@@ -117,7 +116,7 @@ function toSettlement(row: Row): MonthlySettlement {
 }
 
 /** Liquidaciones pagadas y registro de meses propuestos. */
-export class SqlSettlementRepository implements SettlementRepository, ProposalLog {
+export class SqlSettlementRepository implements SettlementRepository {
   constructor(private readonly sql: Sql) {}
 
   async settlement(teacher: TeacherRef, month: YearMonth): Promise<MonthlySettlement | null> {
@@ -151,17 +150,6 @@ export class SqlSettlementRepository implements SettlementRepository, ProposalLo
   async changePaidOn(teacher: TeacherRef, month: YearMonth, date: LocalDate): Promise<void> {
     await this.sql`UPDATE payroll_settlement SET paid_on = ${date.toString()}
       WHERE teacher_id = ${teacher.value} AND month = ${month.toString()}`;
-  }
-
-  async wasProposed(date: LocalDate): Promise<boolean> {
-    return (await this
-      .sql`SELECT 1 FROM payroll_proposed_day WHERE proposed_date = ${date.toString()}`)
-      .length > 0;
-  }
-
-  async markProposed(date: LocalDate): Promise<void> {
-    await this
-      .sql`INSERT INTO payroll_proposed_day (proposed_date) VALUES (${date.toString()}) ON CONFLICT DO NOTHING`;
   }
 }
 
@@ -599,6 +587,13 @@ export class SqlSubstitutionRepository implements SubstitutionRepository {
     return Row.all(
       await this
         .sql`SELECT * FROM payroll_substitution WHERE substitution_date = ${date.toString()}`,
+    ).map(toSubstitution);
+  }
+
+  async between(from: LocalDate, to: LocalDate): Promise<Substitution[]> {
+    return Row.all(
+      await this.sql`SELECT * FROM payroll_substitution
+        WHERE substitution_date BETWEEN ${from.toString()} AND ${to.toString()}`,
     ).map(toSubstitution);
   }
 

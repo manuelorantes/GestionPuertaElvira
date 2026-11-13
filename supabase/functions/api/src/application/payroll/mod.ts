@@ -118,6 +118,8 @@ export interface DutyRepository {
 /** Sustituciones planificadas. */
 export interface SubstitutionRepository {
   onDate(date: LocalDate): Promise<Substitution[]>;
+  /** Las de un periodo de una vez (ambos días incluidos). */
+  between(from: LocalDate, to: LocalDate): Promise<Substitution[]>;
   /** La sustitución de una clase o turno («group:<id>» o «duty:<id>») un día. */
   find(
     source: string,
@@ -143,12 +145,6 @@ export interface AdvanceRepository {
   advance(id: string): Promise<Advance | null>;
   saveAdvance(advance: Advance): Promise<void>;
   deleteAdvance(id: string): Promise<void>;
-}
-
-/** Días cuyas sesiones ya se apuntaron solas (lo que se borre después no vuelve a aparecer). */
-export interface ProposalLog {
-  wasProposed(date: LocalDate): Promise<boolean>;
-  markProposed(date: LocalDate): Promise<void>;
 }
 
 /** Fila del registro de horas. */
@@ -347,66 +343,10 @@ async function ensureTeacherExists(
 }
 
 /**
- * Apunta solas las horas día a día: al acabar cada clase (o el turno de encargado) se crea su sesión, para quien la
- * da ese día (el titular o quien le sustituye). Solo desde el mes anterior hasta hoy; los festivos no cuentan; un día
- * ya apuntado no se rellena otra vez (lo que se borre no vuelve) y no se toca lo de liquidaciones pagadas.
- */
-export class ProposeSessions {
-  constructor(
-    private readonly schedule: ScheduleDirectory,
-    private readonly duties: DutyRepository,
-    private readonly substitutions: SubstitutionRepository,
-    private readonly holidays: HolidayCalendar,
-    private readonly timesheets: TimesheetRepository,
-    private readonly settlements: SettlementRepository,
-    private readonly log: ProposalLog,
-    private readonly clock: Clock,
-    private readonly transactions: TransactionRunner,
-    private readonly locks: Locks,
-  ) {}
-
-  async execute(): Promise<void> {
-    const now = this.clock.now();
-    const today = LocalDate.fromInstant(now);
-    const first = LocalDate.fromString(`${YearMonth.of(today).previous().toString()}-01`);
-    await this.transactions.run(async () => {
-      await this.locks.acquire('payroll:proposal');
-      const groups = await this.schedule.groups();
-      const duties = await this.duties.all();
-      for (let date = first; !today.isBefore(date); date = date.plusDays(1)) {
-        if (await this.log.wasProposed(date)) continue;
-        const past = date.isBefore(today);
-        if (!(await this.holidays.isHoliday(date))) {
-          const planned = new DailyPlanner().plan(
-            date,
-            groups,
-            duties,
-            await this.substitutions.onDate(date),
-            past ? null : minutesOfDayInMadrid(now),
-          );
-          const existing = new Set(
-            (await this.timesheets.onDate(date)).map((e) => e.source).filter((s) => s !== null),
-          );
-          for (const session of planned) {
-            if (existing.has(session.source)) continue;
-            if ((await this.settlements.settlement(session.teacher, YearMonth.of(date))) !== null) {
-              continue;
-            }
-            await this.timesheets.save(
-              TimesheetEntry.planned(TimesheetEntryId.generate(), session),
-            );
-          }
-        }
-        if (past) await this.log.markProposed(date);
-      }
-    });
-  }
-}
-
-/**
- * Apunta en el momento la sesión de una clase o actividad de un día (cuando su profesor pasa lista o la confirma), sin
- * esperar a la tarea de la noche: la del horario, para quien la da ese día. No hace nada si ya está apuntada, si es
- * festivo o si la liquidación de ese mes ya está pagada.
+ * Apunta la sesión de una clase o actividad de un día cuando alguien confirma que se dio (su profesor pasa lista o la
+ * confirma, superadministración pasa la lista o administración pulsa «Se dio»): la del horario, para quien la da ese día.
+ * Es la única forma de que el horario apunte horas. No hace nada si ya está apuntada, si es festivo o si la liquidación
+ * de ese mes ya está pagada.
  */
 export class RecordScheduledSession {
   constructor(
@@ -432,13 +372,33 @@ export class RecordScheduledSession {
       )
       .find((p) => p.source === source);
     if (!planned) return;
-    // Ya apuntada: por la tarea de la noche o a mano (una sesión de ese grupo ese día).
-    const recorded = (e: TimesheetEntry) =>
-      e.source === source ||
-      (planned.group !== null && e.group !== null && planned.group.equals(e.group));
-    if ((await this.timesheets.onDate(day)).some(recorded)) return;
+    if ((await this.timesheets.onDate(day)).some(recordedAs(source, planned.group))) return;
     if ((await this.settlements.settlement(planned.teacher, YearMonth.of(day))) !== null) return;
     await this.timesheets.save(TimesheetEntry.planned(TimesheetEntryId.generate(), planned));
+  }
+}
+
+/** La sesión ya apuntada de esa clase o actividad: con ese origen o, a mano, de ese grupo ese día. */
+const recordedAs = (source: string, group: GroupRef | null) => (e: TimesheetEntry) =>
+  e.source === source || (group !== null && e.group !== null && group.equals(e.group));
+
+/**
+ * Quita las sesiones apuntadas de una clase o actividad un día porque no se dio («No se dio» en «Listas sin pasar»).
+ * No se puede si la liquidación de su mes ya está pagada.
+ */
+export class RemoveScheduledSession {
+  constructor(
+    private readonly timesheets: TimesheetRepository,
+    private readonly settlements: SettlementRepository,
+  ) {}
+
+  /** `source`: «group:<id>» o «duty:<id>». */
+  async execute(source: string, date: string): Promise<void> {
+    const day = LocalDate.fromString(date);
+    const group = source.startsWith('group:') ? GroupRef.fromString(source.slice(6)) : null;
+    const entries = (await this.timesheets.onDate(day)).filter(recordedAs(source, group));
+    for (const entry of entries) await ensureOpen(this.settlements, entry.teacher(), entry.month());
+    for (const entry of entries) await this.timesheets.delete(entry.id);
   }
 }
 
@@ -464,53 +424,6 @@ export class GroupTeacherOn {
       )
       .find((p) => p.source === `group:${groupId}`);
     return planned?.teacher.value ?? null;
-  }
-}
-
-/**
- * Apunta las horas automáticas de un día ya pasado que falten (p. ej. si ese día no se llegaron a apuntar), sin
- * duplicar las que ya hay. No hace nada en festivos ni toca liquidaciones pagadas. Devuelve cuántas creó.
- */
-export class RefillDay {
-  constructor(
-    private readonly schedule: ScheduleDirectory,
-    private readonly duties: DutyRepository,
-    private readonly substitutions: SubstitutionRepository,
-    private readonly holidays: HolidayCalendar,
-    private readonly timesheets: TimesheetRepository,
-    private readonly settlements: SettlementRepository,
-    private readonly log: ProposalLog,
-    private readonly clock: Clock,
-  ) {}
-
-  async execute(date: string): Promise<number> {
-    const day = LocalDate.fromString(date);
-    if (!day.isBefore(LocalDate.fromInstant(this.clock.now()))) {
-      throw new InvalidValue('date', 'Solo se pueden apuntar días que ya han pasado.');
-    }
-    if (await this.holidays.isHoliday(day)) return 0;
-    const existing = new Set(
-      (await this.timesheets.onDate(day)).map((e) => e.source).filter((s) => s !== null),
-    );
-    let created = 0;
-    for (
-      const session of new DailyPlanner().plan(
-        day,
-        await this.schedule.groups(),
-        await this.duties.all(),
-        await this.substitutions.onDate(day),
-        null,
-      )
-    ) {
-      if (existing.has(session.source)) continue;
-      if ((await this.settlements.settlement(session.teacher, YearMonth.of(day))) !== null) {
-        continue;
-      }
-      await this.timesheets.save(TimesheetEntry.planned(TimesheetEntryId.generate(), session));
-      created++;
-    }
-    await this.log.markProposed(day);
-    return created;
   }
 }
 
@@ -1748,18 +1661,69 @@ const MAX_AGENDA_DAYS = 62;
 const clockTime = (minutes: number) =>
   `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
+/** Una clase o turno de la agenda del club, con quién lo da ese día. */
+export interface ClubAgendaItem extends AgendaItem {
+  teacherId: string;
+}
+
 /**
- * Las clases y turnos que da un profesor cada día de un periodo según el horario: las suyas salvo las que le
- * sustituyen, más las que da sustituyendo a otro; los festivos no tienen clase. No depende de las horas apuntadas,
- * así que la agenda de hoy está completa aunque las horas se apunten por la noche.
+ * Las clases y turnos del club cada día de un periodo según el horario, con quién los da (el titular o quien le
+ * sustituye); los festivos no tienen clase. No depende de las horas apuntadas.
  */
-export class TeacherAgenda {
+export class ClubAgenda {
   constructor(
     private readonly schedule: ScheduleDirectory,
     private readonly duties: DutyRepository,
     private readonly substitutions: SubstitutionRepository,
     private readonly holidays: HolidayCalendar,
   ) {}
+
+  async execute(first: LocalDate, last: LocalDate): Promise<ClubAgendaItem[]> {
+    if (last.isBefore(first)) return [];
+    const groups = await this.schedule.groups();
+    const duties = await this.duties.all();
+    const holidays = await this.holidays.holidaysBetween(first, last);
+    const substitutions = await this.substitutions.between(first, last);
+    const items: ClubAgendaItem[] = [];
+    for (let date = first; !last.isBefore(date); date = date.plusDays(1)) {
+      if (holidays.has(date.toString())) continue;
+      const ofDay = substitutions.filter((s) => s.date.equals(date));
+      for (const planned of new DailyPlanner().plan(date, groups, duties, ofDay, null)) {
+        const group = groups.find((g) => planned.group?.equals(g.id));
+        const duty = duties.find((d) => planned.source === `duty:${d.id.value}`);
+        items.push({
+          teacherId: planned.teacher.value,
+          date: date.toString(),
+          groupId: group?.id.value ?? null,
+          dutyId: duty?.id.value ?? null,
+          label: group?.name ?? duty?.label ?? planned.label,
+          start: clockTime(planned.start),
+          end: clockTime(planned.start + planned.minutes.minutes),
+          minutes: planned.minutes.minutes,
+          substitution: ofDay.some((s) => s.source === planned.source),
+          activity: duty?.kind ?? null,
+        });
+      }
+    }
+    return items;
+  }
+}
+
+/**
+ * Las clases y turnos que da un profesor cada día de un periodo según el horario: las suyas salvo las que le
+ * sustituyen, más las que da sustituyendo a otro; los festivos no tienen clase. No depende de las horas apuntadas.
+ */
+export class TeacherAgenda {
+  private readonly club: ClubAgenda;
+
+  constructor(
+    schedule: ScheduleDirectory,
+    duties: DutyRepository,
+    substitutions: SubstitutionRepository,
+    holidays: HolidayCalendar,
+  ) {
+    this.club = new ClubAgenda(schedule, duties, substitutions, holidays);
+  }
 
   async execute(teacherId: string, from: string, to: string): Promise<AgendaItem[]> {
     const teacher = TeacherRef.fromString(teacherId);
@@ -1768,31 +1732,9 @@ export class TeacherAgenda {
     if (last.isBefore(first) || first.plusDays(MAX_AGENDA_DAYS).isBefore(last)) {
       throw new InvalidValue('to', `Como mucho ${MAX_AGENDA_DAYS} días de agenda de una vez.`);
     }
-    const groups = await this.schedule.groups();
-    const duties = await this.duties.all();
-    const holidays = await this.holidays.holidaysBetween(first, last);
-    const items: AgendaItem[] = [];
-    for (let date = first; !last.isBefore(date); date = date.plusDays(1)) {
-      if (holidays.has(date.toString())) continue;
-      const substitutions = await this.substitutions.onDate(date);
-      for (const planned of new DailyPlanner().plan(date, groups, duties, substitutions, null)) {
-        if (!planned.teacher.equals(teacher)) continue;
-        const group = groups.find((g) => planned.group?.equals(g.id));
-        const duty = duties.find((d) => planned.source === `duty:${d.id.value}`);
-        items.push({
-          date: date.toString(),
-          groupId: group?.id.value ?? null,
-          dutyId: duty?.id.value ?? null,
-          label: group?.name ?? duty?.label ?? planned.label,
-          start: clockTime(planned.start),
-          end: clockTime(planned.start + planned.minutes.minutes),
-          minutes: planned.minutes.minutes,
-          substitution: substitutions.some((s) => s.source === planned.source),
-          activity: duty?.kind ?? null,
-        });
-      }
-    }
-    return items;
+    return (await this.club.execute(first, last))
+      .filter((item) => item.teacherId === teacher.value)
+      .map(({ teacherId: _teacher, ...item }) => item);
   }
 }
 
