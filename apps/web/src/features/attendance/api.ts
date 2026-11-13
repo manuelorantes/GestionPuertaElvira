@@ -1,9 +1,8 @@
 import type { RollCall } from '@/features/teacher-space/api';
 import { apiGet, apiSend } from '@/shared/api/client';
 
-/** Clase apuntada en las horas cuyo plazo para pasar lista acabó sin lista. */
+/** Clase o actividad que el horario esperaba y nadie confirmó cuando acabó su plazo. */
 export interface MissedRollCall {
-  sessionId: string;
   /** La clase, o null si es una actividad del club. */
   groupId: string | null;
   /** La actividad del club, o null si es una clase. */
@@ -11,8 +10,6 @@ export interface MissedRollCall {
   date: string;
   label: string;
   teacherName: string;
-  /** Su liquidación ya está pagada: la sesión no se puede quitar. */
-  locked: boolean;
   /** Otra cuenta ya la dio por buena (y cuenta para las horas): quién y qué día; null si nadie. */
   validation: { by: string | null; on: string } | null;
 }
@@ -21,14 +18,23 @@ export async function fetchMissedRollCalls(): Promise<MissedRollCall[]> {
   return (await apiGet<{ items: MissedRollCall[] }>('/api/admin/attendance/pending')).items;
 }
 
-/** La clase o actividad se dio (o, si otra cuenta ya la dio por buena, vista): deja de salir en mi aviso. */
+/** Dirección de una clase o actividad del aviso para decidir sobre ella. */
+const pendingUrl = (item: MissedRollCall, decision: 'confirm' | 'not-given') =>
+  item.dutyId !== null
+    ? `/api/admin/attendance/pending/activities/${item.dutyId}/${item.date}/${decision}`
+    : `/api/admin/attendance/pending/${item.groupId}/${item.date}/${decision}`;
+
+/** La clase o actividad no se dio: no cuenta horas y deja de salir en el aviso de todos. */
+export function markNotGiven(item: MissedRollCall): Promise<void> {
+  return apiSend('POST', pendingUrl(item, 'not-given'));
+}
+
+/**
+ * La clase o actividad se dio (se apunta en las horas) o, si otra cuenta ya la dio por buena, vista: deja de salir en
+ * mi aviso.
+ */
 export function confirmWithoutRollCall(item: MissedRollCall): Promise<void> {
-  return item.dutyId !== null
-    ? apiSend(
-        'POST',
-        `/api/admin/attendance/pending/activities/${item.dutyId}/${item.date}/confirm`,
-      )
-    : apiSend('POST', `/api/admin/attendance/pending/${item.groupId}/${item.date}/confirm`);
+  return apiSend('POST', pendingUrl(item, 'confirm'));
 }
 
 /** La lista de una clase tal y como la ve superadministración: la de quien la da ese día. */
