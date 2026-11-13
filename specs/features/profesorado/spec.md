@@ -59,29 +59,31 @@ y las pagadas no. Cada cambio queda en el historial, en Profesorado.
 - **WHEN** administración abre la ficha de un grupo
 - **THEN** ve lo que cobra quien la da, pero no puede cambiarlo, y la API le responde 403 si lo intenta
 
-### Requirement: Horas apuntadas solas
-Las horas MUST apuntarse solas cada noche, con una tarea diaria que se ejecuta después del cierre del club: cada clase
-del día crea su sesión, con la duración y la hora de inicio del grupo, para quien la da ese día (el titular o quien le
-sustituye); cada actividad del club, la suya. La tarea rellena lo que falte desde el mes anterior hasta hoy, así que si
-una noche no se ejecuta, la siguiente lo recupera; un día ya apuntado no se rellena otra vez (lo que administración
-borre no vuelve) y no se tocan las liquidaciones pagadas. Consultar el registro de horas, las liquidaciones, la
-rentabilidad o la ficha de un profesor no apunta nada.
-Un profesor con cuenta no espera a la noche: al pasar la lista de una clase, al pulsar «Turno hecho» o al marcar a
-alguien en la lista de los viernes, su sesión de esa clase o actividad se apunta en el momento (si no estaba ya).
-Igual cuando superadministración pasa la lista de una clase, sea del día que sea (ver la spec de asistencia).
-Una sesión de ese grupo ese día apuntada a mano cuenta como ya apuntada.
+### Requirement: Cómo se apuntan las horas
+Las horas de un profesor MUST apuntarse solo cuando alguien dice que la clase o la actividad se dio; nunca solas a
+partir del horario.
+Una sesión entra en las horas, con la duración y la hora de inicio de la clase o actividad y para quien la da ese día
+(el titular o quien le sustituye), cuando:
+- su profesor pasa la lista de la clase, pulsa «Turno hecho» o marca a alguien en la lista de los viernes;
+- superadministración pasa la lista de la clase, sea del día que sea (ver la spec de asistencia);
+- administración la da por buena con «Se dio» en «Listas sin pasar» (ver la spec de asistencia);
+- administración la apunta a mano en el registro de horas.
+Si ya estaba apuntada (también a mano, una sesión de ese grupo ese día), no se duplica, y no se apunta nada en un mes
+cuya liquidación ya está pagada. Los festivos no tienen clase.
+Lo que se esperaba según el horario y nadie confirmó sale en «Listas sin pasar» para que administración decida si se dio.
+Consultar el registro de horas, las liquidaciones, la rentabilidad o la ficha de un profesor no apunta nada.
 
 #### Scenario: Horas al pasar lista
 - **WHEN** Lucía pasa la lista de su clase del martes a las 18:00
-- **THEN** su sesión de esa clase ya está en el registro de horas, y por la noche no se apunta otra vez
+- **THEN** su sesión de esa clase ya está en el registro de horas
 
-#### Scenario: A media tarde
-- **WHEN** se consulta el registro de horas a las 17:30 de un martes
-- **THEN** están las clases hasta el lunes y todavía no las de ese martes, que se apuntan esa noche
+#### Scenario: Una clase que nadie confirma
+- **WHEN** Carlos no pasa la lista de su clase del martes 13 y nadie la da por buena
+- **THEN** esa clase no suma horas a Carlos y, cuando acaba su plazo, sale en «Listas sin pasar»
 
-#### Scenario: Una noche sin tarea
-- **WHEN** la tarea no se ejecuta el martes por la noche
-- **THEN** el miércoles por la noche se apuntan las clases del martes y las del miércoles
+#### Scenario: Pasó lista, pero no dio la clase
+- **WHEN** administración quita la sesión de una clase que Francisco no dio aunque pasó lista
+- **THEN** la sesión no vuelve a apuntarse sola
 
 ### Requirement: Festivos
 El club MUST tener su calendario de festivos (nacionales, de Andalucía y locales de Granada capital). Un festivo no
@@ -133,7 +135,7 @@ explica cuántas eran y con qué se pisa. El total de arriba suma lo que cuenta.
 El registro MUST poder ordenarse desde las cabeceras por fecha (por defecto, de lo más reciente a lo más antiguo),
 profesor, clase, horas o coste, en ambos sentidos.
 Al elegir una actividad del club se proponen su encargado y sus horas, y la sesión queda ligada a la actividad como si la
-hubiera apuntado la tarea de cada noche (cuenta los solapes con su hora de inicio y no se duplica): cada actividad se
+hubiera confirmado su encargado (cuenta los solapes con su hora de inicio y no se duplica): cada actividad se
 apunta como mucho una vez por día.
 
 #### Scenario: Apuntar a mano los viernes de Ángel
