@@ -1,6 +1,6 @@
 # Diagnóstico de datos de cada noche (ver specs/features/diagnostico/spec.md): ejecuta las mismas reglas que el botón
 # «Diagnosticar» de Contabilidad y deja los hallazgos nuevos esperando. Corre a las 22:00 UTC, media hora después de
-# «Horas automáticas y cuotas», para que las cuotas del mes nuevo ya existan. Solo lee datos del club: nunca aplica
+# «Cuotas del mes», para que las cuotas del mes nuevo ya existan. Solo lee datos del club: nunca aplica
 # ningún arreglo.
 name: Diagnóstico de datos
 
