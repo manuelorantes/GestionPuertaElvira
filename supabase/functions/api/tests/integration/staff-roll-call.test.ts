@@ -49,14 +49,8 @@ Deno.test('superadministration should take the roll call of any class any day an
   await atTime('2026-11-20T09:00:00+01:00', async () => {
     await superadmin.logIn('super@club.es');
     await admin.logIn('junta@club.es');
-    // La clase del 6 está apuntada y sin lista: sale en el aviso.
-    const recorded = await admin.json('POST', '/api/admin/payroll/sessions', {
-      teacherId: carlos,
-      groupId: group,
-      date: '2026-10-06',
-      hours: 1,
-    });
-    assertEquals(recorded.status, 201, JSON.stringify(recorded.body));
+    // Nadie ha confirmado la clase del 6: sale en el aviso y no tiene horas.
+    assertEquals(await sessionsOf(group), []);
     const pending = () =>
       admin.get('/api/admin/attendance/pending').then((r) =>
         body<{ items: { date: string }[] }>(r).items.map((i) => i.date)
@@ -73,7 +67,7 @@ Deno.test('superadministration should take the roll call of any class any day an
       { id: student, present: false, name: 'Pablo Gil Ruiz' },
     ]]);
 
-    // Pasa la del 6 (ya apuntada) y la del 13 (sin apuntar): se apunta, sin duplicar.
+    // Pasa la del 6 y la del 13 (dos veces): se apuntan, sin duplicar.
     for (const date of ['2026-10-06', '2026-10-13', '2026-10-13']) {
       const taken = await superadmin.json('PUT', url(date), { absent: [student], guests: [] });
       assertEquals(taken.status, 204, JSON.stringify(taken.body));
@@ -103,19 +97,10 @@ Deno.test('superadministration should take the roll call of any class any day an
 });
 
 Deno.test('a teacher should see the classes whose roll call is overdue until taking it late', async () => {
-  const { admin, carlos, group, student } = await atTime('2026-10-01T10:00:00+02:00', fixture);
-  const record = (date: string) =>
-    admin.json('POST', '/api/admin/payroll/sessions', {
-      teacherId: carlos,
-      groupId: group,
-      date,
-      hours: 1,
-    });
+  const { admin, group, student } = await atTime('2026-10-01T10:00:00+02:00', fixture);
   await atTime('2026-10-14T12:00:00+02:00', async () => {
     await admin.logIn('junta@club.es');
-    for (const date of ['2026-10-06', '2026-10-13']) {
-      assertEquals((await record(date)).status, 201);
-    }
+    // Salen del horario: no hace falta que las clases estén apuntadas en las horas.
     const teacher = new ApiClient();
     await teacher.logIn('carlos@club.es');
     const overdue = async () =>

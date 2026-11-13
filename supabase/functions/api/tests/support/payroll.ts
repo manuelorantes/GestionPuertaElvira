@@ -1,5 +1,4 @@
-import type { LocalDate } from '../../src/domain/common/mod.ts';
-import { Money, YearMonth } from '../../src/domain/common/mod.ts';
+import { LocalDate, minutesOfDayInMadrid, Money, YearMonth } from '../../src/domain/common/mod.ts';
 import {
   type Advance,
   type ClubDuty,
@@ -18,7 +17,6 @@ import type {
   AdvanceRepository,
   DutyRepository,
   HolidayCalendar,
-  ProposalLog,
   ScheduleDirectory,
   SettlementRepository,
   SubstitutionRepository,
@@ -39,14 +37,12 @@ export class PayrollFixture
     TeacherRates,
     TimesheetRepository,
     SettlementRepository,
-    ProposalLog,
     HolidayCalendar,
     AdvanceRepository {
   scheduledGroups: ScheduledGroup[] = [];
   teachers = new Map<string, TeacherRate>();
   entries = new Map<string, TimesheetEntry>();
   paidSettlements = new Map<string, MonthlySettlement>();
-  proposed = new Set<string>();
   holidays = new Map<string, string>();
   duties = new Map<string, ClubDuty>();
   substitutions = new Map<string, Substitution>();
@@ -176,19 +172,33 @@ export class PayrollFixture
     return Promise.resolve();
   }
 
-  wasProposed(date: LocalDate): Promise<boolean> {
-    return Promise.resolve(this.proposed.has(date.toString()));
-  }
-
-  markProposed(date: LocalDate): Promise<void> {
-    this.proposed.add(date.toString());
-    return Promise.resolve();
-  }
-
-  /** Da por apuntados todos los días de un mes (como si ya se hubieran propuesto antes). */
-  markMonthProposed(month: YearMonth): void {
-    for (let day = month.firstDay(); !month.lastDay().isBefore(day); day = day.plusDays(1)) {
-      this.proposed.add(day.toString());
+  /**
+   * Apunta las clases y turnos del horario que ya se dieron este mes hasta ahora, como si cada profesor hubiera pasado
+   * su lista (o confirmado su turno): sin festivos, sin duplicar lo apuntado y sin tocar liquidaciones pagadas.
+   */
+  recordGivenClasses(): void {
+    const now = this.clock.now();
+    const today = LocalDate.fromInstant(now);
+    for (let day = YearMonth.of(today).firstDay(); !today.isBefore(day); day = day.plusDays(1)) {
+      if (this.holidays.has(day.toString())) continue;
+      const existing = new Set(
+        [...this.entries.values()].filter((e) => e.date.equals(day)).map((e) => e.source),
+      );
+      const planned = new DailyPlanner().plan(
+        day,
+        this.scheduledGroups,
+        [...this.duties.values()],
+        [...this.substitutions.values()].filter((s) => s.date.equals(day)),
+        day.equals(today) ? minutesOfDayInMadrid(now) : null,
+      );
+      for (const session of planned) {
+        if (existing.has(session.source)) continue;
+        if (this.paidSettlements.has(session.teacher.value + YearMonth.of(day).toString())) {
+          continue;
+        }
+        const entry = TimesheetEntry.planned(TimesheetEntryId.generate(), session);
+        this.entries.set(entry.id.value, entry);
+      }
     }
   }
 
@@ -254,6 +264,14 @@ export class SubstitutionFixture implements SubstitutionRepository {
 
   onDate(date: LocalDate): Promise<Substitution[]> {
     return Promise.resolve([...this.fx.substitutions.values()].filter((s) => s.date.equals(date)));
+  }
+
+  between(from: LocalDate, to: LocalDate): Promise<Substitution[]> {
+    return Promise.resolve(
+      [...this.fx.substitutions.values()].filter((s) =>
+        !s.date.isBefore(from) && !to.isBefore(s.date)
+      ),
+    );
   }
 
   find(source: string, date: LocalDate) {

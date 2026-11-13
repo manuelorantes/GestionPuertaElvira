@@ -15,7 +15,6 @@ import {
   Profitability,
   RecordAdvance,
   RecordSession,
-  RefillDay,
   RemoveHoliday,
   SaveDuty,
   SetGroupPay,
@@ -207,21 +206,6 @@ export function registerPayrollRoutes(api: ApiApp): void {
     const p = payroll(api, scope);
     await new DeleteSession(p.timesheets, p.settlements).execute(param(c, 'id'));
     return c.body(null, 204);
-  });
-
-  api.defineRoute(admin('POST', '/api/admin/payroll/days/:date/refill'), async (c, scope) => {
-    const p = payroll(api, scope);
-    const created = await new RefillDay(
-      p.schedule,
-      p.duties,
-      p.substitutions,
-      p.holidays,
-      p.timesheets,
-      p.settlements,
-      p.settlements,
-      api.deps.clock,
-    ).execute(param(c, 'date'));
-    return c.json({ created });
   });
 
   // ---- Festivos -----------------------------------------------------------------------------

@@ -242,6 +242,8 @@ export function titleOf(
       return join(group(), dateLabel(text(row, 'class_date')), student());
     case 'attendance_activity_check':
       return join(ref('duty', 'duty_id'), dateLabel(text(row, 'check_date')));
+    case 'attendance_not_given':
+      return join(group() ?? ref('duty', 'duty_id'), dateLabel(text(row, 'class_date')));
     case 'attendance_missed_review':
       return join(
         group() ?? ref('duty', 'duty_id'),

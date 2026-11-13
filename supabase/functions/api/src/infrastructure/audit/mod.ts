@@ -69,7 +69,6 @@ export class AuditLabels {
     'DELETE /api/admin/payroll/sessions/:id': 'Quitar sesión',
     'POST /api/admin/payroll/holidays': 'Añadir festivo',
     'POST /api/admin/payroll/teacher-substitutions': 'Sustituir a un profesor',
-    'POST /api/admin/payroll/days/:date/refill': 'Apuntar las horas de un día',
     'DELETE /api/admin/payroll/holidays/:date': 'Quitar festivo',
     'POST /api/admin/payroll/substitutions': 'Planificar sustitución',
     'DELETE /api/admin/payroll/substitutions/:id': 'Anular sustitución',
@@ -127,6 +126,9 @@ export class AuditLabels {
     'DELETE /api/admin/attendance/comments/:id': 'Quitar comentario de una clase',
     'POST /api/admin/attendance/pending/:groupId/:date/confirm':
       'Dar por buena una clase sin lista',
+    'POST /api/admin/attendance/pending/:groupId/:date/not-given': 'Quitar una clase que no se dio',
+    'POST /api/admin/attendance/pending/activities/:dutyId/:date/not-given':
+      'Quitar una actividad que no se dio',
     'POST /api/admin/import/rows': 'Importar fila de la hoja',
     'POST /api/admin/equipment/products': 'Crear producto de material',
     'PUT /api/admin/equipment/products/:id': 'Editar producto de material',
@@ -161,6 +163,7 @@ export class AuditLabels {
     attendance_activity_check: 'Confirmación de actividad',
     attendance_roll_call: 'Lista de clase',
     attendance_missed_review: 'Lista sin pasar revisada',
+    attendance_not_given: 'Clase no dada',
     points_movement: 'Movimiento de puntos',
     points_photo: 'Foto de torneo',
     billing_account: 'Datos de cobro del alumno',
