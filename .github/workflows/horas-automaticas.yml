@@ -1,9 +1,9 @@
-# Tareas de cada noche en producción, que las consultas de la API ya no hacen: apuntar las horas
-# automáticas de las clases y turnos del día (ver specs/features/profesorado/spec.md) y crear las cuotas
-# que falten del mes (el día 1, las del mes nuevo; ver specs/features/cobros/spec.md). Se lanza después del
-# cierre del club (21:00 en Madrid): 21:30 UTC son las 22:30 en invierno y las 23:30 en verano. Las dos
-# recuperan lo que falte, así que si una noche falla, la siguiente lo arregla.
-name: Horas automáticas y cuotas
+# Tarea de cada noche en producción, que las consultas de la API ya no hacen: crear las cuotas que falten del mes (el
+# día 1, las del mes nuevo; ver specs/features/cobros/spec.md). Se lanza después del cierre del club (21:00 en Madrid):
+# 21:30 UTC son las 22:30 en invierno y las 23:30 en verano. Recupera lo que falte, así que si una noche falla, la
+# siguiente lo arregla. Las horas del profesorado ya no se apuntan aquí (ver specs/features/profesorado/spec.md).
+# El archivo y el id de la tarea («horas-automaticas») se mantienen para no perder su historial en la sección Sistema.
+name: Cuotas del mes
 
 on:
   schedule:
@@ -14,7 +14,7 @@ permissions: {}
 
 jobs:
   proponer:
-    name: Apuntar las horas del día y crear las cuotas del mes
+    name: Crear las cuotas del mes
     if: vars.SUPABASE_PROJECT_REF != ''
     runs-on: ubuntu-latest
     environment: produccion
@@ -26,14 +26,8 @@ jobs:
       - uses: actions/checkout@v7
       - name: Preparar el usuario del runner
         run: echo "HOST_UID=$(id -u)" >> "$GITHUB_ENV" && echo "HOST_GID=$(id -g)" >> "$GITHUB_ENV"
-      - name: app:payroll:propose-sessions
-        # La consola no toca documentos: DOCUMENT_STORAGE_DIR evita pedir las claves de Storage.
-        run: |
-          docker compose run --rm --no-deps -T -e DATABASE_URL -e DOCUMENT_STORAGE_DIR=/tmp/documentos \
-            api deno task console app:payroll:propose-sessions
-        env:
-          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
       - name: app:billing:generate-charges
+        # La consola no toca documentos: DOCUMENT_STORAGE_DIR evita pedir las claves de Storage.
         run: |
           docker compose run --rm --no-deps -T -e DATABASE_URL -e DOCUMENT_STORAGE_DIR=/tmp/documentos \
             api deno task console app:billing:generate-charges
