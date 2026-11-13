@@ -143,18 +143,18 @@ descifran con `gpg -d … > copia.dump`, sin `tar`.
 
 Conviene probar la restauración una vez al año contra la base local (`make db-reset` después).
 
-## Horas automáticas y cuotas
+## Cuotas del mes
 
-El workflow [Horas automáticas y cuotas](../.github/workflows/horas-automaticas.yml) se ejecuta cada noche a las
-21:30 UTC (después del cierre del club) contra la base de datos de producción:
+El workflow [Cuotas del mes](../.github/workflows/horas-automaticas.yml) se ejecuta cada noche a las 21:30 UTC
+(después del cierre del club) contra la base de datos de producción: `app:billing:generate-charges` crea las cuotas que
+falten del mes (el día 1, las del mes nuevo).
 
-- `app:payroll:propose-sessions` apunta las sesiones de las clases y turnos del día;
-- `app:billing:generate-charges` crea las cuotas que falten del mes (el día 1, las del mes nuevo).
+Las horas del profesorado ya no se apuntan por la noche: solo cuando alguien confirma que la clase se dio (al pasar
+lista, con «Turno hecho», con las marcas de los viernes, con «Se dio» en «Listas sin pasar» o a mano).
 
 Consultar la API no escribe nada: las cuotas de un alumno también se crean al momento al darlo de alta o cambiar su
-inscripción o sus datos de cobro. Las dos tareas recuperan lo que falte, así que si una noche falla, la siguiente lo
-arregla; también se lanzan a mano con *Run workflow*. En local:
-`make console ARGS=app:payroll:propose-sessions` y `make console ARGS=app:billing:generate-charges`.
+inscripción o sus datos de cobro. La tarea recupera lo que falte, así que si una noche falla, la siguiente lo arregla;
+también se lanza a mano con *Run workflow*. En local: `make console ARGS=app:billing:generate-charges`.
 
 ## Si el despliegue falla por el token
 
@@ -170,7 +170,7 @@ Las migraciones no dependen del token, así que la base de datos queda al día a
 - **Copias de seguridad**: el plan gratuito de Supabase no las hace; las hace el workflow de arriba, cada día.
 - **Sección Sistema** (superadministración): el estado de los últimos turnos de cada tarea programada y cuándo toca
   la siguiente. Cada workflow apunta su ejecución en `system_task_run` al terminar.
-- **Workflows programados** (copia de seguridad, horas automáticas, mantener activo): GitHub los desactiva en un
+- **Workflows programados** (copia de seguridad, cuotas del mes, mantener activo): GitHub los desactiva en un
   repositorio público tras 60 días sin actividad. Si eso pasa, se reactivan en *Actions* con *Enable workflow*.
 - **Límites gratuitos** (500 MB de base de datos, 1 GB de Storage, 500 000 invocaciones de funciones al mes):
   muy por encima del uso del club.
