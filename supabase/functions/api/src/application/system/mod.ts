@@ -23,9 +23,8 @@ export interface ScheduledTask {
 export const SCHEDULED_TASKS: readonly ScheduledTask[] = [
   {
     id: 'horas-automaticas',
-    name: 'Horas automáticas y cuotas',
-    description:
-      'Apunta las horas de las clases y turnos del día y crea las cuotas que falten del mes (el día 1, las del mes nuevo).',
+    name: 'Cuotas del mes',
+    description: 'Crea las cuotas que falten del mes (el día 1, las del mes nuevo).',
     cron: '30 21 * * *',
     since: '2026-10-08T21:00:00Z',
   },

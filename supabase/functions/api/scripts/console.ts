@@ -6,7 +6,6 @@
 //   deno task console app:dev:seed-users          (solo desarrollo: usuarios con contraseñas conocidas)
 //   deno task console app:dev:seed-demo [--reset]  (solo desarrollo: datos ficticios del diseño)
 //   deno task console app:billing:generate-charges [--month=AAAA-MM]
-//   deno task console app:payroll:propose-sessions (apunta las horas automáticas; lo lanza cada noche un workflow)
 //   deno task console app:diagnostics:run         (diagnóstico de datos; lo lanza cada noche un workflow)
 // Se conecta con DATABASE_URL (en local, el PostgreSQL de Compose; en producción, el pooler de Supabase).
 import { EmailAddress, FullName, InvalidValue } from '../src/domain/common/mod.ts';
@@ -38,7 +37,7 @@ import {
   type Sql,
   type TransactionSql,
 } from '../src/infrastructure/persistence/sql.ts';
-import { generateCharges, proposeSessions, seedDemoData } from './demo-data.ts';
+import { generateCharges, seedDemoData } from './demo-data.ts';
 import { runDiagnosis } from './diagnostics.ts';
 
 /** email => [nombre, rol, contraseña, debe cambiarla]. SOLO para desarrollo y tests. */
@@ -122,9 +121,6 @@ export async function runCommand(
         console.log(await generateCharges(sql, clock, month));
         return 0;
       }
-      case 'app:payroll:propose-sessions':
-        console.log(await proposeSessions(sql, clock));
-        return 0;
       case 'app:diagnostics:run':
         console.log(await runDiagnosis(sql, clock));
         return 0;

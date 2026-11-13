@@ -445,7 +445,7 @@ Deno.test('a teacher should take the roll call of their class, all present by de
   });
 });
 
-Deno.test('administration should see the classes without a roll call once the deadline is over, and settle them', async () => {
+Deno.test('administration should see the expected classes nobody confirmed once the deadline is over, and settle them', async () => {
   const { admin, teacher, lucia, carlos, ana, luciaGroup, carlosGroup, anaGroup } = await atTime(
     TUESDAY_EVENING,
     async () => {
@@ -470,7 +470,7 @@ Deno.test('administration should see the classes without a roll call once the de
         end: '20:00',
         classroom: 'caballo',
       });
-      // Ana no tiene cuenta: no puede pasar lista y sus clases no avisan.
+      // Ana no tiene cuenta: no puede pasar lista, pero sus clases también avisan.
       const ana = await newTeacher(admin, 'Ana Belén Torres');
       const anaGroup = await newGroup(admin, ana, {
         name: 'Martes 16:00',
@@ -479,6 +479,27 @@ Deno.test('administration should see the classes without a roll call once the de
         end: '17:00',
         classroom: 'peon',
       });
+      // Un grupo sin alumnos no tiene clase que esperar.
+      await newGroup(admin, ana, {
+        name: 'Martes 18:00',
+        days: ['tue'],
+        start: '18:00',
+        end: '19:00',
+        classroom: 'rey',
+      });
+      for (const group of [luciaGroup, carlosGroup, anaGroup]) {
+        const created = await admin.json('POST', '/api/admin/students', {
+          fullName: 'Martina López Herrera',
+          groupIds: [],
+        });
+        assertEquals(created.status, 201, JSON.stringify(created.body));
+        const id = body<{ id: string }>(created).id;
+        const enrol = await admin.json('POST', `/api/admin/students/${id}/enrolments`, {
+          groupId: group,
+        });
+        assertEquals(enrol.status, 204, JSON.stringify(enrol.body));
+      }
+      await db()`UPDATE classes_enrolment SET enrolled_on = '2026-10-01'`;
       // Las cuentas de Lucía y Carlos están vinculadas desde el día 1.
       for (const [email, teacherId] of [['profe@club.es', lucia], ['carlos@club.es', carlos]]) {
         await createUser(email ?? '', 'teacher');
@@ -490,37 +511,38 @@ Deno.test('administration should see the classes without a roll call once the de
       return { admin, teacher, lucia, carlos, ana, luciaGroup, carlosGroup, anaGroup };
     },
   );
-  const record = async (teacherId: string, groupId: string, date: string) => {
-    const response = await admin.json('POST', '/api/admin/payroll/sessions', {
-      teacherId,
-      groupId,
-      date,
-      hours: 1,
-    });
-    assertEquals(response.status, 201, JSON.stringify(response.body));
-    return body<{ id: string }>(response).id;
-  };
+  const sessionsOf = async (teacherId: string) =>
+    body<{ items: { date: string; teacherId: string }[] }>(
+      await admin.get(`/api/admin/payroll/sessions?month=2026-10&teacherId=${teacherId}`),
+    ).items.filter((s) => s.teacherId === teacherId).map((s) => s.date);
 
   await atTime(TUESDAY_EVENING, async () => {
-    await record(lucia, luciaGroup, '2026-10-13');
-    await record(carlos, carlosGroup, '2026-10-13');
-    await record(carlos, carlosGroup, '2026-10-06');
-    await record(ana, anaGroup, '2026-10-13');
-    // Lucía pasa su lista; Carlos no pasa ninguna.
+    // Lucía pasa la lista del martes 13; la clase de Ana del 6 la apunta administración a mano; nada más se confirma.
     const taken = await teacher.json('PUT', `/api/teacher/roll-calls/${luciaGroup}/2026-10-13`, {
       absent: [],
     });
     assertEquals(taken.status, 204);
+    const manual = await admin.json('POST', '/api/admin/payroll/sessions', {
+      teacherId: ana,
+      groupId: anaGroup,
+      date: '2026-10-06',
+      hours: 1,
+    });
+    assertEquals(manual.status, 201, JSON.stringify(manual.body));
   });
 
   await atTime('2026-10-15T20:00:00+02:00', async () => {
     await admin.logIn('junta@club.es');
+    // Sin tarea de la noche: nadie más tiene horas hasta que se confirme.
+    assertEquals(await sessionsOf(carlos), []);
     const pending = body<{ items: { date: string; label: string; teacherName: string }[] }>(
       await admin.get('/api/admin/attendance/pending'),
     ).items;
     // La del martes 13 aún se puede pasar hasta el final del 14… y el 15 ya no: sale.
     assertEquals(pending.map((p) => [p.date, p.label, p.teacherName]), [
+      ['2026-10-06', 'Martes 17:00', 'Lucía Moreno Gil'],
       ['2026-10-06', 'Martes 19:00', 'Carlos Ruiz Márquez'],
+      ['2026-10-13', 'Martes 16:00', 'Ana Belén Torres'],
       ['2026-10-13', 'Martes 19:00', 'Carlos Ruiz Márquez'],
     ]);
     assertError(
@@ -538,24 +560,33 @@ Deno.test('administration should see the classes without a roll call once the de
     await admin.logIn('junta@club.es');
     const pending = () =>
       admin.get('/api/admin/attendance/pending').then((r) =>
-        body<{ items: { sessionId: string; date: string }[] }>(r).items
+        body<{ items: { groupId: string; date: string }[] }>(r).items.map((p) => p.date)
       );
-    const [first] = await pending();
-    // La del 6 no se dio: se quita su sesión. La del 13 sí: se da por buena.
-    assertEquals(
-      (await admin.json('DELETE', `/api/admin/payroll/sessions/${first?.sessionId}`, {})).status,
-      204,
-    );
-    assertEquals(
-      (await admin.json(
-        'POST',
-        `/api/admin/attendance/pending/${carlosGroup}/2026-10-13/confirm`,
-        {},
-      ))
-        .status,
-      204,
-    );
+    const decide = (group: string, date: string, decision: 'confirm' | 'not-given') =>
+      admin.json('POST', `/api/admin/attendance/pending/${group}/${date}/${decision}`, {});
+    // Lucía y Carlos no dieron la del 6; Carlos y Ana sí dieron la del 13.
+    assertEquals((await decide(luciaGroup, '2026-10-06', 'not-given')).status, 204);
+    assertEquals((await decide(carlosGroup, '2026-10-06', 'not-given')).status, 204);
+    assertEquals((await decide(carlosGroup, '2026-10-13', 'confirm')).status, 204);
+    assertEquals((await decide(anaGroup, '2026-10-13', 'confirm')).status, 204);
     assertEquals(await pending(), []);
+    assertEquals(await sessionsOf(carlos), ['2026-10-13'], '«Se dio» apunta la sesión');
+    assertEquals(await sessionsOf(ana), ['2026-10-13', '2026-10-06']);
+    assertEquals(await sessionsOf(lucia), ['2026-10-13']);
+
+    // «No se dio» de una clase apuntada la quita de las horas.
+    assertEquals((await decide(anaGroup, '2026-10-06', 'not-given')).status, 204);
+    assertEquals(await sessionsOf(ana), ['2026-10-13']);
+
+    // Otra cuenta no ve las que se quitaron.
+    await createUser('tesoreria@club.es');
+    const treasurer = new ApiClient();
+    await treasurer.logIn('tesoreria@club.es');
+    const theirs = body<{ items: { date: string; label: string }[] }>(
+      await treasurer.get('/api/admin/attendance/pending'),
+    ).items.map((p) => [p.date, p.label]);
+    assertEquals(theirs, [['2026-10-13', 'Martes 16:00'], ['2026-10-13', 'Martes 19:00']]);
+
     await teacher.logIn('profe@club.es');
     assertError(await teacher.get('/api/admin/attendance/pending'), 403, 'forbidden');
   });

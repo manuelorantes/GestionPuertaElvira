@@ -8,7 +8,11 @@ import {
   UpdateStudentAccount,
 } from '../src/application/billing/mod.ts';
 import { CreateClassGroup } from '../src/application/classes/mod.ts';
-import { PaySettlement, ProposeSessions } from '../src/application/payroll/mod.ts';
+import {
+  ClubAgenda,
+  PaySettlement,
+  RecordScheduledSession,
+} from '../src/application/payroll/mod.ts';
 import { LinkSiblings, RegisterStudent } from '../src/application/students/mod.ts';
 import { ChangeTeacherRate, RegisterTeacher } from '../src/application/teachers/mod.ts';
 import { TeachersTeacherDirectory } from '../src/infrastructure/classes/routes.ts';
@@ -334,8 +338,6 @@ const RESET_TABLES = [
   'accounting_closing',
   'payroll_session',
   'payroll_settlement',
-  'payroll_proposed_month',
-  'payroll_proposed_day',
   'payroll_substitution',
   'payroll_duty',
   'payroll_holiday',
@@ -426,17 +428,19 @@ function useCases(tx: TransactionSql, clock: Clock) {
       accounts,
     ),
     issueInvoice: new IssueInvoice(payments, sequence, transactions, clock, locks),
-    proposeSessions: new ProposeSessions(
+    clubAgenda: new ClubAgenda(
+      new SqlScheduleDirectory(tx),
+      new SqlDutyRepository(tx),
+      new SqlSubstitutionRepository(tx),
+      new SqlHolidayCalendar(tx),
+    ),
+    recordScheduledSession: new RecordScheduledSession(
       new SqlScheduleDirectory(tx),
       new SqlDutyRepository(tx),
       new SqlSubstitutionRepository(tx),
       new SqlHolidayCalendar(tx),
       timesheets,
       settlements,
-      settlements,
-      clock,
-      transactions,
-      locks,
     ),
     paySettlement: new PaySettlement(timesheets, settlements, rates, closed, transactions, locks),
     registerInvoice: new RegisterInvoice(accounting, noDocuments, closed, accounting),
@@ -589,7 +593,7 @@ async function seedBilling(
   return count;
 }
 
-/** Sesiones propuestas desde el mes anterior y su liquidación pagada (salvo una). */
+/** Sesiones dadas desde el mes anterior hasta ayer y su liquidación pagada (salvo una). */
 async function seedPayroll(
   app: UseCases,
   clock: Clock,
@@ -598,9 +602,13 @@ async function seedPayroll(
   const current = YearMonth.of(LocalDate.fromInstant(clock.now()));
   const season = Season.teachingSeason(current);
   if (season === null) return;
-  // Las horas se apuntan solas día a día (desde el mes anterior hasta hoy): solo ese mes tiene horas que liquidar.
-  await app.proposeSessions.execute();
+  // Como si el profesorado hubiera dado (y confirmado) todas sus clases desde el mes anterior hasta ayer.
   const previous = current.previous();
+  const yesterday = LocalDate.fromInstant(clock.now()).plusDays(-1);
+  for (const item of await app.clubAgenda.execute(previous.firstDay(), yesterday)) {
+    const source = item.groupId !== null ? `group:${item.groupId}` : `duty:${item.dutyId}`;
+    await app.recordScheduledSession.execute(source, item.date);
+  }
   if (!season.includes(previous)) return;
   for (const [key, teacherId] of Object.entries(teacherIds)) {
     if (key !== UNPAID_TEACHER) {
@@ -687,10 +695,4 @@ export async function generateCharges(
     : YearMonth.fromString(month);
   await useCases(tx, clock).generateCharges.execute(period.toString());
   return `Cuotas de ${period.label()} generadas.`;
-}
-
-/** Apunta las horas automáticas que falten, desde el mes anterior hasta hoy (lo lanza cada noche un workflow). */
-export async function proposeSessions(tx: TransactionSql, clock: Clock): Promise<string> {
-  await useCases(tx, clock).proposeSessions.execute();
-  return `Horas automáticas apuntadas hasta el ${LocalDate.fromInstant(clock.now()).toString()}.`;
 }

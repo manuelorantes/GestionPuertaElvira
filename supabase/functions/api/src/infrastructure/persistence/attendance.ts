@@ -3,11 +3,13 @@ import { ActivityCheck, type ActivityCheckKind } from '../../domain/attendance/m
 import type {
   ActivityCheckRepository,
   ClassRoster,
+  ExpectedClass,
   GroupAttendanceData,
   GroupAttendanceQuery,
   MissedRollCall,
   MissedRollCallQuery,
   MissedRollCallReviews,
+  NotGivenClasses,
   OverdueRollCall,
   OverdueRollCallQuery,
   RosterStudent,
@@ -111,9 +113,22 @@ export class SqlTeacherRosterQuery implements TeacherRosterQuery {
   }
 }
 
+/** Lo que el horario esperaba, como tabla para cruzarlo en SQL con lo que se confirmó. */
+const expectedRows = (expected: readonly ExpectedClass[]) =>
+  JSON.stringify(expected.map((e) => ({
+    class_date: e.date,
+    group_id: e.groupId,
+    duty_id: e.dutyId,
+    teacher_id: e.teacherId,
+    label: e.label,
+    start_time: e.start,
+    end_time: e.end,
+  })));
+
 /**
- * Clases apuntadas en las horas sin lista ni confirmación (sesiones de grupo frente a `attendance_roll_call`), de
- * profesores que pueden pasar lista: con su cuenta activa vinculada, y desde el día en que se vinculó.
+ * Lo esperado del horario frente a lo confirmado: listas (`attendance_roll_call`), actividades
+ * (`attendance_activity_check`), marcas del encargado de los viernes, sesiones apuntadas a mano y clases no dadas
+ * (`attendance_not_given`). Una clase sin ningún alumno inscrito ese día no se espera.
  */
 export class SqlMissedRollCallQuery implements MissedRollCallQuery {
   constructor(private readonly sql: Sql) {}
@@ -125,55 +140,63 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
       : LocalDate.fromInstant(new Date());
   }
 
-  async missed(from: LocalDate, until: LocalDate, userId: string): Promise<MissedRollCall[]> {
-    // Clases sin lista del profesor y actividades sin confirmar por su encargado (un turno sin «Turno hecho»; los
-    // viernes, sin ninguna marca suya), de profesores con la cuenta activa vinculada y desde el día en que se vinculó.
-    // Las que administración dio por buenas siguen saliendo, con quién lo hizo, a quien aún no las revisó.
+  async missed(expected: readonly ExpectedClass[], userId: string): Promise<MissedRollCall[]> {
+    if (expected.length === 0) return [];
+    // Las que administración dio por buenas siguen saliendo, con quién lo hizo, a quien aún no las revisó; las que no,
+    // salvo que ya estén apuntadas a mano. Los meses ya pagados no se pueden cambiar: no salen.
     const rows = await this.sql`
-      SELECT s.id, s.group_id, d.id AS duty_id, s.session_date::text AS date,
-             COALESCE(g.name, d.label, s.label) AS label, t.full_name, st.teacher_id IS NOT NULL AS locked,
+      WITH e AS (
+        SELECT * FROM jsonb_to_recordset(${expectedRows(expected)}::text::jsonb)
+          AS e(class_date date, group_id uuid, duty_id uuid, teacher_id uuid, label text, start_time text,
+               end_time text)
+      )
+      SELECT e.group_id, e.duty_id, e.class_date::text AS date, e.label, t.full_name,
              (r.kind IS NOT NULL OR c.kind IS NOT NULL) AS validated, vu.full_name AS validated_by,
              (COALESCE(r.taken_at, c.taken_at) AT TIME ZONE 'Europe/Madrid')::date::text AS validated_on
-        FROM payroll_session s
-        JOIN teachers_teacher t ON t.id = s.teacher_id
-        JOIN identity_user u ON u.teacher_id = s.teacher_id AND u.status = 'active'
-        LEFT JOIN classes_group g ON g.id = s.group_id
-        LEFT JOIN payroll_duty d ON s.group_id IS NULL AND s.source = 'duty:' || d.id
-        LEFT JOIN payroll_settlement st
-               ON st.teacher_id = s.teacher_id AND st.month = to_char(s.session_date, 'YYYY-MM')
-        LEFT JOIN attendance_roll_call r ON r.group_id = s.group_id AND r.roll_date = s.session_date
-        LEFT JOIN attendance_activity_check c ON c.duty_id = d.id AND c.check_date = s.session_date
+        FROM e
+        JOIN teachers_teacher t ON t.id = e.teacher_id
+        LEFT JOIN payroll_duty d ON d.id = e.duty_id
+        LEFT JOIN attendance_roll_call r ON r.group_id = e.group_id AND r.roll_date = e.class_date
+        LEFT JOIN attendance_activity_check c ON c.duty_id = e.duty_id AND c.check_date = e.class_date
         LEFT JOIN identity_user vu ON vu.id = COALESCE(r.taken_by_user, c.taken_by_user)
-       WHERE (s.group_id IS NOT NULL OR d.id IS NOT NULL)
-         AND s.session_date BETWEEN ${from.toString()} AND ${until.toString()}
-         AND s.session_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
-         AND COALESCE(r.kind, 'confirmed') = 'confirmed'
+       WHERE COALESCE(r.kind, 'confirmed') = 'confirmed'
          AND COALESCE(c.kind, 'confirmed') = 'confirmed'
          AND NOT (COALESCE(d.kind, '') = 'fridays' AND EXISTS (
                SELECT 1 FROM points_movement m JOIN identity_user mu ON mu.id = m.created_by
-                WHERE m.kind = 'friday' AND m.reference = s.session_date::text
-                  AND mu.teacher_id = s.teacher_id))
+                WHERE m.kind = 'friday' AND m.reference = e.class_date::text
+                  AND mu.teacher_id = e.teacher_id))
+         AND (e.group_id IS NULL OR EXISTS (
+               SELECT 1 FROM classes_enrolment en
+                WHERE en.class_group_id = e.group_id AND en.enrolled_on <= e.class_date
+                  AND (en.ends_on IS NULL OR en.ends_on > e.class_date)
+                  AND (en.attendance_days IS NULL
+                       OR en.attendance_days::jsonb @> jsonb_build_array(EXTRACT(ISODOW FROM e.class_date)::int))))
+         AND NOT EXISTS (SELECT 1 FROM attendance_not_given n
+                          WHERE COALESCE(n.group_id, n.duty_id) = COALESCE(e.group_id, e.duty_id)
+                            AND n.class_date = e.class_date)
+         AND NOT EXISTS (SELECT 1 FROM payroll_settlement st
+                          WHERE st.teacher_id = e.teacher_id AND st.month = to_char(e.class_date, 'YYYY-MM'))
+         AND (r.kind IS NOT NULL OR c.kind IS NOT NULL OR NOT EXISTS (
+               SELECT 1 FROM payroll_session s
+                WHERE s.session_date = e.class_date
+                  AND (s.group_id = e.group_id OR s.source = 'duty:' || e.duty_id)))
          AND NOT EXISTS (SELECT 1 FROM attendance_missed_review v
-                          WHERE v.user_id = ${userId} AND COALESCE(v.group_id, v.duty_id) = COALESCE(s.group_id, d.id)
-                            AND v.class_date = s.session_date)
-       ORDER BY s.session_date, s.start_minutes NULLS LAST, label`;
+                          WHERE v.user_id = ${userId}
+                            AND COALESCE(v.group_id, v.duty_id) = COALESCE(e.group_id, e.duty_id)
+                            AND v.class_date = e.class_date)
+       ORDER BY e.class_date, e.start_time, e.label`;
     return Row.all(rows).map((r) => ({
-      sessionId: r.string('id'),
       groupId: r.nullableString('group_id'),
       dutyId: r.nullableString('duty_id'),
       date: r.string('date'),
       label: r.string('label'),
       teacherName: r.string('full_name'),
-      locked: r.bool('locked'),
       validation: r.bool('validated')
         ? { by: r.nullableString('validated_by'), on: r.string('validated_on') }
         : null,
     }));
   }
 }
-
-const clock = (minutes: number) =>
-  `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 
 /** Las clases de un profesor con el plazo acabado y sin lista (su aviso en «Mis clases»). */
 export class SqlOverdueRollCallQuery implements OverdueRollCallQuery {
@@ -185,27 +208,57 @@ export class SqlOverdueRollCallQuery implements OverdueRollCallQuery {
 
   async overdueFor(
     teacherId: string,
-    from: LocalDate,
-    until: LocalDate,
+    expected: readonly ExpectedClass[],
   ): Promise<OverdueRollCall[]> {
+    if (expected.length === 0) return [];
     const rows = await this.sql`
-      SELECT s.group_id, s.session_date::text AS date, g.name AS label, g.start_minutes, g.end_minutes
-        FROM payroll_session s
-        JOIN classes_group g ON g.id = s.group_id
-        JOIN identity_user u ON u.teacher_id = s.teacher_id AND u.status = 'active'
-       WHERE s.teacher_id = ${teacherId}
-         AND s.session_date BETWEEN ${from.toString()} AND ${until.toString()}
-         AND s.session_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
+      WITH e AS (
+        SELECT * FROM jsonb_to_recordset(${expectedRows(expected)}::text::jsonb)
+          AS e(class_date date, group_id uuid, duty_id uuid, teacher_id uuid, label text, start_time text,
+               end_time text)
+      )
+      SELECT e.group_id, e.class_date::text AS date, e.label, e.start_time, e.end_time
+        FROM e
+        JOIN identity_user u ON u.teacher_id = ${teacherId} AND u.status = 'active'
+       WHERE e.group_id IS NOT NULL
+         AND e.class_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
          AND NOT EXISTS (SELECT 1 FROM attendance_roll_call r
-                          WHERE r.group_id = s.group_id AND r.roll_date = s.session_date)
-       ORDER BY s.session_date DESC, g.start_minutes`;
+                          WHERE r.group_id = e.group_id AND r.roll_date = e.class_date)
+         AND NOT EXISTS (SELECT 1 FROM attendance_not_given n
+                          WHERE n.group_id = e.group_id AND n.class_date = e.class_date)
+         AND EXISTS (
+               SELECT 1 FROM classes_enrolment en
+                WHERE en.class_group_id = e.group_id AND en.enrolled_on <= e.class_date
+                  AND (en.ends_on IS NULL OR en.ends_on > e.class_date)
+                  AND (en.attendance_days IS NULL
+                       OR en.attendance_days::jsonb @> jsonb_build_array(EXTRACT(ISODOW FROM e.class_date)::int)))
+       ORDER BY e.class_date DESC, e.start_time`;
     return Row.all(rows).map((r) => ({
       groupId: r.string('group_id'),
       date: r.string('date'),
       label: r.string('label'),
-      start: clock(r.int('start_minutes')),
-      end: clock(r.int('end_minutes')),
+      start: r.string('start_time'),
+      end: r.string('end_time'),
     }));
+  }
+}
+
+/** Clases y actividades que administración marcó como no dadas. */
+export class SqlNotGivenClasses implements NotGivenClasses {
+  constructor(private readonly sql: Sql) {}
+
+  async mark(
+    subject: { group: string } | { duty: string },
+    date: LocalDate,
+    userId: string,
+    now: Date,
+  ): Promise<void> {
+    const group = 'group' in subject ? subject.group : null;
+    const duty = 'duty' in subject ? subject.duty : null;
+    await this.sql`
+      INSERT INTO attendance_not_given (group_id, duty_id, class_date, marked_by_user, marked_at)
+      VALUES (${group}, ${duty}, ${date.toString()}, ${userId}, ${now})
+      ON CONFLICT DO NOTHING`;
   }
 }
 

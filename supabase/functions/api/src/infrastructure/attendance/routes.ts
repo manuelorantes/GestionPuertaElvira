@@ -2,17 +2,19 @@ import { InvalidValue, LocalDate } from '../../domain/common/mod.ts';
 import {
   ActivityProgress,
   type ClassAssignments,
-  type ClassOnDay,
+  type ClassSubject,
   type ClassTeachers,
   CommentClass,
   type CommentEditor,
   ConfirmActivity,
   ConfirmWithoutRollCall,
   EditClassComment,
+  type ExpectedClasses,
   type FridayAttendance,
   GroupAttendance,
   GroupClassComments,
   MarkFridayAsManager,
+  MarkNotGiven,
   MarkShiftDone,
   MissedRollCalls,
   OpenFridayList,
@@ -32,10 +34,12 @@ import {
   TeacherOverdueRollCalls,
 } from '../../application/attendance/mod.ts';
 import {
+  ClubAgenda,
   GroupTeacherOn,
   ListSessions,
   ListSettlements,
   RecordScheduledSession,
+  RemoveScheduledSession,
   TeacherAgenda,
   TeacherHours,
   TeacherPayStatus,
@@ -52,6 +56,7 @@ import {
   SqlGroupAttendanceQuery,
   SqlMissedRollCallQuery,
   SqlMissedRollCallReviews,
+  SqlNotGivenClasses,
   SqlOverdueRollCallQuery,
   SqlStudentAttendanceQuery,
   SqlTeacherRosterQuery,
@@ -142,12 +147,14 @@ class PayrollClassTeachers implements ClassTeachers {
   }
 }
 
-/** Apunta la sesión de una clase o actividad en las horas de nómina en cuanto su profesor la pasa o la confirma. */
+const sourceOf = (item: ClassSubject) =>
+  item.groupId !== null ? `group:${item.groupId}` : `duty:${item.dutyId}`;
+
+/** Las horas de nómina de una clase o actividad: se apuntan cuando alguien confirma que se dio y se quitan si no. */
 class PayrollSessionRecorder implements SessionRecorder {
   constructor(private readonly sql: Sql) {}
 
-  record(item: ClassOnDay): Promise<void> {
-    const source = item.groupId !== null ? `group:${item.groupId}` : `duty:${item.dutyId}`;
+  record(item: ClassSubject): Promise<void> {
     return new RecordScheduledSession(
       new SqlScheduleDirectory(this.sql),
       new SqlDutyRepository(this.sql),
@@ -155,7 +162,28 @@ class PayrollSessionRecorder implements SessionRecorder {
       new SqlHolidayCalendar(this.sql),
       new SqlTimesheetRepository(this.sql),
       new SqlSettlementRepository(this.sql),
-    ).execute(source, item.date);
+    ).execute(sourceOf(item), item.date);
+  }
+
+  remove(item: ClassSubject): Promise<void> {
+    return new RemoveScheduledSession(
+      new SqlTimesheetRepository(this.sql),
+      new SqlSettlementRepository(this.sql),
+    ).execute(sourceOf(item), item.date);
+  }
+}
+
+/** Lo que el horario del club espera cada día: la agenda de nómina (horario, sustituciones y festivos). */
+class PayrollExpectedClasses implements ExpectedClasses {
+  constructor(private readonly sql: Sql) {}
+
+  between(from: Day, to: Day) {
+    return new ClubAgenda(
+      new SqlScheduleDirectory(this.sql),
+      new SqlDutyRepository(this.sql),
+      new SqlSubstitutionRepository(this.sql),
+      new SqlHolidayCalendar(this.sql),
+    ).execute(from, to);
   }
 }
 
@@ -225,6 +253,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     return c.json({
       items: await new TeacherOverdueRollCalls(
         new SqlOverdueRollCallQuery(scope.tx),
+        new PayrollExpectedClasses(scope.tx),
         api.deps.clock,
       )
         .execute(sessionTeacher(scope)),
@@ -452,7 +481,11 @@ export function registerAttendanceRoutes(api: ApiApp): void {
     async (c, scope) => {
       if (scope.user === null) throw httpError(401);
       return c.json({
-        items: await new MissedRollCalls(new SqlMissedRollCallQuery(scope.tx), api.deps.clock)
+        items: await new MissedRollCalls(
+          new SqlMissedRollCallQuery(scope.tx),
+          new PayrollExpectedClasses(scope.tx),
+          api.deps.clock,
+        )
           .execute(scope.user.id),
       });
     },
@@ -469,6 +502,7 @@ export function registerAttendanceRoutes(api: ApiApp): void {
       await new ConfirmWithoutRollCall(
         new SqlRollCallRepository(scope.tx),
         new SqlMissedRollCallReviews(scope.tx),
+        new PayrollSessionRecorder(scope.tx),
         api.deps.clock,
       ).execute(
         param(c, 'groupId'),
@@ -510,9 +544,51 @@ export function registerAttendanceRoutes(api: ApiApp): void {
       await new ConfirmActivity(
         checks(scope),
         new SqlMissedRollCallReviews(scope.tx),
+        new PayrollSessionRecorder(scope.tx),
         api.deps.clock,
       ).execute(
         param(c, 'dutyId'),
+        param(c, 'date'),
+        scope.user.id,
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  const markNotGiven = (scope: RequestScope) =>
+    new MarkNotGiven(
+      new SqlNotGivenClasses(scope.tx),
+      new PayrollSessionRecorder(scope.tx),
+      api.deps.clock,
+    );
+
+  api.defineRoute(
+    {
+      method: 'POST',
+      path: '/api/admin/attendance/pending/:groupId/:date/not-given',
+      access: 'admin',
+    },
+    async (c, scope) => {
+      if (scope.user === null) throw httpError(401);
+      await markNotGiven(scope).execute(
+        { group: param(c, 'groupId') },
+        param(c, 'date'),
+        scope.user.id,
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    {
+      method: 'POST',
+      path: '/api/admin/attendance/pending/activities/:dutyId/:date/not-given',
+      access: 'admin',
+    },
+    async (c, scope) => {
+      if (scope.user === null) throw httpError(401);
+      await markNotGiven(scope).execute(
+        { duty: param(c, 'dutyId') },
         param(c, 'date'),
         scope.user.id,
       );

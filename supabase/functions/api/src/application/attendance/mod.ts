@@ -33,12 +33,26 @@ export interface ClassOnDay {
   activity: 'shift' | 'fridays' | null;
 }
 
+/** Una clase (`groupId`) o una actividad del club (`dutyId`) un día. */
+export type ClassSubject = Pick<ClassOnDay, 'date' | 'groupId' | 'dutyId'>;
+
 /**
- * Apunta en las horas, en el momento, la sesión de una clase o actividad que su profesor acaba de pasar o confirmar (la
- * tarea de la noche apunta el resto; si ya está apuntada, no hace nada).
+ * Las horas de nómina de una clase o actividad: se apuntan cuando alguien confirma que se dio (si ya está apuntada, no
+ * hace nada) y se quitan cuando administración dice que no se dio (no en un mes ya pagado).
  */
 export interface SessionRecorder {
-  record(item: ClassOnDay): Promise<void>;
+  record(item: ClassSubject): Promise<void>;
+  remove(item: ClassSubject): Promise<void>;
+}
+
+/** Clase o actividad que el horario espera un día, con quién la da (el titular o quien le sustituye). */
+export interface ExpectedClass extends ClassOnDay {
+  teacherId: string;
+}
+
+/** Lo que el horario del club espera cada día de un periodo (sin festivos). */
+export interface ExpectedClasses {
+  between(from: LocalDate, to: LocalDate): Promise<ExpectedClass[]>;
 }
 
 /** Quién da cada clase cada día (la agenda de nómina). */
@@ -383,12 +397,10 @@ export class TakeRollCallAsStaff {
 }
 
 /**
- * Clase o actividad apuntada en las horas sin confirmar y con el plazo acabado: una clase sin lista, un turno sin
+ * Clase o actividad que el horario esperaba y nadie confirmó cuando acabó su plazo: una clase sin lista, un turno sin
  * «Turno hecho» o unos viernes en los que el encargado no marcó a nadie.
  */
 export interface MissedRollCall {
-  /** Sesión de horas de esa clase, para quitarla si no se dio. */
-  sessionId: string;
   /** La clase (o, en una actividad del club, null). */
   groupId: string | null;
   /** La actividad del club (o, en una clase, null). */
@@ -396,8 +408,6 @@ export interface MissedRollCall {
   date: string;
   label: string;
   teacherName: string;
-  /** Su liquidación ya está pagada: la sesión no se puede quitar. */
-  locked: boolean;
   /** Otra cuenta ya la dio por buena (cuenta para las horas): quién y qué día; null si nadie. */
   validation: { by: string | null; on: string } | null;
 }
@@ -406,10 +416,12 @@ export interface MissedRollCallQuery {
   /** Primer día que cuenta (el día en que se activó la asistencia). */
   since(): Promise<LocalDate>;
   /**
-   * Sesiones entre esas fechas sin lista ni confirmación del encargado (dadas por buenas o no) que esa cuenta aún no
-   * revisó, de la más antigua a la más reciente.
+   * De esas clases esperadas, las que esa cuenta tiene que revisar, de la más antigua a la más reciente: sin lista,
+   * «Turno hecho» ni marca del encargado los viernes; sin sesión apuntada a mano ni «No se dio»; las clases, con algún
+   * alumno inscrito ese día; fuera de los meses ya pagados; y que esa cuenta aún no revisó (las dadas por buenas por
+   * otra cuenta salen con quién lo hizo).
    */
-  missed(from: LocalDate, until: LocalDate, userId: string): Promise<MissedRollCall[]>;
+  missed(expected: readonly ExpectedClass[], userId: string): Promise<MissedRollCall[]>;
 }
 
 /** Lo que cada cuenta de administración ya revisó del aviso (una clase o actividad, un día). */
@@ -422,23 +434,35 @@ export interface MissedRollCallReviews {
   ): Promise<void>;
 }
 
+/** Clases y actividades que administración marcó como no dadas: no cuentan horas ni vuelven al aviso. */
+export interface NotGivenClasses {
+  mark(
+    subject: { group: string } | { duty: string },
+    date: LocalDate,
+    userId: string,
+    now: Date,
+  ): Promise<void>;
+}
+
 /** Último día cuyo plazo ya acabó: anteayer (el de ayer se puede pasar hasta el final de hoy). */
 const lastClosedDay = (now: Date) => LocalDate.fromInstant(now).plusDays(-2);
 
 /**
- * Listas sin pasar: clases apuntadas cuyo plazo acabó sin lista (para quitarlas o darlas por buenas). Cada cuenta las
- * ve hasta que las revisa ella misma, aunque otra ya las diera por buenas.
+ * Listas sin pasar: lo que el horario esperaba desde que se activó la asistencia y nadie confirmó al acabar su plazo
+ * (para quitarlo o darlo por bueno). Cada cuenta lo ve hasta que lo revisa ella misma, aunque otra ya lo diera por bueno.
  */
 export class MissedRollCalls {
   constructor(
     private readonly query: MissedRollCallQuery,
+    private readonly expected: ExpectedClasses,
     private readonly clock: Clock,
   ) {}
 
   async execute(userId: string): Promise<MissedRollCall[]> {
     const until = lastClosedDay(this.clock.now());
     const since = await this.query.since();
-    return until.isBefore(since) ? [] : await this.query.missed(since, until, userId);
+    if (until.isBefore(since)) return [];
+    return await this.query.missed(await this.expected.between(since, until), userId);
   }
 }
 
@@ -455,10 +479,10 @@ export interface OverdueRollCallQuery {
   /** Primer día que cuenta (el día en que se activó la asistencia). */
   since(): Promise<LocalDate>;
   /**
-   * Clases apuntadas en sus horas entre esas fechas, desde que se vinculó su cuenta, sin lista (ni pasada ni dada por
-   * buena), de la más reciente a la más antigua.
+   * De esas clases suyas, las que siguen sin lista (ni pasada ni dada por buena) ni «No se dio», con algún alumno
+   * inscrito ese día y desde que se vinculó su cuenta, de la más reciente a la más antigua.
    */
-  overdueFor(teacherId: string, from: LocalDate, until: LocalDate): Promise<OverdueRollCall[]>;
+  overdueFor(teacherId: string, expected: readonly ExpectedClass[]): Promise<OverdueRollCall[]>;
 }
 
 /**
@@ -468,13 +492,17 @@ export interface OverdueRollCallQuery {
 export class TeacherOverdueRollCalls {
   constructor(
     private readonly query: OverdueRollCallQuery,
+    private readonly expected: ExpectedClasses,
     private readonly clock: Clock,
   ) {}
 
   async execute(teacherId: string): Promise<OverdueRollCall[]> {
     const until = lastClosedDay(this.clock.now());
     const since = await this.query.since();
-    return until.isBefore(since) ? [] : await this.query.overdueFor(teacherId, since, until);
+    if (until.isBefore(since)) return [];
+    const classes = (await this.expected.between(since, until))
+      .filter((c) => c.teacherId === teacherId && c.groupId !== null);
+    return await this.query.overdueFor(teacherId, classes);
   }
 }
 
@@ -489,13 +517,14 @@ export class RollCallStillOpen extends Error {
 }
 
 /**
- * Administración da por buena una clase sin lista (se dio y cuenta) o, si otra cuenta ya lo hizo, la da por vista: deja
- * de salir en el aviso de quien lo hace.
+ * Administración da por buena una clase sin lista (se dio: su sesión se apunta en las horas) o, si otra cuenta ya lo
+ * hizo, la da por vista: deja de salir en el aviso de quien lo hace.
  */
 export class ConfirmWithoutRollCall {
   constructor(
     private readonly rollCalls: RollCallRepository,
     private readonly reviews: MissedRollCallReviews,
+    private readonly sessions: SessionRecorder,
     private readonly clock: Clock,
   ) {}
 
@@ -505,8 +534,33 @@ export class ConfirmWithoutRollCall {
     if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
     if ((await this.rollCalls.find(groupId, day)) === null) {
       await this.rollCalls.save(RollCall.confirm(groupId, day, userId, now));
+      await this.sessions.record({ groupId, dutyId: null, date: day.toString() });
     }
     await this.reviews.markReviewed(userId, { group: groupId }, day, now);
+  }
+}
+
+/**
+ * Administración dice que una clase o actividad del aviso no se dio: no cuenta horas (si estaba apuntada, se quita; no
+ * en un mes ya pagado) y deja de salir en el aviso de todas las cuentas.
+ */
+export class MarkNotGiven {
+  constructor(
+    private readonly notGiven: NotGivenClasses,
+    private readonly sessions: SessionRecorder,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(subject: { group: string } | { duty: string }, date: string, userId: string) {
+    const day = LocalDate.fromString(date);
+    const now = this.clock.now();
+    if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
+    await this.sessions.remove({
+      groupId: 'group' in subject ? subject.group : null,
+      dutyId: 'duty' in subject ? subject.duty : null,
+      date: day.toString(),
+    });
+    await this.notGiven.mark(subject, day, userId, now);
   }
 }
 
@@ -677,11 +731,15 @@ export class MarkFridayAsManager {
   }
 }
 
-/** Administración da por buena una actividad que su encargado no confirmó: deja de salir en el aviso. */
+/**
+ * Administración da por buena una actividad que su encargado no confirmó (se dio: su sesión se apunta en las horas):
+ * deja de salir en el aviso de quien lo hace.
+ */
 export class ConfirmActivity {
   constructor(
     private readonly checks: ActivityCheckRepository,
     private readonly reviews: MissedRollCallReviews,
+    private readonly sessions: SessionRecorder,
     private readonly clock: Clock,
   ) {}
 
@@ -691,6 +749,7 @@ export class ConfirmActivity {
     if (lastClosedDay(now).isBefore(day)) throw new RollCallStillOpen();
     if ((await this.checks.find(dutyId, day)) === null) {
       await this.checks.save(ActivityCheck.confirm(dutyId, day, userId, now));
+      await this.sessions.record({ groupId: null, dutyId, date: day.toString() });
     }
     await this.reviews.markReviewed(userId, { duty: dutyId }, day, now);
   }
