@@ -55,7 +55,7 @@ y los registros internos de esa petición MUST llevar el mismo identificador.
 
 ### Requirement: Tareas programadas
 Superadministración MUST tener una sección «Sistema», que nadie más ve, con las tareas programadas que se vigilan (las
-horas automáticas y cuotas, el diagnóstico de datos, la copia de seguridad y la consulta que mantiene activo el
+cuotas del mes, el diagnóstico de datos, la copia de seguridad y la consulta que mantiene activo el
 proyecto; no la integración
 continua, el despliegue ni las actualizaciones de dependencias). De cada una MUST mostrar qué hace, su horario, el
 siguiente turno (fecha, hora y cuánto falta), la última ejecución (programada o a mano) y el estado de su último turno,
