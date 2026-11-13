@@ -14,10 +14,10 @@ mes y de la más reciente a la más antigua), pero al guardar MUST confirmar «�
 de una clase pasada?». Cambiar una lista pasada no apunta horas (administración ya decidió sobre ellas en «Listas sin
 pasar»).
 
-Cuando acaba el plazo de una de sus clases apuntadas en las horas sin que se pasara su lista (ni se diera por buena),
+Cuando acaba el plazo de una de sus clases del horario sin que se pasara su lista (ni se diera por buena),
 el profesor MUST verla en un aviso en rojo debajo de «Mis clases» («Tienes 1 clase sin pasar lista»), con el día, la
 clase y la hora, y cada una MUST llevar directamente a su lista para pasarla tarde. Cuentan las mismas que en «Listas
-sin pasar» (desde que se vinculó su cuenta y se activó la asistencia; si administración quita la sesión, deja de
+sin pasar» (desde que se vinculó su cuenta y se activó la asistencia; si administración dice que no se dio, deja de
 salir); las de hoy y ayer no salen, porque aún están en plazo. Al pasarla, deja de salir.
 
 #### Scenario: Al acabar la clase
@@ -145,18 +145,21 @@ antes hasta el final del día siguiente):
 - **THEN** Ana gana su punto, pero la actividad de Ángel del viernes 9 sale en «Listas sin pasar»
 
 ### Requirement: Listas sin pasar
-Una clase apuntada en las horas (sesión de un grupo) cuya lista no se pasó, o una actividad del club que su encargado no
-confirmó, cuando acaba su plazo MUST aparecer en el
-bloque «Listas sin pasar» del resumen, con fecha, clase y profesor, y en un contador junto a «Resumen» en el menú.
-Solo cuentan las clases de profesores que pueden pasar lista (con una cuenta activa vinculada a su ficha), desde
-el día en que se vinculó su cuenta y nunca antes del día en que se activó la asistencia. Para cada una, administración
-MUST poder:
-- **quitar la sesión** («No se dio»): deja de contar horas y de salir en el aviso de todos;
-  no se puede si la liquidación de ese mes ya está pagada;
-- **darla por buena** («Se dio»): sigue contando para las horas
+Cada clase y cada actividad del club que el horario espera un día (para quien la da ese día, el titular o quien le
+sustituye; no los festivos) y nadie ha confirmado, cuando acaba su plazo, MUST aparecer en el bloque «Listas sin pasar»
+del resumen, con fecha, clase y profesor, y en un contador junto a «Resumen» en el menú.
+Está confirmada si tiene la lista pasada, «Turno hecho» o, en los viernes, alguna marca de su encargado; si ya está
+apuntada en las horas (a mano); o si administración la quitó («No se dio»). La que una cuenta dio por buena sigue
+saliendo a las demás como se explica abajo.
+Cuentan todos los profesores, tengan cuenta o no, desde el día en que se activó la asistencia; no las de un mes cuya
+liquidación ya está pagada, que ya no pueden cambiar, ni las clases sin ningún alumno inscrito ese día.
+Para cada una, administración MUST poder:
+- **quitarla** («No se dio»): no cuenta horas (si alguien la había apuntado, se quita) y deja de salir en el aviso de
+  todos; no se puede si la liquidación de ese mes ya está pagada;
+- **darla por buena** («Se dio»): apunta su sesión en las horas de quien la dio (si no estaba ya)
   y deja de salir en el aviso de quien lo hace;
 - solo superadministración, en las clases, **pasar su lista** («Pasar lista»; ver «Superadministración pasa lista»).
-No se puede dar por buena una clase cuyo plazo para pasar lista no ha acabado.
+No se puede decidir sobre una clase cuyo plazo para pasar lista no ha acabado.
 
 El aviso es de cada cuenta de administración:
 una clase que alguien dio por buena sigue saliendo a las demás cuentas
@@ -173,17 +176,21 @@ pulsarlo no da nada por bueno ni por visto.
 - **THEN** administración la ve en «Listas sin pasar» y el menú muestra el contador
 
 #### Scenario: Un profesor sin cuenta
-- **WHEN** Ana no tiene cuenta de profesorado y su clase del martes no tiene lista
-- **THEN** no sale en «Listas sin pasar»: no podía pasarla
+- **WHEN** Ana no tiene cuenta de profesorado y nadie confirma su clase del martes
+- **THEN** sale en «Listas sin pasar», y sus horas no cuentan hasta que administración pulsa «Se dio»
+
+#### Scenario: Los viernes de Ángel
+- **WHEN** Ángel no marca a nadie en la lista del viernes 9 y nadie la da por buena
+- **THEN** la actividad «Viernes» del 9 sale en «Listas sin pasar» y no le suma horas
 
 #### Scenario: Otra cuenta ya la dio por buena
 - **WHEN** Junta da por buena la clase del martes 13 de Carlos
-- **THEN** cuenta para las horas de Carlos y deja de salir en el aviso de Junta
+- **THEN** su sesión se apunta en las horas de Carlos y deja de salir en el aviso de Junta
 - **AND** a Tesorería le sigue saliendo, con «Dada por buena por Junta el 15/10», hasta que pulsa «Visto»
 
 #### Scenario: No se dio
 - **WHEN** administración pulsa «No se dio» en esa clase y lo confirma
-- **THEN** la sesión se quita de las horas de Carlos y del aviso
+- **THEN** no cuenta para las horas de Carlos y deja de salir en el aviso de todas las cuentas
 
 ### Requirement: Asistencia en la ficha del alumno
 La ficha de un alumno MUST mostrar su asistencia de la temporada: a cuántas clases con lista pasada vino de cuántas
