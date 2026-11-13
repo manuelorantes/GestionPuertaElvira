@@ -5,30 +5,26 @@ import { ADMIN, mockApi, renderApp } from '@/test/render';
 
 const MISSED = [
   {
-    sessionId: 'p1',
     groupId: 'g2',
     dutyId: null,
     date: '2026-10-06',
     label: 'Martes 19:00',
     teacherName: 'Carlos Ruiz Márquez',
-    locked: false,
     validation: null,
   },
   // Una actividad del club que su encargado no confirmó y que otra cuenta ya dio por buena.
   {
-    sessionId: 'p2',
     groupId: null,
     dutyId: 'd1',
     date: '2026-10-16',
     label: 'Viernes',
     teacherName: 'Ángel Castillo Rodriguez',
-    locked: false,
     validation: { by: 'Junta Directiva', on: '2026-10-18' },
   },
 ];
 
 describe('Listas sin pasar', () => {
-  it('counts them in the menu and lets administration remove a session or review a class kept by someone else', async () => {
+  it('counts them in the menu and lets administration mark a class as not given or review a class kept by someone else', async () => {
     const spy = mockApi({
       'GET /api/auth/me': [200, { user: ADMIN }],
       'GET /api/admin/attendance/pending': [
@@ -36,7 +32,7 @@ describe('Listas sin pasar', () => {
         [200, { items: [MISSED[1]] }],
         [200, { items: [] }],
       ],
-      'DELETE /api/admin/payroll/sessions/p1': [204],
+      'POST /api/admin/attendance/pending/g2/2026-10-06/not-given': [204],
       'POST /api/admin/attendance/pending/activities/d1/2026-10-16/confirm': [204],
     });
     renderApp('/panel');
@@ -56,15 +52,17 @@ describe('Listas sin pasar', () => {
 
     await userEvent.click(
       within(block).getByRole('button', {
-        name: 'Quitar la sesión del 06/10/2026 de Martes 19:00',
+        name: 'No se dio la clase del 06/10/2026 de Martes 19:00',
       }),
     );
-    const dialog = await screen.findByRole('dialog', { name: 'Quitar la sesión' });
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Quitar sesión' }));
+    const dialog = await screen.findByRole('dialog', { name: 'No se dio' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'No se dio' }));
     await waitFor(() =>
       expect(
         spy.mock.calls.some(
-          ([u, init]) => u === '/api/admin/payroll/sessions/p1' && init?.method === 'DELETE',
+          ([u, init]) =>
+            u === '/api/admin/attendance/pending/g2/2026-10-06/not-given' &&
+            init?.method === 'POST',
         ),
       ).toBe(true),
     );

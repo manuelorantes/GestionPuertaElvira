@@ -43,10 +43,11 @@ export function MissedRollCalls() {
             Listas sin pasar ({items.length})
           </h2>
           <p className="mt-0.5 text-sm text-ink-muted">
-            Clases sin lista y actividades del club que su encargado no confirmó (en la de los
-            viernes, sin marcar a nadie), con el plazo acabado. Si no se dio, quita la sesión; si se
-            dio, dala por buena. Si otra persona de administración ya la dio por buena, cuenta para
-            las horas y aquí se indica quién: márcala como vista cuando lo hayas comprobado.
+            Clases y actividades del club del horario que nadie confirmó (sin lista, sin «Turno
+            hecho» o, en la de los viernes, sin marcar a nadie), con el plazo acabado. No cuentan en
+            las horas hasta que alguien diga que se dieron: si se dio, dala por buena y se apunta;
+            si no, quítala. Si otra persona de administración ya la dio por buena, aquí se indica
+            quién: márcala como vista cuando lo hayas comprobado.
           </p>
         </div>
         {settle.isError && !removing && (
@@ -95,10 +96,9 @@ export function MissedRollCalls() {
                 <button
                   type="button"
                   className={ACTION}
-                  disabled={item.locked || settle.isPending}
-                  title={item.locked ? 'La liquidación de ese mes ya está pagada' : undefined}
+                  disabled={settle.isPending}
                   onClick={() => setRemoving(item)}
-                  aria-label={`Quitar la sesión del ${formatDate(item.date)} de ${item.label}`}
+                  aria-label={`No se dio la clase del ${formatDate(item.date)} de ${item.label}`}
                 >
                   No se dio
                 </button>
@@ -122,9 +122,9 @@ export function MissedRollCalls() {
       </Card>
       {removing && (
         <ConfirmDialog
-          title="Quitar la sesión"
-          message={`La clase ${removing.label} del ${formatDate(removing.date)} dejará de contar en las horas de ${removing.teacherName}.`}
-          confirmLabel="Quitar sesión"
+          title="No se dio"
+          message={`La clase ${removing.label} del ${formatDate(removing.date)} no contará en las horas de ${removing.teacherName} y dejará de salir en el aviso de todos.`}
+          confirmLabel="No se dio"
           busy={settle.isPending}
           error={settle.isError ? apiErrorMessage(settle.error) : null}
           onCancel={() => {
@@ -137,7 +137,7 @@ export function MissedRollCalls() {
               {
                 onSuccess: () => {
                   setRemoving(null);
-                  toast('Sesión quitada');
+                  toast('Clase quitada');
                 },
               },
             )
