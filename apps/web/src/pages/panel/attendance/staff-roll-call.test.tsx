@@ -6,23 +6,19 @@ import { ADMIN, mockApi, renderApp, SUPERADMIN } from '@/test/render';
 
 const MISSED = [
   {
-    sessionId: 'p1',
     groupId: 'g2',
     dutyId: null,
     date: '2026-10-06',
     label: 'Martes 19:00',
     teacherName: 'Carlos Ruiz Márquez',
-    locked: false,
     validation: null,
   },
   {
-    sessionId: 'p2',
     groupId: null,
     dutyId: 'd1',
     date: '2026-10-16',
     label: 'Viernes',
     teacherName: 'Ángel Castillo Rodriguez',
-    locked: false,
     validation: null,
   },
 ];
