@@ -12,7 +12,8 @@ Los profesores sin cuenta no salían en el aviso, así que sus clases contaban s
 - **Ninguna hora se apunta sola.** Una sesión entra en las horas solo cuando alguien confirma que la clase o la
   actividad se dio: el profesor pasa lista, pulsa «Turno hecho» o marca a alguien en la lista de los viernes;
   superadministración pasa la lista; administración pulsa «Se dio»; o administración la apunta a mano. Todas pasan por
-  el mismo caso de uso (`RecordScheduledSession`).
+  el mismo caso de uso (`RecordScheduledSession`). Una lista que el profesor pasa tarde también apunta, salvo que
+  administración ya dijera «No se dio»; corregir una lista ya pasada no vuelve a apuntar.
 - **Se retiran** la tarea nocturna de horas (`app:payroll:propose-sessions`), el endpoint de mantenimiento que rellenaba
   un día (`POST /api/admin/payroll/days/:date/refill`) y su registro de días (`payroll_proposed_day`,
   `payroll_proposed_month`). El workflow sigue cada noche, solo para las cuotas («Cuotas del mes»).

@@ -11,8 +11,9 @@ falta). Dentro del plazo se puede corregir, y una lista ya pasada se abre con lo
 ausentes alumnos de la lista de ese día. Los festivos no tienen lista. Cada lista queda en el historial.
 Pasado el plazo, el profesor MUST poder ver y cambiar la lista de sus clases pasadas (en «Mis clases → Pasadas», mes a
 mes y de la más reciente a la más antigua), pero al guardar MUST confirmar «¿Seguro que quieres cambiar la asistencia
-de una clase pasada?». Cambiar una lista pasada no apunta horas (administración ya decidió sobre ellas en «Listas sin
-pasar»).
+de una clase pasada?». Pasar tarde una lista que no se había pasado apunta la sesión de la clase en sus horas, salvo
+que administración ya dijera que no se dio o la liquidación de ese mes esté pagada; corregir una lista ya pasada no
+vuelve a apuntar horas (administración pudo quitarlas a mano).
 
 Cuando acaba el plazo de una de sus clases del horario sin que se pasara su lista (ni se diera por buena),
 el profesor MUST verla en un aviso en rojo debajo de «Mis clases» («Tienes 1 clase sin pasar lista»), con el día, la
@@ -31,6 +32,10 @@ salir); las de hoy y ayer no salen, porque aún están en plazo. Al pasarla, dej
 #### Scenario: Una lista pasada
 - **WHEN** Lucía corrige el jueves la lista del martes
 - **THEN** se le pide que confirme que cambia la asistencia de una clase pasada; si confirma, se guarda, y si no, no
+
+#### Scenario: Una lista que se pasa tarde
+- **WHEN** Roxanny no pasó la lista del lunes 9 y la pasa el viernes 13 desde el aviso de «Mis clases»
+- **THEN** la clase del 9 se apunta en sus horas y deja de salir en «Listas sin pasar»
 
 #### Scenario: Una lista que se le pasó
 - **WHEN** Lucía no pasó la lista de su clase del martes y entra el jueves
