@@ -309,7 +309,11 @@ export function registerAttendanceRoutes(api: ApiApp): void {
 
   api.defineRoute(teacher('PUT', '/api/teacher/roll-calls/:groupId/:date'), async (c, scope) => {
     const body = await JsonBody.from(c.req.raw);
-    await new TakeRollCall(...ports(scope), new PayrollSessionRecorder(scope.tx)).execute(
+    await new TakeRollCall(
+      ...ports(scope),
+      new PayrollSessionRecorder(scope.tx),
+      new SqlNotGivenClasses(scope.tx),
+    ).execute(
       sessionTeacher(scope),
       param(c, 'groupId'),
       param(c, 'date'),

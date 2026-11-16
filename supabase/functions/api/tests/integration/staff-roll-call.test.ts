@@ -127,6 +127,8 @@ Deno.test('a teacher should see the classes whose roll call is overdue until tak
     });
     assertEquals(taken.status, 204, JSON.stringify(taken.body));
     assertEquals(await overdue(), []);
+    // Pasarla tarde también le apunta las horas de la clase.
+    assertEquals(await sessionsOf(group), ['2026-10-06']);
     // Administración no la ve.
     assertEquals((await admin.get('/api/teacher/overdue-roll-calls')).status, 403);
   });

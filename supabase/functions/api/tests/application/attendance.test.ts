@@ -174,7 +174,7 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, n
     () => new OpenRollCall(agenda, roster, rolls, clock).execute('t1', 'g1', '2026-10-14'),
     ClassNotGiven,
   );
-  // Pasada: se cambia solo confirmándolo, y no apunta horas.
+  // Pasada: se cambia solo confirmándolo; corregir una lista ya pasada no vuelve a apuntar horas.
   const late = new FrozenClock('2026-10-15T09:00:00+02:00');
   const recorded: string[] = [];
   const recorder = {
@@ -197,6 +197,37 @@ Deno.test('OpenRollCall and TakeRollCall should list the students of that day, n
   await lateTake(true);
   assertEquals((await rolls.find('g1', LocalDate.fromString('2026-10-13')))?.absent(), ['s1']);
   assertEquals(recorded, []);
+});
+
+Deno.test('TakeRollCall should record the hours of a roll call taken late, unless administration said it was not given', async () => {
+  const rolls = new InMemoryRollCalls();
+  const agenda = assignments([class_({}), class_({ date: '2026-10-15' })]);
+  const recorded: string[] = [];
+  const recorder = {
+    record: (item: ClassSubject) => Promise.resolve(void recorded.push(item.date)),
+    remove: () => Promise.resolve(),
+  };
+  const notGiven = {
+    isMarked: (subject: { group: string } | { duty: string }, date: LocalDate) =>
+      Promise.resolve('group' in subject && date.toString() === '2026-10-15'),
+  };
+  const take = (date: string) =>
+    new TakeRollCall(
+      agenda,
+      roster,
+      rolls,
+      new FrozenClock('2026-10-20T09:00:00+02:00'),
+      recorder,
+      notGiven,
+    )
+      .execute('t1', 'g1', date, { absent: [] }, true);
+
+  await take('2026-10-13');
+  assertEquals(recorded, ['2026-10-13'], 'la pasa tarde por primera vez: cuenta');
+  await take('2026-10-13');
+  assertEquals(recorded, ['2026-10-13'], 'corregirla no la vuelve a apuntar');
+  await take('2026-10-15');
+  assertEquals(recorded, ['2026-10-13'], 'administración ya dijo que no se dio');
 });
 
 /** Lucía (t1) da g1 los martes y jueves; los demás días no hay clase. */
@@ -369,6 +400,7 @@ Deno.test('MarkNotGiven should remove the session of a class or activity and rem
       );
       return Promise.resolve();
     },
+    isMarked: () => Promise.resolve(false),
   };
   const mark = (subject: { group: string } | { duty: string }, now: string) =>
     new MarkNotGiven(notGiven, sessions, new FrozenClock(now)).execute(subject, '2026-10-13', 'u1');
