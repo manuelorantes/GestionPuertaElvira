@@ -293,6 +293,7 @@ export class TakeRollCall {
     private readonly rollCalls: RollCallRepository,
     private readonly clock: Clock,
     private readonly sessions: SessionRecorder | null = null,
+    private readonly notGiven: Pick<NotGivenClasses, 'isMarked'> | null = null,
   ) {}
 
   async execute(
@@ -313,8 +314,11 @@ export class TakeRollCall {
       RollCall.take(groupId, day, start, teacherId, roster, marks, now, past);
     if (existing) existing.correct(start, teacherId, roster, marks, now, past);
     await this.rollCalls.save(roll);
-    // Pasar lista en plazo apunta ya las horas de la clase (una lista pasada no: administración ya decidió sobre ellas).
-    if (periodOf(item, now) === 'open') await this.sessions?.record(item);
+    // Pasar la lista apunta las horas de la clase, también tarde; corregirla no las vuelve a apuntar (administración
+    // pudo quitarlas a mano), y si administración ya dijo que no se dio, manda su decisión.
+    if (existing !== null) return;
+    if (await this.notGiven?.isMarked({ group: groupId }, day)) return;
+    await this.sessions?.record(item);
   }
 }
 
@@ -442,6 +446,7 @@ export interface NotGivenClasses {
     userId: string,
     now: Date,
   ): Promise<void>;
+  isMarked(subject: { group: string } | { duty: string }, date: LocalDate): Promise<boolean>;
 }
 
 /** Último día cuyo plazo ya acabó: anteayer (el de ayer se puede pasar hasta el final de hoy). */
