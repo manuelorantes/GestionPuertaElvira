@@ -64,7 +64,8 @@ Las horas de un profesor MUST apuntarse solo cuando alguien dice que la clase o 
 partir del horario.
 Una sesión entra en las horas, con la duración y la hora de inicio de la clase o actividad y para quien la da ese día
 (el titular o quien le sustituye), cuando:
-- su profesor pasa la lista de la clase, pulsa «Turno hecho» o marca a alguien en la lista de los viernes;
+- su profesor pasa la lista de la clase (también tarde, salvo que administración ya dijera que no se dio), pulsa
+  «Turno hecho» o marca a alguien en la lista de los viernes;
 - superadministración pasa la lista de la clase, sea del día que sea (ver la spec de asistencia);
 - administración la da por buena con «Se dio» en «Listas sin pasar» (ver la spec de asistencia);
 - administración la apunta a mano en el registro de horas.
