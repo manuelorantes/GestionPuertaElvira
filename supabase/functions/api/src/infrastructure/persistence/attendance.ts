@@ -260,6 +260,13 @@ export class SqlNotGivenClasses implements NotGivenClasses {
       VALUES (${group}, ${duty}, ${date.toString()}, ${userId}, ${now})
       ON CONFLICT DO NOTHING`;
   }
+
+  async isMarked(subject: { group: string } | { duty: string }, date: LocalDate): Promise<boolean> {
+    const id = 'group' in subject ? subject.group : subject.duty;
+    const rows = await this.sql`SELECT 1 FROM attendance_not_given
+      WHERE COALESCE(group_id, duty_id) = ${id} AND class_date = ${date.toString()}`;
+    return rows.length > 0;
+  }
 }
 
 /** Lo revisado del aviso de listas sin pasar, por cuenta. */
