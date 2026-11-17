@@ -388,6 +388,32 @@ Deno.test('ConfirmWithoutRollCall should record a missed class once its deadline
   assertEquals(rolls.saved.size, 1, 'darla por buena dos veces no cambia nada');
   assertEquals(sessions.log.length, 1);
   assertEquals(reviewed, ['u1 g1 2026-10-13', 'u2 g1 2026-10-13']);
+
+  // Para el profesor sigue sin lista: la ve sin pasar, con nadie marcado, y al pasarla no se apuntan más horas.
+  const late = new FrozenClock('2026-10-16T09:00:00+02:00');
+  const agenda = assignments([class_({})]);
+  const [mine] = await new TeacherClasses(agenda, roster, rolls, late).execute(
+    't1',
+    '2026-10-13',
+    '2026-10-13',
+  );
+  assertEquals(mine?.rollCall, 'missed');
+  const view = await new OpenRollCall(agenda, roster, rolls, late).execute(
+    't1',
+    'g1',
+    '2026-10-13',
+  );
+  assertEquals([view.rollCall, view.list.map((s) => s.present)], ['missed', [false, false]]);
+  await new TakeRollCall(agenda, roster, rolls, late, sessions).execute(
+    't1',
+    'g1',
+    '2026-10-13',
+    { absent: ['s2'] },
+    true,
+  );
+  const taken = await rolls.find('g1', LocalDate.fromString('2026-10-13'));
+  assertEquals([taken?.kind(), taken?.absent()], ['taken', ['s2']]);
+  assertEquals(sessions.log.length, 1, 'ya la apuntó quien la dio por buena');
 });
 
 Deno.test('MarkNotGiven should remove the session of a class or activity and remember it was not given', async () => {

@@ -134,6 +134,9 @@ function statusOf(item: ClassOnDay, done: boolean, now: Date): RollCallStatus {
   return date.plusDays(1).isBefore(today) ? 'missed' : 'open';
 }
 
+/** La lista se pasó de verdad: darla por buena administración cuenta las horas, pero la deja sin pasar. */
+const isTaken = (roll: RollCall | null): roll is RollCall => roll?.kind() === 'taken';
+
 /** Una clase de la agenda del profesor, con su aula, los alumnos que van ese día y el estado de su lista. */
 export interface TeacherClassView extends ClassOnDay {
   classroom: string | null;
@@ -175,7 +178,7 @@ export class TeacherClasses {
         ...item,
         classroom: await this.roster.classroomOf(item.groupId),
         students: (await this.roster.studentsOn(item.groupId, date)).length,
-        rollCall: statusOf(item, (await this.rollCalls.find(item.groupId, date)) !== null, now),
+        rollCall: statusOf(item, isTaken(await this.rollCalls.find(item.groupId, date)), now),
       });
     }
     return views;
@@ -245,7 +248,9 @@ async function rollCallView(
   const { groupId } = item;
   const day = LocalDate.fromString(item.date);
   const students = await roster.studentsOn(groupId, day);
-  const roll = await rollCalls.find(groupId, day);
+  // Una clase que administración dio por buena sigue sin lista: se abre como si nadie la hubiera pasado.
+  const found = await rollCalls.find(groupId, day);
+  const roll = isTaken(found) ? found : null;
   // Sin pasar, nadie está marcado (se marca a quien viene); pasada, se ve lo que se guardó.
   const absent = roll?.absent() ?? students.map((s) => s.id);
   // Quien ya es de la lista ese día no es asistencia especial (p. ej. si se le inscribió después con fecha anterior).
@@ -484,7 +489,7 @@ export interface OverdueRollCallQuery {
   /** Primer día que cuenta (el día en que se activó la asistencia). */
   since(): Promise<LocalDate>;
   /**
-   * De esas clases suyas, las que siguen sin lista (ni pasada ni dada por buena) ni «No se dio», con algún alumno
+   * De esas clases suyas, las que siguen sin lista pasada (aunque se dieran por buenas) ni «No se dio», con algún alumno
    * inscrito ese día y desde que se vinculó su cuenta, de la más reciente a la más antigua.
    */
   overdueFor(teacherId: string, expected: readonly ExpectedClass[]): Promise<OverdueRollCall[]>;
