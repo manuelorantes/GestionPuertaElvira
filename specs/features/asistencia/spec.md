@@ -15,11 +15,14 @@ de una clase pasada?». Pasar tarde una lista que no se había pasado apunta la 
 que administración ya dijera que no se dio o la liquidación de ese mes esté pagada; corregir una lista ya pasada no
 vuelve a apuntar horas (administración pudo quitarlas a mano).
 
-Cuando acaba el plazo de una de sus clases del horario sin que se pasara su lista (ni se diera por buena),
+Cuando acaba el plazo de una de sus clases del horario sin que se pasara su lista,
 el profesor MUST verla en un aviso en rojo debajo de «Mis clases» («Tienes 1 clase sin pasar lista»), con el día, la
 clase y la hora, y cada una MUST llevar directamente a su lista para pasarla tarde. Cuentan las mismas que en «Listas
 sin pasar» (desde que se vinculó su cuenta y se activó la asistencia; si administración dice que no se dio, deja de
 salir); las de hoy y ayer no salen, porque aún están en plazo. Al pasarla, deja de salir.
+Que administración la dé por buena cuenta sus horas, pero no la quita de su aviso:
+el profesor la sigue viendo «Sin lista», con nadie marcado al abrirla, hasta que la pasa
+(sin apuntar horas otra vez).
 
 #### Scenario: Al acabar la clase
 - **WHEN** Lucía abre la lista de su clase del martes a las 18:00, marca a todos menos a Pablo y la guarda
@@ -41,6 +44,11 @@ salir); las de hoy y ayer no salen, porque aún están en plazo. Al pasarla, dej
 - **WHEN** Lucía no pasó la lista de su clase del martes y entra el jueves
 - **THEN** ve en rojo debajo de «Mis clases» «Tienes 1 clase sin pasar lista» con «Martes dd/mm · <clase> · hh:mm–hh:mm»;
   al pulsarla abre esa lista, y al guardarla (confirmando que es una clase pasada) el aviso desaparece
+
+#### Scenario: Una clase dada por buena
+- **WHEN** Junta da por buena la clase del martes de Lucía, que no pasó su lista
+- **THEN** cuenta para las horas de Lucía, pero Lucía la sigue viendo en su aviso en rojo y como «Sin lista»
+  hasta que pasa la lista
 
 #### Scenario: Una clase que no es suya
 - **WHEN** Lucía intenta pasar la lista de una clase que ese día da otro profesor
