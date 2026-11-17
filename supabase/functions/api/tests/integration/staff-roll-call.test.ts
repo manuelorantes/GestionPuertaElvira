@@ -119,6 +119,16 @@ Deno.test('a teacher should see the classes whose roll call is overdue until tak
       end: '20:00',
     }]);
 
+    // Administración la da por buena (cuenta las horas), pero el profesor la sigue viendo: tiene que pasar la lista.
+    const confirmed = await admin.json(
+      'POST',
+      `/api/admin/attendance/pending/${group}/2026-10-06/confirm`,
+      {},
+    );
+    assertEquals(confirmed.status, 204, JSON.stringify(confirmed.body));
+    assertEquals(await sessionsOf(group), ['2026-10-06']);
+    assertEquals((await overdue()).map((o) => o.date), ['2026-10-06']);
+
     // La pasa tarde (confirmándolo) y deja de salir.
     const taken = await teacher.json('PUT', `/api/teacher/roll-calls/${group}/2026-10-06`, {
       absent: [student],
@@ -127,7 +137,7 @@ Deno.test('a teacher should see the classes whose roll call is overdue until tak
     });
     assertEquals(taken.status, 204, JSON.stringify(taken.body));
     assertEquals(await overdue(), []);
-    // Pasarla tarde también le apunta las horas de la clase.
+    // Sus horas no se apuntan dos veces.
     assertEquals(await sessionsOf(group), ['2026-10-06']);
     // Administración no la ve.
     assertEquals((await admin.get('/api/teacher/overdue-roll-calls')).status, 403);

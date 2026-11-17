@@ -198,7 +198,7 @@ export class SqlMissedRollCallQuery implements MissedRollCallQuery {
   }
 }
 
-/** Las clases de un profesor con el plazo acabado y sin lista (su aviso en «Mis clases»). */
+/** Las clases de un profesor con el plazo acabado y sin lista pasada, aun dadas por buenas (su aviso en «Mis clases»). */
 export class SqlOverdueRollCallQuery implements OverdueRollCallQuery {
   constructor(private readonly sql: Sql) {}
 
@@ -223,7 +223,8 @@ export class SqlOverdueRollCallQuery implements OverdueRollCallQuery {
        WHERE e.group_id IS NOT NULL
          AND e.class_date >= (u.teacher_linked_at AT TIME ZONE 'Europe/Madrid')::date
          AND NOT EXISTS (SELECT 1 FROM attendance_roll_call r
-                          WHERE r.group_id = e.group_id AND r.roll_date = e.class_date)
+                          WHERE r.group_id = e.group_id AND r.roll_date = e.class_date
+                            AND r.kind = 'taken')
          AND NOT EXISTS (SELECT 1 FROM attendance_not_given n
                           WHERE n.group_id = e.group_id AND n.class_date = e.class_date)
          AND EXISTS (
