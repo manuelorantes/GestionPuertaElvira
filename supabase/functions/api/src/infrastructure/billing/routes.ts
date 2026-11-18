@@ -11,6 +11,7 @@ import {
   BillingStudentNotFound,
   CancelCharge,
   ChangePaymentMethod,
+  ChangePaymentMonths,
   CorrectPaymentAmount,
   decimal,
   DeletePayment,
@@ -167,6 +168,7 @@ export function registerBillingRoutes(api: ApiApp): void {
     SpecialClassNotFound: [404, 'not_found'],
     InvoiceAlreadyIssued: [409, 'invoice_already_issued'],
     InvoicedPaymentCannotBeDeleted: [409, 'payment_invoiced'],
+    InvoicedPaymentKeepsItsMonths: [409, 'payment_invoiced'],
   });
   const admin = (method: 'GET' | 'POST' | 'PUT', path: string) => ({
     method,
@@ -351,6 +353,15 @@ export function registerBillingRoutes(api: ApiApp): void {
     ).execute(
       param(c, 'id'),
       body.requiredString('method'),
+    );
+    return c.body(null, 204);
+  });
+
+  api.defineRoute(admin('PUT', '/api/admin/billing/payments/:id/months'), async (c, scope) => {
+    const body = await JsonBody.from(c.req.raw);
+    await new ChangePaymentMonths(new SqlPaymentRepository(scope.tx)).execute(
+      param(c, 'id'),
+      body.stringList('months'),
     );
     return c.body(null, 204);
   });

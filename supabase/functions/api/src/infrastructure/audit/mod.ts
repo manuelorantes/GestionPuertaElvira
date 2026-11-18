@@ -48,6 +48,7 @@ export class AuditLabels {
     'PUT /api/admin/billing/payments/:id/date': 'Cambiar la fecha de un cobro',
     'PUT /api/admin/billing/payments/:id/amount': 'Cambiar el importe de un cobro',
     'PUT /api/admin/billing/payments/:id/method': 'Cambiar la forma de pago de un cobro',
+    'PUT /api/admin/billing/payments/:id/months': 'Cambiar los meses de un cobro',
     'DELETE /api/admin/billing/payments/:id': 'Borrar cobro',
     'PUT /api/admin/billing/accounts/:id': 'Cambiar datos de cobro del alumno',
     'PUT /api/admin/billing/accounts/:id/price': 'Fijar el precio de un alumno',
