@@ -1052,3 +1052,74 @@ Deno.test({
     );
   },
 });
+
+Deno.test({
+  name: 'billing should move a receipt to another month of its season, also in accounting',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const registered = await fx.client.json('POST', '/api/admin/billing/payments', {
+      studentId: fx.student,
+      kind: 'monthly',
+      months: 1,
+      method: 'cash',
+      date: today,
+    });
+    assertEquals(registered.status, 201, JSON.stringify(registered.body));
+    const payment = body<{ id: string }>(registered).id;
+    type Receipt = {
+      receiptNumber: string;
+      concept: string;
+      periods: string[];
+      totalCents: number;
+    };
+    const receipt = async () =>
+      body<Receipt>(await fx.client.get(`/api/admin/billing/payments/${payment}`));
+    const before = await receipt();
+    const paid = YearMonth.fromString(before.periods[0] as string);
+    // Otro mes de la misma temporada: el siguiente o, en junio, el anterior.
+    const other = paid.month === 6 ? YearMonth.fromString(`${paid.year}-05`) : paid.next();
+    const label = other.label().charAt(0).toUpperCase() + other.label().slice(1);
+
+    const moved = await fx.client.json('PUT', `/api/admin/billing/payments/${payment}/months`, {
+      months: [other.toString()],
+    });
+    assertEquals(moved.status, 204, JSON.stringify(moved.body));
+    assertEquals(await receipt(), {
+      ...before,
+      concept: label,
+      periods: [other.toString()],
+    });
+    const ledger = body<{ items: { sourceId: string; concept: string }[] }>(
+      await fx.client.get(`/api/admin/accounting/ledger?month=${today.slice(0, 7)}`),
+    );
+    assertEquals(
+      ledger.items.find((i) => i.sourceId === payment)?.concept,
+      `${label} · Martina López Herrera`,
+    );
+
+    const months = (list: unknown) =>
+      fx.client.json('PUT', `/api/admin/billing/payments/${payment}/months`, { months: list });
+    assertError(await months([]), 422, 'unprocessable');
+    assertError(await months([other.toString(), paid.toString()]), 422, 'unprocessable');
+    assertError(await months([`${paid.year + 2}-10`]), 422, 'unprocessable');
+    assertError(await months(['noviembre']), 422, 'unprocessable');
+    assertError(
+      await fx.client.json(
+        'PUT',
+        '/api/admin/billing/payments/01a11381-2833-782f-9c2b-ddc95b817821/months',
+        { months: [other.toString()] },
+      ),
+      404,
+      'not_found',
+    );
+
+    const invoiced = await fx.client.json(
+      'POST',
+      `/api/admin/billing/payments/${payment}/invoice`,
+      { name: 'Rocío Herrera', taxId: '12345678Z', address: 'Calle Elvira 1, Granada' },
+    );
+    assertEquals(invoiced.status, 204, JSON.stringify(invoiced.body));
+    assertError(await months([paid.toString()]), 409, 'payment_invoiced');
+  },
+});

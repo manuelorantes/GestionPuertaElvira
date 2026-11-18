@@ -61,6 +61,13 @@ export class InvoicedPaymentCannotBeDeleted extends Error {
   }
 }
 
+export class InvoicedPaymentKeepsItsMonths extends Error {
+  constructor() {
+    super('Este cobro tiene factura: sus meses ya no se cambian.');
+    this.name = 'InvoicedPaymentKeepsItsMonths';
+  }
+}
+
 export class InvoiceAlreadyIssued extends Error {
   constructor() {
     super('Este cobro ya tiene factura.');
@@ -1120,6 +1127,41 @@ export class Payment {
     if (periods.length === 0) throw new InvalidValue('periods', 'Un cobro cubre al menos un mes.');
     this.months = [...periods];
     this.label = concept;
+  }
+
+  /**
+   * Corrige a qué meses corresponde un recibo de cuotas mensuales: los mismos meses que tenía, sin repetir y de la
+   * temporada del recibo. Con factura ya no se cambia. El importe, la fecha y la forma de pago siguen igual.
+   */
+  reassignMonths(periods: readonly YearMonth[], concept: string): void {
+    if (this.kind !== 'monthly' || this.months.length === 0) {
+      throw new InvalidValue(
+        'months',
+        'Solo se cambian los meses de un cobro de cuotas mensuales.',
+      );
+    }
+    if (this.issued !== null) throw new InvoicedPaymentKeepsItsMonths();
+    if (periods.length !== this.months.length) {
+      throw new InvalidValue(
+        'months',
+        `Este cobro es de ${this.months.length} ${
+          this.months.length === 1 ? 'mes: indica uno' : `meses: indica ${this.months.length}`
+        }.`,
+      );
+    }
+    if (new Set(periods.map((m) => m.toString())).size !== periods.length) {
+      throw new InvalidValue('months', 'Hay meses repetidos.');
+    }
+    const year = this.receipt.seasonYear;
+    if (periods.some((m) => Season.teachingSeason(m)?.startYear !== year)) {
+      throw new InvalidValue(
+        'months',
+        `Los meses deben ser de la temporada ${year}/${
+          String((year + 1) % 100).padStart(2, '0')
+        } del recibo (de septiembre a junio).`,
+      );
+    }
+    this.coverMonths(periods, concept);
   }
 
   get paidOn(): LocalDate {
