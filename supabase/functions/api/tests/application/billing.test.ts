@@ -7,6 +7,7 @@ import {
   InvalidPaymentRequest,
   InvoiceAlreadyIssued,
   InvoicedPaymentCannotBeDeleted,
+  InvoicedPaymentKeepsItsMonths,
   PaymentId,
   StudentRef,
 } from '../../src/domain/billing/mod.ts';
@@ -14,6 +15,7 @@ import {
   AdjustCharge,
   CancelCharge,
   ChangePaymentMethod,
+  ChangePaymentMonths,
   ChargeNotFound,
   CorrectPaymentAmount,
   DeletePayment,
@@ -802,4 +804,60 @@ Deno.test('a payment reconciled with the bank should keep its method, date and a
   fx.reconciledKeys.clear();
   await new ChangePaymentMethod(fx, fx).execute(paymentId, 'cash');
   assertEquals((await fx.payment(PaymentId.fromString(paymentId)))!.method, 'cash');
+});
+
+Deno.test('ChangePaymentMonths should move a receipt to other months of its season, keeping everything else', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-10');
+  const paymentId = await register(fx, id, 1);
+  const before = (await fx.payment(PaymentId.fromString(paymentId)))!;
+  const change = new ChangePaymentMonths(fx);
+
+  // Tampoco toca nada de lo que casa con el banco: vale aunque esté conciliado.
+  fx.reconciledKeys.add(`payment:${paymentId}`);
+  await change.execute(paymentId, ['2026-11']);
+
+  const after = (await fx.payment(PaymentId.fromString(paymentId)))!;
+  assertEquals(after.periods.map(String), ['2026-11']);
+  assertEquals(after.concept, 'Noviembre 2026');
+  assertEquals(
+    [after.receipt.toString(), after.total.cents, after.paidOn.toString(), after.method],
+    [before.receipt.toString(), before.total.cents, before.paidOn.toString(), before.method],
+  );
+
+  await assertRejects(() => change.execute(paymentId, ['2026-11', '2026-12']), InvalidValue);
+  await assertRejects(() => change.execute(paymentId, []), InvalidValue);
+  await assertRejects(() => change.execute(paymentId, ['2027-09']), InvalidValue, 'temporada');
+  await assertRejects(() => change.execute(paymentId, ['2026-08']), InvalidValue, 'temporada');
+  await assertRejects(
+    () => change.execute('01a11381-2833-782f-9c2b-ddc95b817821', ['2026-11']),
+    PaymentNotFound,
+  );
+});
+
+Deno.test('ChangePaymentMonths should sort the months and reject repeated ones, other kinds and invoiced receipts', async () => {
+  const fx = new BillingFixture();
+  const id = fx.student({ regularHours: 2 });
+  await generate(fx, '2026-10');
+  const change = new ChangePaymentMonths(fx);
+
+  const quarter = await register(fx, id, 3);
+  await change.execute(quarter, ['2027-01', '2026-11', '2026-12']);
+  const moved = (await fx.payment(PaymentId.fromString(quarter)))!;
+  assertEquals(moved.periods.map(String), ['2026-11', '2026-12', '2027-01']);
+  assertEquals(moved.concept, 'Noviembre 2026 – enero 2027');
+  await assertRejects(
+    () => change.execute(quarter, ['2026-11', '2026-11', '2026-12']),
+    InvalidValue,
+    'repetidos',
+  );
+
+  const membership = await register(fx, id, 1, 'membership');
+  await assertRejects(() => change.execute(membership, ['2026-11']), InvalidValue, 'mensuales');
+
+  const invoiced = await register(fx, id, 1);
+  await new IssueInvoice(fx, fx, fx.transactions, fx.clock, fx.locks)
+    .execute(invoiced, 'Rocío Herrera', '12345678Z', 'Calle Elvira 1, Granada');
+  await assertRejects(() => change.execute(invoiced, ['2027-03']), InvoicedPaymentKeepsItsMonths);
 });

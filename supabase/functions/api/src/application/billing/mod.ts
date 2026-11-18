@@ -1390,6 +1390,24 @@ export class ChangePaymentMethod {
   }
 }
 
+/**
+ * Corrige a qué meses corresponde un cobro de cuotas (p. ej. se anotó como octubre y era noviembre), con el concepto
+ * del recibo recalculado. No toca lo que casa con el banco, así que vale también para un cobro conciliado.
+ */
+export class ChangePaymentMonths {
+  constructor(private readonly payments: PaymentRepository) {}
+
+  async execute(paymentId: string, months: readonly string[]): Promise<void> {
+    const payment = await this.payments.payment(PaymentId.fromString(paymentId));
+    if (payment === null) throw new PaymentNotFound();
+    if (months.length === 0) throw new InvalidValue('months', 'Indica los meses del cobro.');
+    const periods = months.map((m) => YearMonth.fromString(m))
+      .sort((a, b) => a.toString().localeCompare(b.toString()));
+    payment.reassignMonths(periods, concept(periods));
+    await this.payments.savePayment(payment);
+  }
+}
+
 export class IssueInvoice {
   constructor(
     private readonly payments: PaymentRepository,
