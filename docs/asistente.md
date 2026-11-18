@@ -36,6 +36,13 @@ make asistente ARGS="GET /api/admin/students?filter=active"
 make asistente ARGS="POST /api/admin/students '{\"fullName\":\"Nombre Apellidos\"}'"
 ```
 
+Algunas correcciones solo existen en la API, sin pantalla en la web. Por ejemplo, cambiar a qué meses
+corresponde un cobro de cuotas (los mismos meses que tenía, de su temporada; el recibo conserva su número):
+
+```sh
+make asistente ARGS="PUT /api/admin/billing/payments/<id>/months '{\"months\":[\"2026-11\"]}'"
+```
+
 El script `scripts/asistente.sh` inicia sesión cuando hace falta y guarda la cookie en el mismo
 directorio. En la primera llamada sustituye la contraseña temporal por una aleatoria y la deja en el
 fichero: nadie necesita verla ni copiarla. Nunca la imprime.
