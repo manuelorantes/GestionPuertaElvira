@@ -311,7 +311,7 @@ Superadministración MUST poder corregir desde el propio recibo un cobro ya regi
 - el importe, indicando el motivo, que queda como línea «Corrección: <motivo>» del recibo con la diferencia.
 
 Antes de guardar se confirma lo que cambia.
-El número de recibo y los meses cobrados no cambian.
+El número de recibo no cambia, ni los meses cobrados (que se corrigen aparte: ver «Cambiar los meses de un cobro»).
 Un cobro **conciliado con el banco** (ver la conciliación en [Contabilidad](../contabilidad/spec.md)) MUST NOT poder
 corregirse ni borrarse: su recibo lo indica y no ofrece «Editar» ni «Borrar»;
 para corregirlo hay que deshacer antes la conciliación.
@@ -329,6 +329,43 @@ Un recibo que se queda en 0 € no sale en Contabilidad y no impide ver el mes.
 #### Scenario: Recibo corregido a 0 €
 - **WHEN** superadministración corrige a 0 € un recibo de 1 € de octubre
 - **THEN** Contabilidad de octubre se sigue viendo y ese recibo no sale en el libro
+
+### Requirement: Cambiar los meses de un cobro
+Administración MUST poder cambiar a qué meses corresponde un cobro de cuotas mensuales ya registrado
+(se anotó como octubre y era noviembre), indicando los meses nuevos.
+El concepto del recibo MUST recalcularse con ellos
+y Contabilidad MUST atribuir el ingreso a los meses nuevos.
+El número de recibo, el importe, la fecha, la forma de pago y el desglose no cambian,
+y tampoco lo que el alumno tiene cubierto, que se sigue repartiendo de la cuota más antigua a la más reciente.
+Como no cambia nada de lo que casa con el banco, MUST poder hacerse también con un cobro conciliado.
+El cambio queda en el historial.
+De momento no se ofrece en el recibo: lo hace el asistente cuando se le pide.
+
+El cambio MUST rechazarse si:
+
+- el cobro no es de cuotas mensuales o no tiene meses (cuota de socio, material, pago a cuenta);
+- no se indican tantos meses como tenía el recibo, o hay alguno repetido;
+- algún mes no es de la temporada del recibo (de septiembre a junio);
+- el cobro tiene factura.
+
+No se exige que el alumno tenga cuota en los meses indicados.
+
+#### Scenario: Pagó noviembre y se anotó octubre
+- **WHEN** administración cambia a noviembre de 2026 el recibo R-2026-0504, de 40 € y concepto «Octubre 2026»
+- **THEN** el recibo R-2026-0504 sigue siendo de 40 € con la misma fecha y forma de pago,
+  su concepto pasa a «Noviembre 2026» y Contabilidad lo atribuye a noviembre
+
+#### Scenario: Recibo de tres meses
+- **WHEN** administración cambia un recibo de octubre a diciembre de 2026 a noviembre, diciembre y enero
+- **THEN** su concepto pasa a «Noviembre 2026 – enero 2027»
+
+#### Scenario: Distinto número de meses
+- **WHEN** administración indica dos meses para un recibo de un mes
+- **THEN** el cambio se rechaza indicando que el cobro es de un mes
+
+#### Scenario: Cobro con factura
+- **WHEN** administración intenta cambiar los meses de un cobro con factura
+- **THEN** el cambio se rechaza y el recibo sigue igual
 
 ### Requirement: Borrar un cobro
 Superadministración MUST poder borrar desde el propio recibo un cobro anotado por error, indicando el motivo.
