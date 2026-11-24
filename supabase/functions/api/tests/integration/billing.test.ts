@@ -1123,3 +1123,113 @@ Deno.test({
     assertError(await months([paid.toString()]), 409, 'payment_invoiced');
   },
 });
+
+Deno.test({
+  name:
+    'billing should let only superadministration change the membership fee of a student, correcting its receipt',
+  ignore: outsideSeason,
+  async fn() {
+    const fx = await fixture();
+    const change = (client: ApiClient, input: Record<string, unknown>) =>
+      client.json('PUT', `/api/admin/billing/accounts/${fx.student}/membership`, input);
+    const account = async () =>
+      body<{
+        membershipPaid: boolean;
+        membershipFeeCents: number;
+        membershipCharge: { pendingCents: number; manual: boolean; note: string | null };
+        balanceCents: number;
+      }>(await fx.client.get(`/api/admin/billing/accounts/${fx.student}`));
+
+    assertError(
+      await change(fx.client, { amountCents: 2500, reason: 'Hermanos' }),
+      403,
+      'forbidden',
+    );
+    assertError(
+      await fx.client.json(
+        'POST',
+        `/api/admin/billing/accounts/${fx.student}/membership/reset`,
+        {},
+      ),
+      403,
+      'forbidden',
+    );
+
+    await createUser('super@club.es', 'superadministrator');
+    const superadmin = new ApiClient();
+    await superadmin.logIn('super@club.es');
+
+    // Sin cobrar: solo cambia lo que se debe.
+    assertError(await change(superadmin, { amountCents: 2500, reason: ' ' }), 422, 'unprocessable');
+    assertEquals((await change(superadmin, { amountCents: 3000, reason: 'Hermanos' })).status, 204);
+    assertEquals((await account()).membershipFeeCents, 3000);
+    assertEquals((await account()).membershipCharge, {
+      ...(await account()).membershipCharge,
+      pendingCents: 3000,
+      manual: true,
+      note: 'Hermanos',
+    });
+
+    // Cobrada y bajada corrigiendo el recibo: el recibo baja con su línea de corrección y queda pagada.
+    assertEquals(
+      (await fx.client.json('POST', '/api/admin/billing/payments', {
+        studentId: fx.student,
+        kind: 'membership',
+        months: 1,
+        method: 'cash',
+        date: today,
+      })).status,
+      201,
+    );
+    assertEquals(
+      (await change(superadmin, {
+        amountCents: 2500,
+        reason: 'Hermanos',
+        onPaid: 'correct_payment',
+      }))
+        .status,
+      204,
+    );
+    const payment = body<{ items: { id: string }[] }>(
+      await fx.client.get(`/api/admin/billing/payments?studentId=${fx.student}`),
+    ).items[0]!;
+    const receipt = body<{ totalCents: number; lines: { label: string }[] }>(
+      await fx.client.get(`/api/admin/billing/payments/${payment.id}`),
+    );
+    assertEquals(receipt.totalCents, 2500);
+    assertMatch(
+      String(receipt.lines.at(-1)?.label),
+      /^Corrección: cuota de socio .* de 30,00 € a 25,00 € \(Hermanos\)$/,
+    );
+    assertEquals((await account()).membershipPaid, true);
+
+    // Volver a la general: se deben los 50 € y faltan 25 €.
+    assertEquals(
+      (await superadmin.json(
+        'POST',
+        `/api/admin/billing/accounts/${fx.student}/membership/reset`,
+        {},
+      ))
+        .status,
+      204,
+    );
+    const reset = await account();
+    assertEquals(
+      [
+        reset.membershipFeeCents,
+        reset.membershipCharge.pendingCents,
+        reset.membershipCharge.manual,
+      ],
+      [5000, 2500, false],
+    );
+
+    const history = body<{ items: { label: string }[] }>(
+      await superadmin.get('/api/admin/audit/actions'),
+    ).items;
+    assertEquals(history.slice(0, 3).map((h) => h.label), [
+      'Volver a la cuota de socio general',
+      'Cambiar la cuota de socio de un alumno',
+      'Registrar cobro',
+    ]);
+  },
+});

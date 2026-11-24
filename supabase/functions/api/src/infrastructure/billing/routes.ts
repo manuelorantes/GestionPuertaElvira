@@ -8,6 +8,7 @@ import {
 import {
   AddOnAccountMoney,
   AdjustCharge,
+  AdjustMembershipFee,
   BillingStudentNotFound,
   CancelCharge,
   ChangePaymentMethod,
@@ -32,6 +33,7 @@ import {
   RegisterPayment,
   ReschedulePayment,
   ResetCharge,
+  ResetMembershipFee,
   SetChargeDiscount,
   SetSpecialClassPrice,
   UpdateBillingSettings,
@@ -434,6 +436,38 @@ export function registerBillingRoutes(api: ApiApp): void {
             body.optionalString('monthlyPrice'),
           ),
       );
+      return c.body(null, 204);
+    },
+  );
+
+  // La cuota de socio de un alumno solo la cambia superadministración, con motivo.
+  api.defineRoute(
+    { method: 'PUT', path: '/api/admin/billing/accounts/:id/membership', access: 'superadmin' },
+    async (c, scope) => {
+      const body = await JsonBody.from(c.req.raw);
+      await new AdjustMembershipFee(
+        billing(api, scope).charges,
+        new SqlPaymentRepository(scope.tx),
+        api.deps.clock,
+      ).execute(
+        param(c, 'id'),
+        body.requiredInt('amountCents'),
+        body.requiredString('reason'),
+        paidChargePolicyFrom(body.optionalString('onPaid') ?? null),
+      );
+      return c.body(null, 204);
+    },
+  );
+
+  api.defineRoute(
+    {
+      method: 'POST',
+      path: '/api/admin/billing/accounts/:id/membership/reset',
+      access: 'superadmin',
+    },
+    async (c, scope) => {
+      const b = billing(api, scope);
+      await new ResetMembershipFee(b.charges, b.settings, api.deps.clock).execute(param(c, 'id'));
       return c.body(null, 204);
     },
   );
