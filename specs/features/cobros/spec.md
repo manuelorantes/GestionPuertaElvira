@@ -258,6 +258,33 @@ el recibo (su importe menos el porcentaje) y apuntado ese porcentaje; sigue fija
 - **WHEN** un alumno pagó 50 € por septiembre (debían ser 25 €) y 25 € por octubre, y administración fija septiembre en 25 € y octubre en 50 €
 - **THEN** las dos cuotas quedan cobradas sin tocar los recibos
 
+### Requirement: Cambiar la cuota de socio de un alumno
+Superadministración MUST poder fijar a mano el importe de la cuota de socio de la temporada en curso de un alumno,
+con un motivo, y MUST poder devolverla a la cuota de socio de Ajustes; administración y el asistente no pueden.
+Antes de guardar MUST confirmarse el cambio, con el importe anterior y el nuevo.
+Si la cuota ya está cubierta, la confirmación MUST preguntar qué pasa con la diferencia, como al
+editar una cuota:
+al bajarla, cambiar la cantidad pagada (marcado por defecto: el recibo de la cuota de socio baja la diferencia con una
+línea de corrección que lleva el motivo) o dejarla como saldo a favor;
+al subirla, si se pagó el importe nuevo (marcado por defecto: el recibo sube la diferencia) o si falta por pagar.
+La cuota queda «Fijada a mano» con su motivo y cambiar la cuota de socio en Ajustes no la toca.
+Devolverla a la de Ajustes no cambia ningún cobro.
+
+#### Scenario: Bajar una cuota de socio ya cobrada
+- **WHEN** Martina pagó 50 € de cuota de socio y superadministración la fija en 25 € con el motivo «Hermanos»,
+  confirmando «Cambiar la cantidad pagada»
+- **THEN** su recibo pasa a 25 € con la línea «Corrección: cuota de socio 2026/27 de 50,00 € a 25,00 € (Hermanos)» y
+  la cuota de socio sigue cobrada
+
+#### Scenario: Volver a la cuota de socio general
+- **WHEN** la cuota de socio de Martina está fijada a mano en 25 € y cobrada, y superadministración la devuelve a la
+  de Ajustes
+- **THEN** vuelve a ser de 50 € y le faltan 25 € por pagar
+
+#### Scenario: Administración no puede cambiarla
+- **WHEN** administración mira la cuota de socio de un alumno
+- **THEN** no ve cómo editarla y la API le responde que no tiene permiso
+
 ### Requirement: Cancelar una cuota
 Administración MUST poder cancelar, desde «Cuotas», una cuota mensual o de socio que no esté cobrada, tras confirmar
 «¿Seguro que quieres cancelar…?». Si no tiene nada cobrado, se cancela entera: deja de deberse y es como si no existiera
