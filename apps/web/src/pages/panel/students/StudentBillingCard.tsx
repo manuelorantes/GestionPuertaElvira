@@ -32,6 +32,7 @@ import { useToast } from '@/shared/ui/Toast';
 import { SPOTLIGHT_CLASS, useSpotlight } from '@/shared/ui/useSpotlight';
 
 import { ChargeDialog } from './ChargeDialog';
+import { MembershipFeeDialog } from './MembershipFeeDialog';
 
 function hoursLabel(hours: number): string {
   return `${String(Math.round(hours * 100) / 100).replace('.', ',')} h semanales`;
@@ -340,7 +341,10 @@ function SeasonCharges({
   spotlight: Spotlight;
 }) {
   const [editing, setEditing] = useState<AccountCharge | null>(null);
+  const [editingMembership, setEditingMembership] = useState(false);
   const canManage = useCanManageClub();
+  // La cuota de socio de un alumno solo la cambia superadministración.
+  const canEditMembership = usePanelRole(useSession().data) === 'superadministrator';
   const toast = useToast();
   const membership = account.membershipCharge;
   if (account.charges.length === 0 && membership === null && account.balanceCents <= 0) return null;
@@ -354,13 +358,35 @@ function SeasonCharges({
         {membership !== null && (
           <li className="flex items-center gap-2 py-1 text-sm">
             <span className="w-28 shrink-0">Cuota de socio</span>
-            <span className="flex-1 font-medium">{formatCents(account.membershipFeeCents)}</span>
+            <span className="flex-1">
+              <span className="font-medium">{formatCents(account.membershipFeeCents)}</span>
+              {membership.manual && (
+                <span
+                  className="block text-[12px] text-ink-muted"
+                  title={membership.note ?? undefined}
+                >
+                  Fijada a mano{membership.note ? ` · ${membership.note}` : ''}
+                </span>
+              )}
+            </span>
             <MembershipState
               pendingCents={membership.pendingCents}
               feeCents={account.membershipFeeCents}
             />
-            {/* Sin botón de editar: hueco para alinear con las cuotas del mes. */}
-            {canManage && <span aria-hidden className="size-8" />}
+            {canEditMembership ? (
+              <button
+                type="button"
+                aria-label="Editar la cuota de socio"
+                title="Editar cuota de socio"
+                onClick={() => setEditingMembership(true)}
+                className="flex size-8 cursor-pointer items-center justify-center rounded-sm hover:bg-surface-muted"
+              >
+                <Pencil aria-hidden size={14} />
+              </button>
+            ) : (
+              /* Sin botón de editar: hueco para alinear con las cuotas del mes. */
+              canManage && <span aria-hidden className="size-8" />
+            )}
           </li>
         )}
         {account.charges.map((charge) => {
@@ -422,6 +448,20 @@ function SeasonCharges({
         <p className="mt-1 text-[13px] text-success-fg">
           Saldo a favor: {formatCents(account.balanceCents)} (cubrirá las siguientes cuotas)
         </p>
+      )}
+      {editingMembership && membership !== null && (
+        <MembershipFeeDialog
+          studentId={studentId}
+          feeCents={account.membershipFeeCents}
+          pendingCents={membership.pendingCents}
+          manual={membership.manual}
+          note={membership.note}
+          onClose={() => setEditingMembership(false)}
+          onDone={(message) => {
+            setEditingMembership(false);
+            toast(message);
+          }}
+        />
       )}
       {editing && (
         <ChargeDialog

@@ -439,7 +439,7 @@ describe('Alumnos', () => {
       hasPrivateLessons: false,
       membershipPaid: false,
       membershipFeeCents: 5000,
-      membershipCharge: { id: 'c-socio', pendingCents: 5000 },
+      membershipCharge: { id: 'c-socio', pendingCents: 5000, manual: false, note: null },
       charges: [],
       balanceCents: 0,
       materialCharges: [],
@@ -616,7 +616,7 @@ describe('Alumnos', () => {
       hasPrivateLessons: false,
       membershipPaid: true,
       membershipFeeCents: 5000,
-      membershipCharge: { id: 'c-socio', pendingCents: 0 },
+      membershipCharge: { id: 'c-socio', pendingCents: 0, manual: false, note: null },
       charges: [
         {
           id: 'c9',
@@ -686,6 +686,71 @@ describe('Alumnos', () => {
         amountCents: 4500,
         reason: 'Precio acordado',
         scope: 'rest',
+      }),
+    );
+  });
+
+  it('lets only superadministration change the membership fee, after confirming it', async () => {
+    const user = userEvent.setup();
+    const account = {
+      preferredPlan: 'monthly',
+      member: true,
+      privateRate: null,
+      points: 0,
+      suggestedMonths: 1,
+      remainingMonths: 9,
+      weeklyHours: 3,
+      monthlyFeeCents: 4500,
+      familyDiscount: false,
+      familyPercent: 0,
+      hasPrivateLessons: false,
+      membershipPaid: true,
+      membershipFeeCents: 5000,
+      membershipCharge: { id: 'c-socio', pendingCents: 0, manual: false, note: null },
+      charges: [],
+      balanceCents: 0,
+      materialCharges: [],
+      totals: [],
+    };
+    api({ 'GET /api/admin/billing/accounts/s1': [200, account] });
+    const { unmount } = renderApp('/panel/alumnos/s1');
+    const asAdmin = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
+    expect(
+      within(asAdmin).queryByRole('button', { name: 'Editar la cuota de socio' }),
+    ).not.toBeInTheDocument();
+    unmount();
+
+    const spy = api({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/billing/accounts/s1': [200, account],
+      'PUT /api/admin/billing/accounts/s1/membership': [204],
+    });
+    renderApp('/panel/alumnos/s1');
+    const season = await screen.findByRole('region', { name: 'Cuotas de la temporada' });
+    await user.click(
+      await within(season).findByRole('button', { name: 'Editar la cuota de socio' }),
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Cuota de socio' });
+    const amount = within(dialog).getByLabelText('Importe (€)');
+    await user.clear(amount);
+    await user.type(amount, '25');
+    await user.type(within(dialog).getByLabelText('Motivo'), 'Hermanos');
+    await user.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    // Nada se guarda hasta confirmar; como ya está cobrada, se elige qué pasa con el recibo.
+    const confirm = await screen.findByRole('dialog', { name: '¿Guardar estos cambios?' });
+    expect(confirm).toHaveTextContent('Cuota de socio: 50,00 € → 25,00 €');
+    expect(
+      within(confirm).getByRole('checkbox', { name: /Cambiar la cantidad pagada/ }),
+    ).toBeChecked();
+    expect(postBodyFor(spy, 'PUT', '/api/admin/billing/accounts/s1/membership')).toBeNull();
+    await user.click(within(confirm).getByRole('button', { name: 'Confirmar' }));
+
+    await waitFor(() =>
+      expect(postBodyFor(spy, 'PUT', '/api/admin/billing/accounts/s1/membership')).toEqual({
+        amountCents: 2500,
+        reason: 'Hermanos',
+        onPaid: 'correct_payment',
       }),
     );
   });
@@ -805,7 +870,7 @@ describe('Alumnos', () => {
       hasPrivateLessons: false,
       membershipPaid: true,
       membershipFeeCents: 5000,
-      membershipCharge: { id: 'c-socio', pendingCents: 0 },
+      membershipCharge: { id: 'c-socio', pendingCents: 0, manual: false, note: null },
       charges: [
         {
           id: 'c10',
@@ -880,7 +945,7 @@ describe('Alumnos', () => {
       hasPrivateLessons: false,
       membershipPaid: true,
       membershipFeeCents: 5000,
-      membershipCharge: { id: 'c-socio', pendingCents: 0 },
+      membershipCharge: { id: 'c-socio', pendingCents: 0, manual: false, note: null },
       charges: [
         {
           id: 'c10',
@@ -1270,7 +1335,7 @@ describe('Alumnos', () => {
         200,
         {
           charges: [pendingCharge('c-now', now), pendingCharge('c-next', next)],
-          membershipCharge: { id: 'c-socio', pendingCents: 5000 },
+          membershipCharge: { id: 'c-socio', pendingCents: 5000, manual: false, note: null },
           balanceCents: 0,
           materialCharges: [],
           totals: [],

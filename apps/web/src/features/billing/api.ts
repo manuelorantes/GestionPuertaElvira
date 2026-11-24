@@ -135,7 +135,13 @@ export interface Account {
   /** Cuotas mensuales de la temporada con lo cubierto y lo que falta. */
   charges: AccountCharge[];
   /** Su cuota de socio de la temporada con lo pendiente, o null si no tiene. */
-  membershipCharge: { id: string; pendingCents: number } | null;
+  membershipCharge: {
+    id: string;
+    pendingCents: number;
+    /** Fijada a mano por superadministración, con su motivo. */
+    manual: boolean;
+    note: string | null;
+  } | null;
   /** Lo que sobra de los cobros tras cubrir todas las cuotas. */
   balanceCents: number;
   /** Cobros de material con algo pendiente. */
@@ -334,6 +340,19 @@ export function adjustCharge(
   input: { amountCents: number; reason: string; scope: ChargeScope; onPaid?: PaidChargePolicy },
 ): Promise<void> {
   return apiSend('PUT', `${BASE}/accounts/${studentId}/charges/${month}`, input);
+}
+
+/** Fija a mano la cuota de socio de la temporada de un alumno (solo superadministración). */
+export function adjustMembershipFee(
+  studentId: string,
+  input: { amountCents: number; reason: string; onPaid: PaidChargePolicy },
+): Promise<void> {
+  return apiSend('PUT', `${BASE}/accounts/${studentId}/membership`, input);
+}
+
+/** Devuelve la cuota de socio de la temporada de un alumno a la de Ajustes (solo superadministración). */
+export function resetMembershipFee(studentId: string): Promise<void> {
+  return apiSend('POST', `${BASE}/accounts/${studentId}/membership/reset`, {});
 }
 
 /** Devuelve la cuota al importe calculado con lo que hace hoy el alumno. */
