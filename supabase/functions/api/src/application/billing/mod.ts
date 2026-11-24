@@ -1461,7 +1461,10 @@ export interface AccountView {
   /** Cuotas mensuales de la temporada en curso con lo cubierto y lo que falta. */
   charges: AccountCharge[];
   /** Su cuota de socio de la temporada (con lo pendiente), o null si no tiene. */
-  membershipCharge: { id: string; pendingCents: number } | null;
+  /** `manual`/`note`: si se fijó a mano (solo superadministración) y con qué motivo. */
+  membershipCharge:
+    | { id: string; pendingCents: number; manual: boolean; note: string | null }
+    | null;
   /** Lo que sobra de los cobros tras cubrir todas las cuotas mensuales. */
   balanceCents: number;
   /** Cobros de material con algo pendiente (para cobrarlos desde «Registrar cobro»). */
@@ -1563,6 +1566,8 @@ export class GetStudentAccount {
         id: membership.id.value,
         pendingCents:
           membershipLeft.find((p) => p.charge.id.equals(membership.id))?.pending.cents ?? 0,
+        manual: membership.isManual(),
+        note: membership.note(),
       },
       balanceCents: allocation.balance.cents,
       materialCharges: materialLeft.map((p) => ({
@@ -1859,45 +1864,118 @@ export class AdjustCharge {
       charge.adjust(amount, reason);
       const paid = existing !== null && covered.cents > 0 && covered.equals(before);
       if (onPaid === 'correct_payment' && covered.cents > amount.cents) {
-        await this.correctPayment(ref, period, amount.minus(covered), before, amount, reason);
-      } else if (onPaid === 'correct_payment' && paid && amount.cents > before.cents) {
-        const corrected = await this.correctPayment(
+        await correctCoveringPayment(
+          this.payments,
           ref,
+          'monthly',
+          period,
+          amount.minus(covered),
+          `cuota de ${period.label()} de ${before.format()} a ${amount.format()} (${reason.trim()})`,
+        );
+      } else if (onPaid === 'correct_payment' && paid && amount.cents > before.cents) {
+        const corrected = await correctCoveringPayment(
+          this.payments,
+          ref,
+          'monthly',
           period,
           amount.minus(before),
-          before,
-          amount,
-          reason,
+          `cuota de ${period.label()} de ${before.format()} a ${amount.format()} (${reason.trim()})`,
         );
         if (corrected) charge.settleRaisedByHand(amount.minus(before));
       }
       await this.charges.saveCharge(charge);
     }
   }
+}
 
-  /**
-   * Cambia lo pagado en `difference` (negativa al bajar, sin pasar de lo que tiene el recibo) en el recibo que pagó ese
-   * mes o, si no lo hay, en el más reciente. Sin cobros que corregir no hace nada: al bajar, la diferencia queda como
-   * saldo a favor; al subir, como pendiente.
-   */
-  private async correctPayment(
-    student: StudentRef,
-    period: YearMonth,
-    difference: Money,
-    before: Money,
-    after: Money,
+/**
+ * Cambia lo pagado en `difference` (negativa al bajar, sin pasar de lo que tiene el recibo) en el recibo de ese tipo que
+ * pagó ese mes o, si no lo hay, en el más reciente, con una línea de corrección. Sin cobros que corregir no hace nada:
+ * al bajar, la diferencia queda como saldo a favor; al subir, como pendiente.
+ */
+async function correctCoveringPayment(
+  payments: PaymentRepository,
+  student: StudentRef,
+  kind: 'monthly' | 'membership',
+  period: YearMonth,
+  difference: Money,
+  correction: string,
+): Promise<boolean> {
+  const all = await payments.paymentsFor(student, kind);
+  const payment = all.find((p) => p.periods.some((m) => m.equals(period))) ?? all[0];
+  if (payment === undefined) return false;
+  const total = payment.total.plus(difference);
+  payment.correctTotal(total.isNegative() ? Money.zero() : total, correction);
+  await payments.savePayment(payment);
+  return true;
+}
+
+/**
+ * Fija a mano la cuota de socio de la temporada en curso de un alumno, con un motivo (solo superadministración). Si ya
+ * estaba cubierta, `onPaid` decide como al editar una cuota mensual: corregir su recibo o dejar la diferencia.
+ */
+export class AdjustMembershipFee {
+  constructor(
+    private readonly charges: ChargeRepository,
+    private readonly payments: PaymentRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(
+    studentId: string,
+    amountCents: number,
     reason: string,
-  ): Promise<boolean> {
-    const payments = await this.payments.paymentsFor(student, 'monthly');
-    const payment = payments.find((p) => p.periods.some((m) => m.equals(period))) ?? payments[0];
-    if (payment === undefined) return false;
-    const total = payment.total.plus(difference);
-    payment.correctTotal(
-      total.isNegative() ? Money.zero() : total,
-      `cuota de ${period.label()} de ${before.format()} a ${after.format()} (${reason.trim()})`,
+    onPaid: PaidChargePolicy = 'keep_credit',
+  ): Promise<void> {
+    const ref = StudentRef.fromString(studentId);
+    const season = Season.containing(YearMonth.of(LocalDate.fromInstant(this.clock.now())));
+    const charge = await this.charges.chargeFor(ref, 'membership', season.firstMonth());
+    if (charge === null) throw new ChargeNotFound();
+    const amount = Money.cents(amountCents);
+    const before = charge.amount;
+    const covered = await coveredOf(this.charges, charge);
+    charge.adjust(amount, reason);
+    if (onPaid === 'correct_payment') {
+      const paid = covered.cents > 0 && covered.equals(before);
+      const difference = covered.cents > amount.cents
+        ? amount.minus(covered)
+        : paid && amount.cents > before.cents
+        ? amount.minus(before)
+        : null;
+      if (difference !== null) {
+        const corrected = await correctCoveringPayment(
+          this.payments,
+          ref,
+          'membership',
+          season.firstMonth(),
+          difference,
+          `cuota de socio ${season.label()} de ${before.format()} a ${amount.format()} (${reason.trim()})`,
+        );
+        if (corrected && difference.cents > 0) charge.settleRaisedByHand(difference);
+      }
+    }
+    await this.charges.saveCharge(charge);
+  }
+}
+
+/** Devuelve la cuota de socio de la temporada en curso de un alumno a la de Ajustes; los cobros no cambian. */
+export class ResetMembershipFee {
+  constructor(
+    private readonly charges: ChargeRepository,
+    private readonly settings: BillingSettingsRepository,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute(studentId: string): Promise<void> {
+    const season = Season.containing(YearMonth.of(LocalDate.fromInstant(this.clock.now())));
+    const charge = await this.charges.chargeFor(
+      StudentRef.fromString(studentId),
+      'membership',
+      season.firstMonth(),
     );
-    await this.payments.savePayment(payment);
-    return true;
+    if (charge === null) throw new ChargeNotFound();
+    charge.resetTo((await this.settings.get()).tariff.membershipFee);
+    await this.charges.saveCharge(charge);
   }
 }
 

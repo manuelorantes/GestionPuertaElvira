@@ -58,6 +58,8 @@ export class AuditLabels {
     'POST /api/admin/points/adjustments': 'Ajustar puntos a mano',
     'POST /api/admin/points/photos': 'Añadir foto de torneo',
     'DELETE /api/admin/points/photos/:id': 'Quitar foto de torneo',
+    'PUT /api/admin/billing/accounts/:id/membership': 'Cambiar la cuota de socio de un alumno',
+    'POST /api/admin/billing/accounts/:id/membership/reset': 'Volver a la cuota de socio general',
     'PUT /api/admin/billing/accounts/:id/charges/:month': 'Editar cuota',
     'PUT /api/admin/billing/accounts/:id/charges/:month/discount': 'Cambiar descuento de una cuota',
     'POST /api/admin/billing/accounts/:id/charges/:month/reset': 'Volver a la cuota calculada',
