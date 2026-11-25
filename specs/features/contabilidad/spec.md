@@ -381,6 +381,12 @@ Fuera de sacar o ingresar efectivo, cada movimiento por casar MUST ofrecer siemp
 categoría; en una liquidación del datáfono, un ingreso con tarjeta del día cobrado).
 Al elegir a mano, si lo elegido no llega al importe, lo que falta MUST poderse **completar con un ingreso o gasto
 nuevo** (con su concepto y categoría, y la forma de pago y el día del movimiento).
+Al elegir a mano MUST poderse añadir también **otros sin conciliar**: lo de la app que aún no está casado con el
+banco, aunque no salga en la lista propuesta, siempre que case con ese movimiento (en una liquidación del datáfono,
+lo cobrado con tarjeta; en una transferencia recibida, lo cobrado por transferencia; en un pago, los gastos por banco
+o con tarjeta) y sea de dos meses antes a dos meses después.
+Se busca por concepto, se ve con su día, forma de pago e importe, y al casar los cobros pasan al día que les toca,
+como lo demás elegido.
 Antes de aceptar, el concepto, la categoría y los cobros elegidos se pueden cambiar.
 Aceptar una sugerencia MUST hacer el cambio con las mismas operaciones que el resto de Contabilidad y Cobros
 (queda en el historial) y recordar qué movimiento del extracto corresponde a qué cobros, gasto o traspaso.
@@ -409,6 +415,11 @@ superadministración MUST ver lo que queda **sin conciliar** a cada lado:
 Cada lado MUST poderse desplegar para ver su lista: en la app, día, concepto, forma de pago e importe con signo;
 en el banco, día, concepto del banco e importe.
 Lo casado en cualquier ronda (también lo cobrado de más o de menos y lo apuntado nuevo) sale de las dos listas.
+
+#### Scenario: Elegir un cobro que no sale en la lista
+- **WHEN** la liquidación del datáfono de lo cobrado el 19/11, de 63 €, no propone nada y los dos cobros con tarjeta de
+  31,50 € del 16/11 están sin conciliar
+- **THEN** al elegir a mano se buscan en «Otros sin conciliar», se añaden a lo elegido y al casar pasan al 19/11
 
 #### Scenario: Lo que queda sin conciliar
 - **WHEN** en octubre hay un cobro por transferencia de 30 € y un gasto con tarjeta de 12 € sin casar,
