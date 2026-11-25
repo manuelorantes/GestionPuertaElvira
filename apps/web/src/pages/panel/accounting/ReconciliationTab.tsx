@@ -1,5 +1,5 @@
-import { useMutation } from '@tanstack/react-query';
-import { FileUp } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { FileUp, X } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 
 import { apiErrorMessage } from '@/features/auth/apiErrorMessage';
@@ -11,6 +11,7 @@ import {
   type ReconciliationAcceptance,
   type ReconciliationAppItem,
   type ReconciliationItem,
+  fetchUnmatchedForMovement,
   reconcileStatement,
   releaseReconciliation,
 } from '@/features/accounting/api';
@@ -22,6 +23,7 @@ import { Alert } from '@/shared/ui/Alert';
 import { Badge } from '@/shared/ui/Badge';
 import { Button } from '@/shared/ui/Button';
 import { Card } from '@/shared/ui/Card';
+import { Combobox } from '@/shared/ui/Combobox';
 import { Kpi } from '@/shared/ui/Kpi';
 import { Select } from '@/shared/ui/Select';
 import { TextField } from '@/shared/ui/TextField';
@@ -228,7 +230,9 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
   );
   const [category, setCategory] = useState(proposal?.record?.category ?? '');
   // Lo que ya cuenta (lo cobrado con tarjeta ese día) sale marcado, pero se puede desmarcar si no va con este abono.
-  const options = [...item.fixed, ...item.candidates];
+  // Lo añadido desde «Otros sin conciliar» va detrás de lo propuesto.
+  const [extra, setExtra] = useState<ReconciliationAppItem[]>([]);
+  const options = [...item.fixed, ...item.candidates, ...extra];
   const [chosen, setChosen] = useState<Set<string>>(new Set(item.fixed.map(keyOf)));
   const [fees, setFees] = useState<ChosenFee[]>([]);
   const [confirming, setConfirming] = useState(false);
@@ -414,8 +418,8 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
           )}
           <ul className="flex max-h-80 flex-col gap-1 overflow-y-auto">
             {options.map((c) => (
-              <li key={keyOf(c)}>
-                <label className="flex cursor-pointer items-start gap-2">
+              <li key={keyOf(c)} className="flex items-center gap-2">
+                <label className="flex flex-1 cursor-pointer items-start gap-2">
                   <input
                     type="checkbox"
                     className="mt-1"
@@ -429,9 +433,32 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
                   />
                   <AppItemLine item={c} />
                 </label>
+                {extra.includes(c) && (
+                  <button
+                    type="button"
+                    className="inline-flex size-11 cursor-pointer items-center justify-center rounded-sm text-ink-muted hover:bg-surface-raised"
+                    aria-label={`Quitar ${c.concept}`}
+                    onClick={() => {
+                      setExtra(extra.filter((x) => x !== c));
+                      const next = new Set(chosen);
+                      next.delete(keyOf(c));
+                      setChosen(next);
+                    }}
+                  >
+                    <X aria-hidden size={18} />
+                  </button>
+                )}
               </li>
             ))}
           </ul>
+          <UnmatchedPicker
+            movement={movement}
+            shown={options}
+            onAdd={(added) => {
+              setExtra([...extra, added]);
+              setChosen(new Set(chosen).add(keyOf(added)));
+            }}
+          />
           {canFees && (
             <FeePicker
               day={item.day}
@@ -542,6 +569,47 @@ function MovementCard({ item, onAccepted }: { item: ReconciliationItem; onAccept
       {accept.isError && !confirming && <Alert>{apiErrorMessage(accept.error)}</Alert>}
       {release.isError && <Alert>{apiErrorMessage(release.error)}</Alert>}
     </Card>
+  );
+}
+
+/**
+ * «Otros sin conciliar»: lo de la app aún sin casar con el banco que casa con este movimiento aunque no salga en la
+ * lista propuesta (de dos meses antes a dos después). Se carga al elegir a mano y lo elegido se añade marcado.
+ */
+function UnmatchedPicker({
+  movement,
+  shown,
+  onAdd,
+}: {
+  movement: BankMovement;
+  shown: ReconciliationAppItem[];
+  onAdd: (item: ReconciliationAppItem) => void;
+}) {
+  const unmatched = useQuery({
+    queryKey: ['accounting', 'reconciliation', 'unmatched', movement],
+    queryFn: () => fetchUnmatchedForMovement(movement),
+  });
+  const shownKeys = new Set(shown.map(keyOf));
+  const items = (unmatched.data?.items ?? []).filter((i) => !shownKeys.has(keyOf(i)));
+  const options = items.map((i) => ({
+    value: keyOf(i),
+    label: `${formatDate(i.date)} · ${i.concept} · ${METHOD[i.method] ?? i.method} · ${formatCents(i.amountCents)}`,
+  }));
+  return (
+    <div className="flex flex-col gap-1">
+      <Combobox
+        label="Otros sin conciliar"
+        value=""
+        onChange={(key) => {
+          const item = items.find((i) => keyOf(i) === key);
+          if (item) onAdd(item);
+        }}
+        options={options}
+        placeholder={unmatched.isPending ? 'Buscando…' : 'Escribe para buscar…'}
+        emptyText="No queda nada más sin conciliar que case con este movimiento"
+      />
+      {unmatched.isError && <Alert>{apiErrorMessage(unmatched.error)}</Alert>}
+    </div>
   );
 }
 
