@@ -290,6 +290,12 @@ function fitsMovement(item: AppItem, kind: MovementKind): boolean {
   return true;
 }
 
+/** De qué tipo tiene que ser lo de la app que casa con un movimiento: lo que entra, lo que sale o un traspaso. */
+function expectedKind(kind: MovementKind): 'income' | 'expense' | 'transfer' {
+  if (kind === 'expense') return 'expense';
+  return kind === 'card_settlement' || kind === 'income' ? 'income' : 'transfer';
+}
+
 /** Los meses del libro que hay que mirar para un periodo: dos antes y dos después. */
 function window(from: string, to: string): [YearMonth, YearMonth] {
   return [
@@ -1160,12 +1166,7 @@ export class AcceptReconciliation {
       throw new InvalidValue('record', 'Lo elegido ya suma el importe: no queda nada que apuntar.');
     }
     const charges = this.feeAmounts(quotes, input.record ? 0 : left, input.adjust);
-    const expected = kind === 'expense'
-      ? 'expense'
-      : kind === 'card_settlement' || kind === 'income'
-      ? 'income'
-      : 'transfer';
-    if (chosen.some((i) => i.kind !== expected)) {
+    if (chosen.some((i) => i.kind !== expectedKind(kind))) {
       throw new InvalidValue('items', 'Lo elegido no es del mismo tipo que el movimiento.');
     }
     if (chosen.some((i) => !fitsMovement(i, kind))) {
@@ -1313,6 +1314,40 @@ export class PendingReconciliation {
       app: { totalCents: total(app.map((i) => i.amountCents)), items: app },
       bank: { totalCents: total(bank.map((m) => m.amountCents)), items: bank },
     };
+  }
+}
+
+/**
+ * Lo de la app sin conciliar que se puede casar a mano con un movimiento del extracto, aunque no salga entre sus
+ * propuestas: del mismo tipo y con una forma de pago que pase por ese movimiento, de dos meses antes a dos meses después
+ * (lo mismo que acepta `AcceptReconciliation`), del más cercano a su fecha al más lejano.
+ */
+export class UnmatchedForMovement {
+  constructor(
+    private readonly ledger: LedgerQuery,
+    private readonly transfers: TransferRepository,
+    private readonly matches: BankMatchRepository,
+  ) {}
+
+  async execute(movement: BankMovement): Promise<AppItem[]> {
+    const m = BankStatement.of([movement]).movements[0]!;
+    const kind = movementKind(m);
+    const used = new Set(
+      (await this.matches.matches()).flatMap((s) => s.targets.map(keyOf)),
+    );
+    const [first, last] = window(m.operationDate, m.operationDate);
+    const lines = (await this.ledger.linesBetween(first, last)).map(toItem);
+    const transfers = (await this.transfers.transfersBetween(first.firstDay(), last.lastDay()))
+      .map(transferItem);
+    return [...lines, ...transfers]
+      .filter((i) =>
+        !used.has(keyOf(i)) && i.amountCents !== 0 && i.kind === expectedKind(kind) &&
+        fitsMovement(i, kind)
+      )
+      .sort((a, b) =>
+        Math.abs(daysBetween(a.date, m.operationDate)) -
+          Math.abs(daysBetween(b.date, m.operationDate)) || a.concept.localeCompare(b.concept)
+      );
   }
 }
 
