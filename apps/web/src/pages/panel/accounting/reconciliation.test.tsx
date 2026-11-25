@@ -109,6 +109,7 @@ function api(user: typeof SUPERADMIN | typeof ADMIN = SUPERADMIN) {
     ],
     'POST /api/admin/accounting/reconciliation/accept': [204],
     'POST /api/admin/accounting/reconciliation/release': [204],
+    'POST /api/admin/accounting/reconciliation/unmatched': [200, { items: [] }],
   });
 }
 
@@ -525,6 +526,64 @@ describe('bank reconciliation', () => {
     expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
     expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toMatchObject({
       items: [{ source: 'payment', sourceId: 'p1' }],
+    });
+  });
+
+  it('adds by hand what is not matched though it was not offered', async () => {
+    const settlement = {
+      ...item(1, {}),
+      kind: 'card_settlement',
+      status: 'pending',
+      note: 'Faltan 90,00 € con tarjeta el 10/09/2026 y ningún cobro cercano completa la cifra.',
+    };
+    const card = (id: string, concept: string) => ({
+      ...payment(id, 4500),
+      concept,
+      method: 'card',
+      date: '2026-08-20',
+    });
+    const fetch = mockApi({
+      'GET /api/auth/me': [200, { user: SUPERADMIN }],
+      'GET /api/admin/accounting/balances': [200, { clubCents: 0, bankCents: 0, cashCents: 0 }],
+      'GET /api/admin/accounting/categories': [200, { items: CATEGORIES }],
+      'POST /api/admin/accounting/reconciliation': [
+        [200, { ...VIEW, items: [settlement] }],
+        [200, MATCHED],
+      ],
+      'POST /api/admin/accounting/reconciliation/unmatched': [
+        200,
+        { items: [card('p8', 'Agosto · Heriberto'), card('p9', 'Agosto · Elias')] },
+      ],
+      'POST /api/admin/accounting/reconciliation/accept': [204],
+    });
+    renderApp('/panel/contabilidad?pestana=conciliacion');
+    await upload();
+
+    const row = (await screen.findByText('Liquidacion Efectuada El 10/09/2026')).closest(
+      'li',
+    ) as HTMLElement;
+    const others = within(row).getByLabelText('Otros sin conciliar');
+    for (const name of ['Heriberto', 'Elias']) {
+      await userEvent.type(others, name);
+      await userEvent.click(await screen.findByRole('option', { name: new RegExp(name) }));
+    }
+    expect(within(row).getByRole('checkbox', { name: /Agosto · Heriberto/ })).toBeChecked();
+    expect(row).toHaveTextContent('Elegido: 90,00 € de 90,00 €');
+    await userEvent.click(within(row).getByRole('button', { name: 'Quitar Agosto · Elias' }));
+    expect(row).toHaveTextContent('Elegido: 45,00 € de 90,00 €');
+    await userEvent.type(others, 'Elias');
+    await userEvent.click(await screen.findByRole('option', { name: /Elias/ }));
+    await userEvent.click(within(row).getByRole('button', { name: 'Casar con lo elegido' }));
+
+    expect(await screen.findByText('Movimiento conciliado')).toBeInTheDocument();
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/unmatched')[0]).toEqual({
+      movement: MOVEMENTS[1],
+    });
+    expect(sentTo(fetch, '/api/admin/accounting/reconciliation/accept')[0]).toMatchObject({
+      items: [
+        { source: 'payment', sourceId: 'p8' },
+        { source: 'payment', sourceId: 'p9' },
+      ],
     });
   });
 
