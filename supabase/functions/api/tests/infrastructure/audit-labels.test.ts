@@ -13,6 +13,7 @@ const NOT_CHANGING_DATA = [
   'POST /api/admin/billing/payments/on-account/quote',
   'POST /api/admin/import/preview',
   'POST /api/admin/accounting/reconciliation',
+  'POST /api/admin/accounting/reconciliation/unmatched',
   'POST /api/admin/audit/actions/:id/undo',
   'POST /api/admin/audit/actions/:id/restore',
 ];

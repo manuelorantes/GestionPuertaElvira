@@ -164,6 +164,38 @@ Deno.test('reconciliation should be reserved to superadministration', async () =
     403,
     'forbidden',
   );
+  assertError(
+    await admin.json('POST', '/api/admin/accounting/reconciliation/unmatched', {
+      movement: MOVEMENTS[0],
+    }),
+    403,
+    'forbidden',
+  );
+});
+
+Deno.test('reconciliation should offer by hand what is not matched and fits a movement', async () => {
+  const { superadmin } = await clients();
+  const entry = (date: string, method: string) =>
+    superadmin.json('POST', '/api/admin/accounting/entries', {
+      date,
+      kind: 'expense',
+      concept: `Material ${method}`,
+      category: 'other_expenses',
+      method,
+      amount: '12',
+    });
+  const card = (await entry('2025-09-15', 'card')).body as { id: string };
+  await entry('2025-09-15', 'cash');
+  const response = await superadmin.json('POST', '/api/admin/accounting/reconciliation/unmatched', {
+    movement: MOVEMENTS[0],
+  });
+  assertEquals(response.status, 200);
+  assertEquals(
+    (response.body as { items: { sourceId: string; method: string }[] }).items.map((
+      i,
+    ) => [i.sourceId, i.method]),
+    [[card.id, 'card']],
+  );
 });
 
 Deno.test('reconciliation should charge the fee of a transfer nobody recorded and let a match be undone', async () => {

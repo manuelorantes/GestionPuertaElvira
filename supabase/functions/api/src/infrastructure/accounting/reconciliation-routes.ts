@@ -9,6 +9,7 @@ import {
   ReconcileStatement,
   type ReconciliationActions,
   ReleaseMatch,
+  UnmatchedForMovement,
 } from '../../application/accounting/reconciliation.ts';
 import {
   BillingStudentNotFound,
@@ -199,6 +200,26 @@ export function registerReconciliationRoutes(api: ApiApp): void {
         api.deps.clock,
       ).execute();
       return c.json(view);
+    },
+  );
+
+  // Lo sin conciliar que se puede elegir a mano para un movimiento, aunque no salga entre lo que se le propone.
+  api.defineRoute(
+    {
+      method: 'POST',
+      path: '/api/admin/accounting/reconciliation/unmatched',
+      access: 'superadmin',
+    },
+    async (c, scope) => {
+      const b = await JsonBody.from(c.req.raw);
+      const movement = b.optionalObject('movement');
+      if (movement === null) throw new InvalidValue('movement', 'Falta el movimiento del banco.');
+      const items = await new UnmatchedForMovement(
+        new SqlLedgerQuery(scope.tx),
+        new SqlTransferRepository(scope.tx),
+        new SqlBankMatchRepository(scope.tx),
+      ).execute(movementIn(movement));
+      return c.json({ items });
     },
   );
 
