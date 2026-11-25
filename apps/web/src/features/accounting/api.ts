@@ -471,6 +471,13 @@ export function fetchPendingReconciliation(): Promise<PendingReconciliation> {
   return apiGet('/api/admin/accounting/reconciliation/pending');
 }
 
+/** Lo sin conciliar que se puede elegir a mano para un movimiento, aunque no salga entre lo que se le propone. */
+export function fetchUnmatchedForMovement(
+  movement: BankMovement,
+): Promise<{ items: ReconciliationAppItem[] }> {
+  return apiSend('POST', '/api/admin/accounting/reconciliation/unmatched', { movement });
+}
+
 /** Deshace el casamiento de un movimiento: vuelve a salir para elegir lo suyo y ya no casa solo. */
 export function releaseReconciliation(movement: BankMovement): Promise<void> {
   return apiSend('POST', '/api/admin/accounting/reconciliation/release', { movement });
