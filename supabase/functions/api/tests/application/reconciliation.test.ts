@@ -12,6 +12,7 @@ import {
   ReconcileStatement,
   type ReconciliationActions,
   ReleaseMatch,
+  UnmatchedForMovement,
 } from '../../src/application/accounting/reconciliation.ts';
 import type { BankMovement } from '../../src/domain/accounting/reconciliation.ts';
 import { AccountingFixture } from '../support/accounting.ts';
@@ -785,4 +786,36 @@ Deno.test('PendingReconciliation should leave out bank movements from before the
   const view = await new PendingReconciliation(fx, fx, memory, fx.clock).execute();
   assertEquals(view.bank.items.map((m) => m.operationDate), ['2026-09-01']);
   assertEquals(view.bank.totalCents, 700);
+});
+
+Deno.test('UnmatchedForMovement should offer what is not matched and fits the movement, closest first', async () => {
+  const { fx, memory, accept, calls } = setUp([
+    payment('p1', '2026-10-16', 'card', 3150),
+    payment('p2', '2026-10-16', 'card', 3150),
+    payment('p3', '2026-10-18', 'card', 2300),
+    payment('p4', '2026-10-16', 'transfer', 3150),
+    payment('p5', '2026-10-16', 'cash', 3150),
+    expense('e1', '2026-10-16', 'card', 3150),
+    payment('p6', '2026-06-10', 'card', 3150),
+  ]);
+  memory.saved = [{
+    key: 'otro',
+    operationDate: '2026-10-19',
+    amountCents: 2300,
+    concept: 'Liquidacion Efectuada El 18/10/2026',
+    targets: [{ source: 'payment', sourceId: 'p3' }],
+  }];
+  const [movement] = statement(['2026-10-20', 'Liquidacion Efectuada El 19/10/2026', 6300]);
+  const offered = await new UnmatchedForMovement(fx, fx, memory).execute(movement!);
+  assertEquals(offered.map((i) => i.sourceId), ['p1', 'p2']);
+
+  await accept.execute({
+    movement: movement!,
+    items: offered.map(({ source, sourceId }) => ({ source, sourceId })),
+    record: null,
+    transfer: false,
+    fees: [],
+    adjust: false,
+  });
+  assertEquals(calls, ['fecha p1 2026-10-19', 'fecha p2 2026-10-19']);
 });
