@@ -13,7 +13,7 @@ TeachersPayPage (/panel/profesores)
 ├── ProfitabilityTab
 │   ├── 3 tarjetas: Horas impartidas · Coste de profesores · Margen de las clases (del mes)
 │   └── Tarjeta «Rentabilidad · <mes>» con «Ordenar por» (Margen · Margen por hora · Ocupación) y tabla:
-│       Profesor (avatar oscuro, nombre, badge «Más rentable», grupos) | Horas | Tarifa | Coste | Ingresos |
+│       Profesor (avatar oscuro, nombre, badge «Más rentable», grupos o «Sustituciones» si no tiene) | Horas | Tarifa | Coste | Ingresos |
 │       Margen (barra + importe) | Margen por hora | Ocupación (%)
 │       └── Nota: «Ingresos = cuotas cobradas de los alumnos de sus grupos, repartidas según sus horas. Margen = ingresos − coste de sus horas.»
 ├── SessionsTab
