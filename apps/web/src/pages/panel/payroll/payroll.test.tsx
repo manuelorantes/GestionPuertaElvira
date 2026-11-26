@@ -86,6 +86,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             teacherId: 't1',
             teacherName: 'Lucía Moreno Gil',
             groups: ['Iniciación A'],
+            substitutes: false,
             minutes: 480,
             rateCents: 1600,
             costCents: 12800,
@@ -101,6 +102,7 @@ function api(extra: Parameters<typeof mockApi>[0] = {}) {
             teacherId: 't2',
             teacherName: 'Carlos Ruiz Márquez',
             groups: ['Adultos I'],
+            substitutes: false,
             minutes: 360,
             rateCents: 1800,
             costCents: 10800,
@@ -157,6 +159,41 @@ const links = (table: HTMLElement) =>
     .map((link) => link.textContent);
 
 describe('Profesorado', () => {
+  it('shows who only substitutes that month with «Sustituciones» instead of groups', async () => {
+    api({
+      'GET /api/admin/payroll/profitability?month=2026-09': [
+        200,
+        {
+          month: '2026-09',
+          items: [
+            {
+              teacherId: 't3',
+              teacherName: 'Ana Belén Torres',
+              groups: [],
+              substitutes: true,
+              minutes: 180,
+              rateCents: 1500,
+              costCents: 4500,
+              incomeCents: 0,
+              marginCents: -4500,
+              marginPerHourCents: -1500,
+              occupied: 0,
+              capacity: 0,
+              students: 0,
+            },
+          ],
+          students: { total: 0, shared: [] },
+        },
+      ],
+    });
+    renderApp('/panel/profesores?mes=2026-09');
+
+    const table = await screen.findByRole('table', { name: 'Rentabilidad de septiembre 2026' });
+    const ana = within(table).getByRole('row', { name: /Ana Belén Torres/ });
+    expect(within(ana).getByText('Sustituciones')).toBeInTheDocument();
+    expect(within(ana).getByText('3 h')).toBeInTheDocument();
+  });
+
   it('shows the profitability of each teacher with the month totals', async () => {
     api();
     renderApp('/panel/profesores?mes=2026-09');

@@ -47,6 +47,8 @@ export interface ProfitabilityRow {
   teacherId: string;
   teacherName: string;
   groups: string[];
+  /** Da (o tiene previstas) sustituciones ese mes. */
+  substitutes: boolean;
   minutes: number;
   rateCents: number;
   costCents: number;
