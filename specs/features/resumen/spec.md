@@ -43,7 +43,7 @@ con el mes en curso destacado y una descripción accesible con las cifras de cad
   vienen, además, las que se emitirán a los alumnos matriculados hoy que aún no tengan la de ese mes (las
   [previstas](../cobros/spec.md) de Cobros, con la tarifa de hoy). Julio y agosto no tienen cuotas. Sobre los gastos,
   en gris, los **gastos previstos**: lo que costará el
-  profesorado ese mes según el horario (las [horas esperadas](../profesorado/spec.md) de Rentabilidad: clases y
+  profesorado ese mes según el [horario](../profesorado/spec.md) (clases y
   actividades de los días del mes salvo festivos, a la tarifa de hoy), menos lo del profesorado que ya esté en el
   libro ese mes, del mes en curso en adelante (julio y agosto no tienen); en los meses ya pasados, lo que aún se le
   debe: lo que queda por pagar (importe menos anticipos) de sus liquidaciones sin pagar de ese mes, que no se va al
