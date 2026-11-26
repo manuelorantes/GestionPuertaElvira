@@ -209,9 +209,12 @@ Antes de guardar MUST pedirse confirmación con el cambio («Fecha de pago: 02/1
 Para cada mes, el sistema MUST mostrar por profesor: alumnos, horas, tarifa, coste, ingresos atribuidos, margen, margen por hora y ocupación de sus grupos,
 con los totales del mes. La tabla MUST poder ordenarse desde las cabeceras por cualquiera de esas columnas, en ambos
 sentidos; por defecto, de mayor a menor margen.
-- Horas y coste: en el mes en curso y los futuros, las horas esperadas según el horario (todas sus clases y turnos salvo
-  festivos, aunque aún no se hayan dado; sin tener en cuenta sustituciones ni contar dos veces lo que se solapa) por su
-  tarifa. En un mes ya pasado, las horas realmente imputadas y el coste de su liquidación.
+- Profesores: todos los que tienen grupos y también quien ese mes ha dado o tiene previstas sustituciones aunque no
+  tenga grupos; bajo su nombre van sus grupos o, si no tiene, «Sustituciones».
+- Horas y coste: el total real del mes: lo ya apuntado y el coste de su liquidación, más, en el mes en curso y los
+  futuros, lo que aún le queda por dar según el horario, como en su ficha (sus clases y turnos y las sustituciones
+  planificadas, sin festivos, sin lo que le sustituyen y sin contar dos veces lo que se solapa), a su tarifa o a la
+  propia de la clase. En un mes ya pasado, solo lo apuntado.
 - Ingresos atribuidos: las cuotas mensuales de ese mes de sus alumnos, ya con descuentos (familia, pago adelantado…),
   cobradas o por cobrar y, en meses futuros, las previstas; sin cuotas de socio. Si un alumno va con varios profesores,
   su cuota se reparte según las horas semanales con cada uno.
@@ -232,6 +235,11 @@ sentidos; por defecto, de mayor a menor margen.
 #### Scenario: Alumno con dos profesores
 - **WHEN** un alumno que paga 70 € va 2 horas semanales con una profesora y 1,5 con otro
 - **THEN** a ella se le atribuyen 40 € y a él 30 €
+
+#### Scenario: Quien solo sustituye
+- **WHEN** en octubre Ana, sin grupos, ya sustituyó a Carlos el martes 13 y le sustituirá el martes 27 (1,5 h cada uno)
+- **THEN** la rentabilidad de octubre muestra a Ana con «Sustituciones» bajo su nombre y 3 h, y a Carlos sin la clase
+  del 27
 
 #### Scenario: Profesor que da pérdidas
 - **WHEN** un profesor da 6 horas en el mes a 25 €/h (200 €) y se le atribuyen 74,25 € de ingresos
