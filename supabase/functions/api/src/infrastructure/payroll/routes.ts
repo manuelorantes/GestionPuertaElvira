@@ -3,6 +3,7 @@ import {
   AddHoliday,
   CancelSubstitution,
   ChangeSettlementPaymentDate,
+  ClubAgenda,
   DeleteAdvance,
   DeleteDuty,
   DeleteSession,
@@ -20,7 +21,6 @@ import {
   SetGroupPay,
   SubstitutedDays,
   SubstituteTeacher,
-  TeacherAgenda,
   TeacherReport,
   UpcomingSessions,
   UpdateSession,
@@ -49,10 +49,10 @@ import {
 import { PostgresAdvisoryLocks, SavepointTransactionRunner, type Sql } from '../persistence/sql.ts';
 import { dutyKindFromName } from '../../domain/payroll/mod.ts';
 
-/** Lo que le queda por dar a un profesor en un mes (en la ficha del profesor y en Mis horas). */
+/** Lo que le queda por dar a cada profesor en un mes (en la ficha, en Mis horas y en la rentabilidad). */
 export function upcomingSessions(sql: Sql, clock: Clock): UpcomingSessions {
   return new UpcomingSessions(
-    new TeacherAgenda(
+    new ClubAgenda(
       new SqlScheduleDirectory(sql),
       new SqlDutyRepository(sql),
       new SqlSubstitutionRepository(sql),
@@ -105,14 +105,11 @@ function payroll(api: ApiApp, scope: RequestScope) {
     pay,
     payAll: new PayAllSettlements(pay, list, transactions),
     profitability: new Profitability(
-      schedule,
-      duties,
-      holidays,
+      upcomingSessions(tx, clock),
       teachers,
       list,
       new SqlPayrollQuery(tx, today),
       new SqlMonthlyFees(tx, (month) => billing(api, scope).generate.expected(month)),
-      clock,
     ),
     settings: new SqlBillingSettingsRepository(tx),
   };
