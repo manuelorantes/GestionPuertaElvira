@@ -135,6 +135,10 @@ export function ProfitabilityTab({ month }: { month: string }) {
                           {group}
                         </span>
                       ))}
+                      {/* Quien no tiene grupos y ese mes sustituye. */}
+                      {row.groups.length === 0 && row.substitutes && (
+                        <span className="block text-xs text-ink-muted">Sustituciones</span>
+                      )}
                     </span>
                   </span>
                 </td>
