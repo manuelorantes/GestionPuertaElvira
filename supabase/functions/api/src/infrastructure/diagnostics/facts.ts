@@ -14,6 +14,7 @@ import type {
   FactTeacherMonth,
 } from '../../application/diagnostics/mod.ts';
 import { ListSessions, ListSettlements, Profitability } from '../../application/payroll/mod.ts';
+import { upcomingSessions } from '../payroll/routes.ts';
 import {
   SqlAccountingRepository,
   SqlInvoiceQuery,
@@ -29,11 +30,8 @@ import {
 import { SqlClassQuery } from '../persistence/classes.ts';
 import {
   SqlAdvanceRepository,
-  SqlDutyRepository,
-  SqlHolidayCalendar,
   SqlMonthlyFees,
   SqlPayrollQuery,
-  SqlScheduleDirectory,
   SqlSettlementRepository,
   SqlTeacherRates,
   SqlTimesheetRepository,
@@ -322,14 +320,11 @@ export class SqlDiagnosticsFacts implements FactsSource {
       READ_ONLY,
     );
     const profitability = new Profitability(
-      new SqlScheduleDirectory(sql),
-      new SqlDutyRepository(sql),
-      new SqlHolidayCalendar(sql),
+      upcomingSessions(sql, this.clock),
       rates,
       settlements,
       payrollQuery,
       new SqlMonthlyFees(sql, (month) => generate.expected(month)),
-      this.clock,
     );
     const teachers = new Map((await rates.all()).map((t) => [t.id, t.name]));
     const result: FactTeacherMonth[] = [];

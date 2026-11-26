@@ -63,6 +63,15 @@ function setUp() {
   return { fx, lucia, carlos, propose, pay, list, duties, substitutions };
 }
 
+/** Lo que le queda por dar a cada profesor según la agenda del club. */
+function upcomingOf(fx: PayrollFixture, duties: DutyFixture): UpcomingSessions {
+  return new UpcomingSessions(
+    new ClubAgenda(fx, duties, new SubstitutionFixture(fx), fx),
+    fx,
+    fx.clock,
+  );
+}
+
 Deno.test('ClubAgenda should list who gives each class and duty every day, with substitutions and without holidays', async () => {
   const { fx, lucia, carlos, duties, substitutions } = setUp();
   await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
@@ -406,8 +415,8 @@ Deno.test('SubstituteTeacher should give all the classes of a teacher on those d
 
 Deno.test('Profitability should compare the expected hours of the month with the monthly fees of their students', async () => {
   const { fx, lucia, carlos, duties } = setUp();
-  await fx.add(LocalDate.fromString('2026-10-12'), 'Fiesta Nacional');
-  // Lucía: lunes y miércoles 1 h (7 clases con el festivo) a 16,00 €/h; Carlos: martes 1,5 h (4 clases) a 18,00 €/h.
+  await fx.add(LocalDate.fromString('2026-11-02'), 'Todos los Santos');
+  // Noviembre: Lucía lunes y miércoles 1 h (8 clases con el festivo) a 16,00 €/h; Carlos martes 1,5 h (4) a 18,00 €/h.
   const load = {
     classLoad: () =>
       Promise.resolve({
@@ -435,15 +444,12 @@ Deno.test('Profitability should compare the expected hours of the month with the
       Promise.resolve(new Map([['ana', 7000], ['pablo', 4950], ['rosa', 0], ['socio', 5000]])),
   };
   const rows = await new Profitability(
-    fx,
-    duties,
-    fx,
+    upcomingOf(fx, duties),
     fx,
     new ListSettlements(fx, fx, fx, fx),
     load,
     fees,
-    fx.clock,
-  ).report('2026-10');
+  ).report('2026-11');
   assertEquals(
     rows.items.map((
       r,
@@ -459,7 +465,7 @@ Deno.test('Profitability should compare the expected hours of the month with the
     ]),
     [
       // Margen por hora: (ingresos − coste) / horas, negativo si pierde.
-      ['Lucía Moreno Gil', 420, 11200, 4000 + 4950, 15, 20, 3, -321],
+      ['Lucía Moreno Gil', 480, 12800, 4000 + 4950, 15, 20, 3, -481],
       ['Carlos Ruiz Márquez', 360, 10800, 3000, 4, 10, 1, -1300],
     ],
   );
@@ -576,6 +582,63 @@ Deno.test('ExpectedPayroll should cost the expected hours of each month at the c
   );
 });
 
+Deno.test('Profitability should add what is left to give this month, substitutions included, to what is already recorded', async () => {
+  // Martes 20 de octubre a las 17:30: la clase de Carlos (17:00–18:30) aún no ha acabado.
+  const fx = new PayrollFixture('2026-10-20T17:30:00+02:00');
+  const lucia = fx.teacherWithGroup('Lucía Moreno Gil', 1600, 'Iniciación A', [1, 3], 60);
+  const carlos = fx.teacherWithGroup('Carlos Ruiz Márquez', 1800, 'Adultos I', [2], 90);
+  // Ana no tiene grupos: sustituye a Carlos el martes 13 (ya dado) y el martes 27 (aún no).
+  const ana = TeacherRef.generate().value;
+  fx.teachers.set(ana, {
+    id: ana,
+    name: 'Ana Belén Torres',
+    rate: Money.cents(1500),
+    active: true,
+  });
+  const adultos = fx.scheduledGroups[1];
+  if (!adultos) throw new Error('Falta el grupo');
+  for (const day of ['2026-10-13', '2026-10-27']) {
+    fx.substitutions.set(
+      day,
+      new Substitution(adultos.id, LocalDate.fromString(day), TeacherRef.fromString(ana), null),
+    );
+  }
+  // Lo dado hasta ahora ya está apuntado: Lucía los días 5, 7, 12, 14 y 19; Carlos el 6; Ana el 13.
+  fx.recordGivenClasses();
+  const duties = new DutyFixture(fx);
+  const rows = await new Profitability(
+    upcomingOf(fx, duties),
+    fx,
+    new ListSettlements(fx, fx, fx, fx),
+    {
+      classLoad: () =>
+        Promise.resolve({
+          teachers: new Map([
+            [lucia, { groups: ['Iniciación A'], occupied: 15, capacity: 20 }],
+            [carlos, { groups: ['Adultos I'], occupied: 4, capacity: 10 }],
+          ]),
+          students: new Map(),
+          teachersOn: new Map(),
+          studentNames: new Map(),
+        }),
+    },
+    { monthlyFees: () => Promise.resolve(new Map()) },
+  ).execute('2026-10');
+
+  assertEquals(
+    rows.map((r) => [r.teacherName, r.groups, r.substitutes, r.minutes, r.costCents])
+      .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    [
+      // Lo apuntado (1,5 h del 13) más la sustitución del 27 (1,5 h) a 15,00 €/h.
+      ['Ana Belén Torres', [], true, 180, 4500],
+      // El 6 apuntado y hoy, que aún no ha acabado; el 27 le sustituyen.
+      ['Carlos Ruiz Márquez', ['Adultos I'], false, 180, 5400],
+      // 5 h apuntadas y las del 21, 26 y 28.
+      ['Lucía Moreno Gil', ['Iniciación A'], false, 480, 12800],
+    ],
+  );
+});
+
 Deno.test('Profitability should use the hours actually recorded in a month already over', async () => {
   const { fx, lucia, carlos, duties } = setUp();
   // Hoy es 31 de octubre: septiembre ya pasó. Lucía tiene apuntadas 3 h (un torneo); Carlos, ninguna.
@@ -597,14 +660,11 @@ Deno.test('Profitability should use the hours actually recorded in a month alrea
   };
   const fees = { monthlyFees: () => Promise.resolve(new Map([['ana', 4500]])) };
   const rows = await new Profitability(
-    fx,
-    duties,
-    fx,
+    upcomingOf(fx, duties),
     fx,
     new ListSettlements(fx, fx, fx, fx),
     load,
     fees,
-    fx.clock,
   ).execute('2026-09');
   assertEquals(rows.map((r) => [r.teacherName, r.minutes, r.costCents, r.incomeCents]), [
     ['Carlos Ruiz Márquez', 0, 0, 4500],
@@ -700,9 +760,7 @@ Deno.test('TeacherReport should gather the months, payments and balance of a tea
     duties: () => Promise.resolve([]),
   };
   const profitability = new Profitability(
-    fx,
-    duties,
-    fx,
+    upcomingOf(fx, duties),
     fx,
     list(),
     {
@@ -715,7 +773,6 @@ Deno.test('TeacherReport should gather the months, payments and balance of a tea
         }),
     },
     { monthlyFees: () => Promise.resolve(new Map()) },
-    fx.clock,
   );
   const report = await new TeacherReport(fx, list(), profitability, fx, query, fx.clock).execute(
     carlos,
@@ -1016,7 +1073,7 @@ Deno.test('UpcomingSessions should list what a teacher still has to give in a mo
   );
   await fx.add(LocalDate.fromString('2026-10-26'), 'Puente');
   const upcoming = new UpcomingSessions(
-    new TeacherAgenda(fx, new DutyFixture(fx), new SubstitutionFixture(fx), fx),
+    new ClubAgenda(fx, new DutyFixture(fx), new SubstitutionFixture(fx), fx),
     fx,
     fx.clock,
   );
@@ -1066,7 +1123,7 @@ Deno.test('UpcomingSessions should list what a teacher still has to give in a mo
     label: 'Viernes',
   });
   const fridays = await new UpcomingSessions(
-    new TeacherAgenda(friday, duties, new SubstitutionFixture(friday), friday),
+    new ClubAgenda(friday, duties, new SubstitutionFixture(friday), friday),
     friday,
     friday.clock,
   ).execute(angel, YearMonth.fromString('2026-10'));

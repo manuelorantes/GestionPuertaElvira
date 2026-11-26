@@ -150,12 +150,27 @@ Deno.test({
       incomeCents: 4500,
       expenseCents: 5000,
     });
-    // Profesorado previsto: lo que Rentabilidad calcula para el mes (horario × tarifa), de este mes en adelante.
+    // Profesorado previsto: horario × tarifa, de este mes en adelante (en los que vienen, lo mismo que Rentabilidad).
     const payrollOf = async (m: string) =>
       ((await client.get(`/api/admin/payroll/profitability?month=${m}`)).body as {
         items: { costCents: number }[];
       }).items.reduce((total, row) => total + row.costCents, 0);
-    const currentPayroll = await payrollOf(today.slice(0, 7));
+    // En el mes en curso, Rentabilidad cuenta lo real (lo apuntado y lo que queda); el resumen prevé el horario
+    // entero: la clase de los lunes y miércoles (1 h a 15,00 €/h) cada día del mes que no es festivo.
+    const holidays = new Set(
+      ((await client.get('/api/admin/payroll/holidays')).body as { items: { date: string }[] })
+        .items.map((h) => h.date),
+    );
+    const thisMonth = YearMonth.fromString(today.slice(0, 7));
+    let currentPayroll = 0;
+    for (
+      let day = thisMonth.firstDay();
+      !thisMonth.lastDay().isBefore(day);
+      day = day.plusDays(1)
+    ) {
+      const weekday = new Date(`${day.toString()}T12:00:00Z`).getUTCDay();
+      if ((weekday === 1 || weekday === 3) && !holidays.has(day.toString())) currentPayroll += 1500;
+    }
     assert(currentPayroll > 0, 'la profesora tiene clases este mes');
     // Cuotas vs gastos fijos: solo las categorías del mes (las cuotas y la luz, no el material). La cuota del mes ya
     // está cobrada: nada previsto; la liquidación de la profesora, aún sin pagar, sí.

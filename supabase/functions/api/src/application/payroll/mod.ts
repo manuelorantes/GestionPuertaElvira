@@ -765,6 +765,8 @@ export interface ProfitabilityRow {
   teacherId: string;
   teacherName: string;
   groups: string[];
+  /** Da (o tiene previstas) sustituciones ese mes. */
+  substitutes: boolean;
   minutes: number;
   rateCents: number;
   costCents: number;
@@ -790,20 +792,18 @@ export interface ProfitabilityReport {
 }
 
 /**
- * Rentabilidad del mes por profesor. Coste: en el mes en curso y los futuros, las horas esperadas según el horario (sin
- * festivos ni sustituciones) a su tarifa; en un mes ya pasado, las horas realmente imputadas (su liquidación). Ingresos: las cuotas mensuales de sus alumnos, repartidas entre profesores según las horas
- * que pasa con cada uno. Ocupación: plazas ocupadas de todas sus clases frente a las totales.
+ * Rentabilidad del mes por profesor, también de quien solo sustituye. Horas y coste: lo ya apuntado (su liquidación)
+ * más, en el mes en curso y los futuros, lo que aún le queda por dar según el horario, con las sustituciones
+ * planificadas y sin festivos (ver `UpcomingSessions`). Ingresos: las cuotas mensuales de sus alumnos, repartidas entre
+ * profesores según las horas que pasa con cada uno. Ocupación: plazas ocupadas de todas sus clases frente a las totales.
  */
 export class Profitability {
   constructor(
-    private readonly schedule: ScheduleDirectory,
-    private readonly duties: DutyRepository,
-    private readonly holidays: HolidayCalendar,
+    private readonly upcoming: UpcomingSessions,
     private readonly teachers: TeacherRates,
     private readonly settlements: ListSettlements,
     private readonly load: ClassLoadQuery,
     private readonly fees: MonthlyFees,
-    private readonly clock: Clock,
   ) {}
 
   /** Ordenadas por margen, de mayor a menor. */
@@ -814,16 +814,9 @@ export class Profitability {
   /** Las filas y el resumen de alumnos del mes (cada alumno una vez aunque vaya con varios profesores). */
   async report(month: string): Promise<ProfitabilityReport> {
     const period = YearMonth.fromString(month);
-    const past = period.isBefore(YearMonth.of(LocalDate.fromInstant(this.clock.now())));
-    const holidays = await this.holidays.holidaysBetween(period.firstDay(), period.lastDay());
     const teachers = await this.teachers.all();
-    const expected = new ExpectedHours().costsOfMonth(
-      period,
-      await this.schedule.groups(),
-      await this.duties.all(),
-      holidays,
-      new Map(teachers.map((t) => [t.id, t.rate])),
-    );
+    const left = await this.upcoming.byTeacher(period);
+    const pays = await this.teachers.groupPays();
     // La tarifa congelada si la liquidación ya está pagada; si no, la actual.
     const settled = new Map((await this.settlements.execute(month)).map((s) => [s.teacherId, s]));
     const load = await this.load.classLoad(period);
@@ -840,17 +833,27 @@ export class Profitability {
     const rows: ProfitabilityRow[] = [];
     for (const teacher of teachers) {
       const settlement = settled.get(teacher.id) ?? null;
-      const planned = expected.get(teacher.id) ?? { minutes: 0, cents: 0 };
-      const minutes = past ? (settlement?.minutes ?? 0) : planned.minutes;
+      const toGive = left.get(teacher.id) ?? [];
+      const minutes = (settlement?.minutes ?? 0) +
+        toGive.reduce((sum, s) => sum + s.countedMinutes, 0);
       const seats = load.teachers.get(teacher.id) ?? null;
       const earned = Math.round(income.get(teacher.id) ?? 0);
       if (minutes === 0 && earned === 0 && seats === null) continue;
       const rate = settlement?.rateCents ?? teacher.rate.cents;
-      const cost = past ? (settlement?.amountCents ?? 0) : planned.cents;
+      // Lo que queda por dar, a la tarifa propia de su clase o, si no tiene, a la del profesor.
+      const cost = (settlement?.amountCents ?? 0) + Math.round(
+        toGive.reduce((sum, s) => {
+          const pay = s.groupId === null ? undefined : pays.get(s.groupId);
+          return sum +
+            (pay ? pay.exactCents(s.countedMinutes, s.minutes) : (rate * s.countedMinutes) / 60);
+        }, 0),
+      );
       rows.push({
         teacherId: teacher.id,
         teacherName: teacher.name,
         groups: seats?.groups ?? [],
+        substitutes: toGive.some((s) => s.substitution) ||
+          (settlement?.lines ?? []).some((l) => l.label.endsWith(SUBSTITUTION_SUFFIX)),
         minutes,
         rateCents: rate,
         costCents: cost,
@@ -1746,6 +1749,9 @@ export type UpcomingSessionView =
   & Pick<AgendaItem, 'date' | 'label' | 'minutes' | 'substitution'>
   & { countedMinutes: number };
 
+/** Lo que queda por dar, con su clase (para saber a qué tarifa se paga). */
+export type UpcomingSession = UpcomingSessionView & Pick<AgendaItem, 'groupId'>;
+
 const minutesOfClock = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
 
 /**
@@ -1756,62 +1762,85 @@ const minutesOfClock = (time: string) => Number(time.slice(0, 2)) * 60 + Number(
  */
 export class UpcomingSessions {
   constructor(
-    private readonly agenda: TeacherAgenda,
+    private readonly agenda: ClubAgenda,
     private readonly timesheets: Pick<TimesheetRepository, 'forMonth'>,
     private readonly clock: Clock,
   ) {}
 
   async execute(teacherId: string, month: YearMonth): Promise<UpcomingSessionView[]> {
+    const teacher = TeacherRef.fromString(teacherId);
+    return ((await this.byTeacher(month)).get(teacher.value) ?? []).map((
+      { groupId: _group, ...session },
+    ) => session);
+  }
+
+  /** Lo de cada profesor que aún tiene algo por dar ese mes, por id. */
+  async byTeacher(month: YearMonth): Promise<Map<string, UpcomingSession[]>> {
     const now = this.clock.now();
     const today = LocalDate.fromInstant(now);
-    if (month.lastDay().isBefore(today)) return [];
+    if (month.lastDay().isBefore(today)) return new Map();
     const first = month.firstDay().isBefore(today) ? today : month.firstDay();
     const nowMinutes = minutesOfDayInMadrid(now);
-    const entries = (await this.timesheets.forMonth(month)).filter((e) =>
-      e.teacher().value === teacherId
-    );
+    const entries = await this.timesheets.forMonth(month);
     const recorded = new Set(
       entries.map((e) =>
-        `${e.date.toString()}|${e.source ?? (e.group ? `group:${e.group.value}` : '')}`
+        `${e.teacher().value}|${e.date.toString()}|${
+          e.source ?? (e.group ? `group:${e.group.value}` : '')
+        }`
       ),
     );
-    const items = (await this.agenda.execute(
-      teacherId,
-      first.toString(),
-      month.lastDay().toString(),
-    ))
+    const items = (await this.agenda.execute(first, month.lastDay()))
       .filter((i) => i.date !== today.toString() || minutesOfClock(i.end) > nowMinutes)
       .filter((i) =>
-        !recorded.has(`${i.date}|${i.groupId !== null ? `group:${i.groupId}` : `duty:${i.dutyId}`}`)
+        !recorded.has(
+          `${i.teacherId}|${i.date}|${
+            i.groupId !== null ? `group:${i.groupId}` : `duty:${i.dutyId}`
+          }`,
+        )
       );
-    // Lo previsto se reparte los minutos solapados con lo demás de su día, previsto o ya apuntado.
-    const days = new Set(items.map((i) => i.date));
-    const shares = overlapShares<AgendaItem | TimesheetEntry>(
-      [...items, ...entries.filter((e) => days.has(e.date.toString()))],
-      (x) =>
-        x instanceof TimesheetEntry
-          ? {
-            day: x.date.toString(),
-            start: x.start,
-            minutes: x.minutes().minutes,
-            substitution: x.label.endsWith(SUBSTITUTION_SUFFIX),
-          }
-          : {
-            day: x.date,
-            start: minutesOfClock(x.start),
-            minutes: x.minutes,
-            substitution: x.substitution,
-          },
-    );
-    const counted = new Map(shares.map((s) => [s.item, s.minutes]));
-    return items.map((i) => ({
-      date: i.date,
-      label: i.label,
-      minutes: i.minutes,
-      countedMinutes: counted.get(i) ?? i.minutes,
-      substitution: i.substitution,
-    }));
+    const result = new Map<string, UpcomingSession[]>();
+    for (const teacher of new Set(items.map((i) => i.teacherId))) {
+      result.set(
+        teacher,
+        counted(
+          items.filter((i) => i.teacherId === teacher),
+          entries.filter((e) => e.teacher().value === teacher),
+        ),
+      );
+    }
+    return result;
   }
+}
+
+/** Lo previsto de un profesor se reparte los minutos solapados con lo demás de su día, previsto o ya apuntado. */
+function counted(items: ClubAgendaItem[], entries: TimesheetEntry[]): UpcomingSession[] {
+  const days = new Set(items.map((i) => i.date));
+  const shares = overlapShares<ClubAgendaItem | TimesheetEntry>(
+    [...items, ...entries.filter((e) => days.has(e.date.toString()))],
+    (x) =>
+      x instanceof TimesheetEntry
+        ? {
+          day: x.date.toString(),
+          start: x.start,
+          minutes: x.minutes().minutes,
+          substitution: x.label.endsWith(SUBSTITUTION_SUFFIX),
+        }
+        : {
+          day: x.date,
+          start: minutesOfClock(x.start),
+          minutes: x.minutes,
+          substitution: x.substitution,
+        },
+  );
+  const minutes = new Map(shares.map((s) => [s.item, s.minutes]));
+  return items.map((i) => ({
+    date: i.date,
+    label: i.label,
+    groupId: i.groupId,
+    minutes: i.minutes,
+    countedMinutes: minutes.get(i) ?? i.minutes,
+    substitution: i.substitution,
+  }));
 }
 
 /** Un mes de la temporada tal como lo ve el profesor: sin ingresos ni margen del club. */
